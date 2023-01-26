@@ -212,6 +212,13 @@ impl Scheduler {
         None
     }
 
+    #[cfg(test)]
+    /// Return the TxnIndex and Wave of current commit index
+    pub fn commit_state(&self) -> (usize, u32) {
+        let commit_state = self.commit_state.lock();
+        (commit_state.0, commit_state.1)
+    }
+
     /// Return the number of transactions to be executed from the block.
     pub fn num_txn_to_execute(&self) -> usize {
         self.num_txns
@@ -253,7 +260,7 @@ impl Scheduler {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
-                 } else {
+                } else {
                     if !committing {
                         // Avoid pointlessly spinning, and give priority to other threads
                         // that may be working to finish the remaining tasks.
@@ -263,7 +270,7 @@ impl Scheduler {
                         hint::spin_loop();
                     }
                     SchedulerTask::NoTask
-                 };
+                };
             }
 
             if idx_to_validate < idx_to_execute {
@@ -322,7 +329,11 @@ impl Scheduler {
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
         let mut validation_status = self.txn_status[txn_idx].1.write();
-        validation_status.max_validated_wave = Some(validation_status.max_validated_wave.map_or(wave, |prev_wave| max(prev_wave, wave)));
+        validation_status.max_validated_wave = Some(
+            validation_status
+                .max_validated_wave
+                .map_or(wave, |prev_wave| max(prev_wave, wave)),
+        );
     }
 
     /// After txn is executed, schedule its dependencies for re-execution.

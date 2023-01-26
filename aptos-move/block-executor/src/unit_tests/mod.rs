@@ -254,7 +254,7 @@ fn scheduler_tasks() {
     // validation index is higher will return validation task to the caller.
     assert!(matches!(
         s.finish_execution(0, 0, false),
-        SchedulerTask::ValidationTask((0, 0), _)
+        SchedulerTask::ValidationTask((0, 0), 0)
     ));
     // Requires revalidation suffix, so validation index will be decreased to 2,
     // and txn 4 will not need to return a validation task.
@@ -271,12 +271,12 @@ fn scheduler_tasks() {
 
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((2, 0), _)
+        SchedulerTask::ValidationTask((2, 0), 1)
     ));
     // txn 3 hasn't finished execution, so no validation task for it.
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((4, 0), _)
+        SchedulerTask::ValidationTask((4, 0), 1)
     ));
 
     // Validation index is decreased and no task returned to caller.
@@ -287,13 +287,13 @@ fn scheduler_tasks() {
 
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((3, 0), _)
+        SchedulerTask::ValidationTask((3, 0), 2)
     ));
     // txn 4 dispatched for validation again because it the previous validation
     // hasn't finished.
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((4, 0), _)
+        SchedulerTask::ValidationTask((4, 0), 2)
     ));
 
     // successful abort.
@@ -574,5 +574,120 @@ fn scheduler_drain_idx() {
 
     while s.try_commit().is_some() {}
 
+    assert!(matches!(s.next_task(false), SchedulerTask::Done));
+}
+
+#[test]
+fn test_rolling_commit_wave() {
+    let s = Scheduler::new(2);
+
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ExecutionTask((0, 0), None)
+    ));
+
+    // Finish execution for txns 0 without validate_suffix and because
+    // validation index is higher will return validation task to the caller.
+    assert!(matches!(
+        s.finish_execution(0, 0, false),
+        SchedulerTask::NoTask
+    ));
+    // finish validating txn 0 with proper wave
+    s.finish_validation(0, 0);
+    // txn 0 can be committed
+    assert!(s.try_commit().is_some());
+    assert!(matches!(s.commit_state(), (1, 0)));
+
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ExecutionTask((1, 0), None)
+    ));
+
+    // Increase validation_index
+    assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
+
+    // Requires revalidation suffix, so validation index will be decreased to 1
+    assert!(matches!(
+        s.finish_execution(1, 0, true),
+        SchedulerTask::NoTask
+    ));
+
+    // finish validating txn 1 with lower wave
+    s.finish_validation(1, 0);
+    // txn 1 cannot be committed
+    assert!(s.try_commit().is_none());
+    assert!(matches!(s.commit_state(), (1, 1)));
+
+    // finish validating txn 1 with proper wave
+    s.finish_validation(1, 1);
+    // txn 1 can be committed
+    assert!(s.try_commit().is_some());
+    // commit_state wave is updated
+    assert!(matches!(s.commit_state(), (2, 1)));
+
+    // All txns have been committed.
+    assert!(s.try_commit().is_none());
+    assert!(matches!(s.next_task(false), SchedulerTask::Done));
+}
+
+#[test]
+fn test_rolling_commit_wave_update() {
+    let s = Scheduler::new(2);
+    // create txn 0 with max_triggered_wave = 0 and required_wave = 1
+    // create txn 1 with max_triggered_wave = 1 and required_wave = 1
+
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ExecutionTask((0, 0), None)
+    ));
+
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ExecutionTask((1, 0), None)
+    ));
+
+    // Increase validation_index
+    assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
+
+    // Requires revalidation suffix, so validation index will be decreased to 1
+    // validation_index wave = 1
+    // txn 1 max_triggered_wave = 1
+    assert!(matches!(
+        s.finish_execution(1, 0, true),
+        SchedulerTask::NoTask
+    ));
+
+    // The required_wave of txn 0 is 1
+    assert!(matches!(
+        s.finish_execution(0, 0, false),
+        SchedulerTask::ValidationTask((0, 0), 1)
+    ));
+
+    // finish validating txn 0 with lower wave
+    s.finish_validation(0, 0);
+    // txn 0 cannot be committed since the required_wave of txn 0 is 1
+    assert!(s.try_commit().is_none());
+    assert!(matches!(s.commit_state(), (0, 0)));
+
+    // finish validating txn 0 with proper wave
+    s.finish_validation(0, 1);
+    // txn 0 can be committed
+    assert!(s.try_commit().is_some());
+    assert!(matches!(s.commit_state(), (1, 0)));
+
+    // finish validating txn 1 with lower wave
+    s.finish_validation(1, 0);
+    // txn 1 cannot be committed
+    assert!(s.try_commit().is_none());
+    assert!(matches!(s.commit_state(), (1, 1)));
+
+    // finish validating txn 1 with proper wave
+    s.finish_validation(1, 1);
+    // txn 1 can be committed
+    assert!(s.try_commit().is_some());
+    assert!(matches!(s.commit_state(), (2, 1)));
+
+    // All txns have been committed.
+    assert!(s.try_commit().is_none());
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
