@@ -34,7 +34,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |SENDING_ACCOUNT_DOES_NOT_EXIST|The sending account does not exist.| Create the account prior to sending the transaction again |
 |REJECTED_WRITE_SET|This write set transaction was rejected because it did not meet the requirements for one.| N/A |
 |INVALID_WRITE_SET|This write set transaction cannot be applied to the current state.| N/A |
-|EXCEEDED_MAX_TRANSACTION_SIZE|Length of program field in raw transaction exceeded max length.| The transaction is too large for a single transaction, if this is a package publish, try to break it into multiple packages |
+|EXCEEDED_MAX_TRANSACTION_SIZE|Length of program field in raw transaction exceeded max length.| The transaction is too large for a single transaction; if this is a package publish, try to break it into multiple packages |
 |UNKNOWN_SCRIPT|This script is not in our allowlist of scripts.| N/A |
 |UNKNOWN_MODULE|Transaction is trying to publish a new module.| N/A |
 |MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND|Max gas units submitted with transaction exceeds max gas units bound in VM.| Decrease the max gas amount in the transaction below the maximum value in the gas schedule |
@@ -47,7 +47,7 @@ Help us update this list by sending pull requests containing the errors you enco
 |CURRENCY_INFO_DOES_NOT_EXIST|The currency info was unable to be found.| N/A |
 |INVALID_MODULE_PUBLISHER|The account sender doesn't have permissions to publish modules.| N/A |
 |NO_ACCOUNT_ROLE|The sending account has no role.| N/A |
-|BAD_CHAIN_ID|The transaction's chain_id does not match the one published on-chain.| Verify that your chain id matches the chain id for your network |
+|BAD_CHAIN_ID|The transaction's chain_id does not match the one published on-chain.| Verify that your chain ID matches the chain ID for your network |
 |SEQUENCE_NUMBER_TOO_BIG|The sequence number is too large and would overflow if the transaction were executed.| N/A |
 |BAD_TRANSACTION_FEE_CURRENCY|The gas currency is not registered as a TransactionFee currency.| N/A |
 |FEATURE_UNDER_GATING|The feature requested is intended for a future Aptos version instead of the current one.| N/A |
@@ -55,16 +55,16 @@ Help us update this list by sending pull requests containing the errors you enco
 |SIGNERS_CONTAIN_DUPLICATES|There are duplicates among signers, including the sender and all the secondary signers.| Remove any duplicate signers |
 |SEQUENCE_NONCE_INVALID|The sequence nonce in the transaction is invalid (too new, too old, or already used).| N/A |
 |CHAIN_ACCOUNT_INFO_DOES_NOT_EXIST|There was an error when accessing chain-specific account information.| N/A |
-|MODULE_ADDRESS_DOES_NOT_MATCH_SENDER|the module publisher is not the account that will eventually hold the module.| Check that the module address in the move contract matches the sender of the transaction |
+|MODULE_ADDRESS_DOES_NOT_MATCH_SENDER|the module publisher is not the account that will eventually hold the module.| Confirm the module address in the move contract matches the sender of the transaction |
 |ZERO_SIZED_STRUCT|Reported when a struct has zero fields.| N/A |
-|DUPLICATE_MODULE_NAME|The sender is trying to publish two modules with the same name in one transaction.| Check that every module has a unique name |
-|BACKWARD_INCOMPATIBLE_MODULE_UPDATE|The sender is trying to publish a module that breaks the compatibility checks.| Check that your new modules being published don't break backwards compatibility |
+|DUPLICATE_MODULE_NAME|The sender is trying to publish two modules with the same name in one transaction.| Confirm every module has a unique name |
+|BACKWARD_INCOMPATIBLE_MODULE_UPDATE|The sender is trying to publish a module that breaks the compatibility checks.| Confirm your new modules being published don't break backwards compatibility |
 |CYCLIC_MODULE_DEPENDENCY|The updated module introduces a cyclic dependency (i.e., A uses B and B also uses A).| Check for loops in your module dependencies in the modules being published |
-|INVALID_FRIEND_DECL_WITH_SELF|Cannot mark the module itself as a friend.| Check that a module doesn't have itself marked as a friend in the modules being published |
-|INVALID_FRIEND_DECL_WITH_MODULES_OUTSIDE_ACCOUNT_ADDRESS|Cannot declare modules outside of account address as friends.| Check that all friends are in the same account address in the modules being published |
+|INVALID_FRIEND_DECL_WITH_SELF|Cannot mark the module itself as a friend.| Confirm no module has itself marked as a friend in the modules being published |
+|INVALID_FRIEND_DECL_WITH_MODULES_OUTSIDE_ACCOUNT_ADDRESS|Cannot declare modules outside of account address as friends.| Confirm all friends are in the same account address in the modules being published |
 |INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES|Cannot declare modules that this module depends on as friends.| Check friend declarations of the modules being published |
 |CYCLIC_MODULE_FRIENDSHIP|The updated module introduces a cyclic friendship (i.e., A friends B and B also friends A).| Check friend declarations of the modules being published |
-|INVALID_PHANTOM_TYPE_PARAM_POSITION|A phantom type parameter was used in a non-phantom position.| Check that phantom types are used only with generics |
+|INVALID_PHANTOM_TYPE_PARAM_POSITION|A phantom type parameter was used in a non-phantom position.| Confirm phantom types are used only with generics |
 |LOOP_MAX_DEPTH_REACHED|Loops are too deeply nested.| Check for many nested loops |
 |TYPE_RESOLUTION_FAILURE|Failed to resolve type due to linking being broken after verification.| N/A |
 |RESOURCE_DOES_NOT_EXIST|We tried to access a resource that does not exist under the account.| Check the contract and possibly change it to handle resources that don't exist |
@@ -97,31 +97,31 @@ Help us update this list by sending pull requests containing the errors you enco
 |EACCOUNT_ALREADY_EXISTS|Account already exists.| N/A |
 |EACCOUNT_DOES_NOT_EXIST|Account does not exist.| Create the account first |
 |ESEQUENCE_NUMBER_TOO_BIG|Sequence number exceeds the maximum value for a u64.| Provide a smaller sequence number |
-|EMALFORMED_AUTHENTICATION_KEY|The provided authentication key has an invalid length.| Check your authentication key, it should be a 32-byte vector |
+|EMALFORMED_AUTHENTICATION_KEY|The provided authentication key has an invalid length.| Check your authentication key; it should be a 32-byte vector |
 |ECANNOT_RESERVED_ADDRESS|Cannot create account because address is reserved.| N/A |
 |EOUT_OF_GAS|Transaction exceeded its allocated max gas.| Increase the max gas amount |
-|EWRONG_CURRENT_PUBLIC_KEY|Specified current public key is not correct.| Check that the public key matches the account |
-|EINVALID_PROOF_OF_KNOWLEDGE|Specified proof of knowledge required to prove ownership of a public key is invalid.| Check your proof of knowledge in key rotation that it has proper signatures |
-|ENO_CAPABILITY|The caller does not have a digital-signature-based capability to call this function.| Check that you have the capability for the called functions |
-|EINVALID_ACCEPT_ROTATION_CAPABILITY|The caller does not have a valid rotation capability offer from the other account.| Check that the account being rotated is correct |
+|EWRONG_CURRENT_PUBLIC_KEY|Specified current public key is not correct.| Confirm the public key matches the account |
+|EINVALID_PROOF_OF_KNOWLEDGE|Specified proof of knowledge required to prove ownership of a public key is invalid.| Check your proof of knowledge in key rotation to ensure it has proper signatures |
+|ENO_CAPABILITY|The caller does not have a digital-signature-based capability to call this function.| Confirm you have the capability for the called functions |
+|EINVALID_ACCEPT_ROTATION_CAPABILITY|The caller does not have a valid rotation capability offer from the other account.| Confirm the account being rotated is correct |
 |ENO_VALID_FRAMEWORK_RESERVED_ADDRESS|Address to create is not a valid reserved address for Aptos framework.| N/A |
-|EINVALID_SCHEME|Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1).| Check that the transaction was signed correctly when creating the account |
-|EINVALID_ORIGINATING_ADDRESS|Abort the transaction if the expected originating address is different from the originating address on-chain.| Check that you are rotating the correct account's key |
-|ENO_SUCH_SIGNER_CAPABILITY|The signer capability doesn't exist at the given address.| Check that the address is correct |
+|EINVALID_SCHEME|Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1).| Confirm the transaction was signed correctly when creating the account |
+|EINVALID_ORIGINATING_ADDRESS|Abort the transaction if the expected originating address is different from the originating address on-chain.| Confirm you are rotating the correct account's key |
+|ENO_SUCH_SIGNER_CAPABILITY|The signer capability doesn't exist at the given address.| Confirm the address is correct |
 
 ## Aptos coins
 
 | Error | Meaning  | Possible Resolution |
 | --- | :---: | --- |
-|ECOIN_INFO_ADDRESS_MISMATCH|Address of account which is used to initialize a coin `CoinType` doesn't match the deployer of module.| Create the coin, using a `CoinType` in the same account as the account creating the coin. |
+|ECOIN_INFO_ADDRESS_MISMATCH|Address of account which is used to initialize a coin `CoinType` doesn't match the deployer of module.| Create the coin using a `CoinType` in the same account creating the coin. |
 |ECOIN_INFO_ALREADY_PUBLISHED|`CoinType` is already initialized as a coin.| N/A |
 |ECOIN_INFO_NOT_PUBLISHED|`CoinType` hasn't been initialized as a coin.| Create the coin with `CoinType` first before using it |
 |ECOIN_STORE_ALREADY_PUBLISHED|Account already has `CoinStore` registered for `CoinType`.| N/A |
 |ECOIN_STORE_NOT_PUBLISHED|Account hasn't registered `CoinStore` for `CoinType`.| Register the account for the `CoinType` |
 |EINSUFFICIENT_BALANCE|Not enough coins to complete transaction.| Transfer less coins, or acquire more coins prior to the transfer |
 |EDESTRUCTION_OF_NONZERO_TOKEN|Cannot destroy non-zero coins.| N/A |
-|EZERO_COIN_AMOUNT|Coin amount cannot be zero.| Cannot burn coins or other actions with zero coins |
-|EFROZEN|CoinStore is frozen. Coins cannot be deposited or withdrawn.| Account is frozen for this token.  Please talk to the coin owner |
+|EZERO_COIN_AMOUNT|Coin amount cannot be zero.| Don't burn coins or conduct other actions with zero coins |
+|EFROZEN|CoinStore is frozen. Coins cannot be deposited or withdrawn.| Account is frozen for this token; talk to the coin owner |
 |ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED|Cannot upgrade the total supply of coins to different implementation.| N/A |
 |ECOIN_NAME_TOO_LONG|Name of the coin is too long.| Coin name must be less than or equal to 32 characters |
 |ECOIN_SYMBOL_TOO_LONG|Symbol of the coin is too long.| Coin symbol must be less than or equal to 10 characters |
