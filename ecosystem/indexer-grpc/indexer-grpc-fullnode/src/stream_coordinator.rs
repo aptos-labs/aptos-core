@@ -60,6 +60,7 @@ impl IndexerStreamCoordinator {
     }
 
     pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+        let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
@@ -84,6 +85,7 @@ impl IndexerStreamCoordinator {
                                 transactions: chunk.to_vec(),
                             },
                         )),
+                        chain_id: ledger_chain_id as u32,
                     };
                     match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
                         Ok(_) => {},

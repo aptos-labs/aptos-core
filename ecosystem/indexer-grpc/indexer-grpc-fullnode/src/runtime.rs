@@ -95,15 +95,7 @@ impl IndexerStream for IndexerStreamService {
         let context = self.context.clone();
         let mut ma = MovingAverage::new(10_000);
 
-        let chain_id = r.chain_id as u8;
-        // Make sure that the request is going to the correct fullnode
-        if context.chain_id().id() != chain_id {
-            return Err(Status::invalid_argument(format!(
-                "Chain ID mismatch: expected {}, got {}",
-                context.chain_id().id(),
-                chain_id
-            )));
-        }
+        let ledger_chain_id = context.chain_id().id();
         tokio::spawn(async move {
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
@@ -113,7 +105,8 @@ impl IndexerStream for IndexerStreamService {
                 output_batch_size,
                 tx.clone(),
             );
-            let init_status = Self::get_status(StatusType::Init, starting_version, None);
+            let init_status =
+                Self::get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
@@ -147,6 +140,7 @@ impl IndexerStream for IndexerStreamService {
                     StatusType::BatchEnd,
                     coordinator.current_version,
                     Some(max_version),
+                    ledger_chain_id,
                 );
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
@@ -184,6 +178,7 @@ impl IndexerStreamService {
         status_type: StatusType,
         start_version: u64,
         end_version: Option<u64>,
+        ledger_chain_id: u8,
     ) -> RawDatastreamResponse {
         RawDatastreamResponse {
             response: Some(raw_datastream_response::Response::Status(StreamStatus {
@@ -191,6 +186,7 @@ impl IndexerStreamService {
                 start_version,
                 end_version,
             })),
+            chain_id: ledger_chain_id as u32,
         }
     }
 }

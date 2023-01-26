@@ -42,8 +42,6 @@ message StreamStatus {
 message RawDatastreamRequest {
   // Required; start version of current stream.
   uint64 starting_version = 1;
-  // Required; for validation purpose.
-  uint32 chain_id = 2;
 }
 
 message RawDatastreamResponse {
@@ -55,6 +53,8 @@ message RawDatastreamResponse {
     StreamStatus status = 1;
     TransactionsOutput data = 2;
   }
+  // Making sure that all the responses include a chain id
+  uint32 chain_id = 3;
 }
 
 service IndexerStream {
