@@ -1,5 +1,0 @@
-{
-  "message": "Failed to deserialize input into SignedTransaction: unexpected end of input",
-  "error_code": "invalid_input",
-  "vm_error_code": null
-}
