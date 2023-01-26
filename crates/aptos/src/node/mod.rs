@@ -1590,7 +1590,8 @@ pub struct Time {
 
 impl Time {
     pub fn new(time: Duration) -> Self {
-        let date_time = NaiveDateTime::from_timestamp(time.as_secs() as i64, time.subsec_nanos());
+        let date_time =
+            NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
         let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time zone
         Self {
