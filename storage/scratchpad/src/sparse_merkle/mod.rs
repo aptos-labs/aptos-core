@@ -579,7 +579,7 @@ where
 
         loop {
             match subtree {
-                SubTree::Empty => return StateStoreStatus::DoesNotExist,
+                SubTree::Empty => return StateStoreStatus::Unknown,
                 SubTree::NonEmpty { .. } => {
                     match subtree.get_node_if_in_mem(self.base_generation) {
                         None => return StateStoreStatus::Unknown,
@@ -601,7 +601,7 @@ where
                                         None => StateStoreStatus::ExistsInDB,
                                     }
                                 } else {
-                                    StateStoreStatus::DoesNotExist
+                                    StateStoreStatus::Unknown
                                 };
                             }, // end NodeInner::Leaf
                         }, // end Some(node) got from mem
