@@ -193,6 +193,15 @@ pub static PULLED_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("quorum_store_pulled_txn_count", "Count of the pulled txns.").unwrap()
 });
 
+/// Count of the failed local batch lookup.
+pub static FAILED_LOCAL_BATCH_LOOKUP_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_failed_local_batch_lookup_count",
+        "Count of failed local batch lookup."
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of txns are pulled.
 pub static PULLED_TXNS_NUM: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(

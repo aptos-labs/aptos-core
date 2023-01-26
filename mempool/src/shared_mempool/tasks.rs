@@ -469,7 +469,9 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     // gc before pulling block as extra protection against txns that may expire in consensus
                     // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                     let curr_time = aptos_infallible::duration_since_epoch();
-                    mempool.gc_by_expiration_time(curr_time);
+                    mempool.gc_by_expiration_time(
+                        curr_time.checked_add(Duration::from_secs(2)).unwrap(),
+                    );
                 }
 
                 let max_txns = cmp::max(max_txns, 1);

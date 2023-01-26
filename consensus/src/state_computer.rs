@@ -16,6 +16,7 @@ use aptos_consensus_types::{
     block::Block, executed_block::ExecutedBlock, proof_of_store::LogicalTime,
 };
 use aptos_crypto::HashValue;
+use aptos_executor::metrics;
 use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -120,6 +121,9 @@ impl StateComputer for ExecutionProxy {
             .collect::<Vec<_>>();
 
         debug!("unexpired_txns: {}", unexpired_txns.len());
+
+        counters::PRUNED_EXPIRED_TXNS_IN_BLOCK
+            .inc_by(txns.len() as u64 - unexpired_txns.len() as u64);
 
         let transactions_to_execute =
             block.transactions_to_execute(&self.validators.lock(), unexpired_txns);

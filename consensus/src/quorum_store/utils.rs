@@ -318,7 +318,9 @@ impl ProofQueue {
                                 }
                                 ret.push(proof.clone());
                             },
-                            None => {},
+                            None => {
+                                counters::FAILED_LOCAL_BATCH_LOOKUP_COUNT.inc();
+                            },
                         }
                     },
                     None => {}, // Proof was already committed, skip.

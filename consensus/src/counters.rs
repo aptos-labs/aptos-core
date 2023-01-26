@@ -17,6 +17,15 @@ use once_cell::sync::Lazy;
 pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
     Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("consensus"));
 
+/// Counts the total number of pruned expired txns in block
+pub static PRUNED_EXPIRED_TXNS_IN_BLOCK: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_pruned_expired_txns_in_block",
+        "Count of expired transactions in block"
+    )
+    .unwrap()
+});
+
 /// Counts the total number of errors
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
