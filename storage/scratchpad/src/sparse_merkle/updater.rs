@@ -166,7 +166,6 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
         self,
         a_descendent_key: HashValue,
         depth: usize,
-        proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<(Self, Self)> {
         let myself = self;
@@ -218,7 +217,6 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
     pub(crate) fn update(
         root: InMemSubTree<V>,
         updates: &'a [(HashValue, Option<&'a V>)],
-        proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<InMemSubTree<V>> {
         let updater = Self {
@@ -227,10 +225,10 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
             updates,
             generation,
         };
-        Ok(updater.run(proof_reader)?.into_subtree())
+        Ok(updater.run()?.into_subtree())
     }
 
-    fn run(self, proof_reader: &impl ProofRead) -> Result<InMemSubTreeInfo<V>> {
+    fn run(self) -> Result<InMemSubTreeInfo<V>> {
         // Limit total tasks that are potentially sent to other threads.
         const MAX_PARALLELIZABLE_DEPTH: usize = 8;
         // No point to introduce Rayon overhead if work is small.
@@ -241,14 +239,14 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         match self.maybe_end_recursion()? {
             MaybeEndRecursion::End(ended) => Ok(ended),
             MaybeEndRecursion::Continue(myself) => {
-                let (left, right) = myself.into_children(proof_reader)?;
+                let (left, right) = myself.into_children()?;
                 let (left_ret, right_ret) = if depth <= MAX_PARALLELIZABLE_DEPTH
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    rayon::join(|| left.run(proof_reader), || right.run(proof_reader))
+                    rayon::join(|| left.run(), || right.run())
                 } else {
-                    (left.run(proof_reader), right.run(proof_reader))
+                    (left.run(), right.run())
                 };
 
                 Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
@@ -309,13 +307,13 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         })
     }
 
-    fn into_children(self, proof_reader: &'a impl ProofRead) -> Result<(Self, Self)> {
+    fn into_children(self) -> Result<(Self, Self)> {
         let pivot = partition(self.updates, self.depth);
         let (left_updates, right_updates) = self.updates.split_at(pivot);
         let generation = self.generation;
         let (left_info, right_info) =
             self.info
-                .into_children(self.updates[0].0, self.depth, proof_reader, generation)?;
+                .into_children(self.updates[0].0, self.depth, generation)?;
 
         Ok((
             Self {

@@ -136,7 +136,6 @@ impl CachedStateView {
         StateCache {
             frozen_base: self.speculative_state,
             state_cache: self.state_cache.into_inner(),
-            proofs: self.proof_fetcher.get_proof_cache(),
         }
     }
 
@@ -170,7 +169,6 @@ impl CachedStateView {
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub state_cache: HashMap<StateKey, Option<StateValue>>,
-    pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
 impl TStateView for CachedStateView {

@@ -97,7 +97,6 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                         .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
                     StateStorageUsage::new_untracked(),
-                    &ProofReader::new_empty(),
                 )
                 .unwrap()
                 .unfreeze();
@@ -120,7 +119,6 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
                 StateStorageUsage::new_untracked(),
-                &ProofReader::new_empty(),
             )
             .unwrap()
             .unfreeze();

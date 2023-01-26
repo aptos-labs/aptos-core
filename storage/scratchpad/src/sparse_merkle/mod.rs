@@ -448,7 +448,7 @@ where
     ) -> Result<Self, UpdateError> {
         self.clone()
             .freeze()
-            .batch_update(updates, StateStorageUsage::zero(), proof_reader)
+            .batch_update(updates, StateStorageUsage::zero())
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
@@ -547,7 +547,6 @@ where
         &self,
         updates: Vec<(HashValue, Option<&V>)>,
         usage: StateStorageUsage,
-        proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
         // versions may overlap on the same address in which case the latter always overwrites.
@@ -565,7 +564,6 @@ where
             let root = SubTreeUpdater::update(
                 current_root,
                 &kvs[..],
-                proof_reader,
                 self.smt.inner.generation + 1,
             )?;
             Ok(self.spawn(root, usage))

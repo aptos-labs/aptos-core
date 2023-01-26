@@ -42,7 +42,6 @@ pub struct InMemoryStateCalculator {
     // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
     // calculation
     _frozen_base: FrozenSparseMerkleTree<StateValue>,
-    proof_reader: ProofReader,
 
     //// These changes every time a new txn is added to the calculator.
     state_cache: HashMap<StateKey, Option<StateValue>>,
@@ -65,7 +64,6 @@ impl InMemoryStateCalculator {
         let StateCache {
             frozen_base,
             state_cache,
-            proofs,
         } = state_cache;
         let StateDelta {
             base,
@@ -77,7 +75,6 @@ impl InMemoryStateCalculator {
 
         Self {
             _frozen_base: frozen_base,
-            proof_reader: ProofReader::new(proofs),
 
             state_cache,
             next_version: current_version.map_or(0, |v| v + 1),
@@ -164,7 +161,7 @@ impl InMemoryStateCalculator {
             .collect();
         let new_checkpoint =
             self.latest
-                .batch_update(smt_updates, self.usage, &self.proof_reader)?;
+                .batch_update(smt_updates, self.usage)?;
         let root_hash = new_checkpoint.root_hash();
 
         // Move self to the new checkpoint.
@@ -200,7 +197,7 @@ impl InMemoryStateCalculator {
             .collect();
         let latest = self
             .latest
-            .batch_update(smt_updates, self.usage, &self.proof_reader)?;
+            .batch_update(smt_updates, self.usage)?;
 
         self.updates_between_checkpoint_and_latest
             .extend(self.updates_after_latest);
