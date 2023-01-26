@@ -24,19 +24,19 @@ const sidebars = {
     "whats-new-in-docs",
     {
       type: "category",
+      label: "Read Aptos White Paper",
+      collapsible: true,
+      collapsed: false,
+      link: { type: "doc", id: "aptos-white-paper/index" },
+      items: ["aptos-white-paper/in-korean"],
+    },
+    {
+      type: "category",
       label: "Learn Aptos Concepts",
       link: { type: "doc", id: "concepts/index" },
       collapsible: true,
       collapsed: true,
       items: [
-        {
-          type: "category",
-          label: "Aptos White Paper",
-          collapsible: true,
-          collapsed: true,
-          link: { type: "doc", id: "aptos-white-paper/index" },
-          items: ["aptos-white-paper/in-korean"],
-        },
         "concepts/accounts",
         "concepts/resources",
         "concepts/events",
@@ -50,7 +50,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Set Environment",
+      label: "Prepare Environment",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
@@ -95,6 +95,13 @@ const sidebars = {
       label: "Read Blockchain Data",
       collapsible: true,
       collapsed: true,
+      link: {
+        type: "generated-index",
+        title: "Read Blockchain Data",
+        description: "Use the Aptos API and indexer to read the Aptos blockchain state.",
+        slug: "/category/data",
+        keywords: ["data"],
+      },
       items: ["guides/aptos-apis", "guides/indexing"],
     },
     {
@@ -124,13 +131,19 @@ const sidebars = {
   ],
   moveSidebar: [
     {
+      type: "html",
+      value: "Learn Move Language",
+      className: "sidebar-title",
+    },
+    {
       type: "category",
-      label: "Write Move Smart Contracts",
+      label: "Write Smart Contracts",
       link: { type: "doc", id: "guides/move-guides/index" },
       collapsible: false,
       collapsed: false,
       items: [
         "guides/move-guides/move-on-aptos",
+        "guides/move-guides/move-structure",
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
@@ -139,6 +152,11 @@ const sidebars = {
     },
   ],
   nftSidebar: [
+    {
+      type: "html",
+      value: "Make Aptos Tokens",
+      className: "sidebar-title",
+    },
     {
       type: "category",
       label: "Create NFTs on Aptos",
@@ -311,7 +329,7 @@ const sidebars = {
   refSidebar: [
     {
       type: "html",
-      value: "Reference",
+      value: "Aptos References",
       className: "sidebar-title",
     },
     "reference/index",
@@ -335,8 +353,8 @@ const sidebars = {
         "sdks/rust-sdk",
       ],
     },
-    "reference/glossary",
     "reference/move",
+    "reference/glossary",
     "issues-and-workarounds",
   ],
 };
