@@ -142,6 +142,7 @@ async fn handler_thread<'a>(
         if let Some(val) = cache.lock().unwrap().get(&(key.clone(), version)) {
             sender.send(val.clone()).unwrap();
         } else {
+            assert!(version > 0, "Expecting a non-genesis version");
             let db = db.clone();
             let cache = cache.clone();
             tokio::spawn(async move {
