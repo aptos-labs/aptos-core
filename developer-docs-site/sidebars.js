@@ -29,7 +29,7 @@ const sidebars = {
       collapsed: false,
       link: { type: "doc", id: "aptos-white-paper/index" },
       items: ["aptos-white-paper/in-korean"],
-    },    
+    },
     {
       type: "category",
       label: "Learn Aptos Concepts",
