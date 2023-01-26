@@ -8,5 +8,8 @@ fn main() -> shadow_rs::SdResult<()> {
         "cargo:rustc-env=USING_TOKIO_UNSTABLE={}",
         std::env::var("CARGO_CFG_TOKIO_UNSTABLE").is_ok()
     );
+    println!("cargo:rerun-if-changed=.git/HEAD");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     shadow_rs::new()
 }
