@@ -5,7 +5,7 @@ id: "create-a-smart-contract"
 
 # Create a smart contract
 
-If you haven’t done it, you would want to Install Aptos CLI now. You can follow the instructions [here](../../cli-tools/aptos-cli-tool/) - just make sure you use CLI version 1.0.4 as this what we use in this tutorial.
+If you haven’t done it, you would want to Install Aptos CLI now. You can follow the instructions [here](../../cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) - just make sure you use CLI version 1.0.4 as this what we use in this tutorial.
 
 1.  `cd` into `my-first-dapp` root folder, and create a new `move` folder
 2.  `cd` into the new `move` folder and run
