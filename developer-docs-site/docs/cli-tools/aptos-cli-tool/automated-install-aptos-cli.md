@@ -12,6 +12,7 @@ First, ensure you have Python 3.6+ installed:
 $ python3 --version
 Python 3.9.13
 ```
+If it is not installed, you can find installation instructions [here](https://www.python.org/downloads/).
 
 <details>
 <summary>macOS / Linux / Windows Subsystem for Linux (WSL)</summary>
