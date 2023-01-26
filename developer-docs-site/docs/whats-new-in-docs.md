@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 26 January 2023
+
+- Developed and now recommend use of a script to [automate installation of the Aptos command line interface (CLI)](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) that works on Linux, macOS, Windows Subsystem for Linux (WSL), and Windows NT.
+
 ## 25 January 2023
 
 - Split up the sidebars of Aptos.dev into one left navigation menu per topic to ease use. As part of this:
@@ -37,11 +41,11 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 16 January 2023
 
-- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos command line interface (CLI).
+- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos CLI.
 
 ## 12 January 2023
 
-- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and Windows Subsystem for Linux (WSL) package manager.
+- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and WSL package manager.
 
 ## 11 January 2023
 
