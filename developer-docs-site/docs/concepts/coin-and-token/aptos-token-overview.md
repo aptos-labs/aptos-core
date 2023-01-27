@@ -1,5 +1,5 @@
 ---
-title: "Compare Aptos Tokens"
+title: "Compare the Aptos Token standards"
 id: "aptos-token-comparison"
 ---
 import ThemedImage from '@theme/ThemedImage';

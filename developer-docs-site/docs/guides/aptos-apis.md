@@ -1,5 +1,5 @@
 ---
-title: "Use Aptos API"
+title: "Use the Aptos API"
 slug: "aptos-api"
 ---
 
