@@ -187,7 +187,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Understand Nodes",
+      label: "Learn about Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/nodes-landing" },
@@ -221,7 +221,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Install Validators",
+      label: "Run a Validator",
       link: { type: "doc", id: "nodes/validator-node/index" },
       collapsible: true,
       collapsed: true,
@@ -275,7 +275,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Install Fullnodes",
+      label: "Run a Fullnode",
       link: { type: "doc", id: "nodes/full-node/index" },
       collapsible: true,
       collapsed: true,
@@ -292,7 +292,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Monitor Nodes",
+      label: "Monitor a Node",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/measure/index" },
@@ -305,7 +305,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Configure Nodes",
+      label: "Configure a Node",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/identity-and-configuration" },
