@@ -18,7 +18,7 @@ const sidebars = {
   aptosSidebar: [
     {
       type: "html",
-      value: "Getting Started",
+      value: "Get Started",
       className: "sidebar-title",
     },
     "whats-new-in-docs",
@@ -71,7 +71,7 @@ const sidebars = {
             "cli-tools/install-move-prover",
           ],
         },
-         "cli-tools/aptos-cli-tool/use-aptos-cli",
+        "cli-tools/aptos-cli-tool/use-aptos-cli",
         "guides/get-test-funds",
       ],
     },
