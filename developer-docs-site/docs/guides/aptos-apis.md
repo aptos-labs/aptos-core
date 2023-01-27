@@ -38,8 +38,7 @@ The REST API offers querying transactions and events in these ways:
 
 View functions do not modify blockchain state. The [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) help read on-chain state using Move. For example, you can preview who would be the winner of a bidding contract currently. See the [test](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) file for an example, related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code, and [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
 
-The View function operates much like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), but it does not generate side effects. The function is immutable if tagged as `#[view]`, the compiler will confirm it is so and if not fail. The View endpoint is: \
-`/view`
+The View function operates much like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), but it does not generate side effects. The function is immutable if tagged as `#[view]`, the compiler will confirm it is so and if not fail. The View endpoint is: `/view`
 
 The View function operates much like the Aptos Simulation API, with similar input and output. You call the module and function with the same input type parameters and input Move value parameters. Using the Aptos View function API, the results are read values on the blockchain, and the Aptos Simulation API is expected to write output on the blockchain.
 
