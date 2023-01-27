@@ -1,14 +1,20 @@
 ---
-title: "Aptos Wallet Adapter"
+title: "Integrate with Aptos Wallets"
 id: "wallet-adapter-concept"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Implement Aptos Wallet Adapter
+# Integrate with Aptos wallets
 
-Building a dapp requires you provide a wallet for the user to interact with the Aptos chain. And for the best user experience, we suggest you offer multiple wallets so users can chose the one they want.
+Decentralized applications often run through a browser extension or mobile application to read onchain data and submit
+transactions.  The Aptos Wallet Adapter allows for a single interface for apps and wallets to integrate together.
+
+## Implementing the Aptos Wallet Adapter
+
+For the best user experience, we shuggest that dapps offer multiple wallets, to allow users to choose their preferred
+wallet.
 
 Implementing wallet integration can be difficult for dapps in:
 
