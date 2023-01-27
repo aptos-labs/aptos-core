@@ -42,7 +42,6 @@ impl NetworkLoadTest for EnableQuorumStoreTest {
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
         // Connect the operator tool to the node's JSON RPC API
         let rest_client = swarm.validators().next().unwrap().rest_client();
-        let transaction_factory = swarm.chain_info().transaction_factory();
         let runtime = Runtime::new().unwrap();
         let mut cli = runtime.block_on(async {
             CliTestFramework::new(

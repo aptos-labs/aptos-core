@@ -919,6 +919,11 @@ impl CliTestFramework {
         )
         .unwrap();
 
+        warn!(
+            "BCHO aptos_framework_dir: {:?}",
+            Self::aptos_framework_dir()
+        );
+
         RunScript {
             txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
