@@ -13,7 +13,7 @@ transactions.  The Aptos Wallet Adapter allows for a single interface for apps a
 
 ## Implementing the Aptos Wallet Adapter
 
-For the best user experience, we shuggest that dapps offer multiple wallets, to allow users to choose their preferred
+For the best user experience, we suggest that dapps offer multiple wallets, to allow users to choose their preferred
 wallet.
 
 Implementing wallet integration can be difficult for dapps in:
