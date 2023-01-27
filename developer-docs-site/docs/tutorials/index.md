@@ -47,6 +47,6 @@ Learn how to [build your first dapp](first-dapp.md). Focuses on building the use
 Learn how to [deploy and manage a coin](first-coin.md). The `coin` interface is defined in the [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) Move module.
 
 
-### [Your First Multisig](your-first-multisig)
+### [Your First Multisig](first-multisig.md)
 
-Learn how to perform assorted operations using [K-of-N multisigner authentication](../concepts/accounts#multisigner-authentication).
+Learn how to perform assorted operations using [K-of-N multisigner authentication](../concepts/accounts.md#multisigner-authentication).
