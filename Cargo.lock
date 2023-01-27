@@ -927,6 +927,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-push-metrics",
  "aptos-schemadb",
  "aptos-scratchpad",
