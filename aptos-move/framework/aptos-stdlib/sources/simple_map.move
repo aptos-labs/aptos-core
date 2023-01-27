@@ -278,8 +278,8 @@ module aptos_std::simple_map {
     fun test_for_each_mut() {
         let m = make(1, 4, 2, 5);
         for_each_mut(&mut m, |_key, val| {
-            let v : &mut u64 = val;
-            *v = *v + 1
+            let val : &mut u64 = val;
+            *val = *val + 1
         });
         assert!(*borrow(&m, &1) == 5, 1)
     }
