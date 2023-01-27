@@ -1,12 +1,12 @@
 ---
-title: "Typescript SDK Overview"
+title: "Typescript SDK Architecture"
 slug: "typescript-sdk-overview"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Typescript SDK Overview
+# Typescript SDK Architecture 
 
 This document describes the main features and components of the Aptos Typescript SDK.
 
