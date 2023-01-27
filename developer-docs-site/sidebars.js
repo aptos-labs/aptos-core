@@ -132,7 +132,7 @@ const sidebars = {
     {
       type: "category",
       label: "Build an e2e dapp with Aptos",
-      link: { type: "doc", id: "tutorials/build-e2e-dapp/build-e2e-dapp" },
+      link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
       collapsible: true,
       collapsed: true,
       items: [

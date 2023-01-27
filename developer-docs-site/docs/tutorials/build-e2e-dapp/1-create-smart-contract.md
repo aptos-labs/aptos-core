@@ -3,35 +3,34 @@ title: "Create a smart contract"
 id: "create-a-smart-contract"
 ---
 
-# Create a smart contract
+# Create a Smart Contract
 
-If you haven’t done it, you would want to `install Aptos CLI` now. You can follow the instructions [here](../../cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) - just make sure you use CLI version 1.0.4 as this what we use in this tutorial.
+If you haven’t done it, [install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). Make sure you use CLI version 1.0.4 as this what we use in this tutorial.
 
-1.  `cd` into `my-first-dapp` root folder, and create a new `move` folder
-2.  `cd` into the new `move` folder and run
-    `aptos move init --name my_todo_list`
-    That would create a `sources/` folder and `Move.toml` file inside the `move` folder.
-3.  Your new `move` folder should look like that
+1.  `cd` into the `my-first-dapp` root directory, and create a new `move` directory.
+2.  `cd` into the new `move` directory and run: `aptos move init --name my_todo_list`
+    That would create a `sources/` directory and `Move.toml` file inside the `move` directory.
+3.  Your new `move` directory should resemble:
 
-    ![move-folder](../../../static/img/docs/build-e2e-dapp-img-1.png)
+    ![move-directory](../../../static/img/docs/build-e2e-dapp-img-1.png)
 
 ### What is a `Move.toml` file?
 
-`Move.toml` file is a manifest file that contains metadata such as name, version, and dependencies for the package.
+A `Move.toml` file is a manifest file that contains metadata such as name, version, and dependencies for the package.
 
-Take a look at the new `Move.toml` file, you should see your package info (pay attention that the `name` prop is the same `--name` attribute we pass to the `aptos move init` command before) and an `AptosFramework` dependency. The `AptosFramework` dependency points to `aptos-core/aptos-move/framework/aptos-framework` github repo main branch.
+Take a look at the new `Move.toml` file. You should see your package information and an `AptosFramework` dependency. Note that the `name` property is the same `--name` attribute we passed to the `aptos move init` command before. The `AptosFramework` dependency points to the `aptos-core/aptos-move/framework/aptos-framework` GitHub repo main branch.
 
-### Why `sources` folder?
+### Why `sources` directory?
 
-sources folder holds a collection of `.move` modules files and later when we would want to compile the package using the CLI, it will look for that `sources` file (and for the `Move.toml` file).
+The `sources` directory holds a collection of `.move` modules files. And later when we would want to compile the package using the CLI, it will look for that `sources` directory and the `Move.toml` file.
 
 ### Create a Move module
 
 An account is needed to publish a Move module. So first we need to create an account, that we have its private key, so we can create a module under its account address and publish the module using that account.
 
-1. On our `move` folder, run `aptos config init --network devnet`. Press enter when the prompt pops up.
+1. On our `move` directory, run `aptos config init --network devnet`. Press enter when the prompt pops up.
 
-   This creates for us a `.aptos` folder with a `config.yaml` file that holds our profiles info. On the `config` file we now have our profiles list that holds a `default` profile. You should see something like that
+   This creates for us a `.aptos` directory with a `config.yaml` file that holds our profiles info. On the `config` file we now have our profiles list that holds a `default` profile. You should see something like that
 
    ```yaml
    profiles:
@@ -43,14 +42,14 @@ An account is needed to publish a Move module. So first we need to create an acc
        faucet_url: "https://faucet.devnet.aptoslabs.com"
    ```
 
-   From now on, whenever we run a CLI command in this `move` folder, it will run with that default profile.
+   From now on, whenever we run a CLI command in this `move` directory, it will run with that default profile.
    We use the `devnet` network flag so eventually when we publish our package it would get published to the `devnet` network.
 
    :::tip
    You just created a new account on the Aptos (dev)netowrk! Yay! You can check it by going to [Explorer](https://explorer.aptoslabs.com/?network=devnet) past the `account value` from above into the search input and click on the dropdown option!
    :::
 
-As mentioned, our `sources` folder holds our `.move` module files, so let’s add our first move file.
+As mentioned, our `sources` directory holds our `.move` module files, so let’s add our first move file.
 
 2. Open the `Move.toml` file
 3. Add the following code into that file
@@ -67,7 +66,7 @@ If the default profile account address is `cbddf398841353776903dbab2fdaefc54f181
 myaddr='cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018'
 ```
 
-4. Create a new `main.move` file under the sources folder and add the following
+4. Create a new `main.move` file under the sources directory and add the following
 
 ```rust
 module myaddr::main {
@@ -157,7 +156,7 @@ A struct that has the `store`, `drop` and `copy`abilities.
 
 Let’s try to compile what we have by now.
 
-1. `cd` into the `move` folder
+1. `cd` into the `move` directory
 2. run `aptos move compile`
 
 **Seeing errors?!** let’s understand.
@@ -192,7 +191,7 @@ BUILDING myTodolist
 
 At this point we have successfully compiled our Move module. Yay.
 
-We also have a new `move/build` folder (created by the compiler) that holds our compiled modules, build info and sources folder.
+We also have a new `move/build` directory (created by the compiler) that holds our compiled modules, build info and sources directory.
 
 ### Create list function
 
@@ -558,7 +557,7 @@ Now that everything works, we can compile the move modules and publish the move 
 
 For now, the easiest way to publish a move package to chain is using the CLI.
 
-1. `cd` into our `move` folder, and run `aptos move compile`
+1. `cd` into our `move` directory, and run `aptos move compile`
 
 We are getting some Unused alias errors. This is because, before we added the `string` alias since we use it in our tests. But we dont use this alias in our smart contract code.
 
