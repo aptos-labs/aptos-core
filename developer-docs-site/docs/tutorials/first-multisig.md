@@ -62,7 +62,7 @@ Bob:   0x089d6e00e946af8d372ef4ef7f26e21a08cb856747014d15525180bf37f31ef5
 Chad:  0x784508b54b812f89a6cb6c47010a5c389ff25316feed7f923b9e1489f7772acf
 ```
 
-For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts#creating-an-account) is different.
+For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
 
 ## Step 4: Generate a multisig account
 
@@ -119,7 +119,7 @@ Bob:   0xc8120ebeebff07b647666431ceb66fd5043635e8ccc836b99c525185b3bf5a8293de630
 
 ### Step 6.2 Generate a multisig authenticator
 
-Next generate a [multisig authenticator](../guides/creating-a-signed-transaction#multisignature-transactions):
+Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisignature-transactions):
 
 
 ```python
