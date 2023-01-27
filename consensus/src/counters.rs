@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_counter, register_gauge, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
-    register_int_gauge_vec, Counter, Gauge, Histogram, HistogramVec, IntCounter, IntCounterVec,
-    IntGauge, IntGaugeVec,
+    op_counters::DurationHistogram, register_counter, register_gauge, register_gauge_vec,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, register_int_gauge_vec, Counter, Gauge, GaugeVec, Histogram, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -248,6 +248,105 @@ pub static CHAIN_HEALTH_PARTICIPATING_NUM_VALIDATORS: Lazy<Vec<IntGauge>> = Lazy
         .collect()
 });
 
+/// Emits consensus participation status for all peers, 0 means no participation in the window
+/// 1 otherwise.
+pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_participation_status",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Voting power of the validator
+pub static VALIDATOR_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_validator_voting_power",
+        "Voting power of the validator"
+    )
+    .unwrap()
+});
+
+/// Emits voting power for all validators in the current epoch.
+pub static ALL_VALIDATORS_VOTING_POWER: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_all_validators_voting_power",
+        "Voting power for all validators in current epoch",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// For the current ordering round, voting power needed for quorum.
+pub static CONSENSUS_CURRENT_ROUND_QUORUM_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_consensus_current_round_quorum_voting_power",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+    )
+    .unwrap()
+});
+
+/// For the current ordering round, for each peer, whether they have voted, and for which hash_index
+pub static CONSENSUS_CURRENT_ROUND_VOTED_POWER: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "aptos_consensus_current_round_voted_power",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+        &["peer_id", "hash_index"]
+    )
+    .unwrap()
+});
+
+/// For the current ordering round, for each peer, whether they have voted for a timeout
+pub static CONSENSUS_CURRENT_ROUND_TIMEOUT_VOTED_POWER: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "aptos_consensus_current_round_timeout_voted_power",
+        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Last vote seen for each of the peers
+pub static CONSENSUS_LAST_VOTE_EPOCH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_last_voted_epoch",
+        "for each peer_id, last epoch we've seen consensus vote",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Last vote seen for each of the peers
+pub static CONSENSUS_LAST_VOTE_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_last_voted_round",
+        "for each peer_id, last round we've seen consensus vote",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Last timeout vote seen for each of the peers
+pub static CONSENSUS_LAST_TIMEOUT_VOTE_EPOCH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_last_timeout_voted_epoch",
+        "for each peer_id, last epoch we've seen consensus timeout vote",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
+/// Last timeout vote seen for each of the peers
+pub static CONSENSUS_LAST_TIMEOUT_VOTE_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_last_timeout_voted_round",
+        "for each peer_id, last round we've seen consensus timeout vote",
+        &["peer_id"]
+    )
+    .unwrap()
+});
+
 //////////////////////
 // RoundState COUNTERS
 //////////////////////
@@ -332,36 +431,6 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_num_blocks_in_tree",
         "Counter for the number of blocks in the block tree (including the root)."
-    )
-    .unwrap()
-});
-
-/// Emits consensus participation status for all peers, 0 means no participation in the window
-/// 1 otherwise.
-pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "aptos_consensus_participation_status",
-        "Counter for consensus participation status, 0 means no participation and 1 otherwise",
-        &["peer_id"]
-    )
-    .unwrap()
-});
-
-/// Voting power of the validator
-pub static VALIDATOR_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
-        "aptos_validator_voting_power",
-        "Voting power of the validator"
-    )
-    .unwrap()
-});
-
-/// Emits voting power for all validators in the current epoch.
-pub static ALL_VALIDATORS_VOTING_POWER: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "aptos_all_validators_voting_power",
-        "Voting power for all validators in current epoch",
-        &["peer_id"]
     )
     .unwrap()
 });
