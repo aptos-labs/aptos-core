@@ -6,12 +6,13 @@ use crate::{
     txn_emitter::generate_traffic,
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt, TransactionType};
+use aptos_logger::info;
 use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
     PeerId,
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
-use std::{sync::Arc, time::Duration};
+use std::{fs, sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 60;
 
@@ -151,6 +152,83 @@ async fn test_remote_batch_reads() {
     }
 
     generate_traffic_and_assert_committed(&mut swarm, &[validator_peer_ids[2]]).await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+}
+
+/// Checks that a validator can still get signatures on batches even if its db is reset (e.g.,
+/// the disk failed, or the validator had to be moved to another node).
+#[tokio::test]
+async fn test_batch_id_on_restart() {
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        // TODO: remove when quorum store becomes the in-code default
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.consensus_config =
+                OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        }))
+        .build()
+        .await;
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let node_to_restart = validator_peer_ids[0];
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    info!("restart node 0, db intact");
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    info!("stop node 0");
+    swarm.validator_mut(node_to_restart).unwrap().stop();
+    info!("nuke only quorum store db");
+    let node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
+    // TODO: get this dir from quorum store code
+    let db_dir = node0_config.storage.dir();
+    let quorum_store_db_dir = db_dir.join("quorumstoreDB");
+    fs::remove_dir_all(quorum_store_db_dir.clone()).unwrap();
+    info!("start node 0");
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
+        .unwrap();
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    info!("generate traffic");
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
