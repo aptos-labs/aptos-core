@@ -133,7 +133,7 @@ const sidebars = {
   moveSidebar: [
     {
       type: "html",
-      value: "Learn Move Language",
+      value: "Learn the Move Language",
       className: "sidebar-title",
     },
     {
@@ -155,17 +155,17 @@ const sidebars = {
   nftSidebar: [
     {
       type: "html",
-      value: "Make Aptos Tokens",
+      value: "Create Tokens",
       className: "sidebar-title",
     },
     {
       type: "category",
-      label: "Create NFTs on Aptos",
+      label: "Create Tokens on Aptos",
       collapsible: false,
       collapsed: false,
       link: {
         type: "generated-index",
-        title: "Create NFTs on Aptos",
+        title: "Create Tokens on Aptos",
         description: "Learn the various ways to mint and exchange tokens.",
         slug: "/category/nft",
         keywords: ["nft"],

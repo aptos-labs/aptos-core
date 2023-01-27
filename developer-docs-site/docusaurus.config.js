@@ -160,7 +160,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Write Move",
+            label: "Learn Move",
             position: "left",
             items: [
               {
@@ -202,27 +202,27 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Create NFTs",
+            label: "Create Tokens",
             position: "left",
             items: [
               {
                 type: "doc",
-                label: "Create NFTs on Aptos",
+                label: "Create Tokens on Aptos",
                 docId: "/category/nft",
               },
               {
                 type: "doc",
-                label: "Compare Aptos Tokens",
+                label: "Compare Token Standards",
                 docId: "concepts/coin-and-token/aptos-token-comparison",
               },
               {
                 type: "doc",
-                label: "Mint NFTs with Aptos SDKs",
+                label: "Mint NFTs with the SDKs",
                 docId: "tutorials/your-first-nft",
               },
               {
                 type: "doc",
-                label: "Mint NFTs with Aptos CLI",
+                label: "Mint NFTs with the Aptos CLI",
                 docId: "guides/move-guides/mint-nft-cli",
               },
               {
@@ -232,7 +232,7 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Mint NFTs with NFT CLI Mint Tool",
+                label: "Mint NFTs with the Mint Tool",
                 docId: "concepts/coin-and-token/nft-minting-tool",
               },
             ],
