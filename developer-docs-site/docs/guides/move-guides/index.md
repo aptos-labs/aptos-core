@@ -71,8 +71,8 @@ Use these external resources to learn about the core Move programming language.
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)
 * [Move Book](https://move-language.github.io/move/)
-* [Move Tutorial](https://github.com/move-language/move/tree/main/language/documentation/tutorial)
-* [Move language repository](https://github.com/move-language/move)
+* [Move Tutorial](https://github.com/georgemitenkov/move/tree/main/language/documentation/tutorial)
+* [Move language repository](https://github.com/georgemitenkov/move)
 * [Move by example](https://move-book.com/)
 * [Awesome Move resources](https://github.com/MystenLabs/awesome-move)
 
