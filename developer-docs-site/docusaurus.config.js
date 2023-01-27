@@ -96,7 +96,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Start Aptos",
+            label: "Get Started",
             position: "left",
             items: [
               {
@@ -115,12 +115,12 @@ const config = {
                 docId: "concepts/index",
               },
               {
-                label: "Prepare Environment",
+                label: "Prepare Your Environment",
                 type: "doc",
                 docId: "guides/getting-started",
               },
               {
-                label: "Integrate with the Aptos blockchain",
+                label: "Integrate with Aptos",
                 type: "doc",
                 docId: "guides/system-integrators-guide",
               },
@@ -133,7 +133,7 @@ const config = {
             items: [
               {
                 type: "doc",
-                label: "Aptos Standards",
+                label: "Follow the Aptos Standards",
                 docId: "concepts/coin-and-token/index",
               },
               {
@@ -143,17 +143,17 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Interact with Blockchain",
+                label: "Interact with the Blockchain",
                 docId: "guides/index",
               },
               {
                 type: "doc",
-                label: "Develop with SDKs",
+                label: "Develop with the SDKs",
                 docId: "tutorials/index",
               },
               {
                 type: "doc",
-                label: "Implement Wallet Adapter",
+                label: "Integrate with Wallets",
                 docId: "concepts/wallet-adapter-concept",
               },
             ],
