@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import hashlib
+
 import unittest
 
 from nacl.signing import SigningKey, VerifyKey
+from typing import List, Tuple
 
 from .bcs import Deserializer, Serializer
 
@@ -92,6 +95,27 @@ class PublicKey:
         serializer.to_bytes(self.key.encode())
 
 
+class MultiEd25519PublicKey:
+    LENGTH: int = 32
+
+    key: VerifyKey
+    keys: List[PublicKey]
+    threshold: int
+
+    def __init__(self, keys: List[PublicKey], threshold: int):
+        self.keys = keys
+        self.threshold = threshold
+        hasher = hashlib.sha3_256()
+        concatenated_keys = bytes()
+        for key in keys:
+            concatenated_keys += key.key.encode()
+        hasher.update(concatenated_keys + bytes([threshold]) + b"\x01")
+        self.key = VerifyKey(hasher.digest())
+
+    def __str__(self) -> str:
+        return f"0x{self.key.encode().hex()}"
+
+
 class Signature:
     LENGTH: int = 64
 
@@ -121,6 +145,14 @@ class Signature:
 
     def serialize(self, serializer: Serializer):
         serializer.to_bytes(self.signature)
+
+
+class MultiEd25519Signature:
+
+    signatures: List[Tuple[PublicKey, Signature]]
+
+    def __init__(self, signatures):
+        self.signatures = signatures
 
 
 class Test(unittest.TestCase):

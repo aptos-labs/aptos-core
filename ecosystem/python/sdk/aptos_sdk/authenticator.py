@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import typing
-from typing import List
+from typing import List, Tuple
 
 from . import ed25519
 from .account_address import AccountAddress
@@ -146,8 +146,21 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-    def __init__(self):
-        raise NotImplementedError
+
+    public_key: ed25519.MultiEd25519PublicKey
+    signature: ed25519.MultiEd25519Signature
+    bitmap: bytes
+
+    def __init__(self, public_key, signature):
+        self.public_key = public_key
+        self.signature = signature
+        bitmap = 0
+        for single_signature in signature.signatures:
+            index = public_key.keys.index(single_signature[0])
+            shift = 31 - index # 32 bit positions, left to right.
+            bitmap = bitmap | (1 << shift)
+        # 4-byte big endian bitmap
+        self.bitmap = bitmap.to_bytes(4, 'big')
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError

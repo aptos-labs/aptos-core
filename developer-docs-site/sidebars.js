@@ -118,7 +118,12 @@ const sidebars = {
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
-      items: ["tutorials/first-transaction", "tutorials/first-dapp", "tutorials/first-coin"],
+      items: [
+        "tutorials/first-transaction",
+        "tutorials/first-dapp",
+        "tutorials/first-coin",
+        "tutorials/first-multisig"
+      ],
     },
     {
       type: "category",
