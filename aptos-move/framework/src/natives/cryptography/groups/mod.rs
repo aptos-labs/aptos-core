@@ -2,18 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-use std::any::Any;
-use std::collections::{HashMap, VecDeque};
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg};
-use std::rc::Rc;
+use std::collections::VecDeque;
+use std::ops::{Add, Mul, Neg};
 use ark_bls12_381::{Fq12, Fr, FrParameters, G1Projective, G2Projective, Parameters};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{Field, Fp256, PrimeField};
+use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
-use better_any::{Tid, TidAble, TidExt};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use better_any::{Tid, TidAble};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
 use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -23,119 +21,46 @@ use move_vm_types::pop_arg;
 use move_vm_types::values::Value;
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use smallvec::smallvec;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::on_chain_config::FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS;
-use crate::natives::cryptography::groups::abort_codes::{NOT_IMPLEMENTED, NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS};
-use crate::natives::cryptography::groups::API::ScalarDeserialize;
+use crate::natives::cryptography::groups::abort_codes::NOT_IMPLEMENTED;
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum Structure {
+    BLS12_381_Fr,
+    BLS12_381_G1,
+    BLS12_381_G2,
+    BLS12_381_Gt,
+}
 
-macro_rules! abort_if_feature_disabled {
-    ($context:expr, $feature:expr) => {
-        if !$context.extensions().get::<GroupContext>().features.is_enabled($feature) {
-            return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+impl Structure {
+    pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
+        match type_tag.to_string().as_str() {
+            "0x1::groups::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
+            "0x1::groups::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
+            "0x1::groups::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
+            "0x1::groups::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
+            _ => None
         }
-    };
+    }
 }
 
-macro_rules! ark_serialize_uncompressed {
-    ($ark_element:expr) => {{
-        let mut buf = vec![];
-        $ark_element.serialize_uncompressed(&mut buf).unwrap();
-        buf
-    }}
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum HashAlg {
+    SHA256,
 }
 
-macro_rules! ark_serialize_compressed {
-    ($ark_element:expr) => {{
-        let mut buf = vec![];
-        $ark_element.serialize(&mut buf).unwrap();
-        buf
-    }}
-}
-
-macro_rules! structure_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
-        structure_from_type_tag(&type_tag)
-    }}
-}
-
-macro_rules! hash_alg_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
-        hash_alg_from_type_tag(&type_tag)
-    }}
-}
-
-macro_rules! borrow_bls12_381_g1 {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_g1_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_g1 {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
-        let ret = inner_ctxt.bls12_381_g1_elements.len();
-        inner_ctxt.bls12_381_g1_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_fr {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_fr_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_fr {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
-        let ret = inner_ctxt.bls12_381_fr_elements.len();
-        inner_ctxt.bls12_381_fr_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_g2 {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_g2_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_g2 {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
-        let ret = inner_ctxt.bls12_381_g2_elements.len();
-        inner_ctxt.bls12_381_g2_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_gt {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_gt_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_gt {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
-        let ret = inner_ctxt.bls12_381_gt_elements.len();
-        inner_ctxt.bls12_381_gt_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_gt {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_gt_elements.get($handle).unwrap()
-    }}
+impl HashAlg {
+    pub fn from_type_tag(type_tag: &TypeTag) -> Option<HashAlg> {
+        match type_tag.to_string().as_str() {
+            "0x1::groups::SHA256" => Some(HashAlg::SHA256),
+            _ => None
+        }
+    }
 }
 
 pub mod abort_codes {
@@ -270,6 +195,104 @@ impl GroupContext {
             features,
         }
     }
+}
+
+macro_rules! abort_if_feature_disabled {
+    ($context:expr, $feature:expr) => {
+        if !$context.extensions().get::<GroupContext>().features.is_enabled($feature) {
+            return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
+        }
+    };
+}
+
+macro_rules! ark_serialize_uncompressed {
+    ($ark_element:expr) => {{
+        let mut buf = vec![];
+        $ark_element.serialize_uncompressed(&mut buf).unwrap();
+        buf
+    }}
+}
+
+macro_rules! ark_serialize_compressed {
+    ($ark_element:expr) => {{
+        let mut buf = vec![];
+        $ark_element.serialize(&mut buf).unwrap();
+        buf
+    }}
+}
+
+macro_rules! structure_from_ty_arg {
+    ($context:expr, $typ:expr) => {{
+        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        Structure::from_type_tag(&type_tag)
+    }}
+}
+
+macro_rules! hash_alg_from_ty_arg {
+    ($context:expr, $typ:expr) => {{
+        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        HashAlg::from_type_tag(&type_tag)
+    }}
+}
+
+macro_rules! borrow_bls12_381_g1 {
+    ($context:expr, $handle:expr) => {{
+        $context.extensions().get::<GroupContext>().bls12_381_g1_elements.get($handle).unwrap()
+    }}
+}
+
+macro_rules! store_bls12_381_g1 {
+    ($context:expr, $element:expr) => {{
+        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let ret = inner_ctxt.bls12_381_g1_elements.len();
+        inner_ctxt.bls12_381_g1_elements.push($element);
+        ret
+    }}
+}
+
+macro_rules! borrow_bls12_381_fr {
+    ($context:expr, $handle:expr) => {{
+        $context.extensions().get::<GroupContext>().bls12_381_fr_elements.get($handle).unwrap()
+    }}
+}
+
+macro_rules! store_bls12_381_fr {
+    ($context:expr, $element:expr) => {{
+        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let ret = inner_ctxt.bls12_381_fr_elements.len();
+        inner_ctxt.bls12_381_fr_elements.push($element);
+        ret
+    }}
+}
+
+macro_rules! borrow_bls12_381_g2 {
+    ($context:expr, $handle:expr) => {{
+        $context.extensions().get::<GroupContext>().bls12_381_g2_elements.get($handle).unwrap()
+    }}
+}
+
+macro_rules! store_bls12_381_g2 {
+    ($context:expr, $element:expr) => {{
+        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let ret = inner_ctxt.bls12_381_g2_elements.len();
+        inner_ctxt.bls12_381_g2_elements.push($element);
+        ret
+    }}
+}
+
+macro_rules! borrow_bls12_381_gt {
+    ($context:expr, $handle:expr) => {{
+        $context.extensions().get::<GroupContext>().bls12_381_gt_elements.get($handle).unwrap()
+    }}
+}
+
+macro_rules! store_bls12_381_gt {
+    ($context:expr, $element:expr) => {{
+        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let ret = inner_ctxt.bls12_381_gt_elements.len();
+        inner_ctxt.bls12_381_gt_elements.push($element);
+        ret
+    }}
 }
 
 fn element_serialize_uncompressed_internal(
@@ -1686,6 +1709,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), element_eq_internal),
         ),
         (
+            "is_prime_order_internal",
+            make_native_from_func(gas_params.clone(), is_prime_order_internal),
+        ),
+        (
             "pairing_product_internal",
             make_native_from_func(gas_params.clone(), pairing_product_internal),
         ),
@@ -1713,63 +1740,4 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     ]);
 
     crate::natives::helpers::make_module_natives(natives)
-}
-
-#[derive(Copy, Clone)]
-pub enum API {
-    ScalarAdd,
-    ScalarDeserialize,
-    ScalarEq,
-    ScalarFromU64,
-    ScalarInv,
-    ScalarMul,
-    ScalarNeg,
-    ScalarSerialize,
-    ElementAdd,
-    ElementDouble,
-    ElementEq,
-    ElementScalarMul,
-    ElementMultiScalarMul,
-    ElementNeg,
-    ElementDeserializeCompressed,
-    ElementDeserializeUncompressed,
-    ElementSerializeCompressed,
-    ElementSerializeUncompressed,
-    GroupGenerator,
-    GroupIdentity,
-    GroupOrder,
-    PairingProduct,
-    HashToElement,
-    RandomElement,
-    RandomScalar,
-}
-
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum Structure {
-    BLS12_381_Fr,
-    BLS12_381_G1,
-    BLS12_381_G2,
-    BLS12_381_Gt,
-}
-
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum HashAlg {
-    SHA256,
-}
-
-fn structure_from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
-    match type_tag.to_string().as_str() {
-        "0x1::groups::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
-        "0x1::groups::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
-        "0x1::groups::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
-        "0x1::groups::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
-        _ => None
-    }
-}
-
-fn hash_alg_from_type_tag(type_tag: &TypeTag) -> Option<HashAlg> {
-    match type_tag.to_string().as_str() {
-        "0x1::groups::SHA256" => Some(HashAlg::SHA256),
-        _ => None
-    }
 }

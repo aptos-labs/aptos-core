@@ -19,7 +19,7 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::Features;
 
 pub struct MoveVmExt {
     inner: MoveVM,
