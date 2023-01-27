@@ -1,5 +1,5 @@
 ---
-title: "Mint NFTs with the Aptos SDKs"
+title: "Mint NFTs with the SDKs"
 slug: "your-first-nft"
 ---
 
