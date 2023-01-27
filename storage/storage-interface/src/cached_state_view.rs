@@ -14,6 +14,7 @@ use aptos_types::{
     transaction::Version,
     write_set::WriteSet,
 };
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::{
@@ -82,7 +83,7 @@ pub struct CachedStateView {
     /// completely and migrate to fine grained storage. A value of None in this cache reflects that
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
-    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
+    state_cache: DashMap<StateKey, Option<StateValue>>,
     proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
@@ -107,7 +108,7 @@ impl CachedStateView {
             id,
             snapshot,
             speculative_state,
-            state_cache: RwLock::new(HashMap::new()),
+            state_cache: DashMap::new(),
             proof_fetcher,
         })
     }
@@ -135,7 +136,7 @@ impl CachedStateView {
     pub fn into_state_cache(self) -> StateCache {
         StateCache {
             frozen_base: self.speculative_state,
-            state_cache: self.state_cache.into_inner(),
+            state_cache: self.state_cache,
             proofs: self.proof_fetcher.get_proof_cache(),
         }
     }
@@ -182,7 +183,7 @@ impl CachedStateView {
 
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
-    pub state_cache: HashMap<StateKey, Option<StateValue>>,
+    pub state_cache: DashMap<StateKey, Option<StateValue>>,
     pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
@@ -196,14 +197,16 @@ impl TStateView for CachedStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
-        if let Some(contents) = self.state_cache.read().get(state_key) {
+        if let Some(contents) = self.state_cache.get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.as_ref().map(|v| v.bytes().to_vec()));
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
-        let mut cache = self.state_cache.write();
-        let new_value = cache.entry(state_key.clone()).or_insert(state_value_option);
+        let new_value = self
+            .state_cache
+            .entry(state_key.clone())
+            .or_insert(state_value_option);
         Ok(new_value.as_ref().map(|v| v.bytes().to_vec()))
     }
 

@@ -151,14 +151,15 @@ impl NetworkTest for dyn NetworkLoadTest {
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let (txn_stat, actual_test_duration, _ledger_transactions) = self.network_load_test(
-            ctx,
-            emit_job_request,
-            duration,
-            WARMUP_DURATION_FRACTION,
-            COOLDOWN_DURATION_FRACTION,
-            rng,
-        )?;
+        let (txn_stat, actual_test_duration, _ledger_transactions, _stats_by_phase) = self
+            .network_load_test(
+                ctx,
+                emit_job_request,
+                duration,
+                WARMUP_DURATION_FRACTION,
+                COOLDOWN_DURATION_FRACTION,
+                rng,
+            )?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
 
@@ -196,7 +197,7 @@ impl dyn NetworkLoadTest {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
-    ) -> Result<(TxnStats, Duration, u64)> {
+    ) -> Result<(TxnStats, Duration, u64, Vec<(TxnStats, Duration)>)> {
         let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
@@ -291,14 +292,15 @@ impl dyn NetworkLoadTest {
             "Emitting txns ran for {} secs, stopping job...",
             duration.as_secs()
         );
-        let txn_stats = rt.block_on(emitter.stop_job(job));
+        let stats_by_phase = rt.block_on(emitter.stop_job(job));
 
         info!("Stopped job");
-        info!("Warmup stats: {}", txn_stats[0].rate(warmup_duration));
+        info!("Warmup stats: {}", stats_by_phase[0].rate(warmup_duration));
 
         let mut stats: Option<TxnStats> = None;
+        let mut stats_and_duration_by_phase_filtered = Vec::new();
         for i in 0..stats_tracking_phases - 2 {
-            let cur = &txn_stats[1 + i];
+            let cur = &stats_by_phase[1 + i];
             info!(
                 "Test stats [test phase {}]: {}",
                 i,
@@ -309,10 +311,11 @@ impl dyn NetworkLoadTest {
             } else {
                 Some(cur.clone())
             };
+            stats_and_duration_by_phase_filtered.push((cur.clone(), actual_phase_durations[i]));
         }
         info!(
             "Cooldown stats: {}",
-            txn_stats.last().unwrap().rate(cooldown_duration)
+            stats_by_phase.last().unwrap().rate(cooldown_duration)
         );
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
@@ -324,6 +327,12 @@ impl dyn NetworkLoadTest {
         } else {
             0
         };
-        Ok((stats.unwrap(), actual_test_duration, ledger_transactions))
+
+        Ok((
+            stats.unwrap(),
+            actual_test_duration,
+            ledger_transactions,
+            stats_and_duration_by_phase_filtered,
+        ))
     }
 }

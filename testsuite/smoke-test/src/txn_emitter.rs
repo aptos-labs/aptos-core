@@ -66,7 +66,12 @@ async fn test_txn_emmitter() {
                 // // commenting this out given it consistently fails smoke test
                 // // and it seems to be called only from `test_txn_emmitter`
                 // (TransactionType::NftMintAndTransfer, 20),
-                (TransactionType::PublishPackage, 20),
+                (
+                    TransactionType::PublishPackage {
+                        use_account_pool: false,
+                    },
+                    20,
+                ),
             ],
             vec![
                 (TransactionType::default_call_different_modules(), 20),

@@ -21,7 +21,7 @@ use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{interface::NetworkClient, storage::PeerMetadataStorage};
+use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
@@ -322,7 +322,7 @@ async fn create_driver_for_tests(
         vec![],
         vec![],
         HashMap::new(),
-        PeerMetadataStorage::new(&[]),
+        PeersAndMetadata::new(&[]),
     ));
     let (aptos_data_client, _) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,

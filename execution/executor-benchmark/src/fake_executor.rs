@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::benchmark_transaction::{
-    AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo,
+use crate::{
+    benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
+    metrics::TIMER,
 };
 use anyhow::Result;
 use aptos_executor::{
@@ -191,20 +192,50 @@ impl FakeExecutor {
         account_creation_info: &AccountCreationInfo,
         state_view: &CachedStateView,
     ) -> Result<TransactionOutput> {
+        let _timer = TIMER.with_label_values(&["account_creation"]).start_timer();
         let sender_address = account_creation_info.sender;
         let new_account_address = account_creation_info.new_account;
 
         let sender_account_key = Self::new_state_key_account(sender_address);
-        let mut sender_account = Self::get_account(&sender_account_key, state_view)?.unwrap();
+        let mut sender_account = {
+            let _timer = TIMER
+                .with_label_values(&["read_sender_account"])
+                .start_timer();
+            Self::get_account(&sender_account_key, state_view)?.unwrap()
+        };
         let sender_coin_store_key = Self::new_state_key_aptos_coin(sender_address);
-        let mut sender_coin_store =
-            Self::get_coin_store(&sender_coin_store_key, state_view)?.unwrap();
+        let mut sender_coin_store = {
+            let _timer = TIMER
+                .with_label_values(&["read_sender_coin_store"])
+                .start_timer();
+            Self::get_coin_store(&sender_coin_store_key, state_view)?.unwrap()
+        };
 
         let new_account_key = Self::new_state_key_account(new_account_address);
         let new_coin_store_key = Self::new_state_key_aptos_coin(new_account_address);
 
-        assert!(Self::get_account(&new_account_key, state_view)?.is_none());
-        assert!(Self::get_coin_store(&new_coin_store_key, state_view)?.is_none());
+        {
+            let _timer = TIMER.with_label_values(&["read_new_account"]).start_timer();
+            let new_account_already_exists =
+                Self::get_account(&new_account_key, state_view)?.is_some();
+            if new_account_already_exists {
+                // This is to handle the case that we re-create seed accounts when adding more
+                // accounts into an existing db. In real VM this will be an abort, I choose to
+                // return Success here, for simplicity.
+                return Ok(TransactionOutput::new(
+                    Default::default(),
+                    vec![],
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                ));
+            }
+        }
+        {
+            let _timer = TIMER
+                .with_label_values(&["read_new_coin_store"])
+                .start_timer();
+            assert!(Self::get_coin_store(&new_coin_store_key, state_view)?.is_none());
+        }
 
         // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
         sender_coin_store.coin -= account_creation_info.initial_balance;

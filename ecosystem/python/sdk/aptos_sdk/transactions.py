@@ -69,7 +69,7 @@ class RawTransaction:
         )
 
     def __str__(self):
-        return f"""RawTranasction:
+        return f"""RawTransaction:
     sender: {self.sender}
     sequence_number: {self.sequence_number}
     payload: {self.payload}
