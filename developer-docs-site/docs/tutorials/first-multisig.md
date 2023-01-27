@@ -5,11 +5,11 @@ slug: "your-first-multisig"
 
 # Your First Multisig
 
-This tutorial introduces assorted [K-of-N multisigner authentication](../concepts/accounts#multisigner-authentication) operations, and supplements content from the following tutorials:
+This tutorial introduces assorted [K-of-N multisigner authentication](../concepts/accounts.md#multisigner-authentication) operations, and supplements content from the following tutorials:
 
-* [Your First Transaction](your-first-transaction)
-* [Your First Coin](your-first-coin)
-* [Your First Move Module](first-move-module)
+* [Your First Transaction](./first-transaction.md)
+* [Your First Coin](./first-coin.md)
+* [Your First Move Module](./first-move-module.md)
 
 :::tip
 Try out the above tutorials (which include dependency installations) before moving on to multisig operations.
@@ -17,9 +17,9 @@ Try out the above tutorials (which include dependency installations) before movi
 
 ## Step 1: Pick an SDK
 
-This tutorial, a community contribution, was created for the [Python SDK](../sdks/python-sdk).
+This tutorial, a community contribution, was created for the [Python SDK](../sdks/python-sdk.md).
 
-Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index) and the [Rust SDK](../sdks/rust-sdk)!
+Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index.md) and the [Rust SDK](../sdks/rust-sdk.md)!
 
 ## Step 2: Start the example
 
@@ -37,13 +37,13 @@ python multisig.py
 
 ## Step 3: Generate signers
 
-First the example will generate single signer accounts for Alice, Bob, and Chad:
+First, we will generate single signer accounts for Alice, Bob, and Chad:
 
 ```python
 :!: static/sdks/python/examples/multisig.py section_1
 ```
 
-Fresh accounts are generated for each example run, but the printout should look something like the following:
+Fresh accounts are generated for each example run, but the output should resemble:
 
 ```zsh
 === Account addresses ===
@@ -62,17 +62,17 @@ Bob:   0x089d6e00e946af8d372ef4ef7f26e21a08cb856747014d15525180bf37f31ef5
 Chad:  0x784508b54b812f89a6cb6c47010a5c389ff25316feed7f923b9e1489f7772acf
 ```
 
-For each user note that the [account address](../concepts/accounts#account-address) and [authentication key](../concepts/accounts#single-signer-authentication) are identical, but the [public key](../concepts/accounts#creating-an-account) is different.
+For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts#creating-an-account) is different.
 
 ## Step 4: Generate a multisig account
 
-Next generate a [K-of-N multisigner](../concepts/accounts#multisigner-authentication) public key and account address for a multisig account requiring 2 of the 3 signatures:
+Next generate a [K-of-N multisigner](../concepts/accounts.md#multisigner-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
 ```python
 :!: static/sdks/python/examples/multisig.py section_2
 ```
 
-The multisig account address depends on the public keys of the single signers (hence it will be different for each example), but your printout should look something like the following:
+The multisig account address depends on the public keys of the single signers. (Hence, it will be different for each example.) But the output should resemble:
 
 ```zsh
 === 2-of-3 Multisig account ===
@@ -99,11 +99,11 @@ Multisig balance: 40000000
 ## Step 6: Send coins from the multisig
 
 This transaction will send 100 octas from the multisig account to Chad's account.
-Since it is a 2-of-3 multisig account, signatures are only required from 2 individual signers.
+Since it is a two-of-three multisig account, signatures are required only from two individual signers.
 
 ### Step 6.1 Gather individual signatures
 
-First generate a raw transaction, signed by Alice and by Bob, but not by Chad.
+First generate a raw transaction, signed by Alice and Bob, but not by Chad.
 
 ```python
 :!: static/sdks/python/examples/multisig.py section_4
