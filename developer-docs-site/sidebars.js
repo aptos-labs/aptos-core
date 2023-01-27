@@ -347,7 +347,7 @@ const sidebars = {
           link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
-          items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
+          items: ["sdks/ts-sdk/typescript-sdk-overview"],
         },
         "sdks/python-sdk",
         "sdks/rust-sdk",
