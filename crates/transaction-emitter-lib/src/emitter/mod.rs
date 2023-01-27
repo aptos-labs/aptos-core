@@ -59,6 +59,7 @@ pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
 pub enum TransactionType {
     CoinTransfer {
         invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
     },
     AccountGeneration {
         add_created_accounts_to_pool: bool,
@@ -66,7 +67,9 @@ pub enum TransactionType {
         creation_balance: u64,
     },
     NftMintAndTransfer,
-    PublishPackage,
+    PublishPackage {
+        use_account_pool: bool,
+    },
     CallCustomModules {
         entry_point: EntryPoints,
         num_modules: usize,
@@ -78,6 +81,7 @@ impl TransactionType {
     pub fn default_coin_transfer() -> Self {
         Self::CoinTransfer {
             invalid_transaction_ratio: 0,
+            sender_use_account_pool: false,
         }
     }
 

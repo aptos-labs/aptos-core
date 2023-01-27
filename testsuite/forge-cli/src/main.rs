@@ -17,7 +17,7 @@ use aptos_testcases::{
     forge_setup_test::ForgeSetupTest,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
-    load_vs_perf_benchmark::LoadVsPerfBenchmark,
+    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
@@ -467,6 +467,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "graceful_overload" => graceful_overload(config),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(config),
+        "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(config),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
@@ -541,7 +542,7 @@ fn run_consensus_only_perf_test(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmark,
-            tps: &[30000],
+            workloads: Workloads::TPS(&[30000]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -728,9 +729,49 @@ fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmarkWithFN,
-            tps: &[
+            workloads: Workloads::TPS(&[
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
-            ],
+            ]),
+        }])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(0)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+        )
+}
+
+fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
+        }))
+        // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+        //     mempool_backlog: 10000,
+        // }))
+        .with_network_tests(vec![&LoadVsPerfBenchmark {
+            test: &PerformanceBenchmarkWithFN,
+            workloads: Workloads::TRANSACTIONS(&[
+                TransactinWorkload::NoOp,
+                TransactinWorkload::NoOpUnique,
+                TransactinWorkload::CoinTransfer,
+                TransactinWorkload::CoinTransferUnique,
+                TransactinWorkload::WriteResourceSmall,
+                TransactinWorkload::WriteResourceBig,
+                TransactinWorkload::LargeModuleWorkingSet,
+                TransactinWorkload::PublishPackages,
+                // TransactinWorkload::NftMint,
+            ]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -834,7 +875,9 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                 job.transaction_type(match test_name.as_str() {
                     "account_creation" => TransactionType::default_account_generation(),
                     "nft_mint" => TransactionType::NftMintAndTransfer,
-                    "publishing" => TransactionType::PublishPackage,
+                    "publishing" => TransactionType::PublishPackage {
+                        use_account_pool: false,
+                    },
                     "module_loading" => TransactionType::CallCustomModules {
                         entry_point: EntryPoints::Nop,
                         num_modules: 1000,
