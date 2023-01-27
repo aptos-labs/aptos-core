@@ -325,6 +325,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
@@ -389,7 +390,11 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
-            self.resolve_pending_code_publish(&mut session, gas_meter)?;
+            self.resolve_pending_code_publish(
+                &mut session,
+                gas_meter,
+                new_published_modules_loaded,
+            )?;
 
             let session_output = session.finish().map_err(|e| e.into_vm_status())?;
             let change_set_ext =
@@ -444,6 +449,7 @@ impl AptosVM {
         modules: &[CompiledModule],
         exists: BTreeSet<ModuleId>,
         senders: &[AccountAddress],
+        new_published_modules_loaded: &mut bool,
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
         for module in modules {
@@ -451,6 +457,7 @@ impl AptosVM {
                 // Call initializer only on first publish.
                 continue;
             }
+            *new_published_modules_loaded = true;
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
@@ -516,6 +523,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
             return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
@@ -554,6 +562,7 @@ impl AptosVM {
             &self.deserialize_module_bundle(modules)?,
             BTreeSet::new(),
             &[txn_data.sender()],
+            new_published_modules_loaded,
         )?;
 
         let session_output = session.finish().map_err(|e| e.into_vm_status())?;
@@ -572,6 +581,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
+        new_published_modules_loaded: &mut bool,
     ) -> VMResult<()> {
         if let Some(PublishRequest {
             destination,
@@ -600,6 +610,8 @@ impl AptosVM {
             }
 
             // Publish the bundle and execute initializers
+            // publish_module_bundle doesn't actually load the published module into
+            // the loader cache. It only puts the module data in the data cache.
             session
                 .publish_module_bundle_with_compat_config(
                     bundle.into_inner(),
@@ -615,16 +627,14 @@ impl AptosVM {
                     ),
                 )
                 .and_then(|_| {
-                    self.execute_module_initialization(session, gas_meter, &modules, exists, &[
-                        destination,
-                    ])
-                })
-                .map_err(|e| {
-                    // Be sure to flash the loader cache to align storage with the cache.
-                    // None of the modules in the bundle will be committed to storage,
-                    // but some of them may have ended up in the cache.
-                    self.0.mark_loader_cache_as_invalid();
-                    e
+                    self.execute_module_initialization(
+                        session,
+                        gas_meter,
+                        &modules,
+                        exists,
+                        &[destination],
+                        new_published_modules_loaded,
+                    )
                 })
         } else {
             Ok(())
@@ -728,6 +738,10 @@ impl AptosVM {
             txn_data.max_gas_amount(),
         );
 
+        // We keep track of whether any newly published modules are loaded into the Vm's loader
+        // cache as part of executing transactions. This would allow us to decide whether the cache
+        // should be flushed later.
+        let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => self
@@ -738,10 +752,17 @@ impl AptosVM {
                     &txn_data,
                     payload,
                     log_context,
+                    &mut new_published_modules_loaded,
                 ),
-            TransactionPayload::ModuleBundle(m) => {
-                self.execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
-            },
+            TransactionPayload::ModuleBundle(m) => self.execute_modules(
+                storage,
+                session,
+                &mut gas_meter,
+                &txn_data,
+                m,
+                log_context,
+                &mut new_published_modules_loaded,
+            ),
         };
 
         let gas_usage = txn_data
@@ -753,6 +774,15 @@ impl AptosVM {
         match result {
             Ok(output) => output,
             Err(err) => {
+                // Invalidate the loader cache in case there was a new module loaded from a module
+                // publish request that failed.
+                // This ensures the loader cache is flushed later to align storage with the cache.
+                // None of the modules in the bundle will be committed to storage,
+                // but some of them may have ended up in the cache.
+                if new_published_modules_loaded {
+                    self.0.mark_loader_cache_as_invalid();
+                };
+
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
@@ -1318,6 +1348,7 @@ impl AptosSimulationVM {
             txn_data.max_gas_amount(),
         );
 
+        let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => {
@@ -1328,17 +1359,31 @@ impl AptosSimulationVM {
                     &txn_data,
                     payload,
                     log_context,
+                    &mut new_published_modules_loaded,
                 )
             },
-            TransactionPayload::ModuleBundle(m) => {
-                self.0
-                    .execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
-            },
+            TransactionPayload::ModuleBundle(m) => self.0.execute_modules(
+                storage,
+                session,
+                &mut gas_meter,
+                &txn_data,
+                m,
+                log_context,
+                &mut new_published_modules_loaded,
+            ),
         };
 
         match result {
             Ok(output) => output,
             Err(err) => {
+                // Invalidate the loader cache in case there was a new module loaded from a module
+                // publish request that failed.
+                // This ensures the loader cache is flushed later to align storage with the cache.
+                // None of the modules in the bundle will be committed to storage,
+                // but some of them may have ended up in the cache.
+                if new_published_modules_loaded {
+                    self.0 .0.mark_loader_cache_as_invalid();
+                };
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
