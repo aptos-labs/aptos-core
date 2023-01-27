@@ -42,7 +42,7 @@ type CommitType = (u64, Round, Vec<Payload>);
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    executor: Arc<dyn BlockExecutorTrait>,
+    executor: Arc<dyn BlockExecutorTrait<Transaction>>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
@@ -53,7 +53,7 @@ pub struct ExecutionProxy {
 
 impl ExecutionProxy {
     pub fn new(
-        executor: Arc<dyn BlockExecutorTrait>,
+        executor: Arc<dyn BlockExecutorTrait<Transaction>>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,

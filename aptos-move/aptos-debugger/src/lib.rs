@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    on_chain_config::{Features, OnChainConfig},
     transaction::{ChangeSet, Transaction, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
@@ -154,17 +155,17 @@ impl AptosDebugger {
     where
         F: FnOnce(&mut SessionExt<StorageAdapter<DebuggerStateView>>) -> VMResult<()>,
     {
+        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let state_view_storage = StorageAdapter::new(&state_view);
+        let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            true,
-            true,
             ChainId::test().id(),
+            features,
         )
         .unwrap();
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = StorageAdapter::new(&state_view);
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         session
