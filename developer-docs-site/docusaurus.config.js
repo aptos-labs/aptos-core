@@ -243,7 +243,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Understand Nodes",
+                label: "Learn about Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
@@ -253,22 +253,22 @@ const config = {
                 docId: "nodes/local-testnet/index",
               },
               {
-                label: "Install Validators",
+                label: "Run a Validator",
                 type: "doc",
                 docId: "nodes/validator-node/index",
               },
               {
-                label: "Install FullNodes",
+                label: "Run a FullNode",
                 type: "doc",
                 docId: "nodes/full-node/index",
               },
               {
-                label: "Monitor Nodes",
+                label: "Monitor a Node",
                 type: "doc",
                 docId: "nodes/measure/index",
               },
               {
-                label: "Configure Nodes",
+                label: "Configure a Node",
                 type: "doc",
                 docId: "nodes/identity-and-configuration",
               },
