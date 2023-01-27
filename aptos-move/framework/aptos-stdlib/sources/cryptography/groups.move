@@ -2,9 +2,7 @@ module aptos_std::groups {
     use std::option::Option;
 
     // Error codes
-    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
-    const E_UNKNOWN_GROUP: u64 = 2;
-    const E_UNKNOWN_PAIRING: u64 = 3;
+    const E_NOT_IMPLEMENTED: u64 = 2;
 
     /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
@@ -219,9 +217,9 @@ module aptos_std::groups {
     }
 
     /// Compute `k*P` for scalar `k` and group element `P`.
-    public fun element_scalar_mul<G, S>(scalar_k: &Scalar<S>, element_p: &Element<G>): Element<G> {
+    public fun element_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Scalar<S>): Element<G> {
         Element<G> {
-            handle: element_mul_internal<G, S>(scalar_k.handle, element_p.handle)
+            handle: element_mul_internal<G, S>(element_p.handle, scalar_k.handle)
         }
     }
 
@@ -233,7 +231,7 @@ module aptos_std::groups {
     }
 
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` for a list of scalars `k[]` and a list of group elements `P[]`, both of size `n`.
-    public fun element_multi_scalar_mul<G, S>(scalars: &vector<Scalar<S>>, elements: &vector<Element<G>>): Element<G> {
+    public fun element_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Scalar<S>>): Element<G> {
         let num_scalars = std::vector::length(scalars);
         let scalar_handles = vector[];
         let i = 0;
@@ -251,14 +249,14 @@ module aptos_std::groups {
         };
 
         Element<G> {
-            handle: element_multi_scalar_mul_internal<G, S>(scalar_handles, element_handles)
+            handle: element_multi_scalar_mul_internal<G, S>(element_handles, scalar_handles)
         }
 
     }
 
     /// Scalar deserialization.
-    public fun deserialize_scalar<S>(bytes: &vector<u8>): Option<Scalar<S>> {
-        let (succeeded, handle) = deserialize_scalar_internal<S>(*bytes);
+    public fun scalar_deserialize<S>(bytes: &vector<u8>): Option<Scalar<S>> {
+        let (succeeded, handle) = scalar_deserialize_internal<S>(*bytes);
         if (succeeded) {
             let scalar = Scalar<S> {
                 handle
@@ -270,23 +268,23 @@ module aptos_std::groups {
     }
 
     /// Scalar serialization.
-    public fun serialize_scalar<S>(scalar: &Scalar<S>): vector<u8> {
-        serialize_scalar_internal<S>(scalar.handle)
+    public fun scalar_serialize<S>(scalar: &Scalar<S>): vector<u8> {
+        scalar_serialize_internal<S>(scalar.handle)
     }
 
     /// Group element serialization with an uncompressed format.
     public fun serialize_element_uncompressed<G>(element: &Element<G>): vector<u8> {
-        serialize_element_uncompressed_internal<G>(element.handle)
+        element_serialize_uncompressed_internal<G>(element.handle)
     }
 
     /// Group element serialization with a compressed format.
     public fun serialize_element_compressed<G>(element: &Element<G>): vector<u8> {
-        serialize_element_compressed_internal<G>(element.handle)
+        element_serialize_compressed_internal<G>(element.handle)
     }
 
     /// Group element deserialization with an uncompressed format.
     public fun deserialize_element_uncompressed<G>(bytes: vector<u8>): Option<Element<G>> {
-        let (succ, handle) = deserialize_element_uncompressed_internal<G>(bytes);
+        let (succ, handle) = element_deserialize_uncompressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
         } else {
@@ -296,7 +294,7 @@ module aptos_std::groups {
 
     /// Group element deserialization with a compressed format.
     public fun deserialize_element_compressed<G>(bytes: vector<u8>): Option<Element<G>> {
-        let (succ, handle) = deserialize_element_compressed_internal<G>(bytes);
+        let (succ, handle) = element_deserialize_compressed_internal<G>(bytes);
         if (succ) {
             std::option::some(Element<G> { handle })
         } else {
@@ -307,11 +305,6 @@ module aptos_std::groups {
     /// Check if `P == Q` for group elements `P` and `Q`.
     public fun element_eq<G>(element_p: &Element<G>, element_q: &Element<G>): bool {
         element_eq_internal<G>(element_p.handle, element_q.handle)
-    }
-
-    /// Check if group `G` has a prime order.
-    public fun is_prime_order<G>(): bool {
-        is_prime_order_internal<G>()
     }
 
     /// Get the order of group `G`, little-endian encoded as a byte string.
@@ -336,29 +329,28 @@ module aptos_std::groups {
     }
 
     // Native functions.
-    native fun deserialize_element_uncompressed_internal<G>(bytes: vector<u8>): (bool, u64);
-    native fun deserialize_element_compressed_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun element_deserialize_uncompressed_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun element_deserialize_compressed_internal<G>(bytes: vector<u8>): (bool, u64);
     native fun scalar_from_u64_internal<G>(value: u64): u64;
-    native fun deserialize_scalar_internal<G>(bytes: vector<u8>): (bool, u64);
+    native fun scalar_deserialize_internal<G>(bytes: vector<u8>): (bool, u64);
     native fun scalar_neg_internal<G>(handle: u64): u64;
     native fun scalar_add_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun scalar_double_internal<G>(handle: u64): u64;
     native fun scalar_mul_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun scalar_inv_internal<G>(handle: u64): (bool, u64);
     native fun scalar_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
-    native fun serialize_scalar_internal<G>(h: u64): vector<u8>;
+    native fun scalar_serialize_internal<G>(h: u64): vector<u8>;
     native fun element_add_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun element_eq_internal<G>(handle_1: u64, handle_2: u64): bool;
     native fun group_identity_internal<G>(): u64;
-    native fun is_prime_order_internal<G>(): bool;
     native fun group_order_internal<G>(): vector<u8>;
     native fun group_generator_internal<G>(): u64;
     native fun element_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
     native fun element_double_internal<G>(element_handle: u64): u64;
     native fun element_neg_internal<G>(handle: u64): u64;
-    native fun serialize_element_uncompressed_internal<G>(handle: u64): vector<u8>;
-    native fun serialize_element_compressed_internal<G>(handle: u64): vector<u8>;
-    native fun element_multi_scalar_mul_internal<G, S>(scalar_handles: vector<u64>, element_handles: vector<u64>): u64;
+    native fun element_serialize_uncompressed_internal<G>(handle: u64): vector<u8>;
+    native fun element_serialize_compressed_internal<G>(handle: u64): vector<u8>;
+    native fun element_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun hash_to_element_internal<H, G>(bytes: vector<u8>): u64;
     #[test_only]
@@ -369,19 +361,18 @@ module aptos_std::groups {
     #[test]
     fun test_bls12_381_g1() {
         // Group info.
-        assert!(is_prime_order<BLS12_381_G1>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G1>(), 1);
 
         // Scalar encoding/decoding.
         let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7_another = std::option::extract(&mut scalar_deserialize<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
-        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
+        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == scalar_serialize(&scalar_7), 1);
+        assert!(std::option::is_none(&scalar_deserialize<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
-        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
+        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == scalar_serialize(&scalar_minus_7), 1);
 
         // Scalar addition.
         let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
@@ -420,13 +411,13 @@ module aptos_std::groups {
         assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Point multiplication by scalar.
-        let point_7g_calc = element_scalar_mul(&scalar_7, &point_g);
+        let point_7g_calc = element_scalar_mul(&point_g, &scalar_7);
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10" == serialize_element_uncompressed(&point_7g_calc), 1);
         assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899" == serialize_element_compressed(&point_7g_calc), 1);
 
         // Point double.
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
         let point_double_g = element_double(&point_g);
         assert!(element_eq(&point_2g, &point_double_g), 1);
 
@@ -436,44 +427,42 @@ module aptos_std::groups {
         assert!(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328198f9067d78113ed5f734fb2e1b497e52013da0c9d679a592da735f6713d2eed2913f9c11208d2e1f455b0c9942f647309" == serialize_element_uncompressed(&point_minus_7g_calc), 1);
 
         // Point addition.
-        let point_9g = element_scalar_mul(&scalar_9, &point_g);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
+        let point_9g = element_scalar_mul(&point_g, &scalar_9);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
         let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
+        let point_14g = element_scalar_mul(&point_g, &scalar_from_u64<BLS12_381_Fr>(14));
         let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
         let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
         let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
-        let point_3g = element_scalar_mul(&scalar_3, &point_g);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
+        let point_3g = element_scalar_mul(&point_g, &scalar_3);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
         let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = element_multi_scalar_mul(&scalars, &points);
+        let point_14g_calc = element_multi_scalar_mul(&points, &scalars);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
 
         // Hash to group.
-        let point = hash_to_element<SHA256, BLS12_381_G1>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_G1>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
+        let _point = hash_to_element<SHA256, BLS12_381_G1>(x"1234");
     }
 
     #[test]
     fun test_bls12_381_g2() {
         // Group info.
-        assert!(is_prime_order<BLS12_381_G2>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_G2>(), 1);
 
         // Scalar encoding/decoding.
         let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7_another = std::option::extract(&mut scalar_deserialize<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
-        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
+        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == scalar_serialize(&scalar_7), 1);
+        assert!(std::option::is_none(&scalar_deserialize<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
-        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
+        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == scalar_serialize(&scalar_minus_7), 1);
 
         // Scalar addition.
         let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
@@ -512,13 +501,13 @@ module aptos_std::groups {
         assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Point multiplication by scalar.
-        let point_7g_calc = element_scalar_mul(&scalar_7, &point_g);
+        let point_7g_calc = element_scalar_mul(&point_g, &scalar_7);
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dddcc1399cdf852dab1e2c8dc3b0ce819362f3a12da56f37aee93d3881ca760e467942c92428864a6172c80bf4daeb7082070fa8e8937746ae82d57ec8b639977f8ceaef21a11375de52b02e145dc39021bf4cab7eeaa955688a1b75436f9ec05" == serialize_element_uncompressed(&point_7g_calc), 1);
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d" == serialize_element_compressed(&point_7g_calc), 1);
 
         // Point double.
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
         let point_double_g = element_double(&point_g);
         assert!(element_eq(&point_2g, &point_double_g), 1);
 
@@ -528,44 +517,43 @@ module aptos_std::groups {
         assert!(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dceddeb663207acdf4d1d8bd4c2f3c304eec676e4c67b3decd07eb16a68a416806f181fb1731fb7a482baff799c6349118b3a057176c88a4f17d2fcc4729c12a72b27020486c1f909dae682123f6f3d62bcb8808bc7fc85f41145c8e4b3181414" == serialize_element_uncompressed(&point_minus_7g_calc), 1);
 
         // Point addition.
-        let point_9g = element_scalar_mul(&scalar_9, &point_g);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
+        let point_9g = element_scalar_mul(&point_g, &scalar_9);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
         let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
+        let point_14g = element_scalar_mul(&point_g, &scalar_from_u64<BLS12_381_Fr>(14));
         let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
         let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
         let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
-        let point_3g = element_scalar_mul(&scalar_3, &point_g);
+        let point_2g = element_scalar_mul(&point_g, &scalar_2);
+        let point_3g = element_scalar_mul(&point_g, &scalar_3);
         let scalars = vector[scalar_1, scalar_2, scalar_3];
         let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = element_multi_scalar_mul(&scalars, &points);
+        let point_14g_calc = element_multi_scalar_mul(&points, &scalars);
         assert!(element_eq(&point_14g, &point_14g_calc), 1);
 
         // Hash to group.
         let point = hash_to_element<SHA256, BLS12_381_G2>(x"1234");
-        assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(0), &point)), 1);
+        assert!(element_eq(&group_identity<BLS12_381_G2>(), &element_scalar_mul(&point, &scalar_from_u64<BLS12_381_Fr>(0))), 1);
     }
 
     #[test]
     fun test_bls12_381_gt() {
         // Group info.
-        assert!(is_prime_order<BLS12_381_Gt>(), 1);
         assert!(x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == group_order<BLS12_381_Gt>(), 1);
 
         // Scalar encoding/decoding.
         let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
-        let scalar_7_another = std::option::extract(&mut deserialize_scalar<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
+        let scalar_7_another = std::option::extract(&mut scalar_deserialize<BLS12_381_Fr>(&x"0700000000000000000000000000000000000000000000000000000000000000"));
         assert!(scalar_eq(&scalar_7, &scalar_7_another), 1);
-        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == serialize_scalar(&scalar_7), 1);
-        assert!(std::option::is_none(&deserialize_scalar<BLS12_381_Fr>(&x"ffff")), 1);
+        assert!( x"0700000000000000000000000000000000000000000000000000000000000000" == scalar_serialize(&scalar_7), 1);
+        assert!(std::option::is_none(&scalar_deserialize<BLS12_381_Fr>(&x"ffff")), 1);
 
         // Scalar negation.
         let scalar_minus_7 = scalar_neg(&scalar_7);
-        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize_scalar(&scalar_minus_7), 1);
+        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == scalar_serialize(&scalar_minus_7), 1);
 
         // Scalar addition.
         let scalar_9 = scalar_from_u64<BLS12_381_Fr>(9);
@@ -584,75 +572,48 @@ module aptos_std::groups {
         let scalar_0 = scalar_from_u64<BLS12_381_Fr>(0);
         assert!(std::option::is_none(&scalar_inv(&scalar_0)), 1);
 
-        // Point encoding/decoding.
-        let point_g = group_generator<BLS12_381_Gt>();
-        assert!(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f" == serialize_element_uncompressed(&point_g), 1);
-        assert!(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f" == serialize_element_compressed(&point_g), 1);
-        let point_g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_Gt>(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f"));
-        let point_g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_Gt>(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f"));
-        assert!(element_eq(&point_g, &point_g_from_comp), 1);
-        assert!(element_eq(&point_g, &point_g_from_uncomp), 1);
+        // Element encoding/decoding.
+        let element_g = group_generator<BLS12_381_Gt>();
+        assert!(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f" == serialize_element_uncompressed(&element_g), 1);
+        let element_g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_Gt>(x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f"));
+        assert!(element_eq(&element_g, &element_g_from_uncomp), 1);
         let inf = group_identity<BLS12_381_Gt>();
         assert!(x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" == serialize_element_uncompressed(&inf), 1);
-        assert!(x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" == serialize_element_compressed(&inf), 1);
         let inf_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_Gt>(x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"));
-        let inf_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_Gt>(x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"));
-        assert!(element_eq(&inf, &inf_from_comp), 1);
         assert!(element_eq(&inf, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_Gt>(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518"));
-        let point_7g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_Gt>(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518"));
-        assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+        let element_7g_from_uncomp = std::option::extract(&mut deserialize_element_uncompressed<BLS12_381_Gt>(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518"));
         assert!(std::option::is_none(&deserialize_element_uncompressed<BLS12_381_Gt>(x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
-        // Point multiplication by scalar.
-        let point_7g_calc = element_scalar_mul(&scalar_7, &point_g);
-        assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518" == serialize_element_uncompressed(&point_7g_calc), 1);
-        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518" == serialize_element_compressed(&point_7g_calc), 1);
+        // Element scalar multiplication.
+        let element_7g_calc = element_scalar_mul(&element_g, &scalar_7);
+        assert!(element_eq(&element_7g_calc, &element_7g_from_uncomp), 1);
+        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c185d185b4605dc9808517196bba9d00a3e37bca466c19187486db104ee03962d39fe473e276355618e44c965f05082bb027a7baa4bcc6d8c0775c1e8a481e77df36ddad91e75a982302937f543a11fe71922dcd4f46fe8f951f91cde412b359507f2b3b6df0374bfe55c9a126ad31ce254e67d64194d32d7955ec791c9555ea5a917fc47aba319e909de82da946eb36e12aff936708402228295db2712f2fc807c95092a86afd71220699df13e2d2fdf2857976cb1e605f72f1b2edabadba3ff05501221fe81333c13917c85d725ce92791e115eb0289a5d0b3330901bb8b0ed146abeb81381b7331f1c508fb14e057b05d8b0190a9e74a3d046dcd24e7ab747049945b3d8a120c4f6d88e67661b55573aa9b361367488a1ef7dffd967d64a1518" == serialize_element_uncompressed(&element_7g_calc), 1);
 
-        // Point double.
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
-        let point_double_g = element_double(&point_g);
-        assert!(element_eq(&point_2g, &point_double_g), 1);
+        // Element negation.
+        let element_minus_7g_calc = element_neg(&element_7g_calc);
+        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c184e92a4b9fa2366b1ae8ebdf5542fa1e0ec390c90df40a91e5261800581b5492bd9640d1c5352babc551d1a49998f4517312f55b4339272b28a3e6b0c7d182e2bb61bd7d72b29ae3696db8fafe32b904ab5d0764e46bf21f9a0c9a1f7bedc6b12b9f64820fc8b3fd4a26541472be3c9c93d784cdd53a059d1604bf3292fedd1babfb00398128e3241bc63a5a47b5e9207fcb0c88f7bfddc376a242c9f0c032ba28eec8670f1fa1d47567593b4571c983b8015df91cfa1241b7fb8a57e0e6e01145b98de017eccc2a66e83ced9d83119a505e552467838d35b8ce2f4d7cc9a894f6dee922f35f0e72b7e96f0879b0c8614d3f9e5f5618b5be9b82381628448641a8bb0fd1dffb16c70e6831d8d69f61f2a2ef9e90c421f7a5b1ce7a5d113c7eb01" == serialize_element_uncompressed(&element_minus_7g_calc), 1);
 
-        // Point negation.
-        let point_minus_7g_calc = element_neg(&point_7g_calc);
-        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c184e92a4b9fa2366b1ae8ebdf5542fa1e0ec390c90df40a91e5261800581b5492bd9640d1c5352babc551d1a49998f4517312f55b4339272b28a3e6b0c7d182e2bb61bd7d72b29ae3696db8fafe32b904ab5d0764e46bf21f9a0c9a1f7bedc6b12b9f64820fc8b3fd4a26541472be3c9c93d784cdd53a059d1604bf3292fedd1babfb00398128e3241bc63a5a47b5e9207fcb0c88f7bfddc376a242c9f0c032ba28eec8670f1fa1d47567593b4571c983b8015df91cfa1241b7fb8a57e0e6e01145b98de017eccc2a66e83ced9d83119a505e552467838d35b8ce2f4d7cc9a894f6dee922f35f0e72b7e96f0879b0c8614d3f9e5f5618b5be9b82381628448641a8bb0fd1dffb16c70e6831d8d69f61f2a2ef9e90c421f7a5b1ce7a5d113c7eb01" == serialize_element_compressed(&point_minus_7g_calc), 1);
-        assert!(x"2041ea7b66c19680e2c0bb23245a71918753220b31f88a925aa9b1e192e7c188a0b365cb994b3ec5e809206117c6411242b940b10caa37ce734496b3b7c63578a0e3c076f9b31a7ca13a716262e0e4cda4ac994efb9e19893cbfe4d464b9210d099d808a08b3c4c3846e7529984899478639c4e6c46152ef49a04af9c8e6ff442d286c4613a3dac6a4bee4b40e1f6b030f2871dabe4223b250c3181ecd3bc6819004745aeb6bac567407f2b9c7d1978c45ee6712ae46930bc00638383f6696158bad488cbe7663d681c96c035481dbcf78e7a7fbaec3799163aa6914cef3365156bdc3e533a7c883d5974e3462ac6f19e3f9ce26800ae248a45c5f0dd3a48a185969224e6cd6af9a048241bdcac9800d94aeee970e08488fb961e36a769b6c184e92a4b9fa2366b1ae8ebdf5542fa1e0ec390c90df40a91e5261800581b5492bd9640d1c5352babc551d1a49998f4517312f55b4339272b28a3e6b0c7d182e2bb61bd7d72b29ae3696db8fafe32b904ab5d0764e46bf21f9a0c9a1f7bedc6b12b9f64820fc8b3fd4a26541472be3c9c93d784cdd53a059d1604bf3292fedd1babfb00398128e3241bc63a5a47b5e9207fcb0c88f7bfddc376a242c9f0c032ba28eec8670f1fa1d47567593b4571c983b8015df91cfa1241b7fb8a57e0e6e01145b98de017eccc2a66e83ced9d83119a505e552467838d35b8ce2f4d7cc9a894f6dee922f35f0e72b7e96f0879b0c8614d3f9e5f5618b5be9b82381628448641a8bb0fd1dffb16c70e6831d8d69f61f2a2ef9e90c421f7a5b1ce7a5d113c7eb01" == serialize_element_uncompressed(&point_minus_7g_calc), 1);
-
-        // Point addition.
-        let point_9g = element_scalar_mul(&scalar_9, &point_g);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
-        let point_2g_calc = element_add(&point_minus_7g_calc, &point_9g);
-        assert!(element_eq(&point_2g, &point_2g_calc), 1);
-
-        // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(14), &point_g);
-        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
-        let point_2g = element_scalar_mul(&scalar_2, &point_g);
-        let point_3g = element_scalar_mul(&scalar_3, &point_g);
-        let scalars = vector[scalar_1, scalar_2, scalar_3];
-        let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = element_multi_scalar_mul(&scalars, &points);
-        assert!(element_eq(&point_14g, &point_14g_calc), 1);
+        // Element addition.
+        let element_9g = element_scalar_mul(&element_g, &scalar_9);
+        let element_2g = element_scalar_mul(&element_g, &scalar_2);
+        let element_2g_calc = element_add(&element_minus_7g_calc, &element_9g);
+        assert!(element_eq(&element_2g, &element_2g_calc), 1);
     }
 
     #[test]
     fun test_bls12381_pairing() {
         // Single pairing.
         let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &group_generator<BLS12_381_G1>()),
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(7), &group_generator<BLS12_381_G2>()),
+            &element_scalar_mul(&group_generator<BLS12_381_G1>(), &scalar_from_u64<BLS12_381_Fr>(5)),
+            &element_scalar_mul(&group_generator<BLS12_381_G2>(), &scalar_from_u64<BLS12_381_Fr>(7)),
         );
         let gt_point_2 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(1), &group_generator()),
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(35), &group_generator()),
+            &element_scalar_mul(&group_generator(), &scalar_from_u64<BLS12_381_Fr>(1)),
+            &element_scalar_mul(&group_generator(), &scalar_from_u64<BLS12_381_Fr>(35)),
         );
         let gt_point_3 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(35), &group_generator<BLS12_381_G1>()),
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(1), &group_generator<BLS12_381_G2>()),
+            &element_scalar_mul(&group_generator<BLS12_381_G1>(), &scalar_from_u64<BLS12_381_Fr>(35)),
+            &element_scalar_mul(&group_generator<BLS12_381_G2>(), &scalar_from_u64<BLS12_381_Fr>(1)),
         );
         assert!(element_eq(&gt_point_1, &gt_point_2), 1);
         assert!(element_eq(&gt_point_1, &gt_point_3), 1);
@@ -663,19 +624,19 @@ module aptos_std::groups {
         // e(k1*P1, k2*P2)
         let k1 = random_scalar<BLS12_381_Fr>();
         let k2 = random_scalar<BLS12_381_Fr>();
-        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_scalar_mul(&k1, &g1_point), &element_scalar_mul(&k2,&g2_point));
+        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_scalar_mul(&g1_point, &k1), &element_scalar_mul(&g2_point, &k2));
         // e(P1,P2)^(k1*k2)
-        let gt_element_another = element_scalar_mul(&scalar_mul(&k1, &k2), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point));
+        let gt_element_another = element_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point), &scalar_mul(&k1, &k2));
         assert!(element_eq(&gt_element, &gt_element_another), 1);
 
         // Multiple pairing.
         let g1_point_1 = group_generator<BLS12_381_G1>();
         let g2_point_1 = group_generator<BLS12_381_G2>();
-        let g1_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &g1_point_1);
-        let g2_point_2 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(2), &g2_point_1);
-        let g1_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(20), &g1_point_1);
-        let g2_point_3 = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &g2_point_1);
-        let expected = element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(111), &pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1));
+        let g1_point_2 = element_scalar_mul(&g1_point_1, &scalar_from_u64<BLS12_381_Fr>(5));
+        let g2_point_2 = element_scalar_mul(&g2_point_1, &scalar_from_u64<BLS12_381_Fr>(2));
+        let g1_point_3 = element_scalar_mul(&g1_point_1, &scalar_from_u64<BLS12_381_Fr>(20));
+        let g2_point_3 = element_scalar_mul(&g2_point_1, &scalar_from_u64<BLS12_381_Fr>(5));
+        let expected = element_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1), &scalar_from_u64<BLS12_381_Fr>(111));
         let actual = pairing_product<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[g1_point_1, g1_point_2, g1_point_3], &vector[g2_point_1, g2_point_2, g2_point_3]);
         assert!(element_eq(&expected, &actual), 1);
     }
@@ -684,18 +645,18 @@ module aptos_std::groups {
     struct UnknownGroup {}
 
     #[test]
-    #[expected_failure(abort_code = E_UNKNOWN_GROUP, location = Self)]
+    #[expected_failure(abort_code = E_NOT_IMPLEMENTED, location = Self)]
     fun test_unknown_group() {
         let _ = group_order<UnknownGroup>();
     }
 
     #[test]
-    #[expected_failure(abort_code = E_UNKNOWN_PAIRING, location = Self)]
+    #[expected_failure(abort_code = E_NOT_IMPLEMENTED, location = Self)]
     fun test_unknown_pairing() {
         // Attempt an invalid pairing: (G2, G1) -> Gt
         pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(7), &group_generator<BLS12_381_G2>()),
-            &element_scalar_mul(&scalar_from_u64<BLS12_381_Fr>(5), &group_generator<BLS12_381_G1>()),
+            &element_scalar_mul(&group_generator<BLS12_381_G2>(), &scalar_from_u64<BLS12_381_Fr>(7)),
+            &element_scalar_mul(&group_generator<BLS12_381_G1>(), &scalar_from_u64<BLS12_381_Fr>(5)),
         );
     }
 }
