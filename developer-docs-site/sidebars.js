@@ -107,7 +107,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Interact with Blockchain",
+      label: "Interact with the Blockchain",
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
@@ -115,7 +115,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Develop with SDKs",
+      label: "Develop with the SDKs",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
@@ -123,7 +123,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Implement Wallet Adapter",
+      label: "Integrate with Wallets",
       link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,

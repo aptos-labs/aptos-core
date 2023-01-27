@@ -1,5 +1,5 @@
 ---
-title: "Integrate with the Aptos Blockchain"
+title: "Integrate with Aptos"
 slug: "system-integrators-guide"
 ---
 
