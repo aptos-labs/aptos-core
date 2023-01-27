@@ -13,6 +13,7 @@ pub enum FeatureFlag {
     VM_BINARY_FORMAT_V6 = 5,
     GENERIC_GROUP_BASIC_OPERATIONS = 9,
     BLS12_381_GROUPS = 10,
+    SHA256_TO_GROUP = 11,
 }
 
 /// Representation of features on chain as a bitset.

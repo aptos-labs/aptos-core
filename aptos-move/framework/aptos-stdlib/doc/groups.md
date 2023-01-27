@@ -29,37 +29,35 @@
 -  [Function `element_scalar_mul`](#0x1_groups_element_scalar_mul)
 -  [Function `hash_to_element`](#0x1_groups_hash_to_element)
 -  [Function `element_multi_scalar_mul`](#0x1_groups_element_multi_scalar_mul)
--  [Function `deserialize_scalar`](#0x1_groups_deserialize_scalar)
--  [Function `serialize_scalar`](#0x1_groups_serialize_scalar)
+-  [Function `scalar_deserialize`](#0x1_groups_scalar_deserialize)
+-  [Function `scalar_serialize`](#0x1_groups_scalar_serialize)
 -  [Function `serialize_element_uncompressed`](#0x1_groups_serialize_element_uncompressed)
 -  [Function `serialize_element_compressed`](#0x1_groups_serialize_element_compressed)
 -  [Function `deserialize_element_uncompressed`](#0x1_groups_deserialize_element_uncompressed)
 -  [Function `deserialize_element_compressed`](#0x1_groups_deserialize_element_compressed)
 -  [Function `element_eq`](#0x1_groups_element_eq)
--  [Function `is_prime_order`](#0x1_groups_is_prime_order)
 -  [Function `group_order`](#0x1_groups_group_order)
--  [Function `deserialize_element_uncompressed_internal`](#0x1_groups_deserialize_element_uncompressed_internal)
--  [Function `deserialize_element_compressed_internal`](#0x1_groups_deserialize_element_compressed_internal)
+-  [Function `element_deserialize_uncompressed_internal`](#0x1_groups_element_deserialize_uncompressed_internal)
+-  [Function `element_deserialize_compressed_internal`](#0x1_groups_element_deserialize_compressed_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_groups_scalar_from_u64_internal)
--  [Function `deserialize_scalar_internal`](#0x1_groups_deserialize_scalar_internal)
+-  [Function `scalar_deserialize_internal`](#0x1_groups_scalar_deserialize_internal)
 -  [Function `scalar_neg_internal`](#0x1_groups_scalar_neg_internal)
 -  [Function `scalar_add_internal`](#0x1_groups_scalar_add_internal)
 -  [Function `scalar_double_internal`](#0x1_groups_scalar_double_internal)
 -  [Function `scalar_mul_internal`](#0x1_groups_scalar_mul_internal)
 -  [Function `scalar_inv_internal`](#0x1_groups_scalar_inv_internal)
 -  [Function `scalar_eq_internal`](#0x1_groups_scalar_eq_internal)
--  [Function `serialize_scalar_internal`](#0x1_groups_serialize_scalar_internal)
+-  [Function `scalar_serialize_internal`](#0x1_groups_scalar_serialize_internal)
 -  [Function `element_add_internal`](#0x1_groups_element_add_internal)
 -  [Function `element_eq_internal`](#0x1_groups_element_eq_internal)
 -  [Function `group_identity_internal`](#0x1_groups_group_identity_internal)
--  [Function `is_prime_order_internal`](#0x1_groups_is_prime_order_internal)
 -  [Function `group_order_internal`](#0x1_groups_group_order_internal)
 -  [Function `group_generator_internal`](#0x1_groups_group_generator_internal)
 -  [Function `element_mul_internal`](#0x1_groups_element_mul_internal)
 -  [Function `element_double_internal`](#0x1_groups_element_double_internal)
 -  [Function `element_neg_internal`](#0x1_groups_element_neg_internal)
--  [Function `serialize_element_uncompressed_internal`](#0x1_groups_serialize_element_uncompressed_internal)
--  [Function `serialize_element_compressed_internal`](#0x1_groups_serialize_element_compressed_internal)
+-  [Function `element_serialize_uncompressed_internal`](#0x1_groups_element_serialize_uncompressed_internal)
+-  [Function `element_serialize_compressed_internal`](#0x1_groups_element_serialize_compressed_internal)
 -  [Function `element_multi_scalar_mul_internal`](#0x1_groups_element_multi_scalar_mul_internal)
 -  [Function `pairing_product_internal`](#0x1_groups_pairing_product_internal)
 -  [Function `hash_to_element_internal`](#0x1_groups_hash_to_element_internal)
@@ -241,7 +239,7 @@ assume a 576-byte encoding <code>[b_0, ..., b_575]</code> of an <code><a href="g
 
 The scalar field for groups <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code> and <code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 A <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> is an integer between 0 and <code>r-1</code> where <code>r</code> is the order of <code><a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a></code>/<code><a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a></code>/<code><a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-Functions <code><a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> and <code><a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>
+Functions <code>deserialize_scalar&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> and <code>serialize_scalar&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>
 assume a 32-byte little-endian encoding of a <code><a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code>.
 
 
@@ -354,29 +352,11 @@ This struct represents an element of the group represented by the type argument 
 ## Constants
 
 
-<a name="0x1_groups_E_NATIVE_FUN_NOT_AVAILABLE"></a>
+<a name="0x1_groups_E_NOT_IMPLEMENTED"></a>
 
 
 
-<pre><code><b>const</b> <a href="groups.md#0x1_groups_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="0x1_groups_E_UNKNOWN_GROUP"></a>
-
-
-
-<pre><code><b>const</b> <a href="groups.md#0x1_groups_E_UNKNOWN_GROUP">E_UNKNOWN_GROUP</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="0x1_groups_E_UNKNOWN_PAIRING"></a>
-
-
-
-<pre><code><b>const</b> <a href="groups.md#0x1_groups_E_UNKNOWN_PAIRING">E_UNKNOWN_PAIRING</a>: u64 = 3;
+<pre><code><b>const</b> <a href="groups.md#0x1_groups_E_NOT_IMPLEMENTED">E_NOT_IMPLEMENTED</a>: u64 = 2;
 </code></pre>
 
 
@@ -753,7 +733,7 @@ Compute <code>2P</code> for group element <code>P</code>.
 Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, element_p: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;, scalar_k: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -762,9 +742,9 @@ Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(scalar_k: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_k.handle, element_p.handle)
+        handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
     }
 }
 </code></pre>
@@ -807,7 +787,7 @@ Hash bytes to a group element.
 Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]</code> and a list of group elements <code>P[]</code>, both of size <code>n</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -816,7 +796,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt;, elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
     <b>let</b> num_scalars = std::vector::length(scalars);
     <b>let</b> scalar_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
@@ -834,7 +814,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
     };
 
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
-        handle: <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles, element_handles)
+        handle: <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles, scalar_handles)
     }
 
 }
@@ -844,14 +824,14 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
 
 </details>
 
-<a name="0x1_groups_deserialize_scalar"></a>
+<a name="0x1_groups_scalar_deserialize"></a>
 
-## Function `deserialize_scalar`
+## Function `scalar_deserialize`
 
 Scalar deserialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_deserialize">scalar_deserialize</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;
 </code></pre>
 
 
@@ -860,8 +840,8 @@ Scalar deserialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar">deserialize_scalar</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
-    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_deserialize_scalar_internal">deserialize_scalar_internal</a>&lt;S&gt;(*bytes);
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_deserialize">scalar_deserialize</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
+    <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_scalar_deserialize_internal">scalar_deserialize_internal</a>&lt;S&gt;(*bytes);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
             handle
@@ -877,14 +857,14 @@ Scalar deserialization.
 
 </details>
 
-<a name="0x1_groups_serialize_scalar"></a>
+<a name="0x1_groups_scalar_serialize"></a>
 
-## Function `serialize_scalar`
+## Function `scalar_serialize`
 
 Scalar serialization.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_serialize">scalar_serialize</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -893,8 +873,8 @@ Scalar serialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar">serialize_scalar</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="groups.md#0x1_groups_serialize_scalar_internal">serialize_scalar_internal</a>&lt;S&gt;(scalar.handle)
+<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_serialize">scalar_serialize</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="groups.md#0x1_groups_scalar_serialize_internal">scalar_serialize_internal</a>&lt;S&gt;(scalar.handle)
 }
 </code></pre>
 
@@ -919,7 +899,7 @@ Group element serialization with an uncompressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(element: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="groups.md#0x1_groups_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(element.handle)
+    <a href="groups.md#0x1_groups_element_serialize_uncompressed_internal">element_serialize_uncompressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
 
@@ -944,7 +924,7 @@ Group element serialization with a compressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(element: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="groups.md#0x1_groups_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(element.handle)
+    <a href="groups.md#0x1_groups_element_serialize_compressed_internal">element_serialize_compressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
 
@@ -969,7 +949,7 @@ Group element deserialization with an uncompressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt; {
-    <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes);
+    <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_element_deserialize_uncompressed_internal">element_deserialize_uncompressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; { handle })
     } <b>else</b> {
@@ -999,7 +979,7 @@ Group element deserialization with a compressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt; {
-    <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes);
+    <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_element_deserialize_compressed_internal">element_deserialize_compressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; { handle })
     } <b>else</b> {
@@ -1037,31 +1017,6 @@ Check if <code>P == Q</code> for group elements <code>P</code> and <code>Q</code
 
 </details>
 
-<a name="0x1_groups_is_prime_order"></a>
-
-## Function `is_prime_order`
-
-Check if group <code>G</code> has a prime order.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_is_prime_order">is_prime_order</a>&lt;G&gt;(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_is_prime_order">is_prime_order</a>&lt;G&gt;(): bool {
-    <a href="groups.md#0x1_groups_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;()
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_groups_group_order"></a>
 
 ## Function `group_order`
@@ -1087,13 +1042,13 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 </details>
 
-<a name="0x1_groups_deserialize_element_uncompressed_internal"></a>
+<a name="0x1_groups_element_deserialize_uncompressed_internal"></a>
 
-## Function `deserialize_element_uncompressed_internal`
+## Function `element_deserialize_uncompressed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_deserialize_uncompressed_internal">element_deserialize_uncompressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
 </code></pre>
 
 
@@ -1102,20 +1057,20 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_uncompressed_internal">deserialize_element_uncompressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_deserialize_uncompressed_internal">element_deserialize_uncompressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_groups_deserialize_element_compressed_internal"></a>
+<a name="0x1_groups_element_deserialize_compressed_internal"></a>
 
-## Function `deserialize_element_compressed_internal`
+## Function `element_deserialize_compressed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_deserialize_compressed_internal">element_deserialize_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
 </code></pre>
 
 
@@ -1124,7 +1079,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_compressed_internal">deserialize_element_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_deserialize_compressed_internal">element_deserialize_compressed_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
 </code></pre>
 
 
@@ -1153,13 +1108,13 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 </details>
 
-<a name="0x1_groups_deserialize_scalar_internal"></a>
+<a name="0x1_groups_scalar_deserialize_internal"></a>
 
-## Function `deserialize_scalar_internal`
+## Function `scalar_deserialize_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar_internal">deserialize_scalar_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_scalar_deserialize_internal">scalar_deserialize_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
 </code></pre>
 
 
@@ -1168,7 +1123,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_scalar_internal">deserialize_scalar_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_deserialize_internal">scalar_deserialize_internal</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
 </code></pre>
 
 
@@ -1307,13 +1262,13 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 </details>
 
-<a name="0x1_groups_serialize_scalar_internal"></a>
+<a name="0x1_groups_scalar_serialize_internal"></a>
 
-## Function `serialize_scalar_internal`
+## Function `scalar_serialize_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar_internal">serialize_scalar_internal</a>&lt;G&gt;(h: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_scalar_serialize_internal">scalar_serialize_internal</a>&lt;G&gt;(h: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1322,7 +1277,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_scalar_internal">serialize_scalar_internal</a>&lt;G&gt;(h: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_serialize_internal">scalar_serialize_internal</a>&lt;G&gt;(h: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1389,28 +1344,6 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_groups_is_prime_order_internal"></a>
-
-## Function `is_prime_order_internal`
-
-
-
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_is_prime_order_internal">is_prime_order_internal</a>&lt;G&gt;(): bool;
 </code></pre>
 
 
@@ -1527,13 +1460,13 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 </details>
 
-<a name="0x1_groups_serialize_element_uncompressed_internal"></a>
+<a name="0x1_groups_element_serialize_uncompressed_internal"></a>
 
-## Function `serialize_element_uncompressed_internal`
+## Function `element_serialize_uncompressed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_serialize_uncompressed_internal">element_serialize_uncompressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1542,20 +1475,20 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_uncompressed_internal">serialize_element_uncompressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_serialize_uncompressed_internal">element_serialize_uncompressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_groups_serialize_element_compressed_internal"></a>
+<a name="0x1_groups_element_serialize_compressed_internal"></a>
 
-## Function `serialize_element_compressed_internal`
+## Function `element_serialize_compressed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_serialize_compressed_internal">element_serialize_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1564,7 +1497,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_compressed_internal">serialize_element_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_serialize_compressed_internal">element_serialize_compressed_internal</a>&lt;G&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1577,7 +1510,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 
-<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
 </code></pre>
 
 
@@ -1586,7 +1519,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 
