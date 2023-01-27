@@ -105,7 +105,7 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
-                label: "Read White Paper",
+                label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",
               },
@@ -120,7 +120,7 @@ const config = {
                 docId: "guides/getting-started",
               },
               {
-                label: "Integrate Aptos",
+                label: "Integrate with the Aptos blockchain",
                 type: "doc",
                 docId: "guides/system-integrators-guide",
               },
@@ -133,7 +133,7 @@ const config = {
             items: [
               {
                 type: "doc",
-                label: "Follow Standards",
+                label: "Aptos Standards",
                 docId: "concepts/coin-and-token/index",
               },
               {

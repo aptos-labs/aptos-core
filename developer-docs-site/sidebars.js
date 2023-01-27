@@ -18,13 +18,13 @@ const sidebars = {
   aptosSidebar: [
     {
       type: "html",
-      value: "Start Aptos",
+      value: "Getting Started",
       className: "sidebar-title",
     },
     "whats-new-in-docs",
     {
       type: "category",
-      label: "Read Aptos White Paper",
+      label: "Read the Aptos White Paper",
       collapsible: true,
       collapsed: false,
       link: { type: "doc", id: "aptos-white-paper/index" },
