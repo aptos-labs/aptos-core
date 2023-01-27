@@ -1,5 +1,5 @@
 ---
-title: "Aptos Standards"
+title: "Follow the Aptos Standards"
 slug: "index"
 ---
 
