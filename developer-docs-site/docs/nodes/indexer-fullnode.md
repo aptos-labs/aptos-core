@@ -36,7 +36,7 @@ For an Aptos indexer fullnode, install these packages:
   -  [`postgres` PostgreSQL server](https://www.postgresql.org/) - `brew install postgresql`
   - [`diesel`](https://diesel.rs/) - `brew install diesel`
 
-## Set up database
+## Set up the database
 
 1. Start the PostgreSQL server: 
    `brew services start postgresql`
@@ -56,7 +56,7 @@ For an Aptos indexer fullnode, install these packages:
     ```
     This will create a database schema with the subdirectory `migrations` located in this `aptos-core/crates/indexer` directory. If for some reason this database is already in use, try a different database. For example: `DATABASE_URL=postgres://postgres@localhost:5432/indexer_v2 diesel database reset`
 
-## Start fullnode indexer
+## Start the fullnode indexer
 
 1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
 1. Pull the latest indexer Docker image with:
@@ -82,7 +82,7 @@ For an Aptos indexer fullnode, install these packages:
 
 1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node.
 
-## Restart indexer
+## Restart the indexer
 
 To restart the PostgreSQL server:
 
