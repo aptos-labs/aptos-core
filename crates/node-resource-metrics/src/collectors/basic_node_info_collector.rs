@@ -1,53 +1,83 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use once_cell::sync::Lazy;
+use crate::collectors::common::NAMESPACE;
+use aptos_infallible::Mutex;
+use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
-    core::{Collector, Desc},
+    core::{Collector, Desc, Describer},
     proto::MetricFamily,
-    register_int_gauge_vec, IntGaugeVec,
+    Opts,
 };
+use std::sync::Arc;
+use sysinfo::{RefreshKind, System, SystemExt};
 
-/// Current host name
-pub static HOST_NAME: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!("aptos_node_host_name", "A no-op counter value", &[
-        "host_name"
-    ])
-    .unwrap()
-});
+const BASIC_NODE_INFO_METRICS_COUNT: usize = 2;
+const RELEASE_GIT_HASH_LABEL: &str = "release_git_hash";
+const NODE_HOST_NAME_LABEL: &str = "host_name";
 
-/// Git hash of the current release.
-pub static NODE_RELEASE_GIT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!("aptos_node_release_git_hash", "A no-op counter value", &[
-        "git_hash"
-    ])
-    .unwrap()
-});
+const GIT_HASH_LABEL: &str = "git_hash";
+const HOST_NAME_LABEL: &str = "name";
 
-pub(crate) struct BasicNodeInfoCollector<'a> {
-    metrics: &'a Lazy<IntGaugeVec>,
+const UNKNOW_LABEL: &str = "unknown";
+
+pub(crate) struct BasicNodeInfoCollector {
+    system: Arc<Mutex<System>>,
+    release: Desc,
+    host_name: Desc,
 }
 
-impl<'a> BasicNodeInfoCollector<'a> {
-    pub(crate) fn new(metrics: &'a Lazy<IntGaugeVec>) -> Self {
-        Self { metrics }
+impl BasicNodeInfoCollector {
+    fn new() -> Self {
+        let system = Arc::new(Mutex::new(System::new_with_specifics(RefreshKind::new())));
+
+        let release = Opts::new(RELEASE_GIT_HASH_LABEL, "Release git hash.")
+            .namespace(NAMESPACE)
+            .variable_label(GIT_HASH_LABEL)
+            .describe()
+            .unwrap();
+        let host_name = Opts::new(NODE_HOST_NAME_LABEL, "Host name.")
+            .namespace(NAMESPACE)
+            .variable_label(HOST_NAME_LABEL)
+            .describe()
+            .unwrap();
+
+        Self {
+            system,
+            release,
+            host_name,
+        }
     }
 }
 
-impl Collector for BasicNodeInfoCollector<'_> {
+impl Default for BasicNodeInfoCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Collector for BasicNodeInfoCollector {
     fn desc(&self) -> Vec<&Desc> {
-        self.metrics.desc()
+        vec![&self.host_name, &self.release]
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        self.metrics.collect()
-    }
-}
+        let host_name = self
+            .system
+            .lock()
+            .host_name()
+            .unwrap_or_else(|| String::from(UNKNOW_LABEL));
 
-pub fn register_basic_node_info_collectors() {
-    prometheus::register(Box::new(BasicNodeInfoCollector::new(
-        &NODE_RELEASE_GIT_HASH,
-    )))
-    .unwrap();
-    prometheus::register(Box::new(BasicNodeInfoCollector::new(&HOST_NAME))).unwrap();
+        let host_name_metrics =
+            ConstMetric::new_gauge(self.host_name.clone(), 1.0, Some(&[host_name])).unwrap();
+
+        let git_hash = aptos_build_info::get_git_hash();
+        let release_metrics =
+            ConstMetric::new_gauge(self.release.clone(), 1.0, Some(&[git_hash])).unwrap();
+
+        let mut mfs = Vec::with_capacity(BASIC_NODE_INFO_METRICS_COUNT);
+        mfs.extend(host_name_metrics.collect());
+        mfs.extend(release_metrics.collect());
+        mfs
+    }
 }

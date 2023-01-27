@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::collectors::register_basic_node_info_collectors;
+use crate::collectors::BasicNodeInfoCollector;
 use aptos_infallible::Mutex;
 use cfg_if::cfg_if;
 use collectors::{
@@ -29,7 +29,7 @@ pub fn register_node_metrics_collector() {
     prometheus::register(Box::<NetworkMetricsCollector>::default()).unwrap();
     prometheus::register(Box::<LoadAvgCollector>::default()).unwrap();
     prometheus::register(Box::<ProcessMetricsCollector>::default()).unwrap();
-    register_basic_node_info_collectors();
+    prometheus::register(Box::<BasicNodeInfoCollector>::default()).unwrap();
     cfg_if! {
         if #[cfg(all(target_os="linux"))] {
             prometheus::register(Box::<collectors::LinuxCpuMetricsCollector>::default()).unwrap();
