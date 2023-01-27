@@ -80,7 +80,7 @@ module std::bcs_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 453, location = Self)]
+    #[expected_failure(abort_code = 453, location = std::bcs)]
     fun encode_129() {
         bcs::to_bytes(&Box { x: box127(true) });
     }

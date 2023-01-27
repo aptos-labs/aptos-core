@@ -1099,6 +1099,19 @@ impl Client {
         self.get_bcs(url).await
     }
 
+    pub async fn get_account_module_bcs_at_version(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+        version: u64,
+    ) -> AptosResult<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/module/{}?ledger_version={}",
+            address, module_name, version
+        ))?;
+        self.get_bcs(url).await
+    }
+
     pub async fn get_account_events(
         &self,
         address: AccountAddress,
