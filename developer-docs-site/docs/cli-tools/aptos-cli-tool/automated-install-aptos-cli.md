@@ -1,5 +1,5 @@
 ---
-title: "Automated Aptos CLI Installation"
+title: "Install CLI by Script"
 id: "automated-install-aptos-cli"
 ---
 

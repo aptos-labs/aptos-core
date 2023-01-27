@@ -50,7 +50,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Prepare Environment",
+      label: "Prepare Your Environment",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
@@ -84,7 +84,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Follow Standards",
+      label: "Follow the Aptos Standards",
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
