@@ -705,8 +705,11 @@ impl TryFrom<MoveType> for TypeTag {
         let ret = match tag {
             MoveType::Bool => TypeTag::Bool,
             MoveType::U8 => TypeTag::U8,
+            MoveType::U16 => TypeTag::U16,
+            MoveType::U32 => TypeTag::U32,
             MoveType::U64 => TypeTag::U64,
             MoveType::U128 => TypeTag::U128,
+            MoveType::U256 => TypeTag::U256,
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
             MoveType::Vector { items } => TypeTag::Vector(Box::new((*items).try_into()?)),

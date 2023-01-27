@@ -18,11 +18,9 @@ use aptos_types::{
     },
     transaction::{Transaction, Version},
 };
+use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
@@ -115,36 +113,58 @@ pub trait AptosValidatorInterface: Sync {
 }
 
 pub struct DebuggerStateView {
-    query_sender: Mutex<UnboundedSender<(StateKey, Version)>>,
-    query_receiver: Mutex<Receiver<Result<Option<StateValue>>>>,
+    query_sender:
+        Mutex<UnboundedSender<(StateKey, Version, std::sync::mpsc::Sender<Option<Vec<u8>>>)>>,
     version: Version,
 }
 
 async fn handler_thread<'a>(
     db: Arc<dyn AptosValidatorInterface + Send>,
-    mut thread_receiver: UnboundedReceiver<(StateKey, Version)>,
-    thread_sender: Sender<Result<Option<StateValue>>>,
+    mut thread_receiver: UnboundedReceiver<(
+        StateKey,
+        Version,
+        std::sync::mpsc::Sender<Option<Vec<u8>>>,
+    )>,
 ) {
+    const M: usize = 1024 * 1024;
+    let cache = Arc::new(Mutex::new(
+        LruCache::<(StateKey, Version), Option<Vec<u8>>>::new(M),
+    ));
+
     loop {
-        let (key, version) = if let Some((key, version)) = thread_receiver.recv().await {
-            (key, version)
+        let (key, version, sender) =
+            if let Some((key, version, sender)) = thread_receiver.recv().await {
+                (key, version, sender)
+            } else {
+                break;
+            };
+
+        if let Some(val) = cache.lock().unwrap().get(&(key.clone(), version)) {
+            sender.send(val.clone()).unwrap();
         } else {
-            break;
-        };
-        let val = db.get_state_value_by_version(&key, version - 1).await;
-        thread_sender.send(val).unwrap();
+            assert!(version > 0, "Expecting a non-genesis version");
+            let db = db.clone();
+            let cache = cache.clone();
+            tokio::spawn(async move {
+                let val = db
+                    .get_state_value_by_version(&key, version - 1)
+                    .await
+                    .ok()
+                    .and_then(|v| v.map(|s| s.into_bytes()));
+                cache.lock().unwrap().put((key, version), val.clone());
+                sender.send(val)
+            });
+        }
     }
 }
 
 impl DebuggerStateView {
     pub fn new(db: Arc<dyn AptosValidatorInterface + Send>, version: Version) -> Self {
         let (query_sender, thread_receiver) = unbounded_channel();
-        let (thread_sender, query_receiver) = channel();
 
-        tokio::spawn(async move { handler_thread(db, thread_receiver, thread_sender).await });
+        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
         Self {
             query_sender: Mutex::new(query_sender),
-            query_receiver: Mutex::new(query_receiver),
             version,
         }
     }
@@ -154,18 +174,12 @@ impl DebuggerStateView {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<Vec<u8>>> {
-        self.query_sender
-            .lock()
-            .unwrap()
-            .send((state_key.clone(), version))
+        let (tx, rx) = std::sync::mpsc::channel();
+        let query_handler_locked = self.query_sender.lock().unwrap();
+        query_handler_locked
+            .send((state_key.clone(), version, tx))
             .unwrap();
-        Ok(self
-            .query_receiver
-            .lock()
-            .unwrap()
-            .recv()?
-            .ok()
-            .and_then(|v| v.map(|s| s.into_bytes())))
+        Ok(rx.recv()?)
     }
 }
 

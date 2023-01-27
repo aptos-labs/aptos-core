@@ -26,6 +26,20 @@ To failover from an outdated or erroneous validator node to an updated and relia
    * For mainnet, use [state synchronization](../../../guides/state-sync.md).
    * For devnet or testnet, [bootstrap a new fullnode from snapshot](../../full-node/bootstrap-fullnode.md).
 
+## Configure
+
+Remember to take the normal measures to connect your node to the Aptos network and establish staking pool operations, such as removing the `secure-data.json` file and updating your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool** address.
+
+See the sections and guides below for full details.
+
+### Connect to Aptos network
+
+After deploying your nodes, [connect to the Aptos Network](./connect-to-aptos-network.md).
+
+### Set up staking pool operations
+
+After connecting your nodes to the Aptos network, [establish staking pool operations](./staking-pool-operations.md).
+
 ## Failover
 
 To replace the validator node:

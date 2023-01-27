@@ -47,6 +47,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+static_assertions = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

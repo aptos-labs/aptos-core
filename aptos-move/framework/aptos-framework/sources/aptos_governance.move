@@ -753,6 +753,41 @@ module aptos_framework::aptos_governance {
         update_governance_config(&account, 10, 20, 30);
     }
 
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    public entry fun test_replace_execution_hash(
+        aptos_framework: signer,
+        proposer: signer,
+        yes_voter: signer,
+        no_voter: signer,
+    ) acquires GovernanceResponsbility, GovernanceConfig, GovernanceEvents, ApprovedExecutionHashes, VotingRecords {
+        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+
+        create_proposal_for_test(proposer, true);
+        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
+        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+
+        // Add approved script hash.
+        timestamp::update_global_time_for_test(100001000000);
+        add_approved_script_hash(0);
+
+        // Resolve the proposal.
+        let execution_hash = vector::empty<u8>();
+        let next_execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
+        vector::push_back(&mut next_execution_hash, 10);
+
+        voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, 0, next_execution_hash);
+
+        if (vector::length(&next_execution_hash) == 0) {
+            remove_approved_hash(0);
+        } else {
+            add_approved_script_hash(0)
+        };
+
+        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
+        assert!(*simple_map::borrow(&approved_hashes, &0) == vector[10u8,], 1);
+    }
+
     #[verify_only]
     public fun initialize_for_verification(
         aptos_framework: &signer,

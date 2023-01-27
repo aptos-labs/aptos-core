@@ -3,8 +3,8 @@
 
 pub mod error;
 pub mod interface;
+pub mod metadata;
 pub mod storage;
-pub mod types;
 
 #[cfg(test)]
 mod tests;

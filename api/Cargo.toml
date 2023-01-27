@@ -48,6 +48,8 @@ url = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }

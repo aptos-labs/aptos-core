@@ -1,12 +1,12 @@
 ---
-title: "Typescript SDK Overview"
+title: "Typescript SDK Architecture"
 slug: "typescript-sdk-overview"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Typescript SDK Overview
+# Typescript SDK Architecture 
 
 This document describes the main features and components of the Aptos Typescript SDK.
 
@@ -98,15 +98,24 @@ In addition, the `AptosClient` component supports submitting transactions in BCS
 ### Token Client
 
 The class [TokenClient](https://aptos-labs.github.io/ts-sdk-doc/classes/TokenClient.html) provides methods for creating and querying the NFT collections and tokens.
+It covers (1) write methods that support creating, transferring, mutating and burning tokens on-chain and (2) read methods performing deserialization and returning data in TS objects.
 
-Some of the methods the Token Client class provides are:
+The main write methods supported by the token SDK are:
 - Create Collection
 - Create Token
 - Offer Token
 - Claim Token
 - Directly Transfer Token
+- Transfer Token with Opt-in
+- Mutate Token Properties
+- Burn Token by Owner or Creator
 
-## Validation for Transaction Builder and BCS
+The main read methods deserializing on-chain data to TS objects are:
+- Get CollectionData
+- Get TokenData
+- Get Token of an Account
+
+## Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 

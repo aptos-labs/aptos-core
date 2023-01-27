@@ -111,16 +111,32 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
-    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 9;
+    /// Whether resource groups are enabled.
+    /// This is needed because of new attributes for structs and a change in storage representation.
+    const RESOURCE_GROUPS: u64 = 9;
+
+    public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
+
+    public fun resource_groups_enabled(): bool acquires Features {
+        is_enabled(RESOURCE_GROUPS)
+    }
+
+    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 10;
     public fun get_generic_group_basic_operations_feature(): u64 { GENERIC_GROUP_BASIC_OPERATIONS }
     public fun generic_group_basic_operations_enabled(): bool acquires Features {
         is_enabled(GENERIC_GROUP_BASIC_OPERATIONS)
     }
 
-    const BLS12_381_GROUPS: u64 = 10;
+    const BLS12_381_GROUPS: u64 = 11;
     public fun get_bls12_381_groups_feature(): u64 { BLS12_381_GROUPS }
     public fun bls12_381_groups_enabled(): bool acquires Features {
         is_enabled(BLS12_381_GROUPS)
+    }
+
+    const SHA256_TO_GROUP: u64 = 12;
+    public fun get_sha256_to_group_feature(): u64 { SHA256_TO_GROUP }
+    public fun sha256_to_group_enabled(): bool acquires Features {
+        is_enabled(SHA256_TO_GROUP)
     }
 
     // ============================================================================================

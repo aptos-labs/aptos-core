@@ -106,8 +106,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
         Features::default(),
     )
@@ -216,8 +214,6 @@ pub fn encode_genesis_change_set(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
         Features::default(),
     )
@@ -401,7 +397,16 @@ fn initialize(
 }
 
 fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
-    let features: Vec<u64> = vec![1, 2, 5];
+    let features: Vec<u64> = vec![
+        FeatureFlag::CODE_DEPENDENCY_CHECK as u64,
+        FeatureFlag::TREAT_FRIEND_AS_PRIVATE as u64,
+        FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES as u64,
+        FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES as u64,
+        FeatureFlag::VM_BINARY_FORMAT_V6 as u64,
+        FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES as u64,
+        FeatureFlag::BLAKE2B_256_NATIVE as u64,
+        FeatureFlag::RESOURCE_GROUPS as u64,
+    ];
 
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(bcs::to_bytes(&features).unwrap());
@@ -865,8 +870,6 @@ pub fn test_genesis_module_publishing() {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        false,
-        true,
         ChainId::test().id(),
         Features::default(),
     )

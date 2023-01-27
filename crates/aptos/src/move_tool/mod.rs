@@ -43,6 +43,7 @@ use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    u256::U256,
 };
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
@@ -320,6 +321,10 @@ pub struct TestPackage {
     #[clap(long, short)]
     pub filter: Option<String>,
 
+    /// A boolean value to skip warnings.
+    #[clap(long, short = 'w')]
+    pub ignore_compile_warnings: bool,
+
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 
@@ -356,6 +361,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter,
                 report_stacktrace_on_abort: true,
+                ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
@@ -973,15 +979,15 @@ pub struct RunFunction {
 
     /// Arguments combined with their type separated by spaces.
     ///
-    /// Supported types [u8, u64, u128, bool, hex, string, address, raw]
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
     ///
-    /// Example: `address:0x1 bool:true u8:0`
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
 
     /// TypeTag arguments separated by spaces.
     ///
-    /// Example: `u8 u64 u128 bool address vector signer`
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
 
@@ -1031,14 +1037,14 @@ pub struct RunScript {
     pub(crate) compile_proposal_args: CompileScriptFunction,
     /// Arguments combined with their type separated by spaces.
     ///
-    /// Supported types [u8, u64, u128, bool, hex, string, address, raw]
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw]
     ///
-    /// Example: `address:0x1 bool:true u8:0`
+    /// Example: `address:0x1 bool:true u8:0 u256:1234`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
-    /// Example: `u8 u64 u128 bool address vector signer`
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
 }
@@ -1086,8 +1092,11 @@ pub(crate) enum FunctionArgType {
     HexArray,
     String,
     U8,
+    U16,
+    U32,
     U64,
     U128,
+    U256,
     Raw,
     Vector(Box<FunctionArgType>),
 }
@@ -1101,8 +1110,11 @@ impl Display for FunctionArgType {
             FunctionArgType::HexArray => write!(f, "hex_array"),
             FunctionArgType::String => write!(f, "string"),
             FunctionArgType::U8 => write!(f, "u8"),
+            FunctionArgType::U16 => write!(f, "u16"),
+            FunctionArgType::U32 => write!(f, "u32"),
             FunctionArgType::U64 => write!(f, "u64"),
             FunctionArgType::U128 => write!(f, "u128"),
+            FunctionArgType::U256 => write!(f, "u256"),
             FunctionArgType::Raw => write!(f, "raw"),
             FunctionArgType::Vector(inner) => write!(f, "vector<{}>", inner),
         }
@@ -1139,6 +1151,14 @@ impl FunctionArgType {
             FunctionArgType::U8 => bcs::to_bytes(
                 &u8::from_str(arg).map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
             ),
+            FunctionArgType::U16 => bcs::to_bytes(
+                &u16::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("u16", err.to_string()))?,
+            ),
+            FunctionArgType::U32 => bcs::to_bytes(
+                &u32::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("u32", err.to_string()))?,
+            ),
             FunctionArgType::U64 => bcs::to_bytes(
                 &u64::from_str(arg)
                     .map_err(|err| CliError::UnableToParse("u64", err.to_string()))?,
@@ -1146,6 +1166,10 @@ impl FunctionArgType {
             FunctionArgType::U128 => bcs::to_bytes(
                 &u128::from_str(arg)
                     .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
+            ),
+            FunctionArgType::U256 => bcs::to_bytes(
+                &U256::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("u256", err.to_string()))?,
             ),
             FunctionArgType::Raw => {
                 let raw = hex::decode(arg)
@@ -1171,13 +1195,25 @@ impl FunctionArgType {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
                     }),
+                    FunctionArgType::U16 => parse_vector_arg(arg, |arg| {
+                        u16::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u16>", err.to_string()))
+                    }),
+                    FunctionArgType::U32 => parse_vector_arg(arg, |arg| {
+                        u32::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u32>", err.to_string()))
+                    }),
                     FunctionArgType::U64 => parse_vector_arg(arg, |arg| {
                         u64::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u64>", err.to_string()))
                     }),
                     FunctionArgType::U128 => parse_vector_arg(arg, |arg| {
-                        u64::from_str(arg)
-                            .map_err(|err| CliError::UnableToParse("vector<128>", err.to_string()))
+                        u128::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u128>", err.to_string()))
+                    }),
+                    FunctionArgType::U256 => parse_vector_arg(arg, |arg| {
+                        U256::from_str(arg)
+                            .map_err(|err| CliError::UnableToParse("vector<u256>", err.to_string()))
                     }),
                     vector_type => {
                         panic!("Unsupported vector type vector<{}>", vector_type)
@@ -1213,8 +1249,11 @@ impl FromStr for FunctionArgType {
             "hex" => Ok(FunctionArgType::Hex),
             "string" => Ok(FunctionArgType::String),
             "u8" => Ok(FunctionArgType::U8),
+            "u16" => Ok(FunctionArgType::U16),
+            "u32" => Ok(FunctionArgType::U32),
             "u64" => Ok(FunctionArgType::U64),
             "u128" => Ok(FunctionArgType::U128),
+            "u256" => Ok(FunctionArgType::U256),
             "hex_array" => Ok(FunctionArgType::HexArray),
             "raw" => Ok(FunctionArgType::Raw),
             str => {
@@ -1243,7 +1282,7 @@ impl FromStr for FunctionArgType {
 
                     Ok(FunctionArgType::Vector(Box::new(arg)))
                 } else {
-                    Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u64','u128','raw', 'vector<inner_type>']", str)))
+                    Err(CliError::CommandArgumentError(format!("Invalid arg type '{}'.  Must be one of: ['address','bool','hex','hex_array','string','u8','u16','u32','u64','u128','u256','raw', 'vector<inner_type>']", str)))
                 }
             },
         }
@@ -1329,9 +1368,14 @@ impl TryInto<TransactionArgument> for ArgWithType {
                 &self.arg, "string",
             )?)),
             FunctionArgType::U8 => Ok(TransactionArgument::U8(txn_arg_parser(&self.arg, "u8")?)),
+            FunctionArgType::U16 => Ok(TransactionArgument::U16(txn_arg_parser(&self.arg, "u16")?)),
+            FunctionArgType::U32 => Ok(TransactionArgument::U32(txn_arg_parser(&self.arg, "u32")?)),
             FunctionArgType::U64 => Ok(TransactionArgument::U64(txn_arg_parser(&self.arg, "u64")?)),
             FunctionArgType::U128 => Ok(TransactionArgument::U128(txn_arg_parser(
                 &self.arg, "u128",
+            )?)),
+            FunctionArgType::U256 => Ok(TransactionArgument::U256(txn_arg_parser(
+                &self.arg, "u256",
             )?)),
             FunctionArgType::Raw => Ok(TransactionArgument::U8Vector(txn_arg_parser(
                 &self.arg, "raw",

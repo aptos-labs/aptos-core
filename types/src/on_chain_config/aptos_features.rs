@@ -10,10 +10,16 @@ use serde::{Deserialize, Serialize};
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
     TREAT_FRIEND_AS_PRIVATE = 2,
+    SHA_512_AND_RIPEMD_160_NATIVES = 3,
+    APTOS_STD_CHAIN_ID_NATIVES = 4,
     VM_BINARY_FORMAT_V6 = 5,
-    GENERIC_GROUP_BASIC_OPERATIONS = 9,
-    BLS12_381_GROUPS = 10,
-    SHA256_TO_GROUP = 11,
+    COLLECT_AND_DISTRIBUTE_GAS_FEES = 6,
+    MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
+    BLAKE2B_256_NATIVE = 8,
+    RESOURCE_GROUPS = 9,
+    GENERIC_GROUP_BASIC_OPERATIONS = 10,
+    BLS12_381_GROUPS = 11,
+    SHA256_TO_GROUP = 12,
 }
 
 /// Representation of features on chain as a bitset.
@@ -44,6 +50,10 @@ impl Features {
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
     }
 
+    pub fn are_resource_groups_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
+    }
+
     pub fn enable(&mut self, flag: FeatureFlag) {
         let bit_id = flag as usize;
         let byte_id = bit_id / 8;
@@ -51,8 +61,8 @@ impl Features {
             self.features.resize(byte_id + 1, 0);
         }
         self.features[byte_id] |= 1 << (bit_id % 8);
-
     }
+
 }
 
 // --------------------------------------------------------------------------------------------
