@@ -1374,6 +1374,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-file-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crash-handler",
+ "aptos-indexer-grpc-utils",
+ "aptos-logger",
+ "aptos-moving-average",
+ "aptos-runtimes",
+ "cloud-storage",
+ "futures-util",
+ "redis",
+ "serde 1.0.149",
+ "serde_json",
+ "tokio",
+ "warp",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-fullnode"
 version = "0.1.0"
 dependencies = [
@@ -1425,6 +1444,17 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cloud-storage",
+ "futures-util",
+ "serde 1.0.149",
+ "serde_json",
 ]
 
 [[package]]
@@ -2540,7 +2570,7 @@ dependencies = [
  "gcp-bigquery-client",
  "hex",
  "httpmock",
- "jsonwebtoken",
+ "jsonwebtoken 8.1.1",
  "once_cell",
  "prometheus",
  "rand 0.7.3",
@@ -3341,6 +3371,12 @@ checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
 name = "base64"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
+
+[[package]]
+name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
@@ -3401,7 +3437,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6aaf33151a6429fe9211d1b276eafdf70cdff28b071e76c0b0e1503221ea3744"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-integer",
  "num-traits 0.2.15",
  "serde 1.0.149",
@@ -3823,6 +3859,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
+]
+
+[[package]]
+name = "cloud-storage"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7602ac4363f68ac757d6b87dd5d850549a14d37489902ae639c06ecec06ad275"
+dependencies = [
+ "async-trait",
+ "base64 0.13.0",
+ "bytes 1.2.1",
+ "chrono",
+ "dotenv",
+ "futures-util",
+ "hex",
+ "jsonwebtoken 7.2.0",
+ "lazy_static 1.4.0",
+ "openssl",
+ "percent-encoding",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -4466,7 +4525,7 @@ dependencies = [
  "chrono",
  "diesel_derives",
  "itoa 1.0.3",
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-integer",
  "num-traits 0.2.15",
  "pq-sys",
@@ -4584,6 +4643,12 @@ dependencies = [
  "redox_users",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "downcast"
@@ -5886,6 +5951,20 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
+version = "7.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afabcc15e437a6484fc4f12d0fd63068fe457bf93f1c148d3d9649c60b103f32"
+dependencies = [
+ "base64 0.12.3",
+ "pem 0.8.3",
+ "ring",
+ "serde 1.0.149",
+ "serde_json",
+ "simple_asn1 0.4.1",
+]
+
+[[package]]
+name = "jsonwebtoken"
 version = "8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aa4b4af834c6cfd35d8763d359661b90f2e45d8f750a0849156c7f4671af09c"
@@ -5895,7 +5974,7 @@ dependencies = [
  "ring",
  "serde 1.0.149",
  "serde_json",
- "simple_asn1",
+ "simple_asn1 0.6.2",
 ]
 
 [[package]]
@@ -6613,7 +6692,7 @@ dependencies = [
  "dirs-next",
  "hex",
  "move-core-types",
- "num-bigint",
+ "num-bigint 0.4.3",
  "once_cell",
  "serde 1.0.149",
  "sha2 0.9.9",
@@ -6640,7 +6719,7 @@ dependencies = [
  "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
- "num-bigint",
+ "num-bigint 0.4.3",
  "once_cell",
  "petgraph 0.5.1",
  "regex",
@@ -7284,11 +7363,22 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-complex",
  "num-integer",
  "num-iter",
  "num-rational",
+ "num-traits 0.2.15",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg",
+ "num-integer",
  "num-traits 0.2.15",
 ]
 
@@ -7351,7 +7441,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
 dependencies = [
  "autocfg",
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-integer",
  "num-traits 0.2.15",
 ]
@@ -9306,11 +9396,22 @@ dependencies = [
 
 [[package]]
 name = "simple_asn1"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "692ca13de57ce0613a363c8c2f1de925adebc81b04c923ac60c5488bb44abe4b"
+dependencies = [
+ "chrono",
+ "num-bigint 0.2.6",
+ "num-traits 0.2.15",
+]
+
+[[package]]
+name = "simple_asn1"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adc4e5204eb1910f40f9cfa375f6f05b68c3abac4b6fd879c8ff5e7ae8a0a085"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.3",
  "num-traits 0.2.15",
  "thiserror",
  "time 0.3.13",

@@ -78,7 +78,9 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
+    "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/db-bootstrapper",
@@ -215,7 +217,9 @@ aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
+aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
@@ -313,6 +317,7 @@ claims = "0.7"
 clap = { version = "3.2.17", features = ["derive", "env", "suggestions"] }
 clap_complete = "3.2.3"
 codespan-reporting = "0.11.1"
+cloud-storage = { version = "0.11.1", features = ["global-client"] }
 console-subscriber = "0.1.6"
 const_format = "0.2.26"
 criterion = "0.3.5"
@@ -323,6 +328,7 @@ crossbeam-queue = "0.3.5"
 curve25519-dalek = "3"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
+deadpool-redis = "0.8.0"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
