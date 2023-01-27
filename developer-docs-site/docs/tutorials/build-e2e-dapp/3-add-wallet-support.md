@@ -5,14 +5,14 @@ id: "add-wallet-support"
 
 # Add Wallet support
 
-Wallet is a program that used to submit a transaction to chain.
+A *wallet* is a program that used to submit a transaction to chain.
 
-Aptos provides a [wallet adapter](https://github.com/aptos-labs/aptos-wallet-adapter) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
+Aptos provides a [wallet adapter](../../concepts/wallet-adapter-concept.md) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
 
-You can read about it more in the [Wallet Adapter Concept](../../concepts/wallet-adapter-concept) page.
+You can read about it more in the [Wallet Adapter Concept](../../concepts/wallet-adapter-concept.md) page.
 
-1. Stop the local server if running
-2. In the `client` folder run
+1. Stop the local server if running.
+2. In the `client` folder, run:
 
 ```cmd
 npm i @aptos-labs/wallet-adapter-react@0.2.2
@@ -22,12 +22,12 @@ npm i @aptos-labs/wallet-adapter-react@0.2.2
 npm i @aptos-labs/wallet-adapter-ant-design@0.1.0
 ```
 
-That installs 2 packages for us
+This installs two packages:
 
-- the adapter react provider that holds the logic
-- a wallet connect UI package
+- the adapter React provider that holds the logic.
+- a wallet connect UI package.
 
-3. We now need to add wallets to our app. There is a [list](https://github.com/aptos-labs/aptos-wallet-adapter#supported-wallet-packages) of wallets the adapter supports, but to keep this tutorial simple, we would use only one wallet.
+3. We now need to add wallets to our app. There is a list of [wallets the adapter supports](https://github.com/aptos-labs/aptos-wallet-adapter#supported-wallet-packages); but to keep this tutorial simple, we will use only one wallet.
    Still in the `client` folder, run
 
 ```cmd
@@ -37,20 +37,21 @@ npm i petra-plugin-wallet-adapter
 :::tip
 If you haven't installed the Petra wallet extension yet:
 
-1. See the [user instructions](https://petra.app/docs/use) on petra.app for help.
-2. Switch to the Devnet network by clicking, settings, network, and selecting **devnet**.
-3. Click the faucet button to ensure you can receive test tokens.
+1. [Install Petral Wallet](../../guides/install-petra-wallet.md) and open the Chrome extension.
+2. Follow the [user instructions](https://petra.app/docs/use) on petra.app for help.
+2. Switch to the Devnet network by clicking **Settings** > **Network** and selecting **devnet**.
+3. Click the **Faucet** button to ensure you can receive test tokens.
 
 :::
 
-4. Open `Index.tsx` file. At the top of the file add the following
+4. Open `Index.tsx` file. At the top of the file, add the following:
 
 ```js
 import { PetraWallet } from "petra-plugin-wallet-adapter";
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
 ```
 
-5. Still on `Index.tsx`, add a const that holds an array of wallets
+5. Still in `Index.tsx`, add a constant that holds an array of wallets:
 
 ```js
 ...
@@ -58,7 +59,7 @@ const wallets = [new PetraWallet()];
 ...
 ```
 
-6. Inside the `render` method, update the code with the following
+6. Inside the `render` method, update the code with the following:
 
 ```js
 ...
@@ -68,22 +69,22 @@ const wallets = [new PetraWallet()];
 ...
 ```
 
-That wraps our app with the adapter provider and initialize it with our wallets. It also sets the provider to autoConnect a wallet.
+That wraps our app with the adapter provider and initializes it with our wallets. It also sets the provider to autoConnect a wallet.
 
-7. Open the App.tsx file, and import the wallet connect UI package we installed in the previous step. At the top of the file add the following
+7. Open the `App.tsx` file and import the wallet connect UI package we installed in the previous step. At the top of the file add the following:
 
 ```js
 import { WalletSelector } from "@aptos-labs/wallet-adapter-ant-design";
 ```
 
-8. The UI package uses a style .css file, lets import that one also at the bottom of the import statements
+8. The UI package uses a style `.css` file; let's import that one also at the bottom of the import statements.
 
 ```js
 ...
 import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 ```
 
-9. In the `return` statement, remove the `<h1>Connect Wallet</h1>` text, and add the WalletSelector component
+9. In the `return` statement, remove the `<h1>Connect Wallet</h1>` text and add the `WalletSelector` component:
 
 ```js
 ...
@@ -93,6 +94,6 @@ import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 ...
 ```
 
-10. Start the local server with `npm start` open app in the browser.
+10. Start the local server with `npm start` and open the app in the browser.
 
 We now have a working Wallet connect button and a wallet selector modal. Feel free to play with it and connect a wallet with it.

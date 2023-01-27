@@ -18,7 +18,7 @@ You must
 1. Aptos CLI `@1.0.4`
 2. Aptos TS SDK `@1.6.0`
 3. Aptos Wallet Adapter `@0.2.2`
-4. Create React app
+4. Create React App
 
 ### Setup
 
