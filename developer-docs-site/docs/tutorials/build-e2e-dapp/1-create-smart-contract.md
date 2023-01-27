@@ -5,12 +5,12 @@ id: "create-a-smart-contract"
 
 # Create a Smart Contract
 
-If you haven’t done it, [install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). Make sure you use CLI version 1.0.4 as this what we use in this tutorial.
+If you haven’t done it, [install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). Make sure you use CLI version 1.0.4 or later as this what we use in this tutorial.
 
 1.  `cd` into the `my-first-dapp` root directory, and create a new `move` directory.
 2.  `cd` into the new `move` directory and run: `aptos move init --name my_todo_list`
-    That would create a `sources/` directory and `Move.toml` file inside the `move` directory.
-3.  Your new `move` directory should resemble:
+    That command creates a `sources/` directory and `Move.toml` file inside the `move` directory.
+3.  Your new `move` directory should now resemble:
 
     ![move-directory](../../../static/img/docs/build-e2e-dapp-img-1.png)
 
@@ -22,15 +22,15 @@ Take a look at the new `Move.toml` file. You should see your package information
 
 ### Why `sources` directory?
 
-The `sources` directory holds a collection of `.move` modules files. And later when we would want to compile the package using the CLI, it will look for that `sources` directory and the `Move.toml` file.
+The `sources` directory holds a collection of `.move` modules files. And later when we want to compile the package using the CLI, the compiler will look for that `sources` directory and its `Move.toml` file.
 
 ### Create a Move module
 
-An account is needed to publish a Move module. So first we need to create an account, that we have its private key, so we can create a module under its account address and publish the module using that account.
+An account is needed to publish a Move module. So first we need to create an account. Once we have the account's private key, we can create a module under its account address and publish the module using that account.
 
-1. On our `move` directory, run `aptos config init --network devnet`. Press enter when the prompt pops up.
+1. In our `move` directory, run `aptos config init --network devnet`. Press enter when prompted.
 
-   This creates for us a `.aptos` directory with a `config.yaml` file that holds our profiles info. On the `config` file we now have our profiles list that holds a `default` profile. You should see something like that
+   This creates for us a `.aptos` directory with a `config.yaml` file that holds our profile information. In the `config.yaml` file, we now have our profiles list that holds a `default` profile. If you open that file, you will see content resembling:
 
    ```yaml
    profiles:
@@ -43,30 +43,30 @@ An account is needed to publish a Move module. So first we need to create an acc
    ```
 
    From now on, whenever we run a CLI command in this `move` directory, it will run with that default profile.
-   We use the `devnet` network flag so eventually when we publish our package it would get published to the `devnet` network.
+   We use the `devnet` network flag so eventually when we publish our package it will get published to the `devnet` network.
 
    :::tip
-   You just created a new account on the Aptos (dev)netowrk! Yay! You can check it by going to [Explorer](https://explorer.aptoslabs.com/?network=devnet) past the `account value` from above into the search input and click on the dropdown option!
+   You just created a new account on the Aptos (dev) network! Yay! You can see it by going to the [Aptos Explorer](https://explorer.aptoslabs.com/?network=devnet) Devnet network view, pasting the `account` address value from your configuration file into the search field, and clicking on the dropdown option!
    :::
 
-As mentioned, our `sources` directory holds our `.move` module files, so let’s add our first move file.
+As mentioned, our `sources` directory holds our `.move` module files; so let’s add our first Move file.
 
-2. Open the `Move.toml` file
-3. Add the following code into that file
+2. Open the `Move.toml` file.
+3. Add the following code to it:
 
 ```toml
 [addresses]
 myaddr='<default_profile_account_address>'
 ```
 
-If the default profile account address is `cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018`, your `Move.toml` file should look like that
+If the default profile account address is `cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018`, your `Move.toml` file should look like:
 
 ```toml
 [addresses]
 myaddr='cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018'
 ```
 
-4. Create a new `main.move` file under the sources directory and add the following
+4. Create a new `main.move` file under the sources directory and add the following:
 
 ```rust
 module myaddr::main {
