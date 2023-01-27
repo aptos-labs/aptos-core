@@ -115,7 +115,7 @@ The main read methods deserializing on-chain data to TS objects are:
 - Get TokenData
 - Get Token of an Account
 
-## Validation for Transaction Builder and BCS
+## Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 
