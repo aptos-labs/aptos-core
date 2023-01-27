@@ -1,12 +1,12 @@
 ---
-title: "Integrate Aptos"
+title: "Integrate with the Aptos Blockchain"
 slug: "system-integrators-guide"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Integrate Aptos with Your Platform
+# Integrate with the Aptos Blockchain
 
 If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform.
 
