@@ -7,6 +7,7 @@ use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::max,
     hint,
+    ops::DerefMut,
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc, Condvar,
@@ -33,7 +34,10 @@ pub enum SchedulerTask {
     Done,
 }
 
-/// All possible statuses for each transaction. Each status contains the latest incarnation number.
+/////////////////////////////// Explanation for ExecutionStatus ///////////////////////////////
+/// All possible execution status for each transaction. In the explanation below, we abbreviate
+/// 'execution status' as 'status'. Each status contains the latest incarnation number,
+/// where incarnation = i means it is the i-th execution instance of the transaction.
 ///
 /// 'ReadyToExecute' means that the corresponding incarnation should be executed and the scheduler
 /// must eventually create a corresponding execution task. The scheduler ensures that exactly one
@@ -92,18 +96,59 @@ impl PartialEq for ExecutionStatus {
     }
 }
 
+/////////////////////////////// Explanation for ValidationStatus ///////////////////////////////
+/// All possible validation status for each transaction. In the explanation below, we abbreviate
+/// 'validation status' as 'status'. Each status contains three wave numbers, each with different
+/// meanings, but in general the concept of 'wave' keeps track of the version number of the validation.
+///
+/// 'max_triggered_wave' records the maximum wave that was triggered at the transaction index, and
+/// will be incremented every time when the validation_idx is decreased. Initialized as 0.
+///
+/// 'max_validated_wave' records the maximum wave among successful validations of the corresponding
+/// transaction, will be incremented upon successful validation (finish_validation). Initialized as None.
+///
+/// 'required_wave' in addition records the wave that must be successfully validated in order
+/// for the transaction to be committed, required to handle the case of the optimization in
+/// finish_execution when only the transaction itself is validated (if last incarnation
+/// didn't write outside of the previous write-set). Initilized as 0.
+///
+/// Other than ValidationStatus, the 'wave' information is also recorded in 'validation_idx' and 'commit_state'.
+/// Below is the description of the wave meanings and how they are updated. More details can be
+/// found in the definition of 'validation_idx' and 'commit_state'.
+///
+/// In 'validation_idx', the first 32 bits identifies a validation wave while the last 32 bits
+/// contain an index that tracks the minimum of all transaction indices that require validation.
+/// The wave is incremented whenever the validation_idx is reduced due to transactions requiring
+/// validation, in particular, after aborts and executions that write outside of the write set of
+/// the same transaction's previous incarnation.
+///
+/// In 'commit_state', the first element records the next transaction to commit, and the
+/// second element records the lower bound on the wave of a validation that must be successful
+/// in order to commit the next transaction. The wave is updated in try_commit, upon seeing an
+/// executed txn with higher max_triggered_wave. Note that the wave is *not* updated with the
+/// required_wave of the txn that is being committed.
+///
+///
+/////////////////////////////// Algorithm Description for Updating Waves ///////////////////////////////
+/// In the following, 'update' means taking the maximum.
+/// (1) Upon decreasing validation_idx, increment validation_idx.wave and update txn's max_triggered_wave <- validation_idx.wave;
+/// (2) Upon finishing execution of txn that is below validation_idx, if this execution does not write new places,
+/// then only this txn needs validation but not all later txns, update txn's required_wave <- validation_idx.wave;
+/// (3) Upon validating a txn successfully, update txn's max_validated_wave <- validation_idx.wave;
+/// (4) Upon trying to commit an executed txn, update commit_state.wave <- txn's max_triggered_wave.
+/// (5) If txn's max_validated_wave >= max(commit_state.wave, txn's required_wave), can commit the txn.
+///
+/// Remark: commit_state.wave is updated only with max_triggered_wave but not required_wave. The reason is that we rely on
+/// the first txn's max_triggered_wave being incremented during a new wave (due to decreasing validation_idx).
+/// Then, since commit_state.wave is updated with the first txn's max_triggered_wave, all later txns also
+/// need to have a max_validated_wave in order to be committed, which indicates they have the up-to-date validation
+/// wave. Similarly, for required_wave which is incremented only when the single txn needs validation,
+/// the commit_state.wave is not updated since later txns do not need new wave of validation.
+
 #[derive(Debug)]
 struct ValidationStatus {
-    // Maximum wave that was triggered at the transaction index corresponding to the status.
     max_triggered_wave: Wave,
-
-    // The maximum wave among successful validations of the corresponding transaction.
     max_validated_wave: Option<Wave>,
-
-    // Additional lower bound on the wave that must be successfully validated in order
-    // for the transaction to be committed, required to handle the case of the optimization in
-    // finish_execution when only the transaction itself is validated (if last incarnation
-    // didn't write outside of the previous write-set).
     required_wave: Wave,
 }
 
@@ -111,8 +156,8 @@ impl ValidationStatus {
     pub fn new() -> Self {
         ValidationStatus {
             max_triggered_wave: 0,
-            max_validated_wave: None,
             required_wave: 0,
+            max_validated_wave: None,
         }
     }
 }
@@ -178,17 +223,19 @@ impl Scheduler {
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
     pub fn try_commit(&self) -> Option<TxnIndex> {
-        let mut commit_state = self.commit_state.lock();
-        let idx = commit_state.0;
-        if idx == self.num_txns {
+        let mut commit_state_mutex = self.commit_state.lock();
+        let commit_state = commit_state_mutex.deref_mut();
+        let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
+
+        if *commit_idx == self.num_txns {
             // All txns have been committed, the parallel execution can finish.
             self.done_marker.store(true, Ordering::SeqCst);
             return None;
         }
 
-        if let Some(validation_status) = self.txn_status[idx].1.try_read() {
+        if let Some(validation_status) = self.txn_status[*commit_idx].1.try_read() {
             // Acquired the validation status lock, now try the status lock.
-            if let Some(status) = self.txn_status[idx].0.try_upgradable_read() {
+            if let Some(status) = self.txn_status[*commit_idx].0.try_upgradable_read() {
                 if let ExecutionStatus::Executed(incarnation) = *status {
                     // Status is executed and we are holding the lock.
 
@@ -196,14 +243,14 @@ impl Scheduler {
                     // since max_triggered_wave records the new wave when validation index is
                     // decreased thus affecting all later txns as well,
                     // while required_wave only records the new wave for one single txn.
-                    commit_state.1 = max(commit_state.1, validation_status.max_triggered_wave);
+                    *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
                     if let Some(validated_wave) = validation_status.max_validated_wave {
-                        if validated_wave >= max(commit_state.1, validation_status.required_wave) {
+                        if validated_wave >= max(*commit_wave, validation_status.required_wave) {
                             let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
                             // Can commit.
                             *status_write = ExecutionStatus::Committed(incarnation);
-                            commit_state.0 += 1;
-                            return Some(idx);
+                            *commit_idx += 1;
+                            return Some(*commit_idx - 1);
                         }
                     }
                 }
@@ -497,11 +544,13 @@ impl Scheduler {
     /// If the status of transaction is Executed(incarnation), returns Some(incarnation),
     /// Useful to determine when a transaction can be validated, and to avoid a race in
     /// dependency resolution.
-    /// If allow_committed is true, then committed transaction is also considered executed
-    /// (for dependency resolution purposes). If allow_committed is false, then we are
-    /// checking if a transaction may be validated, and a committed (in between) txn does
-    /// not need to be scheduled for validation - so can return None.
-    fn is_executed(&self, txn_idx: TxnIndex, allow_committed: bool) -> Option<Incarnation> {
+    /// If include_committed is true (which is when calling from wait_for_dependency),
+    /// then committed transaction is also considered executed (for dependency resolution
+    /// purposes). If include_committed is false (which is when calling from
+    /// try_validate_next_version), then we are checking if a transaction may be validated,
+    /// and a committed (in between) txn does not need to be scheduled for validation -
+    /// so can return None.
+    fn is_executed(&self, txn_idx: TxnIndex, include_committed: bool) -> Option<Incarnation> {
         if txn_idx >= self.txn_status.len() {
             return None;
         }
@@ -510,9 +559,11 @@ impl Scheduler {
         match *status {
             ExecutionStatus::Executed(incarnation) => Some(incarnation),
             ExecutionStatus::Committed(incarnation) => {
-                if allow_committed {
+                if include_committed {
+                    // Committed txns are also considered executed for dependency resolution purposes.
                     Some(incarnation)
                 } else {
+                    // Committed txns do not need to be scheduled for validation in try_validate_next_version.
                     None
                 }
             },
