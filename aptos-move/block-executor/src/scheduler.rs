@@ -104,7 +104,7 @@ impl PartialEq for ExecutionStatus {
 /// 'max_triggered_wave' records the maximum wave that was triggered at the transaction index, and
 /// will be incremented every time when the validation_idx is decreased. Initialized as 0.
 ///
-/// 'max_validated_wave' records the maximum wave among successful validations of the corresponding
+/// 'maybe_max_validated_wave' records the maximum wave among successful validations of the corresponding
 /// transaction, will be incremented upon successful validation (finish_validation). Initialized as None.
 ///
 /// 'required_wave' in addition records the wave that must be successfully validated in order
@@ -134,22 +134,22 @@ impl PartialEq for ExecutionStatus {
 /// (1) Upon decreasing validation_idx, increment validation_idx.wave and update txn's max_triggered_wave <- validation_idx.wave;
 /// (2) Upon finishing execution of txn that is below validation_idx, if this execution does not write new places,
 /// then only this txn needs validation but not all later txns, update txn's required_wave <- validation_idx.wave;
-/// (3) Upon validating a txn successfully, update txn's max_validated_wave <- validation_idx.wave;
+/// (3) Upon validating a txn successfully, update txn's maybe_max_validated_wave <- validation_idx.wave;
 /// (4) Upon trying to commit an executed txn, update commit_state.wave <- txn's max_triggered_wave.
-/// (5) If txn's max_validated_wave >= max(commit_state.wave, txn's required_wave), can commit the txn.
+/// (5) If txn's maybe_max_validated_wave >= max(commit_state.wave, txn's required_wave), can commit the txn.
 ///
 /// Remark: commit_state.wave is updated only with max_triggered_wave but not required_wave. The reason is that we rely on
 /// the first txn's max_triggered_wave being incremented during a new wave (due to decreasing validation_idx).
 /// Then, since commit_state.wave is updated with the first txn's max_triggered_wave, all later txns also
-/// need to have a max_validated_wave in order to be committed, which indicates they have the up-to-date validation
+/// need to have a maybe_max_validated_wave in order to be committed, which indicates they have the up-to-date validation
 /// wave. Similarly, for required_wave which is incremented only when the single txn needs validation,
 /// the commit_state.wave is not updated since later txns do not need new wave of validation.
 
 #[derive(Debug)]
 struct ValidationStatus {
     max_triggered_wave: Wave,
-    max_validated_wave: Option<Wave>,
     required_wave: Wave,
+    maybe_max_validated_wave: Option<Wave>,
 }
 
 impl ValidationStatus {
@@ -157,7 +157,7 @@ impl ValidationStatus {
         ValidationStatus {
             max_triggered_wave: 0,
             required_wave: 0,
-            max_validated_wave: None,
+            maybe_max_validated_wave: None,
         }
     }
 }
@@ -234,8 +234,9 @@ impl Scheduler {
         }
 
         if let Some(validation_status) = self.txn_status[*commit_idx].1.try_read() {
-            // Acquired the validation status lock, now try the status lock.
+            // Acquired the validation status read lock.
             if let Some(status) = self.txn_status[*commit_idx].0.try_upgradable_read() {
+                // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
                 if let ExecutionStatus::Executed(incarnation) = *status {
                     // Status is executed and we are holding the lock.
 
@@ -244,9 +245,10 @@ impl Scheduler {
                     // decreased thus affecting all later txns as well,
                     // while required_wave only records the new wave for one single txn.
                     *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
-                    if let Some(validated_wave) = validation_status.max_validated_wave {
+                    if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
                         if validated_wave >= max(*commit_wave, validation_status.required_wave) {
                             let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
+                            // Upgrade the execution status read lock to write lock.
                             // Can commit.
                             *status_write = ExecutionStatus::Committed(incarnation);
                             *commit_idx += 1;
@@ -371,9 +373,9 @@ impl Scheduler {
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
         let mut validation_status = self.txn_status[txn_idx].1.write();
-        validation_status.max_validated_wave = Some(
+        validation_status.maybe_max_validated_wave = Some(
             validation_status
-                .max_validated_wave
+                .maybe_max_validated_wave
                 .map_or(wave, |prev_wave| max(prev_wave, wave)),
         );
     }
