@@ -96,7 +96,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Start Aptos",
+            label: "Get Started",
             position: "left",
             items: [
               {
@@ -105,7 +105,7 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
-                label: "Read White Paper",
+                label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",
               },
@@ -115,12 +115,12 @@ const config = {
                 docId: "concepts/index",
               },
               {
-                label: "Prepare Environment",
+                label: "Prepare Your Environment",
                 type: "doc",
                 docId: "guides/getting-started",
               },
               {
-                label: "Integrate Aptos",
+                label: "Integrate with Aptos",
                 type: "doc",
                 docId: "guides/system-integrators-guide",
               },
@@ -133,7 +133,7 @@ const config = {
             items: [
               {
                 type: "doc",
-                label: "Follow Standards",
+                label: "Follow the Aptos Standards",
                 docId: "concepts/coin-and-token/index",
               },
               {
@@ -143,24 +143,24 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Interact with Blockchain",
+                label: "Interact with the Blockchain",
                 docId: "guides/index",
               },
               {
                 type: "doc",
-                label: "Develop with SDKs",
+                label: "Develop with the SDKs",
                 docId: "tutorials/index",
               },
               {
                 type: "doc",
-                label: "Implement Wallet Adapter",
+                label: "Integrate with Wallets",
                 docId: "concepts/wallet-adapter-concept",
               },
             ],
           },
           {
             type: "dropdown",
-            label: "Write Move",
+            label: "Learn Move",
             position: "left",
             items: [
               {
@@ -202,27 +202,27 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Create NFTs",
+            label: "Create Tokens",
             position: "left",
             items: [
               {
                 type: "doc",
-                label: "Create NFTs on Aptos",
+                label: "Create Tokens on Aptos",
                 docId: "/category/nft",
               },
               {
                 type: "doc",
-                label: "Compare Aptos Tokens",
+                label: "Compare Token Standards",
                 docId: "concepts/coin-and-token/aptos-token-comparison",
               },
               {
                 type: "doc",
-                label: "Mint NFTs with Aptos SDKs",
+                label: "Mint NFTs with the SDKs",
                 docId: "tutorials/your-first-nft",
               },
               {
                 type: "doc",
-                label: "Mint NFTs with Aptos CLI",
+                label: "Mint NFTs with the Aptos CLI",
                 docId: "guides/move-guides/mint-nft-cli",
               },
               {
@@ -232,7 +232,7 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Mint NFTs with NFT CLI Mint Tool",
+                label: "Mint NFTs with the Mint Tool",
                 docId: "concepts/coin-and-token/nft-minting-tool",
               },
             ],
@@ -243,7 +243,7 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Understand Nodes",
+                label: "Learn about Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
@@ -253,22 +253,22 @@ const config = {
                 docId: "nodes/local-testnet/index",
               },
               {
-                label: "Install Validators",
+                label: "Run a Validator",
                 type: "doc",
                 docId: "nodes/validator-node/index",
               },
               {
-                label: "Install FullNodes",
+                label: "Run a FullNode",
                 type: "doc",
                 docId: "nodes/full-node/index",
               },
               {
-                label: "Monitor Nodes",
+                label: "Monitor a Node",
                 type: "doc",
                 docId: "nodes/measure/index",
               },
               {
-                label: "Configure Nodes",
+                label: "Configure a Node",
                 type: "doc",
                 docId: "nodes/identity-and-configuration",
               },

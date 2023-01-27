@@ -22,7 +22,7 @@ use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::proposal_msg::ProposalMsg;
 use aptos_infallible::Mutex;
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{network, network::NewNetworkSender},
 };
@@ -130,7 +130,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         DIRECT_SEND.into(),
         RPC.into(),
         hashmap! {NetworkId::Validator => network_sender},
-        PeerMetadataStorage::new(&[NetworkId::Validator]),
+        PeersAndMetadata::new(&[NetworkId::Validator]),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 

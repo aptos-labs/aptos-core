@@ -1,5 +1,5 @@
 ---
-title: "Use Aptos NFT Minting Tool"
+title: "Mint NFTs with the Mint Tool"
 slug: "nft-minting-tool"
 ---
 

@@ -14,7 +14,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
 
 > Please note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
-## Set up the Aptos environment and start with the tutorials
+## Set up your environment and start with the tutorials
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-3a g-4">
@@ -59,7 +59,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
 </div>
 </div>
 
-## Run Aptos nodes
+## Run an Aptos node
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2a g-4">
@@ -85,7 +85,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
 </div>
 </div>
 
-## Develop apps with SDKs and APIs
+## Develop apps with the SDKs and APIs
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2a g-4">
@@ -116,12 +116,12 @@ This documentation will help you develop applications for the Aptos blockchain, 
 </div>
 </div>
 
-## Connect to Aptos networks
+## Connect to an Aptos network
 
-Aptos offers running a local testnet, as well as using the shared devnet and testnet, with mainnet now launched. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
+Aptos offers the ability to run a local testnet, as well as provides a shared devnet and testnet. See the [System Integrators Guide](guides/system-integrators-guide.md#networks) for a summary of the available networks and the means to connect to them.
 
 :::tip Aptos Devnet Resets
-The Aptos devnet is reset every Thursday. See the latest updates in [Aptos Discord](https://discord.gg/aptoslabs).
+The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos Discord](https://discord.gg/aptoslabs).
 :::info
 
 ## Ask questions and offer answers

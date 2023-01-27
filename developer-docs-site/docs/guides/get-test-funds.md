@@ -3,7 +3,7 @@ title: "Create and Fund Accounts"
 slug: "get-test-funds"
 ---
 
-## Create and Fund Aptos Accounts
+# Create and Fund Aptos Accounts
 
 For testing purposes, you will want to create an Aptos account and fund it with testnet tokens. Much of this can be accomplished in the [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets) of your choice. We use the [Petra Wallet](https://petra.app/docs/use) here in combination with the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) to show you how they work together.
 
@@ -16,7 +16,7 @@ You will need these installed to proceed:
 * The wallet of your choice; we use the [Petra Wallet](./install-petra-wallet.md) Chrome extension.
 * [Aptos CLI](../cli-tools/aptos-cli-tool/index.md)
 
-## Create Aptos account
+## Create an Aptos account
 
 First, understand you can use your private key straight from the wallet and not have to import it from the CLI.
 
@@ -53,7 +53,7 @@ Note that you may create specific account types by passing the `--profile` argum
   ```
 6. Note your configuration information can be found in `.aptos/config.yaml` relative to where you ran `aptos init`. Read that file to see each profile's private and public keys, account address, and REST API URL.
 
-## Import account
+## Import the account into the CLI
 
 Here we will add the account to your [wallet](https://github.com/aptos-foundation/ecosystem-projects#wallets). We use the [Petra Wallet](./install-petra-wallet.md) Chrome extension here:
 
@@ -64,7 +64,7 @@ Here we will add the account to your [wallet](https://github.com/aptos-foundatio
 6. Click **Submit** to add the previously created account to the wallet.
 7. You are switched into that account automatically.
 
-## Get coins from faucet
+## Get coins from the faucet
 
 1. Go to the *Petra > Settings > Network > Testnet* network if not there already.
 2. Connect your wallet to the Aptos faucet at https://aptoslabs.com/testnet-faucet:

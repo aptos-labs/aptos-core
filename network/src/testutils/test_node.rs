@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{storage::PeerMetadataStorage, types::PeerState},
+    application::{metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
     protocols::{
         direct_send::Message,
@@ -42,7 +42,7 @@ pub struct InboundNetworkHandle {
     /// To send new incoming connections or disconnections
     pub connection_update_sender: ConnectionUpdateSender,
     /// To update the local state (normally done by peer manager)
-    pub peer_metadata_storage: Arc<PeerMetadataStorage>,
+    pub peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl InboundNetworkHandle {
@@ -53,12 +53,17 @@ impl InboundNetworkHandle {
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
-        let self_peer_id = self_peer_network_id.peer_id();
-        let network_id = self_peer_network_id.network_id();
-
         // PeerManager pushes this data before it's received by events
-        self.peer_metadata_storage
-            .insert_connection(network_id, conn_metadata.clone());
+        let network_id = self_peer_network_id.network_id();
+        let peer_id = conn_metadata.remote_peer_id;
+        self.peers_and_metadata
+            .insert_connection_metadata(
+                PeerNetworkId::new(network_id, peer_id),
+                conn_metadata.clone(),
+            )
+            .unwrap();
+
+        let self_peer_id = self_peer_network_id.peer_id();
         self.connection_update_sender
             .push(
                 conn_metadata.remote_peer_id,
@@ -82,8 +87,8 @@ impl InboundNetworkHandle {
 
         // Set the state of the peer as disconnected
         let peer_network_id = PeerNetworkId::new(network_id, conn_metadata.remote_peer_id);
-        self.peer_metadata_storage
-            .update_peer_state(peer_network_id, PeerState::Disconnected)
+        self.peers_and_metadata
+            .update_connection_state(peer_network_id, ConnectionState::Disconnected)
             .unwrap();
 
         // Push the notification of the lost peer
@@ -184,7 +189,7 @@ pub trait ApplicationNode {
     /// For receiving messages from other nodes
     fn get_outbound_handle(&mut self, network_id: NetworkId) -> &mut OutboundMessageReceiver;
 
-    fn get_peer_metadata_storage(&self) -> &PeerMetadataStorage;
+    fn get_peers_and_metadata(&self) -> &PeersAndMetadata;
 
     fn peer_network_ids(&self) -> &HashMap<NetworkId, PeerNetworkId>;
 }

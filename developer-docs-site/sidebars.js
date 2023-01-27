@@ -18,13 +18,13 @@ const sidebars = {
   aptosSidebar: [
     {
       type: "html",
-      value: "Start Aptos",
+      value: "Get Started",
       className: "sidebar-title",
     },
     "whats-new-in-docs",
     {
       type: "category",
-      label: "Read Aptos White Paper",
+      label: "Read the Aptos White Paper",
       collapsible: true,
       collapsed: false,
       link: { type: "doc", id: "aptos-white-paper/index" },
@@ -50,7 +50,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Prepare Environment",
+      label: "Prepare Your Environment",
       link: { type: "doc", id: "guides/getting-started" },
       collapsible: true,
       collapsed: true,
@@ -59,18 +59,19 @@ const sidebars = {
         "guides/install-petra-wallet",
         {
           type: "category",
-          label: "Install Aptos CLI",
+          label: "Install the Aptos CLI",
           link: { type: "doc", id: "cli-tools/aptos-cli-tool/install-cli" },
           collapsible: true,
           collapsed: true,
           items: [
             "cli-tools/aptos-cli-tool/automated-install-aptos-cli",
+            "cli-tools/build-aptos-cli-brew",
             "cli-tools/aptos-cli-tool/install-aptos-cli",
             "cli-tools/build-aptos-cli",
-            "cli-tools/aptos-cli-tool/use-aptos-cli",
+            "cli-tools/install-move-prover",
           ],
         },
-        "cli-tools/install-move-prover",
+        "cli-tools/aptos-cli-tool/use-aptos-cli",
         "guides/get-test-funds",
       ],
     },
@@ -84,7 +85,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Follow Standards",
+      label: "Follow the Aptos Standards",
       link: { type: "doc", id: "concepts/coin-and-token/index" },
       collapsible: true,
       collapsed: true,
@@ -106,7 +107,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Interact with Blockchain",
+      label: "Interact with the Blockchain",
       link: { type: "doc", id: "guides/index" },
       collapsible: true,
       collapsed: true,
@@ -114,7 +115,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Develop with SDKs",
+      label: "Develop with the SDKs",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
@@ -122,7 +123,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Implement Wallet Adapter",
+      label: "Integrate with Wallets",
       link: { type: "doc", id: "concepts/wallet-adapter-concept" },
       collapsible: true,
       collapsed: true,
@@ -132,7 +133,7 @@ const sidebars = {
   moveSidebar: [
     {
       type: "html",
-      value: "Learn Move Language",
+      value: "Learn the Move Language",
       className: "sidebar-title",
     },
     {
@@ -154,17 +155,17 @@ const sidebars = {
   nftSidebar: [
     {
       type: "html",
-      value: "Make Aptos Tokens",
+      value: "Create Tokens",
       className: "sidebar-title",
     },
     {
       type: "category",
-      label: "Create NFTs on Aptos",
+      label: "Create Tokens on Aptos",
       collapsible: false,
       collapsed: false,
       link: {
         type: "generated-index",
-        title: "Create NFTs on Aptos",
+        title: "Create Tokens on Aptos",
         description: "Learn the various ways to mint and exchange tokens.",
         slug: "/category/nft",
         keywords: ["nft"],
@@ -186,7 +187,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Understand Nodes",
+      label: "Learn about Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/nodes-landing" },
@@ -220,7 +221,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Install Validators",
+      label: "Run a Validator",
       link: { type: "doc", id: "nodes/validator-node/index" },
       collapsible: true,
       collapsed: true,
@@ -274,7 +275,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Install Fullnodes",
+      label: "Run a Fullnode",
       link: { type: "doc", id: "nodes/full-node/index" },
       collapsible: true,
       collapsed: true,
@@ -291,7 +292,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Monitor Nodes",
+      label: "Monitor a Node",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/measure/index" },
@@ -304,7 +305,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Configure Nodes",
+      label: "Configure a Node",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/identity-and-configuration" },
@@ -347,7 +348,7 @@ const sidebars = {
           link: { type: "doc", id: "sdks/ts-sdk/index" },
           collapsible: true,
           collapsed: true,
-          items: ["sdks/ts-sdk/typescript-sdk", "sdks/ts-sdk/typescript-sdk-overview"],
+          items: ["sdks/ts-sdk/typescript-sdk-overview"],
         },
         "sdks/python-sdk",
         "sdks/rust-sdk",

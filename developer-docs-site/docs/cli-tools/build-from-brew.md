@@ -1,11 +1,11 @@
 ---
-title: "Build CLI from Brew"
+title: "Build the CLI with Brew"
 id: "build-aptos-cli-brew"
 ---
 
-# Build Aptos CLI from Brew
+# Build Aptos CLI with Brew
 
-On macOS and some Linux, `brew` is a package manager that allows for installing and updating packages in a single 
+Recommended on macOS, `brew` is a package manager that allows for installing and updating packages in a single 
 command.
 
 :::tip Not supported on Windows

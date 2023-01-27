@@ -5,6 +5,7 @@ mod account_generator;
 pub mod benchmark_transaction;
 pub mod db_generator;
 pub mod fake_executor;
+mod metrics;
 pub mod pipeline;
 pub mod transaction_committer;
 pub mod transaction_executor;

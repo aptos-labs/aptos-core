@@ -11,7 +11,7 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage, types::PeerState},
+    application::{interface::NetworkClient, metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{NetworkSender, NewNetworkSender},
@@ -76,7 +76,7 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
 struct MockNetwork {
     network_id: NetworkId,
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl MockNetwork {
@@ -97,14 +97,14 @@ impl MockNetwork {
         );
         let networks = networks
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
-        let peer_metadata_storage = PeerMetadataStorage::new(&networks);
+        let peers_and_metadata = PeersAndMetadata::new(&networks);
         let client_network_id = NetworkId::Validator;
         let network_client = NetworkClient::new(
             vec![],
             vec![ProtocolId::StorageServiceRpc],
             hashmap! {
             client_network_id => network_sender},
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
         );
 
         // Create a storage service client
@@ -127,7 +127,7 @@ impl MockNetwork {
         let mock_network = Self {
             network_id: client_network_id,
             peer_mgr_reqs_rx,
-            peer_metadata_storage,
+            peers_and_metadata,
         };
 
         (mock_network, mock_time.into_mock(), client, poller)
@@ -164,8 +164,9 @@ impl MockNetwork {
         connection_metadata
             .application_protocols
             .insert(ProtocolId::StorageServiceRpc);
-        self.peer_metadata_storage
-            .insert_connection(network_id, connection_metadata);
+        self.peers_and_metadata
+            .insert_connection_metadata(peer_network_id, connection_metadata)
+            .unwrap();
 
         // Return the new peer
         peer_network_id
@@ -173,18 +174,19 @@ impl MockNetwork {
 
     /// Disconnects the peer in the network peer DB
     fn disconnect_peer(&mut self, peer: PeerNetworkId) {
-        self.update_peer_state(peer, PeerState::Disconnected);
+        self.update_peer_state(peer, ConnectionState::Disconnected);
     }
 
     /// Reconnects the peer in the network peer DB
     fn reconnect_peer(&mut self, peer: PeerNetworkId) {
-        self.update_peer_state(peer, PeerState::Connected);
+        self.update_peer_state(peer, ConnectionState::Connected);
     }
 
     /// Updates the state of the given peer
-    fn update_peer_state(&mut self, peer: PeerNetworkId, state: PeerState) {
-        self.peer_metadata_storage
-            .update_peer_state(peer, state)
+
+    fn update_peer_state(&mut self, peer: PeerNetworkId, state: ConnectionState) {
+        self.peers_and_metadata
+            .update_connection_state(peer, state)
             .unwrap();
     }
 

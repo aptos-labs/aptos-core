@@ -1,12 +1,12 @@
 ---
-title: "Typescript SDK Overview"
+title: "Typescript SDK Architecture"
 slug: "typescript-sdk-overview"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Typescript SDK Overview
+# Typescript SDK Architecture 
 
 This document describes the main features and components of the Aptos Typescript SDK.
 
@@ -115,7 +115,7 @@ The main read methods deserializing on-chain data to TS objects are:
 - Get TokenData
 - Get Token of an Account
 
-## Validation for Transaction Builder and BCS
+## Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 
