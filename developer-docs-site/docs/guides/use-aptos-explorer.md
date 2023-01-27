@@ -1,5 +1,5 @@
 ---
-title: "Use Aptos Explorer"
+title: "Use the Aptos Explorer"
 slug: "use-aptos-explorer"
 ---
 import Tabs from '@theme/Tabs';
@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Use Aptos Explorer
+# Use the Aptos Explorer
 
 The [Aptos Explorer](https://explorer.aptoslabs.com/) lets you delve into the activity on the Aptos blockchain in great detail, seeing transactions, validators, and account information. With the Aptos Explorer, you may ensure the work you do in the [Aptos Petra Wallet](install-petra-wallet.md) and elsewhere on the blockchain is accurately reflected in Aptos.
 
@@ -27,7 +27,7 @@ The Aptos Explorer gives you a near real-time view into the status of the networ
 
 Follow the instructions here to conduct typical work in the Aptos Explorer.
 
-### Select network
+### Select a network
 
 The Aptos Explorer renders data from all Aptos networks: Mainnet, Testnet, Devnet, and your local host if configured. See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for a detailed view of their purposes and differences.
 
@@ -65,7 +65,7 @@ sources={{
 
 The resulting [Transaction details](#transaction-details) page appears.
 
-### Find account address
+### Find an account address
 
 The simplest way to find your address is to use the [Aptos Petra Wallet](https://petra.app/docs/use).
 
