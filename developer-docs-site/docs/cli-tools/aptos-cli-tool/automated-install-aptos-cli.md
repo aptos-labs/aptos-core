@@ -3,7 +3,7 @@ title: "Install CLI by Script"
 id: "automated-install-aptos-cli"
 ---
 
-# Automated Aptos CLI Installation
+# Install CLI by script
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using the automated install script.
 
