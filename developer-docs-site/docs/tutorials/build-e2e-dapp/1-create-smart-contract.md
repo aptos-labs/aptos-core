@@ -197,7 +197,7 @@ We also have a new `move/build` directory (created by the compiler) that holds o
 
 The first thing an account can and should do with our contract is create a new list.
 
-Creating a task is essentially submitting a transaction, and so we need to know the `signer` who signed and submitted the transaction:
+Creating a list is essentially submitting a transaction, and so we need to know the `signer` who signed and submitted the transaction:
 
 1. Add a `create_list` function that accepts a `signer`
 
@@ -209,7 +209,7 @@ public entry fun create_list(account: &signer){
 
 **Let’s understand the components of this function**
 
-- `entry` - an *entry* function is a function that can be called via transactions. Simply put, whenever you want to submit a transaction to the chain, you should call an entry function.
+- `entry` - an _entry_ function is a function that can be called via transactions. Simply put, whenever you want to submit a transaction to the chain, you should call an entry function.
 
 - `&signer` - The **signer** argument is injected by the Move VM as the address who signed that transaction.
 
@@ -287,7 +287,7 @@ use aptos_std::table::{Self, Table}; // This one we already have, need to modify
 
 ### Complete task function
 
-Another function we want our contract to hold is the option to toggle a task as completed.
+Another function we want our contract to hold is the option to mark a task as completed.
 
 1. Add a `complete_task` function that accepts a `signer` and a `task_id`:
 
@@ -306,7 +306,7 @@ public entry fun complete_task(account: &signer, task_id: u64) acquires TodoList
 
 **Let’s understand the code.**
 
-- As before in our create task function, we retrieve the `TodoList` struct by the signer address so we can have access to the tasks table that holds all of the account tasks.
+- As before in our create list function, we retrieve the `TodoList` struct by the signer address so we can have access to the tasks table that holds all of the account tasks.
 - Then, we look for the task with the provided `task_id` on the `todo_list.tasks` table.
 - Finally, we update that task completed property to be true.
 
@@ -341,10 +341,11 @@ public entry fun create_task(account: &signer, content: String) acquires TodoLis
 
 1. Add a check to the `complete_task` function to make sure the:
    - signer has created a list.
-   - ask exists.
+   - task exists.
    - task is not completed.
 
 With:
+
 ```rust
 public entry fun complete_task(account: &signer, task_id: u64) acquires TodoList {
   // gets the signer address
@@ -494,7 +495,7 @@ Additionally, the function itself now accepts a signer argument.
 
 **Let’s understand our tests.**
 
-Since our tests runs outside of an account scope, we need to *create* accounts to use in our tests. The `#[test]` annotation gives us the option to declare those accounts. We use an `admin` account and set it to a random account address (`@0x123`). The function accepts this signer (account) and creates it by using a built-in function to create an account for test.
+Since our tests runs outside of an account scope, we need to _create_ accounts to use in our tests. The `#[test]` annotation gives us the option to declare those accounts. We use an `admin` account and set it to a random account address (`@0x123`). The function accepts this signer (account) and creates it by using a built-in function to create an account for test.
 
 Then we simply go through the flow by:
 
@@ -560,7 +561,7 @@ For now, the easiest way to publish a Move package to chain is using the CLI:
 
 1. `cd` into our `move` directory, and run: `aptos move compile`
 
-We are getting some *Unused alias* errors. This is because we added the `string` alias before since we use it in our tests. But we don't use this alias in our smart contract code.
+We are getting some _Unused alias_ errors. This is because we added the `string` alias before since we use it in our tests. But we don't use this alias in our smart contract code.
 
 This is why we are getting this error when we want to compile the module but not are getting it when we only run tests.
 
@@ -596,6 +597,6 @@ use std::string; // add this
 }
 ```
 
-6. You can now head to the [Aptos Explorer](https://explorer.aptoslabs.com/), change the dropdown on the top right to the *Devnet* network and look for that `transaction_hash` value - this will show you the transaction details.
+6. You can now head to the [Aptos Explorer](https://explorer.aptoslabs.com/), change the dropdown on the top right to the _Devnet_ network and look for that `transaction_hash` value - this will show you the transaction details.
 
 Now let's [set up a React app](./2-set-up-react-app.md).

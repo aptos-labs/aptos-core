@@ -5,7 +5,7 @@ id: "add-wallet-support"
 
 # Add Wallet Support
 
-With your [React app set up](./2-set-up-react-app.md), you now need a *wallet* to submit a transaction to the blockchain.
+With your [React app set up](./2-set-up-react-app.md), you now need a _wallet_ to submit a transaction to the blockchain.
 
 Aptos provides a [wallet adapter](../../concepts/wallet-adapter-concept.md) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
 
@@ -39,8 +39,8 @@ If you haven't installed the Petra wallet extension yet:
 
 1. [Install Petral Wallet](../../guides/install-petra-wallet.md) and open the Chrome extension.
 2. Follow the [user instructions](https://petra.app/docs/use) on petra.app for help.
-2. Switch to the Devnet network by clicking **Settings** > **Network** and selecting **devnet**.
-3. Click the **Faucet** button to ensure you can receive test tokens.
+3. Switch to the Devnet network by clicking **Settings** > **Network** and selecting **devnet**.
+4. Click the **Faucet** button to ensure you can receive test tokens.
 
 :::
 
@@ -61,7 +61,7 @@ const wallets = [new PetraWallet()];
 
 6. Inside the `render` method, update the code with the following:
 
-```js
+```jsx
 ...
 <AptosWalletAdapterProvider plugins={wallets} autoConnect={true}>
   <App />
@@ -86,7 +86,7 @@ import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 
 9. In the `return` statement, remove the `<h1>Connect Wallet</h1>` text and add the `WalletSelector` component:
 
-```js
+```jsx
 ...
 <Col span={12} style={{ textAlign: "right", paddingRight: "200px" }}>
   <WalletSelector />

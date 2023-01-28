@@ -28,6 +28,7 @@ npx create-react-app client --template typescript
 That will create a new `client` folder in the current path:
 
 2. Your file structure should look something like:
+
    ![client-folder](../../../static/img/docs/build-e2e-dapp-img-2.png)
 
 3. Run: `cd client`
@@ -56,9 +57,9 @@ Once you save the changes, you should see that the app content has changed in th
 
 First we will build the dApp UI layout. We have two UI states for the app:
 
-* When an account hasn’t created a list yet (on the left).
-* When an account has created a list and can now add tasks to it (on the right).
-   ![dapp-ui](../../../static/img/docs/build-e2e-dapp-img-3.png)
+- When an account hasn’t created a list yet (on the left).
+- When an account has created a list and can now add tasks to it (on the right).
+  ![dapp-ui](../../../static/img/docs/build-e2e-dapp-img-3.png)
 
 We will use the [Ant Design](https://ant.design/) library for our UI:
 
@@ -66,7 +67,7 @@ We will use the [Ant Design](https://ant.design/) library for our UI:
 2. On to the `client` directory and install our UI library package: `npm i antd@5.1.4`
 3. Update `App.tsx` with the initial state UI:
 
-```js
+```jsx
 return (
   <>
     <Layout>
@@ -83,12 +84,12 @@ return (
 );
 ```
 
-4. Dont forget to import the *components* we just added:
+4. Dont forget to import the _components_ we just added:
 
 ```js
 import { Layout, Row, Col } from "antd";
 ```
 
-5. Run the local server with `npm start`, you should see the *header* that matches our UI mockup.
+5. Run the local server with `npm start`, you should see the _header_ that matches our UI mockup.
 
 It is now time to [add wallet support](./3-add-wallet-support.md).
