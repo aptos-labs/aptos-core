@@ -129,6 +129,21 @@ const sidebars = {
       collapsed: true,
       items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
+    {
+      type: "category",
+      label: "Build E2E Dapp with Aptos",
+      link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "tutorials/build-e2e-dapp/create-a-smart-contract",
+        "tutorials/build-e2e-dapp/set-up-react-app",
+        "tutorials/build-e2e-dapp/add-wallet-support",
+        "tutorials/build-e2e-dapp/fetch-data-from-chain",
+        "tutorials/build-e2e-dapp/submit-data-to-chain",
+        "tutorials/build-e2e-dapp/handle-tasks",
+      ],
+    },
   ],
   moveSidebar: [
     {
