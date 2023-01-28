@@ -8,7 +8,7 @@ slug: "e2e-dapp-index"
 A common way to learn a new framework or programming language is to build a simple todo list. In this tutorial, we will learn how to build an end-to-end todo list dapp, starting from the smart contract side through the front-end side and finally use of a wallet to interact with the two.
 
 :::tip
-The completed code is in the [todolist-dapp-toturial](../../../../aptos-move/move-examples/my_first_dapp/)
+The completed code is in the [my_first_dapp](../../../../aptos-move/move-examples/my_first_dapp/)
 :::
 
 ## Prerequisites
