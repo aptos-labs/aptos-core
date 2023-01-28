@@ -195,6 +195,17 @@ module std::vector {
         accu
     }
 
+    /// Map the function over the references of the elements of the vector, producing a new vector without modifying the
+    /// original map.
+    public inline fun map_ref<Element, NewElement>(
+        v: &vector<Element>,
+        f: |&Element|NewElement
+    ): vector<NewElement> {
+        let result = vector<NewElement>[];
+        for_each_ref(v, |elem| push_back(&mut result, f(elem)));
+        result
+    }
+
     /// Map the function over the elements of the vector, producing a new vector.
     public inline fun map<Element, NewElement>(
         v: vector<Element>,
