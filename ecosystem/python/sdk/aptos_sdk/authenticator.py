@@ -146,28 +146,19 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-
     public_key: ed25519.MultiEd25519PublicKey
     signature: ed25519.MultiEd25519Signature
-    bitmap: bytes
 
     def __init__(self, public_key, signature):
         self.public_key = public_key
         self.signature = signature
-        bitmap = 0
-        for single_signature in signature.signatures:
-            index = public_key.keys.index(single_signature[0])
-            shift = 31 - index # 32 bit positions, left to right.
-            bitmap = bitmap | (1 << shift)
-        # 4-byte big endian bitmap
-        self.bitmap = bitmap.to_bytes(4, 'big')
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
 
-    @staticmethod
-    def deserialize(deserializer: Deserializer) -> MultiEd25519Authenticator:
-        raise NotImplementedError
+    def to_bytes(self):
+        self.public_key.to_bytes() + self.signature.to_bytes()
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)

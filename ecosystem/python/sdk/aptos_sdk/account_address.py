@@ -55,7 +55,7 @@ class AccountAddress:
     def from_multisig_schema(
             keys: List[ed25519.PublicKey], threshold: int) -> AccountAddress:
         multisig_public_key = ed25519.MultiEd25519PublicKey(keys, threshold)
-        return AccountAddress(multisig_public_key.key.encode())
+        return AccountAddress(multisig_public_key.auth_key())
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> AccountAddress:
