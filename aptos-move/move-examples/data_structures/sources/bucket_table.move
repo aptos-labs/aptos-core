@@ -37,7 +37,7 @@ module aptos_std::bucket_table {
     }
 
     /// Create an empty BucketTable with `initial_buckets` buckets.
-    public fun new<K: drop + store, V: store>(initial_buckets: u64): BucketTable<K, V> {
+    public fun new<K: copy + store + drop, V: store>(initial_buckets: u64): BucketTable<K, V> {
         assert!(initial_buckets > 0, error::invalid_argument(EZERO_CAPACITY));
         let buckets = table_with_length::new();
         table_with_length::add(&mut buckets, 0, vector::empty());
@@ -144,7 +144,7 @@ module aptos_std::bucket_table {
     /// Aborts if there is no entry for `key`.
     /// The requirement of &mut BucketTable is to bypass the borrow checker issue described in https://github.com/move-language/move/issues/95
     /// Once Table supports borrow by K, we can remove the &mut
-    public fun borrow<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &V {
+    public fun borrow<K: drop, V>(map: &mut BucketTable<K, V>, key: K): &V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(&key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
@@ -161,7 +161,7 @@ module aptos_std::bucket_table {
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun borrow_mut<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &mut V {
+    public fun borrow_mut<K: drop, V>(map: &mut BucketTable<K, V>, key: K): &mut V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(&key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
@@ -194,7 +194,7 @@ module aptos_std::bucket_table {
 
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun remove<K: drop, V>(map: &mut BucketTable<K,V>, key: &K): V {
+    public fun remove<K: drop, V>(map: &mut BucketTable<K, V>, key: &K): V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
