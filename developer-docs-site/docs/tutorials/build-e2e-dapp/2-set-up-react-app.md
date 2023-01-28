@@ -3,6 +3,8 @@ title: "Set up React app"
 id: "set-up-react-app"
 ---
 
+Now that you have [created a smart contract](./1-create-smart-contract.md), we are going to set up React app.
+
 ## Prerequisites
 
 Although we will explain some React decisions, we are not going to deep dive into how React works; so we assume you have some previous experience with React.
@@ -86,3 +88,5 @@ import { Layout, Row, Col } from "antd";
 ```
 
 5. Run the local server with `npm start`, you should see the *header* that matches our UI mockup.
+
+It is now time to [add wallet support](./3-add-wallet-support.md).

@@ -5,7 +5,7 @@ id: "add-wallet-support"
 
 # Add Wallet support
 
-A *wallet* is a program that used to submit a transaction to chain.
+With you [React app set up](./2-set-up-react-app.md), you now need a *wallet* to submit a transaction to the blockchain.
 
 Aptos provides a [wallet adapter](../../concepts/wallet-adapter-concept.md) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
 
@@ -97,3 +97,5 @@ import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 10. Start the local server with `npm start` and open the app in the browser.
 
 We now have a working Wallet connect button and a wallet selector modal. Feel free to play with it and connect a wallet with it.
+
+Then learn how to [fetch data from chain](./4-fetch-data-from-chain.md).

@@ -1,44 +1,45 @@
 ---
-title: "Fetch data from chain"
+title: "Fetch Data from Chain"
 id: "fetch-data-from-chain"
 ---
 
-# Fetch data from chain
+# Fetch Data from Chain
 
-Our UI logic relies on whether the connected account has created a todo list or not. If they have, we should display their todo list, if they haven’t we should display a button letting them the option to create a new list.
+Our UI logic relies on whether the connected account has created a todo list. If the account has created a todo list, our app should display that list; if not, the app should display a button offering the option to create a new list.
 
-For that, we first need to check if the connected account’s has a `TodoList` resource. this is because, in our smart contract, whenever someone creates a todo list we create and assign a `TodoList` resource to their account.
+For that, we first need to check if the connected account has a `TodoList` resource. In our smart contract, whenever someone creates a todo list we create and assign a `TodoList` resource to their account.
 
-To fetch data from chain, we can use Aptos TS SDK. The SDK provides classes and functions for us to easily interact and query the Aptos chain
+To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
 
-1. Stop the local server if running
-2. on the `client` folder, run `npm i aptos@1.6.0`
-3. On the `App.tsx` file import the `AptosClient` class like that
+To get started:
+1. Stop the local server if running.
+2. In the `client` directory, run: `npm i aptos@1.6.0`
+3. In the `App.tsx` file, import the `AptosClient` class like so:
 
 ```js
 import { AptosClient } from "aptos";
 ```
 
-The TS SDK provides us with an `AptosClient` class where we can initialize and query the Aptos chain. `AptosClient` expects the get a `node_url` as an argument which is the network URL we want to interact with.
+The TypeScript SDK provides us with an `AptosClient` class where we can initialize and query the Aptos chain. `AptosClient` expects`node_url` as an argument, which is the [network URL](../../guides/system-integrators-guide.md#choose-a-network) we want to interact with.
 
-1. On the `App.tsx` file add the following
+1. In the `App.tsx` file, add:
 
 ```js
 const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
 const client = new AptosClient(NODE_URL);
 ```
 
-That would initialize an AptosClient instance for us with the devnet node url.
+This will initialize an `AptosClient` instance for us with the devnet node URL.
 
 Our app displays different UIs based on a user resource (i.e if a user has a list ⇒ if a user has a `TodoList` resource). For that, we need to know the current account connected to our app.
 
-1. Import Wallet from the wallet adapter react provider
+1. Import wallet from the wallet adapter React provider:
 
 ```js
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 ```
 
-2. Extract the account object from the wallet adapter
+2. Extract the account object from the wallet adapter:
 
 ```js
 function App (
@@ -47,10 +48,10 @@ function App (
 )
 ```
 
-The `account` object is `null` if there is no account connected and holds the account info, like the account address, when account is connected
+The `account` object is `null` if there is no account connected; when an account is connected, the `account` object holds the account information, including the account address.
 
-3. Next thing we want to do is to fetch the account’s TodoList resource.
-   Let’s add a useEffect hook to our file that would call a function to fetch the resource whenever our account address changes.
+3. Next, we want to fetch the account’s TodoList resource.
+   Let’s add a `useEffect` hook to our file that would call a function to fetch the resource whenever our account address changes:
 
 ```jsx
 function App() {
@@ -62,7 +63,7 @@ function App() {
 }
 ```
 
-4. Before creating our `fetchList` function, let’s also create a local state to store whether the account has a list
+4. Before creating our `fetchList` function, let’s also create a local state to store whether the account has a list:
 
 ```js
 function App (
@@ -72,7 +73,7 @@ function App (
 )
 ```
 
-5. Our `useEffect` hook is calling a `fetchList` function, let’s create it.
+5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
 ```jsx
 const fetchList = async () => {
@@ -91,19 +92,19 @@ const fetchList = async () => {
 };
 ```
 
-`moduleAddress` is the address we publish the module under, i.e the account address you have on your `Move.toml` file (`myaddr`)
+The `moduleAddress` is the address we publish the module under, i.e the account address you have in your `Move.toml` file (`myaddr`).
 
-The `client.getAccountResource()`expects an `account address` that holds the resource we are looking for and a string representation of an on-chain `Move struct type` .
+The `client.getAccountResource()`expects an *account address* that holds the resource we are looking for and a string representation of an on-chain *Move struct type*.
 
 - account address - is the current connected account (we are getting it from the wallet account object)
-- Move struct type string syntax
+- Move struct type string syntax:
   - The account address who holds the move module = our profile account address (You might want to change the `moduleAddress` const to be your own account address)
   - The module name the resource lives in = `main`
   - The resource name = `TodoList`
 
-If the request succeed and there is a resource for that account, we want to set our local state to true, otherwise we would set it to false.
+If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
 
-6. Let’s update our UI based on the `accountHasList` state
+6. Let’s update our UI based on the `accountHasList` state:
 
 ```jsx
 return (
@@ -131,8 +132,8 @@ return (
 );
 ```
 
-We now have a “add new list” button that only shows up if the account doesn’t have a list.
+We now have an **Add new list** button that appears only if the account doesn’t have a list.
 
-Start the local server with `npm start` , you should see the “Add new list” button.
+Start the local server with `npm start`. You should see the **Add new list** button.
 
-Let’s understand how we create a new list which is submit a transaction to chain.
+Next, let’s understand how to create a new list by [submitting data to chain](./5-submit-data-to-chain.md).

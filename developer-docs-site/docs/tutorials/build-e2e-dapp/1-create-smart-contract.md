@@ -597,3 +597,5 @@ use std::string; // add this
 ```
 
 6. You can now head to the [Aptos Explorer](https://explorer.aptoslabs.com/), change the dropdown on the top right to the *Devnet* network and look for that `transaction_hash` value - this will show you the transaction details.
+
+Now let's [set up a React app](./2-set-up-react-app.md).

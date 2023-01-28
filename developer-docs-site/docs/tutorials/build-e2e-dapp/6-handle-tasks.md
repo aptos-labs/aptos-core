@@ -5,13 +5,13 @@ id: "handle-tasks"
 
 # Handle tasks
 
-By now, we went over on how to fetch data (account’s todo list) from chain and how to submit a transaction (new todo list) to chain using Wallet.
+We have covered how to [fetch data](./4-fetch-data-from-chain.md) (an account’s todo list) from chain and how to [submit a transaction](./5-submit-data-to-chain.md) (new todo list) to chain using Wallet.
 
-Let’s continue building our app and implement fetch tasks and add a task functions.
+Let’s continue building our app by implementing fetch tasks and adding a task function.
 
-### Fetch Tasks
+## Fetch tasks
 
-1. Create a local state `tasks` that would hold our tasks. It would be a state of a Task type (that has the same properties we set on our smart contract)
+1. Create a local state `tasks` that will hold our tasks. It will be a state of a Task type (that has the same properties we set on our smart contract):
 
 ```ts
 type Task = {
@@ -27,7 +27,7 @@ function App() {
 }
 ```
 
-2. Update our `fetchList` function to fetch the tasks in the account’s `TodoList` resource.
+2. Update our `fetchList` function to fetch the tasks in the account’s `TodoList` resource:
 
 ```js
 const fetchList = async () => {
@@ -63,18 +63,18 @@ const fetchList = async () => {
 };
 ```
 
-**This part is a bit confusing so bear with me!**
+**This part is a bit confusing, so stick with us!**
 
-Tasks are stored in a table (this is how we built our contract). To fetch a table item (i.e a task) we need that tasks table handle. We also need the `task_counter` in that resource so we can loop over and fetch the task that the task_id matches the task_counter.
+Tasks are stored in a table (this is how we built our contract). To fetch a table item (i.e a task), we need that task's table handle. We also need the `task_counter` in that resource so we can loop over and fetch the task with the `task_id` that matches the `task_counter`.
 
 ```js
 const tableHandle = (TodoListResource as any).data.tasks.handle;
 const taskCounter = (TodoListResource as any).data.task_counter;
 ```
 
-Now that we have our tasks table handle and our task_counter variable, lets loop over the `taskCounter` . We define a `counter` and set it to 1 (as the task_counter / task_id) is never less than 1.
+Now that we have our tasks table handle and our `task_counter` variable, lets loop over the `taskCounter` . We define a `counter` and set it to 1 as the task_counter / task_id is never less than 1.
 
-We loop while the `counter` is less then the `taskCounter` and fetch the table item and push it to the tasks array.
+We loop while the `counter` is less then the `taskCounter` and fetch the table item and push it to the tasks array:
 
 ```js
 let tasks = [];
@@ -91,20 +91,20 @@ while (counter <= taskCounter) {
 }
 ```
 
-We build a `tableItem` object to fetch. If we will take a look at our table structure from the contract
+We build a `tableItem` object to fetch. If we take a look at our table structure from the contract:
 
 ```rust
 tasks: Table<u64, Task>,
 ```
 
-We see that it has a `key` type `u64` and a `value` of type `Task` and whenever we create a new task, we assign the `key` to be the incremented task counter
+We see that it has a `key` type `u64` and a `value` of type `Task`. And whenever we create a new task, we assign the `key` to be the incremented task counter.
 
 ```rust
 // adds the new task into the tasks table
 table::upsert(&mut todo_list.tasks, counter, new_task);
 ```
 
-So the object we built is
+So the object we built is:
 
 ```js
 {
@@ -114,15 +114,15 @@ So the object we built is
 }
 ```
 
-where `key_type` is the table `key` type, `key` is the key value we are looking for, and the `value_type` is the table `value` which is a `Task` struct. The Task struct use the same format from our previous resource query
+Where `key_type` is the table `key` type, `key` is the key value we are looking for, and the `value_type` is the table `value` which is a `Task` struct. The Task struct uses the same format from our previous resource query:
 
 - The account address who holds that module = our profile account address
 - The module name the resource lives in = `main`
 - The struct name = `Task`
 
-Last thing we want to do, is actually display the tasks we just fetched.
+The last thing we want to do is display the tasks we just fetched.
 
-6. On our `App.tsx` , update our UI with the following code
+6. In our `App.tsx` file, update our UI with the following code:
 
 ```jsx
 {
@@ -169,15 +169,15 @@ Last thing we want to do, is actually display the tasks we just fetched.
 }
 ```
 
-That would display the “Add new list” button if account doesn’t have a list or the tasks if the account has a list.
+That will display the **Add new list** button if account doesn’t have a list or instead the tasks if the account has a list.
 
 Go ahead and refresh your browser - see the magic!
 
-We haven’t added any task yet, so we simply see a box with empty data content. Let’s add some tasks!
+We haven’t added any tasks yet, so we simply see a box of empty data. Let’s add some tasks!
 
 ### Add task
 
-1. Update our UI with a “add task” input
+1. Update our UI with an *add task* input:
 
 ```jsx
 {!accountHasList ? (
@@ -207,7 +207,7 @@ We haven’t added any task yet, so we simply see a box with empty data content.
 
 We have added a text input to write the task and a button to add the task.
 
-2. Create a new local state that holds the task content.
+2. Create a new local state that holds the task content:
 
 ```jsx
 function App() {
@@ -217,7 +217,7 @@ function App() {
 }
 ```
 
-3. Add a `onWriteTask` function that would get called whenever a user types something in the input text
+3. Add an `onWriteTask` function that will get called whenever a user types something in the input text:
 
 ```jsx
 function App() {
@@ -232,7 +232,7 @@ function App() {
 }
 ```
 
-4. Find our `<Input/>` component and add the `onChange` event to it and pass it our `onWriteTask` function and set the input value to be the `newTask` local state
+4. Find our `<Input/>` component, add the `onChange` event to it, pass it our `onWriteTask` function and set the input value to be the `newTask` local state:
 
 ```jsx
 <Input
@@ -244,7 +244,7 @@ function App() {
 />
 ```
 
-Cool! Now we have a working flow that when the user types something on the Input component, a function would get fired and set our local state with that content.
+Cool! Now we have a working flow that when the user types something on the Input component, a function will get fired and set our local state with that content.
 
 5. Let’s also add a function that submits the typed task to chain! Find our Add `<Button />` component and update it with the following
 
@@ -258,17 +258,17 @@ Cool! Now we have a working flow that when the user types something on the Input
 </Button>
 ```
 
-That adds an `onClickevent` that triggers a `onTaskAdded` function.
+That adds an `onClickevent` that triggers an `onTaskAdded` function.
 
-When someones adds a new task we
+When someones adds a new task we:
 
-- want to verify they are connected with a wallet
-- build a transaction payload that would be submitted to chain
-- submit it to chain using our wallet
-- wait for the transaction
-- update our UI with that new task (with out the need to refresh the page)
+- want to verify they are connected with a wallet.
+- build a transaction payload that would be submitted to chain.
+- submit it to chain using our wallet.
+- wait for the transaction.
+- update our UI with that new task (without the need to refresh the page).
 
-6. Add a `onTaskAdded` function with the following code
+6. Add an `onTaskAdded` function with:
 
 ```jsx
 const onTaskAdded = async () => {
@@ -320,9 +320,9 @@ const onTaskAdded = async () => {
 
 **Let’s go over on what is happening.**
 
-First thing we use the `account` prop from our wallet provider to make sure there is an account connected to our app.
+First, note we use the `account` property from our wallet provider to make sure there is an account connected to our app.
 
-Then we build our transaction payload to be submitted to chain
+Then we build our transaction payload to be submitted to chain:
 
 ```js
 const payload = {
@@ -333,23 +333,23 @@ const payload = {
 };
 ```
 
-- `type` is the function type we want to hit - our create_task function is an `entry` type function
-- `function`- is built from the module address, module name and the function name
-- `type_arguments`- this is for the case a move function expects a generic type argument
-- `arguments` - the argument the function expects, in our case is the task content
+- `type` is the function type we want to hit - our `create_task` function is an `entry` type function.
+- `function`- is built from the module address, module name and the function name.
+- `type_arguments`- this is for the case a Move function expects a generic type argument.
+- `arguments` - the arguments the function expects, in our case the task content.
 
-Then, within our try/catch block, we use a wallet provider function to submit the transaction to chain and a SDK function to wait for that transaction.
-If all went good, we want to find the current latest task id so we can add it to our current tasks state array, and create a new task to push to the current tasks state array (so we can display the new task in our tasks list on the UI without the need to refresh the page).
+Then, within our try/catch block, we use a wallet provider function to submit the transaction to chain and an SDK function to wait for that transaction.
+If all goes well, we want to find the current latest task ID so we can add it to our current tasks state array. We will also create a new task to push to the current tasks state array (so we can display the new task in our tasks list on the UI without the need to refresh the page).
 
 TRY IT!
 
-Type a new task in the text input, click Add, approve the transaction and see it being added to the tasks list.
+Type a new task in the text input, click **Add**, approve the transaction and see it being added to the tasks list.
 
 ### Mark task as completed
 
-Next, we can implement the complete_task function. We have the checkbox in our UI so users can mark a task as completed.
+Next, we can implement the `complete_task` function. We have the checkbox in our UI so users can mark a task as completed.
 
-1. Update the `<Checkbox/>` component with a `onCheck` prop that would call a `onCheckboxChange` function once it is checked
+1. Update the `<Checkbox/>` component with an `onCheck` property that would call an `onCheckboxChange` function once it is checked:
 
 ```jsx
 <List.Item actions={[
@@ -357,7 +357,7 @@ Next, we can implement the complete_task function. We have the checkbox in our U
 ]}>
 ```
 
-2. Create the `onCheckboxChange` function (make sure to import `CheckboxChangeEven`t from `antd` - `import { CheckboxChangeEvent } from "antd/es/checkbox";`)
+2. Create the `onCheckboxChange` function (make sure to import `CheckboxChangeEvent` from `antd` - `import { CheckboxChangeEvent } from "antd/es/checkbox";`):
 
 ```js
 const onCheckboxChange = async (
@@ -402,11 +402,11 @@ const onCheckboxChange = async (
   };
 ```
 
-Here we basically so the same thing we did when we created a new list or a new task.
+Here we basically do the same thing we did when we created a new list or a new task.
 
-we make sure there is an account connected, set the transaction in progress state, build the transaction payload and then submit the transaction, wait for it and update the task on the UI as completed.
+We make sure there is an account connected, set the transaction in progress state, build the transaction payload, submit the transaction, wait for it and update the task on the UI as completed.
 
-3. Update the `Checkbox` component to be checked by default is a task has already marked as completed
+3. Update the `Checkbox` component to be checked by default if a task has already marked as completed:
 
 ```jsx
 ...
@@ -428,4 +428,6 @@ we make sure there is an account connected, set the transaction in progress stat
 ...
 ```
 
-Try it! check a task’s checkbox, approve the transaction and see the task marked as completed.
+Try it! Check a task’s checkbox, approve the transaction and see the task marked as completed.
+
+You have now learned how to build a dapp on Aptos from end to end. Congratulations! Tell your friends. :-)
