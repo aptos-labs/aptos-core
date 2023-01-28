@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{generate_blob_name, get_file_store_blob_folder_name, get_file_store_bucket_name};
 use aptos_indexer_grpc_utils::{
-    storage::{get_file_store_metadata, FileStoreMetadata},
+    get_file_store_bucket_name,
+    storage::{
+        generate_blob_name, get_file_store_metadata, upload_file_store_metadata,
+        BLOB_TRANSACTION_CHUNK_SIZE,
+    },
     CACHE_KEY_CHAIN_ID,
 };
-use aptos_logger::info;
 use aptos_moving_average::MovingAverage;
 use cloud_storage::Object;
 use redis::{Client, Commands};
@@ -27,31 +29,20 @@ pub struct Processor {
 }
 
 async fn upload_blob_transactions(
-    starting_version: u64,
-    encoded_proto_data_vec: Vec<String>,
-    blob_size: u64,
+    bucket_name: String,
+    blob_object: TransactionsBlob,
 ) -> anyhow::Result<()> {
-    let blob_object: TransactionsBlob = TransactionsBlob {
-        starting_version,
-        transactions: encoded_proto_data_vec,
-    };
-
     match Object::create(
-        &get_file_store_bucket_name(),
+        bucket_name.as_str(),
         serde_json::to_vec(&blob_object).unwrap(),
-        format!(
-            "{}/{}",
-            get_file_store_blob_folder_name(),
-            generate_blob_name(starting_version, blob_size)
-        )
-        .as_str(),
+        generate_blob_name(blob_object.starting_version).as_str(),
         "application/json",
     )
     .await
     {
         Ok(_) => Ok(()),
         Err(err) => {
-            info!(
+            aptos_logger::info!(
                 error = err.to_string(),
                 "[indexer file store] Failed to process a blob; retrying in 1 second"
             );
@@ -69,36 +60,37 @@ impl Processor {
         }
     }
 
-    pub async fn run(&mut self) {
-        let bucket_name = get_file_store_bucket_name();
-        let metadata = get_file_store_metadata(bucket_name).await;
-        self.process(metadata).await;
-    }
-
     // Starts the processing.
-    async fn process(&mut self, mut metadata: FileStoreMetadata) {
+    pub async fn run(&mut self) {
         let mut conn = self.redis_client.get_connection().unwrap();
         let mut ma = MovingAverage::new(10_000);
-        let bucket_name = get_file_store_bucket_name();
 
+        let bucket_name = get_file_store_bucket_name();
         let redis_chain_id = conn
             .get::<String, String>(CACHE_KEY_CHAIN_ID.to_string())
             .unwrap();
 
+        let mut metadata = get_file_store_metadata(bucket_name.clone()).await;
         // It's fatal if the chain_id doesn't match; this is a safety check.
         assert_eq!(redis_chain_id, metadata.chain_id.to_string());
-        let blob_size = metadata.blob_size;
+
         // The current version is the version of the last blob that was uploaded.
         self.current_version = metadata.version;
 
+        let mut metadata_ref = &mut metadata;
+
         loop {
-            let versions = (self.current_version..self.current_version + blob_size)
+            let versions = (self.current_version
+                ..self.current_version + BLOB_TRANSACTION_CHUNK_SIZE)
                 .map(|e| e.to_string())
                 .collect::<Vec<String>>();
-            let encoded_proto_data_vec = match conn.mget::<Vec<String>, Vec<String>>(versions) {
-                Ok(data) => data,
+            let transactions_blob = match conn.mget::<Vec<String>, Vec<String>>(versions) {
+                Ok(data) => TransactionsBlob {
+                    starting_version: self.current_version,
+                    transactions: data,
+                },
                 Err(err) => {
-                    info!(
+                    aptos_logger::info!(
                         error = err.to_string(),
                         "[indexer file store] Hit the head; retrying in 1 second"
                     );
@@ -106,36 +98,28 @@ impl Processor {
                     continue;
                 },
             };
-            match upload_blob_transactions(self.current_version, encoded_proto_data_vec, blob_size)
-                .await
-            {
-                Ok(_) => {
-                    self.current_version += blob_size;
-                    metadata.version += blob_size;
 
-                    ma.tick_now(blob_size);
-                    info!(
+            match upload_blob_transactions(bucket_name.clone(), transactions_blob).await {
+                Ok(_) => {
+                    self.current_version += BLOB_TRANSACTION_CHUNK_SIZE;
+                    metadata_ref.version += BLOB_TRANSACTION_CHUNK_SIZE;
+
+                    ma.tick_now(BLOB_TRANSACTION_CHUNK_SIZE);
+                    aptos_logger::info!(
                         version = self.current_version,
                         tps = (ma.avg() * 1000.0) as u64,
                         "[indexer file store] Processed a blob"
                     );
                 },
                 Err(err) => {
-                    info!(
+                    aptos_logger::error!(
                         error = err.to_string(),
                         "[indexer file store] Failed to process a blob; retrying in 1 second"
                     );
+                    continue;
                 },
             }
-            // If the metadata is not updated, the indexer will be restarted.
-            Object::create(
-                bucket_name.as_str(),
-                serde_json::to_vec(&metadata).unwrap(),
-                "metadata.json",
-                "application/json",
-            )
-            .await
-            .unwrap();
+            upload_file_store_metadata(bucket_name.clone(), *metadata_ref).await;
         }
     }
 }
