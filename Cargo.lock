@@ -434,6 +434,7 @@ dependencies = [
  "move-binary-format",
  "num_cpus",
  "once_cell",
+ "parking_lot 0.12.1",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
