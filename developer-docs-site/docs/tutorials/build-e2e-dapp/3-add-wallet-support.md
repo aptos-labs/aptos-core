@@ -1,11 +1,11 @@
 ---
-title: "Add Wallet suport"
+title: "Add Wallet Support"
 id: "add-wallet-support"
 ---
 
-# Add Wallet support
+# Add Wallet Support
 
-With you [React app set up](./2-set-up-react-app.md), you now need a *wallet* to submit a transaction to the blockchain.
+With your [React app set up](./2-set-up-react-app.md), you now need a *wallet* to submit a transaction to the blockchain.
 
 Aptos provides a [wallet adapter](../../concepts/wallet-adapter-concept.md) that saves us time and work in implementing wallets logic and a UI package we can use to add a wallet connect button and a wallet selector modal.
 

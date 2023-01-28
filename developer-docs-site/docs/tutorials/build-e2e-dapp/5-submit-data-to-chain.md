@@ -1,9 +1,9 @@
 ---
-title: "Submit data to chain"
+title: "Submit Data to Chain"
 id: "submit-data-to-chain"
 ---
 
-# Submit data to chain
+# Submit Data to Chain
 
 So now we have an **Add new list** button that appears if the connected account hasn’t created a list yet. We still don't have a way for an account to create a list, so let’s add that functionality.
 

@@ -1,5 +1,5 @@
 ---
-title: "Create a smart contract"
+title: "Create a Smart Contract"
 id: "create-a-smart-contract"
 ---
 

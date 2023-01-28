@@ -34,7 +34,7 @@ In this section, we will create a `my-first-dapp` directory to hold our project 
   cd my-first-dapp
   ```
 
-## Parts
+## Chapters
 
 Follow this tutorial in this order:
 

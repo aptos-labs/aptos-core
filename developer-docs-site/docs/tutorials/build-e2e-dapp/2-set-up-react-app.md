@@ -1,7 +1,9 @@
 ---
-title: "Set up React app"
+title: "Set up React App"
 id: "set-up-react-app"
 ---
+
+# Set up React App
 
 Now that you have [created a smart contract](./1-create-smart-contract.md), we are going to set up React app.
 
@@ -11,7 +13,7 @@ Although we will explain some React decisions, we are not going to deep dive int
 
 Also make sure you have [node and npm installed](https://nodejs.org/en/).
 
-# Set up a React app
+## Set up the app
 
 We will use the `react` library to build the client side with [Create React App](https://create-react-app.dev/docs/getting-started#creating-an-app).
 
@@ -50,7 +52,7 @@ Once you save the changes, you should see that the app content has changed in th
 8. Open the `index.tsx` file and remove the `import './index.css';` line at the top of the file.
    Now you can also delete the `src/index.css` file.
 
-### Our dapp UI
+## Our dapp UI
 
 First we will build the dApp UI layout. We have two UI states for the app:
 

@@ -131,7 +131,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Build an e2e dapp with Aptos",
+      label: "Build E2E Dapp with Aptos",
       link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
       collapsible: true,
       collapsed: true,

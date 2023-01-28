@@ -3,7 +3,7 @@ title: "Handle Tasks"
 id: "handle-tasks"
 ---
 
-# Handle tasks
+# Handle Tasks
 
 We have covered how to [fetch data](./4-fetch-data-from-chain.md) (an account’s todo list) from chain and how to [submit a transaction](./5-submit-data-to-chain.md) (new todo list) to chain using Wallet.
 
@@ -175,7 +175,7 @@ Go ahead and refresh your browser - see the magic!
 
 We haven’t added any tasks yet, so we simply see a box of empty data. Let’s add some tasks!
 
-### Add task
+## Add task
 
 1. Update our UI with an *add task* input:
 
@@ -345,7 +345,7 @@ TRY IT!
 
 Type a new task in the text input, click **Add**, approve the transaction and see it being added to the tasks list.
 
-### Mark task as completed
+## Mark task as completed
 
 Next, we can implement the `complete_task` function. We have the checkbox in our UI so users can mark a task as completed.
 
