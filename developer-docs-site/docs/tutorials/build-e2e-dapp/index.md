@@ -40,7 +40,7 @@ Follow this tutorial in this order:
 
 1. [Create a smart contract](./1-create-smart-contract.md)
 2. [Set up React app](./2-set-up-react-app.md)
-3. [Add Wallet suport](3-add-wallet-support.md)
+3. [Add Wallet support](3-add-wallet-support.md)
 4. [Fetch Data from Chain](4-fetch-data-from-chain.md)
 5. [Submit data to chain](./5-submit-data-to-chain.md)
 6. [Handle Tasks](./6-handle-tasks.md)
