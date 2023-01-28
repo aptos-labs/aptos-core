@@ -210,6 +210,12 @@ module std::option_tests {
     }
 
     #[test]
+    fun test_map_ref() {
+        let x = option::map_ref(&option::some(1), |e| *e + 1);
+        assert!(option::extract(&mut x) == 2, 0);
+    }
+
+    #[test]
     fun test_filter() {
         let x = option::filter(option::some(1), |e| *e != 1);
         assert!(option::is_none(&x), 0);
