@@ -68,6 +68,9 @@ impl UpdateTool {
             "linux-x86_64" => {
                 // In the case of Linux, which build to use depends on the OpenSSL
                 // library on the host machine. So we try to determine that here.
+                // This code below parses the output of the `openssl version` command,
+                // where the version string is the 1th (0-indexing) item in the string
+                // when split by whitespace.
                 let output = Command::new("openssl")
                 .args(["version"])
                 .output();
@@ -81,6 +84,13 @@ impl UpdateTool {
                         "1.0.0".to_string()
                     }
                 };
+                // On Ubuntu < 22.04 the bundled OpenSSL is version 1.x.x, whereas on
+                // 22.04+ it is 3.x.x. Unfortunately if you build the CLI on a system
+                // with one major version of OpenSSL, you cannot use it on a system
+                // with a different version. Accordingly, if the current system uses
+                // OpenSSL 3.x.x, we use the version of the CLI built on a system with
+                // OpenSSL 3.x.x, meaning Ubuntu 22.04. Otherwise we use the one built
+                // on 20.04.
                 if version.starts_with('3') {
                     "Ubuntu-22.04-x86_64"
                 } else {
@@ -95,8 +105,8 @@ impl UpdateTool {
         // Build a new configuration that will direct the library to download the
         // binary with the target version tag and target that we determined above.
         let config = Update::configure()
-            .repo_owner("aptos-labs")
-            .repo_name("aptos-core")
+            .repo_owner(&self.repo_owner)
+            .repo_name(&self.repo_name)
             .bin_name("aptos")
             .current_version(cargo_crate_version!())
             .target_version_tag(&info.latest_version_tag)
