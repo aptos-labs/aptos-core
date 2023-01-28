@@ -59,7 +59,7 @@ The view function instead returns a list of values as a vector. The computation 
 
 The user sends a payload containing the address, module, and function name of the Move view function on chain along with serialized arguments. Aptos executes the transaction and returns the execution result to the user. For example, a function may reveal the balance of an account with a return value in the form of an integer. The View function requires being able to query the on-chain state in Aptos.
 
-There are no restrictions on the View function’s use, as the data generated will not be persisted. No global states will be mutated. Move developers must mark the functions that want to be viewable with the `#[view]` annotation. View functions do not work without the View attribute. The full nodes can set a reasonable gas limit to prevent executing view functions from taking too long.
+There are no restrictions on the View function’s use, as the data generated will not be persisted. No global states will be mutated. Move developers must mark the functions that want to be viewable with the `#[view]` annotation. View functions do not work without the View attribute. The fullnodes can set a reasonable gas limit to prevent executing view functions from taking too long.
 
 
 ## Exchanging and tracking coins
