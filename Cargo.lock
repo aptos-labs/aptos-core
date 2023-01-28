@@ -173,6 +173,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest",
+ "self_update",
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
@@ -941,7 +942,7 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "chrono",
  "criterion",
- "indicatif",
+ "indicatif 0.15.0",
  "itertools",
  "jemallocator",
  "move-core-types",
@@ -5624,8 +5625,20 @@ checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
 dependencies = [
  "console",
  "lazy_static 1.4.0",
- "number_prefix",
+ "number_prefix 0.3.0",
  "regex",
+]
+
+[[package]]
+name = "indicatif"
+version = "0.17.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cef509aa9bc73864d6756f0d34d35504af3cf0844373afe9b8669a5b8005a729"
+dependencies = [
+ "console",
+ "number_prefix 0.4.0",
+ "portable-atomic",
+ "unicode-width",
 ]
 
 [[package]]
@@ -7301,6 +7314,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
 
 [[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
 name = "object"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7859,6 +7878,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "portable-atomic"
+version = "0.3.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26f6a7b87c2e435a3241addceeeff740ff8b7e76b74c13bf9acb17fa454ea00b"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8193,6 +8218,15 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
+
+[[package]]
+name = "quick-xml"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "quote"
@@ -8835,6 +8869,24 @@ checksum = "0160a13a177a45bfb43ce71c01580998474f556ad854dcbca936dd2841a5c556"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "self_update"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b28d58e73c427061f46c801176f54349be3c1a2818cf549e1d9bcac37eef7bca"
+dependencies = [
+ "hyper",
+ "indicatif 0.17.3",
+ "log",
+ "quick-xml",
+ "regex",
+ "reqwest",
+ "semver",
+ "serde_json",
+ "tempfile",
+ "zip",
 ]
 
 [[package]]
@@ -10823,6 +10875,19 @@ dependencies = [
  "quote 1.0.21",
  "syn 1.0.105",
  "synstructure",
+]
+
+[[package]]
+name = "zip"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537ce7411d25e54e8ae21a7ce0b15840e7bfcff15b51d697ec3266cc76bdf080"
+dependencies = [
+ "byteorder",
+ "crc32fast",
+ "crossbeam-utils",
+ "flate2",
+ "time 0.3.13",
 ]
 
 [[package]]
