@@ -64,7 +64,7 @@ module aptos_std::big_vector {
     /// Empty and destroy the other vector, and push each of the elements in the other vector onto the lhs vector in the
     /// same order as they occurred in other.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
+    public fun append<T>(lhs: &mut BigVector<T>, other: BigVector<T>) {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
@@ -81,7 +81,7 @@ module aptos_std::big_vector {
 
     /// Add element `val` to the end of the vector `v`. It grows the buckets when the current buckets are full.
     /// This operation will cost more gas when it adds new bucket.
-    public fun push_back<T: store>(v: &mut BigVector<T>, val: T) {
+    public fun push_back<T>(v: &mut BigVector<T>, val: T) {
         let num_buckets = table_with_length::length(&v.buckets);
         if (v.end_index == num_buckets * v.bucket_size) {
             table_with_length::add(&mut v.buckets, num_buckets, vector::empty());
