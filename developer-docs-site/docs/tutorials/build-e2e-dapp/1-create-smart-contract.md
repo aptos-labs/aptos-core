@@ -28,7 +28,7 @@ The `sources` directory holds a collection of `.move` modules files. And later w
 
 An account is needed to publish a Move module. So first we need to create an account. Once we have the account's private key, we can create a module under its account address and publish the module using that account.
 
-1. In our `move` directory, run `aptos config init --network devnet`. Press enter when prompted.
+1. In our `move` directory, run `aptos init --network devnet`. Press enter when prompted.
 
    This creates for us a `.aptos` directory with a `config.yaml` file that holds our profile information. In the `config.yaml` file, we now have our profiles list that holds a `default` profile. If you open that file, you will see content resembling:
 
