@@ -51,6 +51,6 @@ async fn test_custom_event() {
     test_context
         .with_bearer_auth(jwt_token)
         .expect_status_code(500)
-        .post("/custom_event", json!(body))
+        .post("/api/v1/ingest/custom-event", json!(body))
         .await;
 }

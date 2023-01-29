@@ -129,7 +129,7 @@ async fn test_auth_validator() {
         "server_public_key": server_public_key,
         "handshake_msg": &client_noise_msg,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     let decoded = finish_handshake(
         context.inner.jwt_service(),
@@ -172,7 +172,7 @@ async fn test_auth_validatorfullnode() {
         "server_public_key": server_public_key,
         "handshake_msg": &client_noise_msg,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     let decoded = finish_handshake(
         context.inner.jwt_service(),
@@ -232,7 +232,7 @@ async fn test_auth_wrong_key() {
         "server_public_key": server_public_key,
         "handshake_msg": client_noise_msg,
     });
-    let resp = context.post("/auth", req).await;
+    let resp = context.post("/api/v1/auth", req).await;
 
     finish_handshake(
         context.inner.jwt_service(),
@@ -250,12 +250,12 @@ async fn test_chain_access() {
     context.inner.chain_set_mut().insert(present_chain_id);
 
     let resp = context
-        .get(&format!("/chain-access/{}", present_chain_id))
+        .get(&format!("/api/v1/chain-access/{}", present_chain_id))
         .await;
     assert!(resp.as_bool().unwrap());
 
     let resp = context
-        .get(&format!("/chain-access/{}", missing_chain_id))
+        .get(&format!("/api/v1/chain-access/{}", missing_chain_id))
         .await;
     assert!(!resp.as_bool().unwrap());
 }
