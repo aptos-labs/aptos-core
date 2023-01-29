@@ -8,7 +8,6 @@
 -  [Struct `VerifyingKey`](#0x1_groth16_VerifyingKey)
 -  [Struct `PreparedVerifyingKey`](#0x1_groth16_PreparedVerifyingKey)
 -  [Struct `Proof`](#0x1_groth16_Proof)
--  [Constants](#@Constants_0)
 -  [Function `new_vk`](#0x1_groth16_new_vk)
 -  [Function `new_pvk`](#0x1_groth16_new_pvk)
 -  [Function `prepare_verifying_key`](#0x1_groth16_prepare_verifying_key)
@@ -161,20 +160,6 @@ A Groth16 proof.
 
 </details>
 
-<a name="@Constants_0"></a>
-
-## Constants
-
-
-<a name="0x1_groth16_E_NATIVE_FUN_NOT_AVAILABLE"></a>
-
-
-
-<pre><code><b>const</b> <a href="groth16.md#0x1_groth16_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="0x1_groth16_new_vk"></a>
 
 ## Function `new_vk`
@@ -310,18 +295,9 @@ Verify a Groth16 proof.
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1,G2,Gt,S&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;): bool {
     <b>let</b> left = <a href="groups.md#0x1_groups_pairing">groups::pairing</a>&lt;G1,G2,Gt&gt;(&proof.a, &proof.b);
     <b>let</b> right_1 = <a href="groups.md#0x1_groups_pairing">groups::pairing</a>&lt;G1,G2,Gt&gt;(&vk.alpha_g1, &vk.beta_g2);
-
-    <b>let</b> n = std::vector::length(public_inputs);
-    <b>let</b> i = 0;
-    <b>let</b> acc = *std::vector::borrow(&vk.gamma_abc_g1, 0);
-    <b>while</b> (i &lt; n) {
-        <b>let</b> cur_scalar = std::vector::borrow(public_inputs, i);
-        <b>let</b> cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-        acc = <a href="groups.md#0x1_groups_element_add">groups::element_add</a>(&acc, &<a href="groups.md#0x1_groups_element_scalar_mul">groups::element_scalar_mul</a>(cur_point, cur_scalar));
-        i = i + 1;
-    };
-
-    <b>let</b> right_2 = <a href="groups.md#0x1_groups_pairing">groups::pairing</a>(&acc, &vk.gamma_g2);
+    <b>let</b> scalars = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="groups.md#0x1_groups_scalar_from_u64">groups::scalar_from_u64</a>&lt;S&gt;(1)];
+    std::vector::append(&<b>mut</b> scalars, *public_inputs);
+    <b>let</b> right_2 = <a href="groups.md#0x1_groups_pairing">groups::pairing</a>(&<a href="groups.md#0x1_groups_element_multi_scalar_mul">groups::element_multi_scalar_mul</a>(&vk.gamma_abc_g1, &scalars), &vk.gamma_g2);
     <b>let</b> right_3 = <a href="groups.md#0x1_groups_pairing">groups::pairing</a>(&proof.c, &vk.delta_g2);
     <b>let</b> right = <a href="groups.md#0x1_groups_element_add">groups::element_add</a>(&<a href="groups.md#0x1_groups_element_add">groups::element_add</a>(&right_1, &right_2), &right_3);
     <a href="groups.md#0x1_groups_element_eq">groups::element_eq</a>(&left, &right)
@@ -349,7 +325,7 @@ Verify a Groth16 proof <code>proof</code> against the public inputs <code>public
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_with_pvk">verify_proof_with_pvk</a>&lt;G1,G2,Gt,S&gt;(pvk: &<a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;): bool {
-    <b>let</b> scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="groups.md#0x1_groups_scalar_from_u64">groups::scalar_from_u64</a>&lt;S&gt;(1)];
+    <b>let</b> scalars = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="groups.md#0x1_groups_scalar_from_u64">groups::scalar_from_u64</a>&lt;S&gt;(1)];
     std::vector::append(&<b>mut</b> scalars, *public_inputs);
     <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.a, <a href="groups.md#0x1_groups_element_multi_scalar_mul">groups::element_multi_scalar_mul</a>(&pvk.gamma_abc_g1, &scalars), proof.c];
     <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];

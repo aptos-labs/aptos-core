@@ -3,9 +3,6 @@ module aptos_std::groth16 {
     use aptos_std::groups::{BLS12_381_G1, BLS12_381_G2, scalar_deserialize, deserialize_element_uncompressed, BLS12_381_Gt, BLS12_381_Fr};
     use aptos_std::groups;
 
-    // Error codes
-    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 1;
-
     /// A Groth16 verifying key.
     struct VerifyingKey<phantom G1, phantom G2, phantom Gt> has drop {
         alpha_g1: groups::Element<G1>,
@@ -70,18 +67,9 @@ module aptos_std::groth16 {
     public fun verify_proof<G1,G2,Gt,S>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<S>>, proof: &Proof<G1,G2,Gt>): bool {
         let left = groups::pairing<G1,G2,Gt>(&proof.a, &proof.b);
         let right_1 = groups::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
-
-        let n = std::vector::length(public_inputs);
-        let i = 0;
-        let acc = *std::vector::borrow(&vk.gamma_abc_g1, 0);
-        while (i < n) {
-            let cur_scalar = std::vector::borrow(public_inputs, i);
-            let cur_point = std::vector::borrow(&vk.gamma_abc_g1, i+1);
-            acc = groups::element_add(&acc, &groups::element_scalar_mul(cur_point, cur_scalar));
-            i = i + 1;
-        };
-
-        let right_2 = groups::pairing(&acc, &vk.gamma_g2);
+        let scalars = vector[groups::scalar_from_u64<S>(1)];
+        std::vector::append(&mut scalars, *public_inputs);
+        let right_2 = groups::pairing(&groups::element_multi_scalar_mul(&vk.gamma_abc_g1, &scalars), &vk.gamma_g2);
         let right_3 = groups::pairing(&proof.c, &vk.delta_g2);
         let right = groups::element_add(&groups::element_add(&right_1, &right_2), &right_3);
         groups::element_eq(&left, &right)
@@ -89,7 +77,7 @@ module aptos_std::groth16 {
 
     /// Verify a Groth16 proof `proof` against the public inputs `public_inputs` with a prepared verification key `pvk`.
     public fun verify_proof_with_pvk<G1,G2,Gt,S>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<groups::Scalar<S>>, proof: &Proof<G1,G2,Gt>): bool {
-        let scalars: vector<groups::Scalar<S>> = vector[groups::scalar_from_u64<S>(1)];
+        let scalars = vector[groups::scalar_from_u64<S>(1)];
         std::vector::append(&mut scalars, *public_inputs);
         let g1_elements: vector<groups::Element<G1>> = vector[proof.a, groups::element_multi_scalar_mul(&pvk.gamma_abc_g1, &scalars), proof.c];
         let g2_elements: vector<groups::Element<G2>> = vector[proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg];
