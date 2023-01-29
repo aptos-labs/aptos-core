@@ -114,7 +114,6 @@ pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
     peers: PeerStoreTuple,
     clients: ClientTuple,
-    chain_set: HashSet<ChainId>,
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
@@ -125,7 +124,6 @@ impl Context {
         private_key: x25519::PrivateKey,
         peers: PeerStoreTuple,
         clients: ClientTuple,
-        chain_set: HashSet<ChainId>,
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
@@ -134,7 +132,6 @@ impl Context {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
             peers,
             clients,
-            chain_set,
             jwt_service,
             log_env_map,
             peer_identities,
@@ -178,13 +175,8 @@ impl Context {
         &self.peer_identities
     }
 
-    pub fn chain_set(&self) -> &HashSet<ChainId> {
-        &self.chain_set
-    }
-
-    #[cfg(test)]
-    pub fn chain_set_mut(&mut self) -> &mut HashSet<ChainId> {
-        &mut self.chain_set
+    pub fn chain_set(&self) -> HashSet<ChainId> {
+        self.peers.validators.read().keys().cloned().collect()
     }
 
     pub fn log_env_map(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {

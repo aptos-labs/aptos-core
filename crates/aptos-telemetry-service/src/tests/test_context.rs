@@ -10,7 +10,7 @@ use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use warp::{
     http::{header::CONTENT_TYPE, Response},
     hyper::body::Bytes,
@@ -48,7 +48,6 @@ pub async fn new_test_context() -> TestContext {
             server_private_key,
             peers,
             ClientTuple::new(None, Some(BTreeMap::new()), None),
-            HashSet::new(),
             jwt_service,
             HashMap::new(),
             HashMap::new(),
