@@ -125,6 +125,7 @@ jobs:
       - run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: 4297152
 
   rust-consensus-only-unit-test:
     runs-on: high-perf-docker
