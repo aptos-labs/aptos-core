@@ -1,10 +1,11 @@
 module myaddr::main {
 
   use aptos_framework::account;
-  use std::signer;
   use aptos_framework::event;
-  use std::string::String;
   use aptos_std::table::{Self, Table};
+  use std::signer;
+  use std::string::String;
+
   #[test_only]
   use std::string;
 
@@ -21,7 +22,7 @@ module myaddr::main {
 
   struct Task has store, drop, copy {
     task_id: u64,
-    address:address,
+    address: address,
     content: String,
     completed: bool,
   }
