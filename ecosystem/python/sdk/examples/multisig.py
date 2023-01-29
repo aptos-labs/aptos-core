@@ -17,9 +17,12 @@ from aptos_sdk.type_tag import TypeTag, StructTag
 
 from common import NODE_URL, FAUCET_URL
 
-wait_for_user = True
+wait_for_user = False
 
 if __name__ == '__main__':
+
+    rest_client = RestClient(NODE_URL)
+    faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
     # :!:>section_1
     alice = Account.generate()
@@ -57,9 +60,6 @@ if __name__ == '__main__':
     if wait_for_user: input("\nPress Enter to continue...")
 
     # :!:>section_3
-    rest_client = RestClient(NODE_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client)
-
     print("\n=== Funding accounts ===")
     alice_start    = 10_000_000
     bob_start      = 20_000_000
@@ -113,11 +113,15 @@ if __name__ == '__main__':
     # :!:>section_5
     signatures_map = [(alice.public_key(), alice_signature),
                       (bob.public_key(),   bob_signature)]
+
     multisig_signature = MultiEd25519Signature(multisig_public_key,
                                                signatures_map)
+
     authenticator = Authenticator(MultiEd25519Authenticator(
         multisig_public_key, multisig_signature))
+
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
+
     print("\n=== Submitting transaction ===")
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
     print(f"Transaction hash: {tx_hash}") # <:!:section_5
@@ -137,3 +141,74 @@ if __name__ == '__main__':
     print(f"Chad's balance:   {chad_balance}")
     multisig_balance = rest_client.account_balance(multisig_address)
     print(f"Multisig balance: {multisig_balance}") # <:!:section_6
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_7
+    print("\n=== Funding vanity address ===")
+
+    deedee = Account.generate()
+    while (deedee.address().hex()[2:4] != 'dd'):
+        deedee = Account.generate()
+    print(f"Deedee's address:    {deedee.address()}")
+    print(f"Deedee's public key: {deedee.public_key()}")
+
+    deedee_start = 50_000_000
+    faucet_client.fund_account(deedee.address(), deedee_start)
+    deedee_balance = rest_client.account_balance(deedee.address())
+    print(f"Deedee's balance: {deedee_balance}") # <:!:section_7
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_8
+    print("\n=== Signing rotation proof challenge ===")
+
+    sequence_number  = int(0).to_bytes(8, 'big') # 8 bytes, big endian.
+    originator       = deedee.address().address
+    current_auth_key = originator
+    new_public_key   = multisig_public_key.to_bytes()
+
+    rotation_proof_challenge = \
+        sequence_number + originator + current_auth_key + new_public_key
+
+    cap_rotate_key = deedee.sign(rotation_proof_challenge).data()
+
+    cap_update_table = MultiEd25519Signature(
+        multisig_public_key,
+        [(bob.public_key(),  bob.sign(rotation_proof_challenge)),
+         (chad.public_key(), chad.sign(rotation_proof_challenge))]
+    ).to_bytes()
+
+    cap_rotate_key_hex =   f"0x{cap_rotate_key.hex()}"
+    cap_update_table_hex = f"0x{cap_update_table.hex()}"
+    print(f"cap_rotate_key:   {cap_rotate_key_hex}")
+    print(f"cap_update_table: {cap_update_table_hex}") # <:!:section_8
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_9
+    print("\n=== Rotating authentication key ===")
+
+    from_scheme           = Authenticator.ED25519
+    from_public_key_bytes = deedee.public_key().key.encode()
+    to_scheme             = Authenticator.MULTI_ED25519
+    to_public_key_bytes   = multisig_public_key.to_bytes()
+
+    entry_function = EntryFunction.natural(
+        module="0x1::account",
+        function="rotate_authentication_key",
+        ty_args=[],
+        args=[TransactionArgument(from_scheme, Serializer.u8),
+              TransactionArgument(from_public_key_bytes,
+                                  Serializer.to_bytes),
+              TransactionArgument(to_scheme, Serializer.u8),
+              TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
+              TransactionArgument(cap_rotate_key, Serializer.to_bytes),
+              TransactionArgument(cap_update_table, Serializer.to_bytes)])
+
+    signed_transaction = rest_client.create_bcs_signed_transaction(
+        deedee, TransactionPayload(entry_function))
+
+    tx = rest_client.submit_bcs_transaction(signed_transaction)
+
+    print(f"https://explorer.aptoslabs.com/txn/{tx}") # <:!:section_9

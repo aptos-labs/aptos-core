@@ -35,7 +35,7 @@ Run the [`multisig.py`](../../../ecosystem/python/sdk/examples/multisig.py) exam
 python multisig.py
 ```
 
-## Step 3: Generate signers
+## Step 3: Generate single signer accounts
 
 First, we will generate single signer accounts for Alice, Bob, and Chad:
 
@@ -149,3 +149,49 @@ Multisig balance: 39945700
 
 Note that even though Alice and Bob signed the transaction, their account balances have not changed.
 Chad, however, has received 100 octas from the multisig account, which assumed the gas costs of the transaction and thus has had more than 100 octas deducted.
+
+## Step 7: Create a vanity address multisig
+
+In this section, a fourth user named Deedee will generate a vanity address, then rotate her account to the two-of-three multisig.
+
+### Step 7.1 Generate a vanity address
+
+A fourth user, Deedee, wants her account address to start with `0xdd..`, so she generates random accounts until she finds one with a matching account address:
+
+```python
+:!: static/sdks/python/examples/multisig.py section_7
+```
+
+```zsh
+=== Funding vanity address ===
+Deedee's address:    0xdd063617b654750fa97ae2bc82f85efe79770d08029aa9aa8f8c4f4f1271e05e
+Deedee's public key: 0xca8b97f8efc2b0be7a241479802cfd39b70969da1fcfacb08aabd79fa0fb6d73
+Deedee's balance: 50000000
+```
+
+### Step 7.2 Sign a rotation proof challenge
+
+Deedee and the two-of-three multisig must both sign a `RotationProofChallenge`, yielding two signatures.
+Deedee's signature, `cap_rotate_key`, verifies that she approves of the authentication key rotation.
+The multisig signature, `cap_update_table`, verifies that the multisig approves of the authentication key rotation.
+Here, Bob and Chad provide individual signatures for the multisig:
+
+```python
+:!: static/sdks/python/examples/multisig.py section_8
+```
+
+```zsh
+=== Signing rotation proof challenge ===
+cap_rotate_key:   0x61ad912862c3647c9bb1f10d88494f7b157eeccc685e1cb45c338c3b9ea2d1c3a9e0473378f1e1d340b66eea352c961901ef6c5eaf25b7ba439cfa1e32014b03
+cap_update_table: 0xcb49863bbc000a1c62f780115843b7b7c06661525d9195c3b3518aebd9541d73e48e298ef877c114314e91cc1b9001c01ab0bcbf889119350274a3cd447cf40bdade8af39ed873c913ddcd3de4c8a7aa453278664c374190936e7d974a021408c32b53f07c0d21b74cad2b429b3b48285c61be40d636feb6e0d10f4b695cb00360000000
+```
+
+### Step 7.3 Rotate the authentication key
+
+```python
+:!: static/sdks/python/examples/multisig.py section_9
+```
+
+:::warning
+Move abort in 0x1::account: EINVALID_PROOF_OF_KNOWLEDGE(0x10008): Specified proof of knowledge required to prove ownership of a public key is invalid
+:::
