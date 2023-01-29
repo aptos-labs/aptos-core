@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
+    create_emitter_and_request,
+    three_region_simulation_test::{
+        add_execution_delay, create_bandwidth_limit, create_three_region_swarm_network_delay,
+        remove_execution_delay, ExecutionDelayConfig,
+    },
+    traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
 use anyhow::bail;
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, SwarmChaos, Test,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -21,6 +26,8 @@ pub struct TwoTrafficsTest {
 
     pub avg_tps: usize,
     pub latency_thresholds: &'static [(f32, LatencyType)],
+
+    pub add_execution_delay: Option<ExecutionDelayConfig>,
 }
 
 impl Test for TwoTrafficsTest {
@@ -30,8 +37,22 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
+    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
+        // inject network delay
+        let delay = create_three_region_swarm_network_delay(ctx.swarm());
+        let chaos = SwarmChaos::Delay(delay);
+        ctx.swarm().inject_chaos(chaos)?;
+
+        // inject bandwidth limit
+        let bandwidth = create_bandwidth_limit();
+        let chaos = SwarmChaos::Bandwidth(bandwidth);
+        ctx.swarm().inject_chaos(chaos)?;
+
+        if let Some(config) = &self.add_execution_delay {
+            add_execution_delay(ctx.swarm(), config)?;
+        }
+
+        Ok(LoadDestination::AllNodes)
     }
 
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
@@ -88,6 +109,14 @@ impl NetworkLoadTest for TwoTrafficsTest {
         )?;
 
         Ok(())
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> Result<()> {
+        if self.add_execution_delay.is_some() {
+            remove_execution_delay(swarm)?;
+        }
+
+        swarm.remove_all_chaos()
     }
 }
 
