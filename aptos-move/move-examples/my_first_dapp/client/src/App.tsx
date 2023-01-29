@@ -18,16 +18,14 @@ type Task = {
 export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
 export const client = new AptosClient(NODE_URL);
 // change this to be your module account address
-export const moduleAddress =
-  "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
+export const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState<string>("");
   const { account, signAndSubmitTransaction } = useWallet();
   const [accountHasList, setAccountHasList] = useState<boolean>(false);
-  const [transactionInProgress, setTransactionInProgress] =
-    useState<boolean>(false);
+  const [transactionInProgress, setTransactionInProgress] = useState<boolean>(false);
 
   const onWriteTask = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
@@ -37,10 +35,7 @@ function App() {
   const fetchList = async () => {
     if (!account) return [];
     try {
-      const todoListResource = await client.getAccountResource(
-        account?.address,
-        `${moduleAddress}::main::TodoList`
-      );
+      const todoListResource = await client.getAccountResource(account?.address, `${moduleAddress}::main::TodoList`);
       setAccountHasList(true);
       // tasks table handle
       const tableHandle = (todoListResource as any).data.tasks.handle;
@@ -102,8 +97,7 @@ function App() {
     };
 
     // hold the latest task.task_id from our local state
-    const latestId =
-      tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
+    const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
 
     // build a newTaskToPush objct into our local state
     const newTaskToPush = {
@@ -135,10 +129,7 @@ function App() {
     }
   };
 
-  const onCheckboxChange = async (
-    event: CheckboxChangeEvent,
-    taskId: string
-  ) => {
+  const onCheckboxChange = async (event: CheckboxChangeEvent, taskId: string) => {
     if (!account) return;
     if (!event.target.checked) return;
     setTransactionInProgress(true);
@@ -217,11 +208,7 @@ function App() {
                   size="large"
                   value={newTask}
                 />
-                <Button
-                  onClick={onTaskAdded}
-                  type="primary"
-                  style={{ height: "40px", backgroundColor: "#3f67ff" }}
-                >
+                <Button onClick={onTaskAdded} type="primary" style={{ height: "40px", backgroundColor: "#3f67ff" }}>
                   Add
                 </Button>
               </Input.Group>
@@ -239,11 +226,7 @@ function App() {
                           {task.completed ? (
                             <Checkbox defaultChecked={true} disabled />
                           ) : (
-                            <Checkbox
-                              onChange={(event) =>
-                                onCheckboxChange(event, task.task_id)
-                              }
-                            />
+                            <Checkbox onChange={(event) => onCheckboxChange(event, task.task_id)} />
                           )}
                         </div>,
                       ]}
@@ -254,9 +237,7 @@ function App() {
                           <a
                             href={`https://explorer.aptoslabs.com/account/${task.address}/`}
                             target="_blank"
-                          >{`${task.address.slice(0, 6)}...${task.address.slice(
-                            -5
-                          )}`}</a>
+                          >{`${task.address.slice(0, 6)}...${task.address.slice(-5)}`}</a>
                         }
                       />
                     </List.Item>
