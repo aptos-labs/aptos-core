@@ -107,19 +107,20 @@ module aptos_std::groups {
         handle: u64
     }
 
-    /// This struct represents an element of the group represented by the type argument `G`.
+    /// This struct represents an element of the group `G`, where `G` is a type argument.
     struct Element<phantom G> has copy, drop {
         handle: u64
     }
 
-    /// Perform a pairing.
+    /// Computes a pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
+    /// Returns an element in the target group `Gt`.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         Element<Gt> {
             handle: pairing_product_internal<G1,G2,Gt>(vector[element_1.handle], vector[element_2.handle])
         }
     }
 
-    /// Compute the product of multiple pairing.
+    /// Compute the product of multiple pairings.
     public fun pairing_product<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<G1>();
@@ -160,7 +161,7 @@ module aptos_std::groups {
         }
     }
 
-    /// Compute `x + y` for scalar `x` and `y`.
+    /// Compute `x + y` for scalars `x` and `y`.
     public fun scalar_add<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
@@ -169,7 +170,7 @@ module aptos_std::groups {
         }
     }
 
-    /// Compute `x * y` for scalar `x` and `y`.
+    /// Compute `x * y` for scalars `x` and `y`.
     public fun scalar_mul<S>(x: &Scalar<S>, y: &Scalar<S>): Scalar<S> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
@@ -191,7 +192,7 @@ module aptos_std::groups {
         }
     }
 
-    /// Check if `x == y` for scalar `x` and `y`.
+    /// Check if `x == y` for scalars `x` and `y`.
     public fun scalar_eq<S>(x: &Scalar<S>, y: &Scalar<S>): bool {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
@@ -264,6 +265,7 @@ module aptos_std::groups {
     }
 
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` for a list of scalars `k[]` and a list of group elements `P[]`, both of size `n`.
+    /// This function is much faster and cheaper than calling `element_scalar_mul` and adding up the results using `scalar_add`.
     public fun element_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Scalar<S>>): Element<G> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
@@ -357,7 +359,7 @@ module aptos_std::groups {
         element_eq_internal<G>(element_p.handle, element_q.handle)
     }
 
-    /// Get the order of group `G`, little-endian encoded as a byte string.
+    /// Get the order of group `G`, little-endian encoded as a byte array.
     public fun group_order<G>(): vector<u8> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
@@ -497,7 +499,7 @@ module aptos_std::groups {
         let point_7g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_G1>(x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899"));
         assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
-        // Point multiplication by scalar.
+        // Point scalar multiplication.
         let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
         let point_7g_calc = element_scalar_mul(&point_g, &scalar_7);
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
@@ -523,16 +525,18 @@ module aptos_std::groups {
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&point_g, &scalar_from_u64<BLS12_381_Fr>(14));
-        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
-        let point_2g = element_scalar_mul(&point_g, &scalar_2);
-        let point_3g = element_scalar_mul(&point_g, &scalar_3);
-        let scalars = vector[scalar_1, scalar_2, scalar_3];
-        let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = element_multi_scalar_mul(&points, &scalars);
-        assert!(element_eq(&point_14g, &point_14g_calc), 1);
+        let scalar_a = random_scalar<BLS12_381_Fr>();
+        let scalar_b = random_scalar<BLS12_381_Fr>();
+        let scalar_c = random_scalar<BLS12_381_Fr>();
+        let point_p = random_element<BLS12_381_G1>();
+        let point_q = random_element<BLS12_381_G1>();
+        let point_r = random_element<BLS12_381_G1>();
+        let naive = group_identity<BLS12_381_G1>();
+        naive = element_add(&naive, &element_scalar_mul(&point_p, &scalar_a));
+        naive = element_add(&naive, &element_scalar_mul(&point_q, &scalar_b));
+        naive = element_add(&naive, &element_scalar_mul(&point_r, &scalar_c));
+        let fast = element_multi_scalar_mul(&vector[point_p, point_q, point_r], &vector[scalar_a, scalar_b, scalar_c]);
+        assert!(element_eq(&naive, &fast), 1);
 
         // Hash to group.
         let _point = hash_to_element<SHA256, BLS12_381_G1>(x"1234");
@@ -563,7 +567,7 @@ module aptos_std::groups {
         let point_7g_from_comp = std::option::extract(&mut deserialize_element_compressed<BLS12_381_G2>(x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d"));
         assert!(element_eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
-        // Point multiplication by scalar.
+        // Point scalar multiplication.
         let scalar_7 = scalar_from_u64<BLS12_381_Fr>(7);
         let point_7g_calc = element_scalar_mul(&point_g, &scalar_7);
         assert!(element_eq(&point_7g_calc, &point_7g_from_comp), 1);
@@ -589,16 +593,18 @@ module aptos_std::groups {
         assert!(element_eq(&point_2g, &point_2g_calc), 1);
 
         // Multi-scalar multiplication.
-        let point_14g = element_scalar_mul(&point_g, &scalar_from_u64<BLS12_381_Fr>(14));
-        let scalar_1 = scalar_from_u64<BLS12_381_Fr>(1);
-        let scalar_2 = scalar_from_u64<BLS12_381_Fr>(2);
-        let scalar_3 = scalar_from_u64<BLS12_381_Fr>(3);
-        let point_2g = element_scalar_mul(&point_g, &scalar_2);
-        let point_3g = element_scalar_mul(&point_g, &scalar_3);
-        let scalars = vector[scalar_1, scalar_2, scalar_3];
-        let points = vector[point_g, point_2g, point_3g];
-        let point_14g_calc = element_multi_scalar_mul(&points, &scalars);
-        assert!(element_eq(&point_14g, &point_14g_calc), 1);
+        let scalar_a = random_scalar<BLS12_381_Fr>();
+        let scalar_b = random_scalar<BLS12_381_Fr>();
+        let scalar_c = random_scalar<BLS12_381_Fr>();
+        let point_p = random_element<BLS12_381_G2>();
+        let point_q = random_element<BLS12_381_G2>();
+        let point_r = random_element<BLS12_381_G2>();
+        let naive = group_identity<BLS12_381_G2>();
+        naive = element_add(&naive, &element_scalar_mul(&point_p, &scalar_a));
+        naive = element_add(&naive, &element_scalar_mul(&point_q, &scalar_b));
+        naive = element_add(&naive, &element_scalar_mul(&point_r, &scalar_c));
+        let fast = element_multi_scalar_mul(&vector[point_p, point_q, point_r], &vector[scalar_a, scalar_b, scalar_c]);
+        assert!(element_eq(&naive, &fast), 1);
 
         // Hash to group.
         let _point = hash_to_element<SHA256, BLS12_381_G2>(x"1234");

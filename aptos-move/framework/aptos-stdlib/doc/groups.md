@@ -328,7 +328,7 @@ This struct represents an integer between 0 and <code>r-1</code>, where <code>r<
 
 ## Struct `Element`
 
-This struct represents an element of the group represented by the type argument <code>G</code>.
+This struct represents an element of the group <code>G</code>, where <code>G</code> is a type argument.
 
 
 <pre><code><b>struct</b> <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; <b>has</b> <b>copy</b>, drop
@@ -370,7 +370,8 @@ This struct represents an element of the group represented by the type argument 
 
 ## Function `pairing`
 
-Perform a pairing.
+Computes a pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
+Returns an element in the target group <code>Gt</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_pairing">pairing</a>&lt;G1, G2, Gt&gt;(element_1: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;, element_2: &<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;Gt&gt;
@@ -397,7 +398,7 @@ Perform a pairing.
 
 ## Function `pairing_product`
 
-Compute the product of multiple pairing.
+Compute the product of multiple pairings.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_pairing_product">pairing_product</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G2&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;Gt&gt;
@@ -498,7 +499,7 @@ Compute <code>-x</code> for scalar <code>x</code>.
 
 ## Function `scalar_add`
 
-Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
+Compute <code>x + y</code> for scalars <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
@@ -527,7 +528,7 @@ Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
 
 ## Function `scalar_mul`
 
-Compute <code>x * y</code> for scalar <code>x</code> and <code>y</code>.
+Compute <code>x * y</code> for scalars <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;
@@ -589,7 +590,7 @@ Compute <code>x^(-1)</code> for scalar <code>x</code>, if defined.
 
 ## Function `scalar_eq`
 
-Check if <code>x == y</code> for scalar <code>x</code> and <code>y</code>.
+Check if <code>x == y</code> for scalars <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;): bool
@@ -822,6 +823,7 @@ Hash bytes to a group element.
 ## Function `element_multi_scalar_mul`
 
 Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]</code> and a list of group elements <code>P[]</code>, both of size <code>n</code>.
+This function is much faster and cheaper than calling <code>element_scalar_mul</code> and adding up the results using <code>scalar_add</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">groups::Scalar</a>&lt;S&gt;&gt;): <a href="groups.md#0x1_groups_Element">groups::Element</a>&lt;G&gt;
@@ -1075,7 +1077,7 @@ Check if <code>P == Q</code> for group elements <code>P</code> and <code>Q</code
 
 ## Function `group_order`
 
-Get the order of group <code>G</code>, little-endian encoded as a byte string.
+Get the order of group <code>G</code>, little-endian encoded as a byte array.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
