@@ -19,6 +19,7 @@ use std::{
     collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
     path::PathBuf, sync::Arc, time::Duration,
 };
+use types::common::ChainCommonName;
 use warp::{Filter, Reply};
 
 mod auth;
@@ -102,11 +103,6 @@ impl AptosTelemetryServiceArgs {
         let validators = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
-        let chain_set = config
-            .trusted_full_node_addresses
-            .iter()
-            .map(|pair| pair.0.to_owned())
-            .collect();
 
         let context = Context::new(
             server_private_key,
@@ -120,7 +116,6 @@ impl AptosTelemetryServiceArgs {
                 Some(metrics_clients),
                 Some(humio_client),
             ),
-            chain_set,
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
@@ -241,7 +236,7 @@ pub struct TelemetryServiceConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
 
-    pub trusted_full_node_addresses: HashMap<ChainId, String>,
+    pub trusted_full_node_addresses: HashMap<ChainCommonName, String>,
     pub update_interval: u64,
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 

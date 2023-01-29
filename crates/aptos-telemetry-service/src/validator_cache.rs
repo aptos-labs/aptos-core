@@ -5,7 +5,7 @@ use crate::{
     debug, error,
     errors::ValidatorCacheUpdateError,
     metrics::{VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT},
-    types::common::EpochedPeerStore,
+    types::common::{ChainCommonName, EpochedPeerStore},
 };
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
@@ -22,7 +22,7 @@ pub struct PeerSetCacheUpdater {
     validators: Arc<RwLock<EpochedPeerStore>>,
     validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
 
-    query_addresses: Arc<HashMap<ChainId, String>>,
+    query_addresses: Arc<HashMap<ChainCommonName, String>>,
     update_interval: time::Duration,
 }
 
@@ -30,7 +30,7 @@ impl PeerSetCacheUpdater {
     pub fn new(
         validators: Arc<RwLock<EpochedPeerStore>>,
         validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
-        trusted_full_node_addresses: HashMap<ChainId, String>,
+        trusted_full_node_addresses: HashMap<ChainCommonName, String>,
         update_interval: Duration,
     ) -> Self {
         Self {
@@ -52,21 +52,24 @@ impl PeerSetCacheUpdater {
     }
 
     async fn update(&self) {
-        for (chain_id, url) in self.query_addresses.iter() {
-            match self.update_for_chain(chain_id, url).await {
+        for (chain_name, url) in self.query_addresses.iter() {
+            match self.update_for_chain(chain_name, url).await {
                 Ok(_) => {
                     VALIDATOR_SET_UPDATE_SUCCESS_COUNT
-                        .with_label_values(&[&chain_id.to_string()])
+                        .with_label_values(&[&chain_name.to_string()])
                         .inc();
-                    debug!("validator set update successful for chain id {}", chain_id);
+                    debug!(
+                        "validator set update successful for chain name {}",
+                        chain_name
+                    );
                 },
                 Err(err) => {
                     VALIDATOR_SET_UPDATE_FAILED_COUNT
-                        .with_label_values(&[&chain_id.to_string(), &err.to_string()])
+                        .with_label_values(&[&chain_name.to_string(), &err.to_string()])
                         .inc();
                     error!(
-                        "validator set update error for chain id {}: {:?}",
-                        chain_id, err
+                        "validator set update error for chain name {}: {:?}",
+                        chain_name, err
                     );
                 },
             }
@@ -75,11 +78,11 @@ impl PeerSetCacheUpdater {
 
     async fn update_for_chain(
         &self,
-        chain_id: &ChainId,
-        url: &String,
+        chain_name: &ChainCommonName,
+        url: &str,
     ) -> Result<(), ValidatorCacheUpdateError> {
         let client = aptos_rest_client::Client::new(Url::parse(url).map_err(|e| {
-            error!("invalid url for chain_id {}: {}", chain_id, e);
+            error!("invalid url for chain_id {}: {}", chain_name, e);
             ValidatorCacheUpdateError::InvalidUrl
         })?);
         let response: Response<ValidatorSet> = client
@@ -89,14 +92,7 @@ impl PeerSetCacheUpdater {
 
         let (peer_addrs, state) = response.into_parts();
 
-        let received_chain_id = ChainId::new(state.chain_id);
-        if received_chain_id != *chain_id {
-            error!(
-                "Chain Id mismatch: Received in headers: {}. Provided in configuration: {} for {}",
-                received_chain_id, chain_id, url
-            );
-            return Err(ValidatorCacheUpdateError::ChainIdMismatch);
-        }
+        let chain_id = ChainId::new(state.chain_id);
 
         let mut validator_cache = self.validators.write();
         let mut vfn_cache = self.validator_fullnodes.write();
@@ -116,8 +112,8 @@ impl PeerSetCacheUpdater {
                     })
                     .map_err(|err| {
                         error!(
-                            "unable to parse validator network address for validator info {} for chain id {}: {}",
-                            validator_info, chain_id, err
+                            "unable to parse validator network address for validator info {} for chain name {}: {}",
+                            validator_info, chain_name, err
                         )
                     })
                     .ok()
@@ -138,8 +134,8 @@ impl PeerSetCacheUpdater {
                     })
                     .map_err(|err| {
                         error!(
-                            "unable to parse fullnode network address for validator info {} in chain id {}: {}",
-                            validator_info, chain_id, err
+                            "unable to parse fullnode network address for validator info {} in chain name {}: {}",
+                            validator_info, chain_name, err
                         );
                     })
                     .ok()
@@ -147,8 +143,8 @@ impl PeerSetCacheUpdater {
             .collect();
 
         debug!(
-            "Validator peers for chain id {} at epoch {}: {:?}",
-            chain_id, state.epoch, validator_peers
+            "Validator peers for chain name {} (chain id {}) at epoch {}: {:?}",
+            chain_name, chain_id, state.epoch, validator_peers
         );
 
         let result = if validator_peers.is_empty() && vfn_peers.is_empty() {
@@ -162,16 +158,16 @@ impl PeerSetCacheUpdater {
         };
 
         if !validator_peers.is_empty() {
-            validator_cache.insert(*chain_id, (state.epoch, validator_peers));
+            validator_cache.insert(chain_id, (state.epoch, validator_peers));
         }
 
         debug!(
-            "Validator fullnode peers for chain id {} at epoch {}: {:?}",
-            chain_id, state.epoch, vfn_peers
+            "Validator fullnode peers for chain name {} (chain id {}) at epoch {}: {:?}",
+            chain_name, chain_id, state.epoch, vfn_peers
         );
 
         if !vfn_peers.is_empty() {
-            vfn_cache.insert(*chain_id, (state.epoch, vfn_peers));
+            vfn_cache.insert(chain_id, (state.epoch, vfn_peers));
         }
 
         result
@@ -223,7 +219,7 @@ mod tests {
         });
 
         let mut fullnodes = HashMap::new();
-        fullnodes.insert(ChainId::new(25), server.base_url());
+        fullnodes.insert("testing".into(), server.base_url());
 
         let updater = PeerSetCacheUpdater::new(
             Arc::new(RwLock::new(HashMap::new())),
@@ -271,7 +267,7 @@ mod tests {
         });
 
         let mut fullnodes = HashMap::new();
-        fullnodes.insert(ChainId::new(25), server.base_url());
+        fullnodes.insert("testing".into(), server.base_url());
 
         let updater = PeerSetCacheUpdater::new(
             Arc::new(RwLock::new(HashMap::new())),

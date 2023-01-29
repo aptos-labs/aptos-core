@@ -111,8 +111,6 @@ pub(crate) enum ValidatorCacheUpdateError {
     InvalidUrl,
     #[error("request error")]
     RestError(#[source] RestError),
-    #[error("chain id mismatch")]
-    ChainIdMismatch,
     #[error("both peer set empty")]
     BothPeerSetEmpty,
     #[error("validator set empty")]
