@@ -8,12 +8,12 @@ slug: "e2e-dapp-index"
 A common way to learn a new framework or programming language is to build a simple todo list. In this tutorial, we will learn how to build an end-to-end todo list dapp, starting from the smart contract side through the front-end side and finally use of a wallet to interact with the two.
 
 :::tip
-The completed code is in the my_first_dapp
+The completed code is in the [todolist-dapp-toturial](https://github.com/aptos-labs/todolist-dapp-toturial)
 :::
 
 ## Prerequisites
 
-You must
+You must 
 
 1. Aptos CLI `@1.0.4`
 2. Aptos TS SDK `@1.6.0`
@@ -26,16 +26,13 @@ In this section, we will create a `my-first-dapp` directory to hold our project 
 
 1. Open a terminal and navigate to the desired directory for the project (for example, the `Desktop` directory).
 2. Create a new directory called `my-first-dapp`, for example:
-
-```shell
-mkdir my-first-dapp
-```
-
+  ```shell
+  mkdir my-first-dapp
+  ```
 3. Navigate into that directory:
-
-```shell
-cd my-first-dapp
-```
+  ```shell
+  cd my-first-dapp
+  ```
 
 ## Chapters
 
