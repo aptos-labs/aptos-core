@@ -64,7 +64,7 @@ impl HashAlg {
 }
 
 pub mod abort_codes {
-    pub const NOT_IMPLEMENTED: u64 = 2;
+    pub const NOT_IMPLEMENTED: u64 = 0x0c0000;
     pub const NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS: u64 = 4;
     pub const NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS: u64 = 5;
 }

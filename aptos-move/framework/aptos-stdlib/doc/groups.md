@@ -37,6 +37,9 @@
 -  [Function `deserialize_element_compressed`](#0x1_groups_deserialize_element_compressed)
 -  [Function `element_eq`](#0x1_groups_element_eq)
 -  [Function `group_order`](#0x1_groups_group_order)
+-  [Function `abort_if_generic_group_basic_operations_disabled`](#0x1_groups_abort_if_generic_group_basic_operations_disabled)
+-  [Function `abort_unless_structure_enabled`](#0x1_groups_abort_unless_structure_enabled)
+-  [Function `abort_unless_hash_alg_enabled`](#0x1_groups_abort_unless_hash_alg_enabled)
 -  [Function `element_deserialize_uncompressed_internal`](#0x1_groups_element_deserialize_uncompressed_internal)
 -  [Function `element_deserialize_compressed_internal`](#0x1_groups_element_deserialize_compressed_internal)
 -  [Function `scalar_from_u64_internal`](#0x1_groups_scalar_from_u64_internal)
@@ -64,7 +67,9 @@
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
 
@@ -405,6 +410,10 @@ Compute the product of multiple pairing.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_pairing_product">pairing_product</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G2&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;Gt&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G1&gt;();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G2&gt;();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;Gt&gt;();
     <b>let</b> num_g1 = std::vector::length(g1_elements);
     <b>let</b> num_g2 = std::vector::length(g2_elements);
     <b>assert</b>!(num_g1 == num_g2, std::error::invalid_argument(1));
@@ -444,6 +453,8 @@ Convert a u64 to a scalar.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_from_u64">scalar_from_u64</a>&lt;S&gt;(value: u64): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
         handle: <a href="groups.md#0x1_groups_scalar_from_u64_internal">scalar_from_u64_internal</a>&lt;S&gt;(value)
     }
@@ -471,6 +482,8 @@ Compute <code>-x</code> for scalar <code>x</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_neg">scalar_neg</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
         handle: <a href="groups.md#0x1_groups_scalar_neg_internal">scalar_neg_internal</a>&lt;S&gt;(x.handle)
     }
@@ -498,6 +511,8 @@ Compute <code>x + y</code> for scalar <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_add">scalar_add</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
         handle: <a href="groups.md#0x1_groups_scalar_add_internal">scalar_add_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
@@ -525,6 +540,8 @@ Compute <code>x * y</code> for scalar <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_mul">scalar_mul</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
         handle: <a href="groups.md#0x1_groups_scalar_mul_internal">scalar_mul_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
@@ -552,6 +569,8 @@ Compute <code>x^(-1)</code> for scalar <code>x</code>, if defined.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_inv">scalar_inv</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_scalar_inv_internal">scalar_inv_internal</a>&lt;S&gt;(x.handle);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; { handle };
@@ -583,6 +602,8 @@ Check if <code>x == y</code> for scalar <code>x</code> and <code>y</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_eq">scalar_eq</a>&lt;S&gt;(x: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;, y: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): bool {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_scalar_eq_internal">scalar_eq_internal</a>&lt;S&gt;(x.handle, y.handle)
 }
 </code></pre>
@@ -608,6 +629,8 @@ Get the identity of group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_group_identity">group_identity</a>&lt;G&gt;(): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_group_identity_internal">group_identity_internal</a>&lt;G&gt;()
     }
@@ -635,6 +658,8 @@ Get the generator of group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_group_generator">group_generator</a>&lt;G&gt;(): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_group_generator_internal">group_generator_internal</a>&lt;G&gt;()
     }
@@ -662,6 +687,8 @@ Compute <code>-P</code> for group element <code>P</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_neg">element_neg</a>&lt;G&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_element_neg_internal">element_neg_internal</a>&lt;G&gt;(element_p.handle)
     }
@@ -689,6 +716,8 @@ Compute <code>P + Q</code> for group element <code>P</code> and <code>Q</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_add">element_add</a>&lt;G&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;, element_q: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_element_add_internal">element_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
     }
@@ -716,6 +745,8 @@ Compute <code>2P</code> for group element <code>P</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_double">element_double</a>&lt;G&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_element_double_internal">element_double_internal</a>&lt;G&gt;(element_p.handle)
     }
@@ -743,6 +774,9 @@ Compute <code>k*P</code> for scalar <code>k</code> and group element <code>P</co
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_scalar_mul">element_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
     }
@@ -770,6 +804,9 @@ Hash bytes to a group element.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_hash_to_element">hash_to_element</a>&lt;H, G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_hash_alg_enabled">abort_unless_hash_alg_enabled</a>&lt;H&gt;();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
         handle: <a href="groups.md#0x1_groups_hash_to_element_internal">hash_to_element_internal</a>&lt;H, G&gt;(bytes)
     }
@@ -797,6 +834,9 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> for a list of scalars <code>k[]
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_multi_scalar_mul">element_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt;): <a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> num_scalars = std::vector::length(scalars);
     <b>let</b> scalar_handles = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
@@ -841,6 +881,8 @@ Scalar deserialization.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_deserialize">scalar_deserialize</a>&lt;S&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="groups.md#0x1_groups_scalar_deserialize_internal">scalar_deserialize_internal</a>&lt;S&gt;(*bytes);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt; {
@@ -874,6 +916,8 @@ Scalar serialization.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_scalar_serialize">scalar_serialize</a>&lt;S&gt;(scalar: &<a href="groups.md#0x1_groups_Scalar">Scalar</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="groups.md#0x1_groups_scalar_serialize_internal">scalar_serialize_internal</a>&lt;S&gt;(scalar.handle)
 }
 </code></pre>
@@ -899,6 +943,8 @@ Group element serialization with an uncompressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_uncompressed">serialize_element_uncompressed</a>&lt;G&gt;(element: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_element_serialize_uncompressed_internal">element_serialize_uncompressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
@@ -924,6 +970,8 @@ Group element serialization with a compressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_serialize_element_compressed">serialize_element_compressed</a>&lt;G&gt;(element: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_element_serialize_compressed_internal">element_serialize_compressed_internal</a>&lt;G&gt;(element.handle)
 }
 </code></pre>
@@ -949,6 +997,8 @@ Group element deserialization with an uncompressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_uncompressed">deserialize_element_uncompressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_element_deserialize_uncompressed_internal">element_deserialize_uncompressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; { handle })
@@ -979,6 +1029,8 @@ Group element deserialization with a compressed format.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_deserialize_element_compressed">deserialize_element_compressed</a>&lt;G&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <b>let</b> (succ, handle) = <a href="groups.md#0x1_groups_element_deserialize_compressed_internal">element_deserialize_compressed_internal</a>&lt;G&gt;(bytes);
     <b>if</b> (succ) {
         std::option::some(<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt; { handle })
@@ -1009,6 +1061,8 @@ Check if <code>P == Q</code> for group elements <code>P</code> and <code>Q</code
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_element_eq">element_eq</a>&lt;G&gt;(element_p: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;, element_q: &<a href="groups.md#0x1_groups_Element">Element</a>&lt;G&gt;): bool {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_element_eq_internal">element_eq_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
 }
 </code></pre>
@@ -1034,7 +1088,95 @@ Get the order of group <code>G</code>, little-endian encoded as a byte string.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="groups.md#0x1_groups_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="groups.md#0x1_groups_group_order_internal">group_order_internal</a>&lt;G&gt;()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groups_abort_if_generic_group_basic_operations_disabled"></a>
+
+## Function `abort_if_generic_group_basic_operations_disabled`
+
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>() {
+    <b>if</b> (!std::features::generic_group_basic_operations_enabled()) {
+        <b>abort</b>(std::error::not_implemented(0))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groups_abort_unless_structure_enabled"></a>
+
+## Function `abort_unless_structure_enabled`
+
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;() {
+    <b>let</b> type = type_of&lt;S&gt;();
+    <b>if</b> ((type == type_of&lt;<a href="groups.md#0x1_groups_BLS12_381_G1">BLS12_381_G1</a>&gt;() || type == type_of&lt;<a href="groups.md#0x1_groups_BLS12_381_G2">BLS12_381_G2</a>&gt;() || type == type_of&lt;<a href="groups.md#0x1_groups_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="groups.md#0x1_groups_BLS12_381_Fr">BLS12_381_Fr</a>&gt;())
+        && std::features::bls12_381_groups_enabled()
+    ) {
+        // Let go.
+    } <b>else</b> {
+        <b>abort</b>(std::error::not_implemented(0))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_groups_abort_unless_hash_alg_enabled"></a>
+
+## Function `abort_unless_hash_alg_enabled`
+
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_unless_hash_alg_enabled">abort_unless_hash_alg_enabled</a>&lt;S&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="groups.md#0x1_groups_abort_unless_hash_alg_enabled">abort_unless_hash_alg_enabled</a>&lt;S&gt;() {
+    <b>let</b> type = type_of&lt;S&gt;();
+    <b>if</b> (type == type_of&lt;<a href="groups.md#0x1_groups_SHA256">SHA256</a>&gt;() && std::features::sha256_to_group_enabled()) {
+        // Let go.
+    } <b>else</b> {
+        <b>abort</b>(std::error::not_implemented(0))
+    }
 }
 </code></pre>
 
