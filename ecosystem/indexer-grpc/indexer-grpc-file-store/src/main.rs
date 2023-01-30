@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_file_store::{get_redis_address, processor::Processor};
+use aptos_indexer_grpc_file_store::processor::Processor;
+use aptos_indexer_grpc_utils::{get_health_check_port, get_redis_address};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -23,7 +24,9 @@ fn main() {
     runtime.spawn(async move {
         let readiness = warp::path("readiness")
             .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
-        warp::serve(readiness).run(([0, 0, 0, 0], 8080)).await;
+        warp::serve(readiness)
+            .run(([0, 0, 0, 0], get_health_check_port()))
+            .await;
     });
 
     let term = Arc::new(AtomicBool::new(false));

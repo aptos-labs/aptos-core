@@ -14,7 +14,13 @@ pub fn get_redis_address() -> String {
 
 #[inline]
 pub fn get_file_store_bucket_name() -> String {
-    let bucket_prefix = std::env::var("FILE_STORE_BUCKET_NAME").expect("FILE_STORE_BUCKET_NAME is not set.");
-    let chain_name =  std::env::var("CHAIN_NAME").expect("CHAIN_NAME is not set.");
+    let bucket_prefix =
+        std::env::var("FILE_STORE_BUCKET_NAME").expect("FILE_STORE_BUCKET_NAME is not set.");
+    let chain_name = std::env::var("CHAIN_NAME").expect("CHAIN_NAME is not set.");
     format!("{}-{}", bucket_prefix, chain_name)
+}
+
+#[inline]
+pub fn get_health_check_port() -> u16 {
+    std::env::var("HEALTH_CHECK_PORT").map_or_else(|_| 8080, |v| v.parse::<u16>().unwrap())
 }

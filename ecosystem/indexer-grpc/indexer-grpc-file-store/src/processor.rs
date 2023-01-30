@@ -78,6 +78,8 @@ impl Processor {
         self.current_version = metadata.version;
 
         let mut metadata_ref = &mut metadata;
+        // TODO: fix this with a proper traffic control mechanism.
+        let mut prev_metadata_update_time = std::time::Instant::now();
 
         loop {
             let versions = (self.current_version
@@ -119,7 +121,10 @@ impl Processor {
                     continue;
                 },
             }
-            upload_file_store_metadata(bucket_name.clone(), *metadata_ref).await;
+            if prev_metadata_update_time + Duration::from_secs(10) < std::time::Instant::now() {
+                upload_file_store_metadata(bucket_name.clone(), *metadata_ref).await;
+                prev_metadata_update_time = std::time::Instant::now();
+            }
         }
     }
 }
