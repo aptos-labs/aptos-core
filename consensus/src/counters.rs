@@ -91,15 +91,6 @@ pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Voting power of the validator
-pub static VALIDATOR_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
-        "aptos_validator_voting_power",
-        "Voting power of the validator"
-    )
-    .unwrap()
-});
-
 /// Number of rounds we were collecting votes for proposer
 /// (similar to PROPOSALS_COUNT, but can be larger, if we failed in creating/sending of the proposal)
 pub static PROPOSER_COLLECTED_ROUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -345,7 +336,8 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for the number of blocks in the pipeline broken down by stage.
+/// Emits consensus participation status for all peers, 0 means no participation in the window
+/// 1 otherwise.
 pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_consensus_participation_status",
@@ -353,6 +345,16 @@ pub static CONSENSUS_PARTICIPATION_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
         &["peer_id"]
     )
     .unwrap()
+});
+
+/// Emits voting power for all validators in the current epoch.
+pub static VALIDATOR_VOTING_POWER: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_consensus_validator_voting_power",
+        "Voting power for all validators in current epoch",
+        &["peer_id"]
+    )
+        .unwrap()
 });
 
 /// Counter for the number of blocks in the pipeline broken down by stage.
