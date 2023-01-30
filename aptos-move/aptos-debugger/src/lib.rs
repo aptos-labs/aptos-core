@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
+use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher};
 use aptos_gas::{
     AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
     LATEST_GAS_FEATURE_VERSION,
@@ -12,7 +13,10 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig},
-    transaction::{ChangeSet, Transaction, TransactionOutput, Version},
+    proof::accumulator::InMemoryAccumulator,
+    transaction::{
+        ChangeSet, Transaction, TransactionInfo, TransactionOutput, TransactionStatus, Version,
+    },
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
@@ -59,7 +63,7 @@ impl AptosDebugger {
         mut begin: Version,
         mut limit: u64,
     ) -> Result<Vec<TransactionOutput>> {
-        let mut txns = self
+        let (mut txns, mut txn_infos) = self
             .debugger
             .get_committed_transactions(begin, limit)
             .await?;
@@ -76,9 +80,68 @@ impl AptosDebugger {
             begin += epoch_result.len() as u64;
             limit -= epoch_result.len() as u64;
             txns = txns.split_off(epoch_result.len());
+            let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
+            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+
             ret.append(&mut epoch_result);
         }
         Ok(ret)
+    }
+
+    fn print_mismatches(
+        txn_outputs: &[TransactionOutput],
+        expected_txn_infos: &[TransactionInfo],
+        first_version: Version,
+    ) {
+        for idx in 0..txn_outputs.len() {
+            let txn_output = &txn_outputs[idx];
+            let txn_info = &expected_txn_infos[idx];
+            let version = first_version + idx as Version;
+            let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
+            if txn_output.status() != &expected_txn_status {
+                println!(
+                    "Mismatch: ver:{} status:{:?} on_chain:{:?}",
+                    version,
+                    txn_output.status(),
+                    expected_txn_status,
+                );
+            }
+
+            if txn_output.gas_used() != txn_info.gas_used() {
+                println!(
+                    "Mismatch: ver:{} gas_used:{} on_chain:{}",
+                    version,
+                    txn_output.gas_used(),
+                    txn_info.gas_used(),
+                );
+            }
+
+            let write_set_hash = txn_output.write_set().hash();
+            if write_set_hash != txn_info.state_change_hash() {
+                println!(
+                    "Mismatch: ver:{} write_set_hash:{} on_chain:{}",
+                    version,
+                    write_set_hash,
+                    txn_info.state_change_hash(),
+                );
+            }
+
+            let event_hashes = txn_output
+                .events()
+                .iter()
+                .map(CryptoHash::hash)
+                .collect::<Vec<_>>();
+            let event_root_hash =
+                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+            if event_root_hash != txn_info.event_root_hash() {
+                println!(
+                    "Mismatch: ver:{} event_root_hash:{} on_chain:{}",
+                    version,
+                    event_root_hash,
+                    txn_info.event_root_hash(),
+                );
+            }
+        }
     }
 
     pub async fn execute_transactions_by_epoch(
