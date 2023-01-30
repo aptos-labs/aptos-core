@@ -36,6 +36,7 @@ use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
 use ntest::timeout;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::time::sleep;
 
 #[tokio::test(flavor = "multi_thread")]
 #[timeout(120_000)]
@@ -44,28 +45,14 @@ async fn test_auto_bootstrapping() {
     let (validator_driver, consensus_notifier, _, _, _, time_service) =
         create_validator_driver(None).await;
 
-    // Spawn a driver client that's blocked on bootstrapping
-    let driver_client = validator_driver.create_driver_client();
-    let join_handle = tokio::spawn(async move {
-        driver_client.notify_once_bootstrapped().await.unwrap();
-    });
-
     // Verify auto-bootstrapping hasn't happened yet
     let result = consensus_notifier
         .sync_to_target(create_ledger_info_at_version(0))
         .await;
     assert_err!(result);
 
-    // Elapse enough time on the time service for auto-bootstrapping
-    time_service
-        .into_mock()
-        .advance_async(Duration::from_secs(
-            StateSyncDriverConfig::default().max_connection_deadline_secs,
-        ))
-        .await;
-
-    // Wait until the validator is bootstrapped (auto-bootstrapping should occur)
-    join_handle.await.unwrap();
+    // Wait for validator auto bootstrapping
+    wait_for_auto_bootstrapping(validator_driver, time_service).await;
 }
 
 #[tokio::test]
@@ -104,17 +91,8 @@ async fn test_mempool_commit_notifications() {
         time_service,
     ) = create_validator_driver(Some(vec![subscription_event_key])).await;
 
-    // Elapse enough time on the time service for auto-bootstrapping
-    time_service
-        .into_mock()
-        .advance_async(Duration::from_secs(
-            StateSyncDriverConfig::default().max_connection_deadline_secs,
-        ))
-        .await;
-
-    // Wait until the validator is bootstrapped
-    let driver_client = validator_driver.create_driver_client();
-    driver_client.notify_once_bootstrapped().await.unwrap();
+    // Wait for validator auto bootstrapping
+    wait_for_auto_bootstrapping(validator_driver, time_service).await;
 
     // Create commit data for testing
     let transactions = vec![create_transaction(), create_transaction()];
@@ -159,17 +137,8 @@ async fn test_reconfiguration_notifications() {
         time_service,
     ) = create_validator_driver(None).await;
 
-    // Elapse enough time on the time service for auto-bootstrapping
-    time_service
-        .into_mock()
-        .advance_async(Duration::from_secs(
-            StateSyncDriverConfig::default().max_connection_deadline_secs,
-        ))
-        .await;
-
-    // Wait until the validator is bootstrapped
-    let driver_client = validator_driver.create_driver_client();
-    driver_client.notify_once_bootstrapped().await.unwrap();
+    // Wait for validator auto bootstrapping
+    wait_for_auto_bootstrapping(validator_driver, time_service).await;
 
     // Test different events
     let reconfiguration_event = new_epoch_event_key();
@@ -371,4 +340,27 @@ async fn create_driver_for_tests(
         event_subscriber,
         time_service,
     )
+}
+
+/// Waits for node auto bootstrapping by the driver
+async fn wait_for_auto_bootstrapping(validator_driver: DriverFactory, time_service: TimeService) {
+    // Create the driver client and a join handle that waits on auto bootstrapping
+    let driver_client = validator_driver.create_driver_client();
+    let auto_bootstrapping_handle = tokio::spawn(async move {
+        driver_client.notify_once_bootstrapped().await.unwrap();
+    });
+
+    // Spawn a task that continuously elapses time
+    tokio::spawn(async move {
+        time_service
+            .into_mock()
+            .advance_async(Duration::from_secs(
+                StateSyncDriverConfig::default().max_connection_deadline_secs,
+            ))
+            .await;
+        sleep(Duration::from_secs(1)).await;
+    });
+
+    // Wait until the validator is auto-bootstrapped
+    auto_bootstrapping_handle.await.unwrap();
 }
