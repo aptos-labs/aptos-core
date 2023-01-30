@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{create_grpc_client, get_ttl_in_seconds, IndexerGrpcCacheWorkerConfig};
+use aptos_indexer_grpc_utils::update_cache_latest_version;
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::datastream::v1::{
@@ -64,7 +65,7 @@ impl Worker {
     /// Function to process streaming response from datastream.
     /// It accepts a starting version, a response stream, and a function to process each transaction.
     pub(crate) async fn process_streaming_response(
-        &self,
+        &mut self,
         starting_version: u64,
         mut resp_stream: impl futures_core::Stream<Item = Result<RawDatastreamResponse, tonic::Status>>
             + std::marker::Unpin,
@@ -143,7 +144,10 @@ impl Worker {
                         )
                         .unwrap();
                     }
-
+                    update_cache_latest_version(&mut conn, batch_end_version)
+                        .await
+                        .expect("Update cache latest version failed.");
+                    self.current_version = batch_end_version;
                     ma.tick_now(transaction_len as u64);
                     transaction_count += transaction_len as u64;
                     info!(
