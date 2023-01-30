@@ -13,7 +13,7 @@ You must have:
 
 1. [Aptos CLI](../../cli-tools/aptos-cli-tool/index.md) `@1.0.4`
 2. [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md) `@1.6.0`
-3. [Aptos Wallet Adapter](../../guides/wallet-standard.md) `@0.2.2`
+3. [Aptos Wallet Adapter](../../concepts/wallet-adapter-concept.md) `@0.2.2`
 4. [Create React App](https://create-react-app.dev/)
 
 See also the completed code is in the [todolist-dapp-tutorial](https://github.com/aptos-labs/todolist-dapp-tutorial).
