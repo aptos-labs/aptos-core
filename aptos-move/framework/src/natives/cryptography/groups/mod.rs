@@ -83,11 +83,10 @@ pub struct Bls12381GasParameters {
     pub ark_fr_deser: InternalGasPerArg,
     pub ark_fr_div: InternalGasPerArg,
     pub ark_fr_eq: InternalGasPerArg,
-    pub ark_fr_from_u64: InternalGasPerArg,
+    pub ark_fr_from_u128: InternalGasPerArg,
     pub ark_fr_inv: InternalGasPerArg,
     pub ark_fr_mul: InternalGasPerArg,
     pub ark_fr_neg: InternalGasPerArg,
-    pub ark_fr_rand: InternalGasPerArg,
     pub ark_fr_serialize: InternalGasPerArg,
     pub ark_fr_sub: InternalGasPerArg,
     pub ark_fr_to_repr: InternalGasPerArg,
@@ -106,24 +105,20 @@ pub struct Bls12381GasParameters {
     pub ark_g1_affine_eq_proj: InternalGasPerArg,
     pub ark_g1_affine_generator: InternalGasPerArg,
     pub ark_g1_affine_infinity: InternalGasPerArg,
-    pub ark_g1_affine_mul_to_proj: InternalGasPerArg,
+    pub ark_g1_affine_scalar_mul_to_proj: InternalGasPerArg,
     pub ark_g1_affine_neg: InternalGasPerArg,
-    pub ark_g1_affine_serialize_uncompressed: InternalGasPerArg,
-    pub ark_g1_affine_serialize_compressed: InternalGasPerArg,
+    pub ark_g1_affine_ser_comp: InternalGasPerArg,
+    pub ark_g1_affine_ser_uncomp: InternalGasPerArg,
     pub ark_g1_affine_to_prepared: InternalGasPerArg,
     pub ark_g1_affine_to_proj: InternalGasPerArg,
     pub ark_g1_proj_add: InternalGasPerArg,
-    pub ark_g1_proj_addassign: InternalGasPerArg,
     pub ark_g1_proj_double: InternalGasPerArg,
     pub ark_g1_proj_eq: InternalGasPerArg,
     pub ark_g1_proj_generator: InternalGasPerArg,
     pub ark_g1_proj_infinity: InternalGasPerArg,
-    pub ark_g1_proj_mul: InternalGasPerArg,
-    pub ark_g1_proj_mulassign: InternalGasPerArg,
     pub ark_g1_proj_neg: InternalGasPerArg,
-    pub ark_g1_proj_rand: InternalGasPerArg,
+    pub ark_g1_proj_scalar_mul: InternalGasPerArg,
     pub ark_g1_proj_sub: InternalGasPerArg,
-    pub ark_g1_proj_subassign: InternalGasPerArg,
     pub ark_g1_proj_to_affine: InternalGasPerArg,
     pub ark_g1_proj_to_prepared: InternalGasPerArg,
     pub ark_g2_affine_add: InternalGasPerArg,
@@ -132,24 +127,20 @@ pub struct Bls12381GasParameters {
     pub ark_g2_affine_eq_proj: InternalGasPerArg,
     pub ark_g2_affine_generator: InternalGasPerArg,
     pub ark_g2_affine_infinity: InternalGasPerArg,
-    pub ark_g2_affine_mul_to_proj: InternalGasPerArg,
+    pub ark_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
     pub ark_g2_affine_neg: InternalGasPerArg,
-    pub ark_g2_affine_serialize_compressed: InternalGasPerArg,
-    pub ark_g2_affine_serialize_uncompressed: InternalGasPerArg,
+    pub ark_g2_affine_ser_comp: InternalGasPerArg,
+    pub ark_g2_affine_ser_uncomp: InternalGasPerArg,
     pub ark_g2_affine_to_prepared: InternalGasPerArg,
     pub ark_g2_affine_to_proj: InternalGasPerArg,
     pub ark_g2_proj_add: InternalGasPerArg,
-    pub ark_g2_proj_addassign: InternalGasPerArg,
     pub ark_g2_proj_double: InternalGasPerArg,
     pub ark_g2_proj_eq: InternalGasPerArg,
     pub ark_g2_proj_generator: InternalGasPerArg,
     pub ark_g2_proj_infinity: InternalGasPerArg,
-    pub ark_g2_proj_mul: InternalGasPerArg,
-    pub ark_g2_proj_mulassign: InternalGasPerArg,
     pub ark_g2_proj_neg: InternalGasPerArg,
-    pub ark_g2_proj_rand: InternalGasPerArg,
+    pub ark_g2_proj_scalar_mul: InternalGasPerArg,
     pub ark_g2_proj_sub: InternalGasPerArg,
-    pub ark_g2_proj_subassign: InternalGasPerArg,
     pub ark_g2_proj_to_affine: InternalGasPerArg,
     pub ark_g2_proj_to_prepared: InternalGasPerArg,
     pub ark_pairing_product_base: InternalGasPerArg,
@@ -310,7 +301,7 @@ fn element_serialize_uncompressed_internal(
             let element = borrow_bls12_381_g1!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_serialize_uncompressed) * NumArgs::one(),
+                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_ser_uncomp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -319,7 +310,7 @@ fn element_serialize_uncompressed_internal(
             let element = borrow_bls12_381_g2!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_serialize_uncompressed) * NumArgs::one(),
+                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_ser_uncomp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -352,7 +343,7 @@ fn element_serialize_compressed_internal(
             let element = borrow_bls12_381_g1!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_serialize_compressed) * NumArgs::one(),
+                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_ser_comp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -360,7 +351,7 @@ fn element_serialize_compressed_internal(
             let element = borrow_bls12_381_g2!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_serialize_compressed) * NumArgs::one(),
+                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_ser_comp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -607,7 +598,7 @@ fn scalar_from_u64_internal(
             let element = ark_bls12_381::Fr::from(value as u128);
             let handle = store_bls12_381_fr!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_from_u64 * NumArgs::one(),
+                gas_params.bls12_381.ark_fr_from_u128 * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -1098,7 +1089,7 @@ fn element_scalar_mul_internal(
             let new_element = element.mul(scalar.into_repr());
             let new_handle = store_bls12_381_g1!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_mul * NumArgs::one(),
+                gas_params.bls12_381.ark_g1_proj_scalar_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1109,7 +1100,7 @@ fn element_scalar_mul_internal(
             let new_element = element.mul(scalar.into_repr());
             let new_handle = store_bls12_381_g2!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_mul * NumArgs::one(),
+                gas_params.bls12_381.ark_g2_proj_scalar_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1346,7 +1337,7 @@ fn element_multi_scalar_mul_internal(
             let ark_g1_proj = ark_g1_affine.into_projective();
             let new_handle = store_bls12_381_g1!(context, ark_g1_proj);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_mul + gas_params.bls12_381.ark_g1_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
+                (gas_params.bls12_381.ark_g1_proj_scalar_mul + gas_params.bls12_381.ark_g1_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1372,7 +1363,7 @@ fn element_multi_scalar_mul_internal(
             let ark_g2_proj = ark_g2_affine.into_projective();
             let new_handle = store_bls12_381_g2!(context, ark_g2_proj);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_mul + gas_params.bls12_381.ark_g2_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
+                (gas_params.bls12_381.ark_g2_proj_scalar_mul + gas_params.bls12_381.ark_g2_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }

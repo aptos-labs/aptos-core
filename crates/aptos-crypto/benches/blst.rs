@@ -6,7 +6,7 @@ extern crate criterion;
 
 use std::cmp::min;
 use std::ops::MulAssign;
-use blst::blst_p1;
+use blst::{blst_p1, blst_p1_affine, blst_p2, blst_p2_affine};
 use aptos_crypto::{
     bls12381,
     bls12381::ProofOfPossession,
@@ -106,6 +106,18 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
+    group.bench_function("g1_proj_to_affine", move |b| {
+        b.iter_with_setup(
+            || {
+                random_p1()
+            },
+            |p| {
+                let mut out = blst_p1_affine::default();
+                unsafe { blst::blst_p1_to_affine(&mut out, &p); }
+            }
+        )
+    });
+
     group.bench_function("g1_affine_deserialize_uncomp", move |b| {
         b.iter_with_setup(
             || {
@@ -150,19 +162,63 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    for input_byte_length in [64, 1024] {
+    group.bench_function("g2_proj_serialize", move |b| {
+        b.iter_with_setup(
+            || {
+                random_p2()
+            },
+            |p| {
+                let mut out = vec![0_u8; 288];
+                unsafe { blst::blst_p2_serialize(out.as_mut_ptr(), &p); }
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_to_affine", move |b| {
+        b.iter_with_setup(
+            || {
+                random_p2()
+            },
+            |p| {
+                let mut out = blst_p2_affine::default();
+                unsafe { blst::blst_p2_to_affine(&mut out, &p); }
+            }
+        )
+    });
+
+
+    for input_byte_length in (1..4097).step_by(45) {
         group.bench_function(format!("hash_{input_byte_length}_bytes_to_g1_proj").as_str(), move |b| {
             b.iter_with_setup(
                 || {
                     let msg = random_bytes(input_byte_length);
-                    let dst = random_bytes(64);
-                    let aug = random_bytes(64);
+                    let dst = random_bytes(32);
+                    let aug = random_bytes(32);
                     (msg,dst,aug)
                 },
                 |(msg,dst,aug)| {
                     let mut point = blst_p1::default();
                     unsafe {
                         blst::blst_hash_to_g1(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len());
+                    }
+                }
+            )
+        });
+    }
+
+    for input_byte_length in (1..4097).step_by(45) {
+        group.bench_function(format!("hash_{input_byte_length}_bytes_to_g2_proj").as_str(), move |b| {
+            b.iter_with_setup(
+                || {
+                    let msg = random_bytes(input_byte_length);
+                    let dst = random_bytes(32);
+                    let aug = random_bytes(32);
+                    (msg,dst,aug)
+                },
+                |(msg,dst,aug)| {
+                    let mut point = blst_p2::default();
+                    unsafe {
+                        blst::blst_hash_to_g2(&mut point, msg.as_ptr(), msg.len(), dst.as_ptr(), dst.len(), aug.as_ptr(), aug.len());
                     }
                 }
             )
@@ -193,8 +249,8 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    for scalar_count in [16, 1024] {
-        let bench_id = format!("g1_affine_{scalar_count}sm");
+    for scalar_count in (2..2049).step_by(22) {
+        let bench_id = format!("g1_affine_msm_size_{scalar_count}");
         group.bench_function(bench_id.as_str(), move |b| {
             b.iter_with_setup(
                 || {
@@ -209,6 +265,24 @@ fn bench_group(c: &mut Criterion) {
             )
         });
     }
+
+    for scalar_count in (2..2049).step_by(22) {
+        let bench_id = format!("g2_affine_msm_size_{scalar_count}");
+        group.bench_function(bench_id.as_str(), move |b| {
+            b.iter_with_setup(
+                || {
+                    let points: Vec<blst_p2> = (0..scalar_count).map(|_i| random_p2()).collect();
+                    let affine_points = blst::p2_affines::from(points.as_slice());
+                    let scalars_bytes = random_bytes(256 * scalar_count);
+                    (affine_points, scalars_bytes)
+                },
+                |(affine_points, scalars_bytes)| {
+                    let _actual = affine_points.mult(scalars_bytes.as_slice(), 256);
+                }
+            )
+        });
+    }
+
     group.finish();
 }
 
