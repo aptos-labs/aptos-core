@@ -14,17 +14,17 @@ use sysinfo::{RefreshKind, System, SystemExt};
 
 const BASIC_NODE_INFO_METRICS_COUNT: usize = 2;
 const RELEASE_GIT_HASH_LABEL: &str = "release_git_hash";
-const NODE_HOST_NAME_LABEL: &str = "host_name";
+const NODE_HOSTNAME_LABEL: &str = "hostname";
 
 const GIT_HASH_LABEL: &str = "git_hash";
-const HOST_NAME_LABEL: &str = "name";
+const HOSTNAME_LABEL: &str = "name";
 
 const UNKNOW_LABEL: &str = "unknown";
 
 pub(crate) struct BasicNodeInfoCollector {
     system: Arc<Mutex<System>>,
     release: Desc,
-    host_name: Desc,
+    hostname: Desc,
 }
 
 impl BasicNodeInfoCollector {
@@ -36,16 +36,16 @@ impl BasicNodeInfoCollector {
             .variable_label(GIT_HASH_LABEL)
             .describe()
             .unwrap();
-        let host_name = Opts::new(NODE_HOST_NAME_LABEL, "Host name.")
+        let hostname = Opts::new(NODE_HOSTNAME_LABEL, "Hostname.")
             .namespace(NAMESPACE)
-            .variable_label(HOST_NAME_LABEL)
+            .variable_label(HOSTNAME_LABEL)
             .describe()
             .unwrap();
 
         Self {
             system,
             release,
-            host_name,
+            hostname,
         }
     }
 }
@@ -58,18 +58,18 @@ impl Default for BasicNodeInfoCollector {
 
 impl Collector for BasicNodeInfoCollector {
     fn desc(&self) -> Vec<&Desc> {
-        vec![&self.host_name, &self.release]
+        vec![&self.hostname, &self.release]
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let host_name = self
+        let hostname = self
             .system
             .lock()
             .host_name()
             .unwrap_or_else(|| String::from(UNKNOW_LABEL));
 
         let host_name_metrics =
-            ConstMetric::new_gauge(self.host_name.clone(), 1.0, Some(&[host_name])).unwrap();
+            ConstMetric::new_gauge(self.hostname.clone(), 1.0, Some(&[hostname])).unwrap();
 
         let git_hash = aptos_build_info::get_git_hash();
         let release_metrics =
