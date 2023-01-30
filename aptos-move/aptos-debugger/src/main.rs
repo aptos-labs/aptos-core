@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
     let debugger = match args.target {
         Target::Rest { endpoint } => {
             AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?
-        },
+        }
         Target::DB { path } => AptosDebugger::db(path)?,
     };
 
