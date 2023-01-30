@@ -14,7 +14,7 @@ This page shows the key updates to the developer documentation on this site. Not
   * [View functions](guides/aptos-apis.md#reading-state-with-the-view-function) to evaluate transactions before execution
   * Compile-time checks for transaction arguments
   * Various updates to smart contracts
-  * Several Aptos Improvement proposals
+  * Several Aptos Improvement Proposals (AIPs)
 
   See the [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for many more details.
 
