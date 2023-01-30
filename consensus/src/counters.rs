@@ -354,7 +354,7 @@ pub static VALIDATOR_VOTING_POWER: Lazy<IntGaugeVec> = Lazy::new(|| {
         "Voting power for all validators in current epoch",
         &["peer_id"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Counter for the number of blocks in the pipeline broken down by stage.
