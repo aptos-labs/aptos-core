@@ -7,18 +7,16 @@ slug: "e2e-dapp-index"
 
 A common way to learn a new framework or programming language is to build a simple todo list. In this tutorial, we will learn how to build an end-to-end todo list dapp, starting from the smart contract side through the front-end side and finally use of a wallet to interact with the two.
 
-:::tip
-The completed code is in the [todolist-dapp-toturial](https://github.com/aptos-labs/todolist-dapp-toturial)
-:::
-
 ## Prerequisites
 
-You must 
+You must have:
 
-1. Aptos CLI `@1.0.4`
-2. Aptos TS SDK `@1.6.0`
-3. Aptos Wallet Adapter `@0.2.2`
-4. Create React App
+1. [Aptos CLI](../../cli-tools/aptos-cli-tool/index.md) `@1.0.4`
+2. [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md) `@1.6.0`
+3. [Aptos Wallet Adapter](../../concepts/wallet-adapter-concept.md) `@0.2.2`
+4. [Create React App](https://create-react-app.dev/)
+
+See also the completed code is in the [todolist-dapp-tutorial](https://github.com/aptos-labs/todolist-dapp-tutorial).
 
 ## Setup
 
