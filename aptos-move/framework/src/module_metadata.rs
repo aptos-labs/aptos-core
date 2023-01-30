@@ -56,7 +56,7 @@ pub struct RuntimeModuleMetadataV1 {
 /// Enumeration of potentially known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct KnownAttribute {
-    kind: u16,
+    kind: u8,
     args: Vec<String>,
 }
 
@@ -71,28 +71,28 @@ pub enum KnownAttributeKind {
 impl KnownAttribute {
     pub fn view_function() -> Self {
         Self {
-            kind: KnownAttributeKind::ViewFunction as u16,
+            kind: KnownAttributeKind::ViewFunction as u8,
             args: vec![],
         }
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == (KnownAttributeKind::ViewFunction as u16)
+        self.kind == (KnownAttributeKind::ViewFunction as u8)
     }
 
     pub fn resource_group(scope: ResourceGroupScope) -> Self {
         Self {
-            kind: KnownAttributeKind::ResourceGroup as u16,
+            kind: KnownAttributeKind::ResourceGroup as u8,
             args: vec![scope.as_str().to_string()],
         }
     }
 
     pub fn is_resource_group(&self) -> bool {
-        self.kind == KnownAttributeKind::ResourceGroup as u16
+        self.kind == KnownAttributeKind::ResourceGroup as u8
     }
 
     pub fn get_resource_group(&self) -> Option<ResourceGroupScope> {
-        if self.kind == KnownAttributeKind::ResourceGroup as u16 {
+        if self.kind == KnownAttributeKind::ResourceGroup as u8 {
             self.args.get(0).and_then(|scope| str::parse(scope).ok())
         } else {
             None
@@ -101,13 +101,13 @@ impl KnownAttribute {
 
     pub fn resource_group_member(container: String) -> Self {
         Self {
-            kind: KnownAttributeKind::ResourceGroupMember as u16,
+            kind: KnownAttributeKind::ResourceGroupMember as u8,
             args: vec![container],
         }
     }
 
     pub fn get_resource_group_member(&self) -> Option<StructTag> {
-        if self.kind == KnownAttributeKind::ResourceGroupMember as u16 {
+        if self.kind == KnownAttributeKind::ResourceGroupMember as u8 {
             self.args.get(0).and_then(|group| str::parse(group).ok())
         } else {
             None
@@ -115,7 +115,7 @@ impl KnownAttribute {
     }
 
     pub fn is_resource_group_member(&self) -> bool {
-        self.kind == KnownAttributeKind::ResourceGroupMember as u16
+        self.kind == KnownAttributeKind::ResourceGroupMember as u8
     }
 }
 
@@ -159,7 +159,7 @@ pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetad
 #[error("Unknown attribute ({}) for key: {}", self.attribute, self.key)]
 pub struct MetadataValidationError {
     pub key: String,
-    pub attribute: u16,
+    pub attribute: u8,
 }
 
 pub fn is_valid_view_function(
@@ -176,7 +176,7 @@ pub fn is_valid_view_function(
 
     Err(MetadataValidationError {
         key: fun.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 
@@ -198,7 +198,7 @@ pub fn is_valid_resource_group(
 
     Err(MetadataValidationError {
         key: struct_.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 
@@ -217,7 +217,7 @@ pub fn is_valid_resource_group_member(
 
     Err(MetadataValidationError {
         key: struct_.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 
