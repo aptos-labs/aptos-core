@@ -147,10 +147,11 @@ pub mod aptos_logger;
 mod event;
 mod filter;
 mod kv;
-mod logger;
+pub mod logger;
 mod macros;
 mod metadata;
 pub mod sample;
+pub mod speculative_log;
 pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 

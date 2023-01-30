@@ -3,10 +3,9 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    counters::*,
+    counters::CRITICAL_ERRORS,
     data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
-    logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
@@ -16,7 +15,13 @@ use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
     Gas, NativeGasParameters, StorageGasParameters,
 };
-use aptos_logger::prelude::*;
+use aptos_logger::{
+    enabled,
+    prelude::*,
+    speculative_log,
+    speculative_log::{speculative_log, AdapterLogSchema},
+    Level,
+};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
@@ -173,8 +178,12 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
         self.gas_params.as_ref().ok_or_else(|| {
-            log_context.alert();
-            error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
+            speculative_log!(
+                Level::Error,
+                log_context,
+                String::from("VM Startup Failed. Gas Parameters Not Found"),
+                true,
+            );
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
         })
     }
@@ -184,10 +193,11 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
         self.storage_gas_params.as_ref().ok_or_else(|| {
-            log_context.alert();
-            error!(
-                *log_context,
-                "VM Startup Failed. Storage Gas Parameters Not Found"
+            speculative_log!(
+                Level::Error,
+                log_context,
+                String::from("VM Startup Failed. Gas Parameters Not Found"),
+                true,
             );
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
         })
@@ -247,11 +257,14 @@ impl AptosVMImpl {
             };
 
             if !valid {
-                warn!(
-                    *log_context,
-                    "[VM] Transaction size too big {} (max {})",
-                    raw_bytes_len,
-                    txn_gas_params.max_transaction_size_in_bytes,
+                speculative_log!(
+                    Level::Warn,
+                    log_context,
+                    format!(
+                        "[VM] Transaction size too big {} (max {})",
+                        raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
+                    ),
+                    false,
                 );
                 return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
             }
@@ -261,11 +274,15 @@ impl AptosVMImpl {
         // maximum number of gas units bound that we have set for any
         // transaction.
         if txn_data.max_gas_amount() > txn_gas_params.maximum_number_of_gas_units {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; max {}, submitted {}",
-                txn_gas_params.maximum_number_of_gas_units,
-                txn_data.max_gas_amount(),
+            speculative_log!(
+                Level::Warn,
+                log_context,
+                format!(
+                    "[VM] Gas unit error; max {}, submitted {}",
+                    txn_gas_params.maximum_number_of_gas_units,
+                    txn_data.max_gas_amount()
+                ),
+                false,
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
@@ -280,11 +297,15 @@ impl AptosVMImpl {
             .to_unit_round_up_with_params(txn_gas_params);
 
         if txn_data.max_gas_amount() < intrinsic_gas {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                intrinsic_gas,
-                txn_data.max_gas_amount(),
+            speculative_log!(
+                Level::Warn,
+                log_context,
+                format!(
+                    "[VM] Gas unit error; min {}, submitted {}",
+                    intrinsic_gas,
+                    txn_data.max_gas_amount()
+                ),
+                false,
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
@@ -297,22 +318,30 @@ impl AptosVMImpl {
         #[allow(clippy::absurd_extreme_comparisons)]
         let below_min_bound = txn_data.gas_unit_price() < txn_gas_params.min_price_per_gas_unit;
         if below_min_bound {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                txn_gas_params.min_price_per_gas_unit,
-                txn_data.gas_unit_price(),
+            speculative_log!(
+                Level::Warn,
+                log_context,
+                format!(
+                    "[VM] Gas unit error; min {}, submitted {}",
+                    txn_gas_params.min_price_per_gas_unit,
+                    txn_data.gas_unit_price()
+                ),
+                false,
             );
             return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND));
         }
 
         // The submitted gas price is greater than the maximum gas unit price set by the VM.
         if txn_data.gas_unit_price() > txn_gas_params.max_price_per_gas_unit {
-            warn!(
-                *log_context,
-                "[VM] Gas unit error; min {}, submitted {}",
-                txn_gas_params.max_price_per_gas_unit,
-                txn_data.gas_unit_price(),
+            speculative_log!(
+                Level::Warn,
+                log_context,
+                format!(
+                    "[VM] Gas unit error; max {}, submitted {}",
+                    txn_gas_params.max_price_per_gas_unit,
+                    txn_data.gas_unit_price()
+                ),
+                false,
             );
             return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND));
         }

@@ -723,7 +723,7 @@ impl LoggerFilterUpdater {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{AptosData, LogEntry};
     use crate::{
         aptos_logger::{json_format, RUST_LOG_TELEMETRY},
@@ -732,8 +732,11 @@ mod tests {
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
         Schema, Value, Visitor,
     };
-    use chrono::{DateTime, Utc};
     #[cfg(test)]
+    use aptos_infallible::Mutex;
+    use arc_swap::ArcSwapOption;
+    use chrono::{DateTime, Utc};
+    use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
     use std::{
@@ -765,14 +768,16 @@ mod tests {
     struct LogStream {
         sender: SyncSender<LogEntry>,
         enable_backtrace: bool,
+        level: Level,
     }
 
     impl LogStream {
-        fn new(enable_backtrace: bool) -> (Self, Receiver<LogEntry>) {
+        fn new(level: Level, enable_backtrace: bool) -> (Self, Receiver<LogEntry>) {
             let (sender, receiver) = mpsc::sync_channel(1024);
             let log_stream = Self {
                 sender,
                 enable_backtrace,
+                level,
             };
             (log_stream, receiver)
         }
@@ -780,7 +785,7 @@ mod tests {
 
     impl Logger for LogStream {
         fn enabled(&self, metadata: &Metadata) -> bool {
-            metadata.level() <= Level::Debug
+            metadata.level() <= self.level
         }
 
         fn record(&self, event: &Event) {
@@ -795,17 +800,40 @@ mod tests {
         fn flush(&self) {}
     }
 
-    fn set_test_logger() -> Receiver<LogEntry> {
-        let (logger, receiver) = LogStream::new(true);
-        let logger = Arc::new(logger);
-        crate::logger::set_global_logger(logger, None);
-        receiver
+    static TEST_LOGGER_RECEIVER: Lazy<ArcSwapOption<Mutex<Receiver<LogEntry>>>> =
+        Lazy::new(|| ArcSwapOption::new(None));
+
+    pub(crate) fn set_test_logger(
+        level: Level,
+        enable_backtrace: bool,
+    ) -> Arc<Mutex<Receiver<LogEntry>>> {
+        if TEST_LOGGER_RECEIVER.load().is_none() {
+            let (logger, receiver) = LogStream::new(level, enable_backtrace);
+            let logger = Arc::new(logger);
+            let receiver_mutex = Arc::new(Mutex::new(receiver));
+
+            if TEST_LOGGER_RECEIVER
+                .compare_and_swap(&None::<Arc<_>>, Some(receiver_mutex))
+                .is_none()
+            {
+                // Successfully stored the receiver by the first test, set
+                // the global logger.
+                crate::logger::set_global_logger(logger, None);
+            }
+        }
+
+        TEST_LOGGER_RECEIVER
+            .load()
+            .as_ref()
+            .expect("Test logger receiver must be set")
+            .clone()
     }
 
     // TODO: Find a better mechanism for testing that allows setting the logger not globally
     #[test]
     fn basic() {
-        let receiver = set_test_logger();
+        let receiver_mutex = set_test_logger(Level::Debug, true);
+        let receiver = receiver_mutex.lock();
         let number = 12345;
 
         // Send an info log

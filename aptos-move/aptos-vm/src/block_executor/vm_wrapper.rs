@@ -6,11 +6,14 @@ use crate::{
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
-    logging::AdapterLogSchema,
 };
 use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
-use aptos_logger::prelude::*;
+use aptos_logger::{
+    enabled, speculative_log,
+    speculative_log::{speculative_log, AdapterLogSchema},
+    Level,
+};
 use aptos_state_view::StateView;
 use move_core_types::{
     ident_str,
@@ -78,19 +81,30 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
                 if output_ext.txn_output().status().is_discarded() {
                     match sender {
-                        Some(s) => trace!(
-                            log_context,
-                            "Transaction discarded, sender: {}, error: {:?}",
-                            s,
-                            vm_status,
+                        Some(s) => speculative_log!(
+                            Level::Trace,
+                            &log_context,
+                            format!(
+                                "Transaction discarded, sender: {}, error: {:?}",
+                                s, vm_status
+                            ),
+                            false,
                         ),
-                        None => {
-                            trace!(log_context, "Transaction malformed, error: {:?}", vm_status,)
-                        },
+                        None => speculative_log!(
+                            Level::Trace,
+                            &log_context,
+                            format!("Transaction malformed, error: {:?}", vm_status),
+                            false,
+                        ),
                     };
                 }
                 if AptosVM::should_restart_execution(output_ext.txn_output()) {
-                    info!(log_context, "Reconfiguration occurred: restart required",);
+                    speculative_log!(
+                        Level::Info,
+                        &log_context,
+                        String::from("Reconfiguration occurred: restart required"),
+                        false,
+                    );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
                 } else {
                     ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))

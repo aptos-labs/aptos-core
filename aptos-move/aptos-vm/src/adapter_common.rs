@@ -1,12 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    logging::AdapterLogSchema,
-    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-};
+use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_logger::speculative_log::AdapterLogSchema;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_metadata::BlockMetadata,

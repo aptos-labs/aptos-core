@@ -8,7 +8,7 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
+        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS, CRITICAL_ERRORS,
     },
     AptosVM,
 };
@@ -21,6 +21,7 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
+use aptos_logger::speculative_log::flush_speculative_logs;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -123,6 +124,12 @@ impl BlockAptosVM {
                         .collect()
                 })
             });
+
+        // Clear the buffered logs and asynchronously flush them.
+        let critical_err_cnt = flush_speculative_logs();
+        for _ in 0..critical_err_cnt {
+            CRITICAL_ERRORS.inc();
+        }
 
         match ret {
             Ok(outputs) => Ok(outputs),

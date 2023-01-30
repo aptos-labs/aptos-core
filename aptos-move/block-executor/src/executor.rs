@@ -11,7 +11,10 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
-use aptos_logger::debug;
+use aptos_logger::{
+    debug,
+    speculative_log::{clear_speculative_log, clear_speculative_logs, resize_speculative_logs},
+};
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use aptos_types::write_set::WriteOp;
@@ -172,6 +175,8 @@ where
 
         if aborted {
             counters::SPECULATIVE_ABORT_COUNT.inc();
+            // Any logs from the aborted execution should be cleared and not reported.
+            clear_speculative_log(idx_to_validate);
 
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
             for k in last_input_output.modified_keys(idx_to_validate) {
@@ -260,6 +265,8 @@ where
         }
 
         let num_txns = signature_verified_block.len();
+        resize_speculative_logs(num_txns);
+
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
@@ -332,6 +339,8 @@ where
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let num_txns = signature_verified_block.len();
+        resize_speculative_logs(num_txns);
+
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
 
@@ -396,6 +405,8 @@ where
 
         if matches!(ret, Err(Error::ModulePathReadWrite)) {
             debug!("[Execution]: Module read & written, sequential fallback");
+            // All logs from the parallel execution should be cleared and not reported.
+            clear_speculative_logs();
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
