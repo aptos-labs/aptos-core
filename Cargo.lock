@@ -1825,6 +1825,7 @@ dependencies = [
 name = "aptos-node-resource-metrics"
 version = "0.1.0"
 dependencies = [
+ "aptos-build-info",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
