@@ -833,6 +833,7 @@ name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-gas",
  "aptos-logger",
  "aptos-resource-viewer",
@@ -2663,6 +2664,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
+ "itertools",
  "lru",
  "move-binary-format",
  "tokio",
