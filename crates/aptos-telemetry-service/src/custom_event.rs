@@ -29,6 +29,7 @@ pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
             NodeType::ValidatorFullNode,
             NodeType::PublicFullNode,
             NodeType::Unknown,
+            NodeType::CLI,
         ]))
         .and(warp::body::json())
         .and_then(handle_custom_event)
@@ -40,9 +41,10 @@ pub(crate) async fn handle_custom_event(
     claims: Claims,
     body: TelemetryDump,
 ) -> anyhow::Result<impl Reply, Rejection> {
-    if !body
-        .user_id
-        .eq_ignore_ascii_case(&claims.peer_id.to_string())
+    if claims.node_type != NodeType::CLI
+        && !body
+            .user_id
+            .eq_ignore_ascii_case(&claims.peer_id.to_string())
     {
         return Err(reject::custom(ServiceError::bad_request(
             CustomEventIngestError::InvalidEvent(body.user_id, claims.peer_id).into(),

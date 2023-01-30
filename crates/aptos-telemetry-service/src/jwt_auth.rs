@@ -51,13 +51,17 @@ pub async fn authorize_jwt(
     })?;
     let claims = decoded.claims;
 
-    let current_epoch = match context.peers().validators().read().get(&claims.chain_id) {
-        Some(info) => info.0,
-        None => {
-            return Err(reject::custom(ServiceError::unauthorized(
-                JwtAuthError::ExpiredAuthToken.into(),
-            )));
-        },
+    let current_epoch = if claims.node_type == NodeType::CLI {
+        0
+    } else {
+        match context.peers().validators().read().get(&claims.chain_id) {
+            Some(info) => info.0,
+            None => {
+                return Err(reject::custom(ServiceError::unauthorized(
+                    JwtAuthError::ExpiredAuthToken.into(),
+                )));
+            },
+        }
     };
 
     if !allow_roles.contains(&claims.node_type) {

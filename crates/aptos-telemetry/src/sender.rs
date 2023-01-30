@@ -83,6 +83,13 @@ impl TelemetrySender {
         }
     }
 
+    pub fn new_for_cli(base_url: Url) -> Self {
+        let chain_id = ChainId::new(u8::max_value());
+        let node_config = NodeConfig::default_for_public_full_node();
+
+        Self::new(base_url, chain_id, &node_config)
+    }
+
     pub fn build_path(&self, path: &str) -> Result<Url> {
         Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
     }
@@ -317,7 +324,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(format!("{}/api/v1/auth", self.base_url))
+            .post(self.build_path("auth")?)
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;

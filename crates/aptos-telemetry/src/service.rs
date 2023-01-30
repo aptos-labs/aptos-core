@@ -421,7 +421,7 @@ pub(crate) async fn send_telemetry_event_with_ip(
     chain_id: String,
     telemetry_sender: Option<TelemetrySender>,
     telemetry_event: TelemetryEvent,
-) -> JoinHandle<()> {
+) -> (JoinHandle<()>, JoinHandle<()>) {
     // Update the telemetry event with the ip address and random token
     let TelemetryEvent { name, mut params } = telemetry_event;
     params.insert(IP_ADDRESS_KEY.to_string(), get_origin_ip().await);
@@ -451,7 +451,7 @@ async fn send_telemetry_event(
     peer_id: String,
     telemetry_sender: Option<TelemetrySender>,
     telemetry_event: TelemetryEvent,
-) -> JoinHandle<()> {
+) -> (JoinHandle<()>, JoinHandle<()>) {
     // Parse the Google analytics env variables
     let api_secret =
         env::var(ENV_GA_API_SECRET).unwrap_or_else(|_| APTOS_GA_API_SECRET.to_string());
@@ -470,12 +470,15 @@ async fn send_telemetry_event(
         timestamp_micros,
         events: vec![telemetry_event],
     };
-    let _handle = spawn_telemetry_service_event_sender(
+    let handle1 = spawn_telemetry_service_event_sender(
         event_name.clone(),
         telemetry_sender,
         telemetry_dump.clone(),
     );
-    spawn_telemetry_event_sender(api_secret, measurement_id, event_name, telemetry_dump)
+    let handle2 =
+        spawn_telemetry_event_sender(api_secret, measurement_id, event_name, telemetry_dump);
+
+    (handle1, handle2)
 }
 
 fn spawn_telemetry_service_event_sender(

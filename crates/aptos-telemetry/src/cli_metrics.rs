@@ -1,10 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{service, utils};
+use crate::{
+    constants::{ENV_TELEMETRY_SERVICE_URL, TELEMETRY_SERVICE_URL},
+    sender::TelemetrySender,
+    service, utils,
+};
 use aptos_logger::debug;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
-use std::{collections::BTreeMap, time::Duration};
+use reqwest::Url;
+use std::{collections::BTreeMap, env, time::Duration};
 
 /// CLI metrics event name
 const APTOS_CLI_METRICS: &str = "APTOS_CLI_METRICS";
@@ -23,6 +28,12 @@ pub async fn send_cli_telemetry_event(
     success: bool,
     error: Option<&str>,
 ) {
+    let telemetry_url =
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or(TELEMETRY_SERVICE_URL.to_owned());
+    let telemetry_sender = Url::parse(&telemetry_url)
+        .ok()
+        .map(|url| TelemetrySender::new_for_cli(url));
+
     // Collection information about the cli command
     collect_cli_info(command, latency, success, error, &mut build_information);
 
@@ -37,10 +48,20 @@ pub async fn send_cli_telemetry_event(
 
     // Send the event (we block on the join handle to ensure the
     // event is processed before terminating the cli command).
-    let join_handle =
-        service::send_telemetry_event_with_ip(user_id, "NO_CHAIN".into(), None, telemetry_event)
-            .await;
-    if let Err(error) = join_handle.await {
+    let join_handle = service::send_telemetry_event_with_ip(
+        user_id,
+        "NO_CHAIN".into(),
+        telemetry_sender,
+        telemetry_event,
+    )
+    .await;
+    if let Err(error) = join_handle.0.await {
+        debug!(
+            "Failed to send telemetry event with join error: {:?}",
+            error
+        );
+    }
+    if let Err(error) = join_handle.1.await {
         debug!(
             "Failed to send telemetry event with join error: {:?}",
             error

@@ -103,19 +103,24 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
             }
         },
         None => {
-            warn!(
-                "Validator set unavailable for Chain ID {}. Rejecting request.",
-                body.chain_id
-            );
-            Err(reject::custom(ServiceError::unauthorized(
-                ServiceErrorCode::AuthError(AuthError::ValidatorSetUnavailable, body.chain_id),
-            )))
+            if body.chain_id == ChainId::new(255) {
+                Ok((0, PeerRole::Unknown))
+            } else {
+                warn!(
+                    "Validator set unavailable for Chain ID {}. Rejecting request.",
+                    body.chain_id
+                );
+                Err(reject::custom(ServiceError::unauthorized(
+                    ServiceErrorCode::AuthError(AuthError::ValidatorSetUnavailable, body.chain_id),
+                )))
+            }
         },
     }?;
 
     let node_type = match peer_role {
         PeerRole::Validator => NodeType::Validator,
         PeerRole::ValidatorFullNode => NodeType::ValidatorFullNode,
+        PeerRole::Unknown if body.chain_id == ChainId::new(255) => NodeType::CLI,
         PeerRole::Unknown => context
             .peers()
             .public_fullnodes()
