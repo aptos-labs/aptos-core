@@ -119,6 +119,35 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
     fn finish(&self);
 }
 
+#[derive(Clone)]
+pub enum VerifyExecutionMode {
+    NoVerify,
+    Verify {
+        txns_to_skip: Arc<BTreeSet<Version>>,
+    },
+}
+
+impl VerifyExecutionMode {
+    pub fn verify_all() -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(BTreeSet::new()),
+        }
+    }
+
+    pub fn verify_except(txns_to_skip: Vec<Version>) -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(txns_to_skip.into_iter().collect()),
+        }
+    }
+
+    pub fn txns_to_skip(&self) -> Arc<BTreeSet<Version>> {
+        match self {
+            VerifyExecutionMode::NoVerify => Arc::new(BTreeSet::new()),
+            VerifyExecutionMode::Verify { txns_to_skip } => txns_to_skip.clone(),
+        }
+    }
+}
+
 pub trait TransactionReplayer: Send {
     fn replay(
         &self,
@@ -126,7 +155,7 @@ pub trait TransactionReplayer: Send {
         transaction_infos: Vec<TransactionInfo>,
         writesets: Vec<WriteSet>,
         events: Vec<Vec<ContractEvent>>,
-        txns_to_skip: Arc<BTreeSet<Version>>,
+        verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;

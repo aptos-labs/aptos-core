@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use aptos_vm::AptosVM;
@@ -28,7 +29,7 @@ pub struct ReplayVerifyCoordinator {
     start_version: Version,
     end_version: Version,
     validate_modules: bool,
-    txns_to_skip: Vec<Version>,
+    verify_execution_mode: VerifyExecutionMode,
 }
 
 impl ReplayVerifyCoordinator {
@@ -42,7 +43,7 @@ impl ReplayVerifyCoordinator {
         start_version: Version,
         end_version: Version,
         validate_modules: bool,
-        txns_to_skip: Vec<Version>,
+        verify_execution_mode: VerifyExecutionMode,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -54,7 +55,7 @@ impl ReplayVerifyCoordinator {
             start_version,
             end_version,
             validate_modules,
-            txns_to_skip,
+            verify_execution_mode,
         })
     }
 
@@ -155,7 +156,7 @@ impl ReplayVerifyCoordinator {
             txn_manifests,
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
-            self.txns_to_skip,
+            self.verify_execution_mode,
         )
         .run()
         .await?;

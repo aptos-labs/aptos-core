@@ -13,6 +13,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{AptosDB, GetRestoreHandler};
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -88,7 +89,7 @@ async fn main_impl() -> Result<()> {
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
         opt.validate_modules,
-        opt.txns_to_skip,
+        VerifyExecutionMode::verify_except(opt.txns_to_skip),
     )?
     .run()
     .await

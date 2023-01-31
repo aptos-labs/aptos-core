@@ -13,7 +13,9 @@ use crate::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
-use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
+use aptos_executor_types::{
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
@@ -35,7 +37,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use proptest::prelude::*;
-use std::{collections::BTreeSet, iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
 
@@ -693,7 +695,7 @@ proptest! {
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(BTreeSet::new())).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], &VerifyExecutionMode::verify_all()).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
