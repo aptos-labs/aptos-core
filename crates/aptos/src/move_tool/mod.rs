@@ -109,7 +109,7 @@ impl MoveTool {
 
 const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
 
-fn set_bytecode_version(version: Option<u32>) {
+pub(crate) fn set_bytecode_version(version: Option<u32>) {
     // Note: this is a bit of a hack to get the compiler emit bytecode with the right
     //       version. In the future, we should add an option to the Move package system
     //       that would allow us to configure this directly instead of relying on
@@ -322,7 +322,7 @@ pub struct TestPackage {
     pub filter: Option<String>,
 
     /// A boolean value to skip warnings.
-    #[clap(long, short = 'w')]
+    #[clap(long)]
     pub ignore_compile_warnings: bool,
 
     #[clap(flatten)]
