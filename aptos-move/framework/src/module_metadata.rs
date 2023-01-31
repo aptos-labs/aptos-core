@@ -53,6 +53,9 @@ pub struct KnownAttribute {
 /// Enumeration of known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
+    // An older compiler placed view functions at 0. This was then published to
+    // Testnet and now we need to recognize this as a legacy index.
+    LegacyViewFunction = 0,
     ViewFunction = 1,
 }
 
@@ -65,7 +68,8 @@ impl KnownAttribute {
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == (KnownAttributeKind::ViewFunction as u8)
+        self.kind == (KnownAttributeKind::LegacyViewFunction as u8)
+            || self.kind == (KnownAttributeKind::ViewFunction as u8)
     }
 }
 
