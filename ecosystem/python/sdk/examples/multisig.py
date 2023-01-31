@@ -1,3 +1,4 @@
+import subprocess
 import time
 
 from aptos_sdk.account import Account, RotationProofChallenge
@@ -225,3 +226,73 @@ if __name__ == '__main__':
 
     print(f"Auth key post-rotation: {auth_key}")
     print(f"First multisig address: {multisig_address}") # <:!:section_9
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_10
+    print("\n=== Publishing v1.0.0 ===")
+    packages_dir = "../../../../aptos-move/move-examples/upgrade_and_govern/"
+
+    command = f"aptos move compile --save-metadata " \
+              f"--package-dir {packages_dir}v1_0_0 " \
+              f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
+
+    print(f"Running aptos CLI command: {command}\n")
+    subprocess.run(command.split(), stdout=subprocess.PIPE)
+
+    build_path = f"{packages_dir}v1_0_0/build/UpgradeAndGovern/"
+
+    with open(f"{build_path}package-metadata.bcs", "rb") as f:
+        package_metadata = f.read()
+
+    with open(f"{build_path}bytecode_modules/parameters.mv", "rb") as f:
+        parameters_module = f.read()
+
+    payload = EntryFunction.natural(
+        module="0x1::code",
+        function="publish_package_txn",
+        ty_args=[],
+        args=[TransactionArgument(package_metadata, Serializer.to_bytes),
+              TransactionArgument(
+                [parameters_module],
+                Serializer.sequence_serializer(Serializer.to_bytes))])
+
+    raw_transaction = RawTransaction(
+        sender=deedee.address(),
+        sequence_number=1,
+        payload=TransactionPayload(payload),
+        max_gas_amount=rest_client.client_config.max_gas_amount,
+        gas_unit_price=rest_client.client_config.gas_unit_price,
+        expiration_timestamps_secs=(
+            int(time.time()) + rest_client.client_config.expiration_ttl),
+        chain_id=rest_client.chain_id)
+
+    alice_signature = alice.sign(raw_transaction.keyed())
+    chad_signature = chad.sign(raw_transaction.keyed())
+
+    signatures_map = [(alice.public_key(), alice_signature),
+                      (chad.public_key(),  chad_signature)]
+
+    multisig_signature = MultiEd25519Signature(multisig_public_key,
+                                               signatures_map)
+
+    authenticator = Authenticator(MultiEd25519Authenticator(
+        multisig_public_key, multisig_signature))
+
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
+
+    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    print(f"\nTransaction hash: {tx_hash}")
+
+    print(f"\nWaiting for client to update...\n")
+
+    time.sleep(2.5)
+
+    registry = rest_client.account_resource(
+        deedee.address(), '0x1::code::PackageRegistry')
+
+    package_name = registry['data']['packages'][0]['name']
+    upgrade_number = registry['data']['packages'][0]['upgrade_number']
+
+    print(f"Package name from on-chain registry: {package_name}")
+    print(f"On-chain upgrade number: {upgrade_number}") # <:!:section_10

@@ -207,3 +207,95 @@ First multisig address: 0xeec99e7567cceebcbdffdffd5248d5c6dde6e332ca7c1fa04d5cc4
 
 In other words, Deedee generated an account with a vanity address so that Alice, Bob, and Chad could use it as a multisig account.
 Then Deedee and the Alice/Bob/Chad group (under the authority of Bob and Chad) approved to rotate the vanity account's authentication key to the authentication key of the first multisig account.
+
+## Step 8: Perform Move package governance
+
+In this section the multisig vanity account will publish a simple package, upgrade it, then invoke a Move governance script.
+
+Here, [semantic versioning](https://semver.org/) is used to distinguish between versions `v1.0.0` and `v1.1.0` of the `UpgradeAndGovern` example package from the `move-examples` folder.
+
+### Step 8.1: Review v1.0.0
+
+Version 1.0.0 of the `UpgradeAndGovern` package contains a simple manifest and a single Move source file:
+
+```toml
+[package]
+name = 'UpgradeAndGovern'
+version = '1.0.0'
+
+[addresses]
+upgrade_and_govern = '_'
+
+[dependencies.AptosFramework]
+local = '../../../framework/aptos-framework'
+```
+
+```rust
+/// Mock on-chain governance parameters.
+module upgrade_and_govern::parameters {
+
+    struct GovernanceParameters has key {
+        parameter_1: u64,
+        parameter_2: u64
+    }
+
+    const GENESIS_PARAMETER_1: u64 = 123;
+    const GENESIS_PARAMETER_2: u64 = 456;
+
+    fun init_module(
+        upgrade_and_govern: &signer
+    ) {
+        let governance_parameters = GovernanceParameters{
+            parameter_1: GENESIS_PARAMETER_1,
+            parameter_2: GENESIS_PARAMETER_2};
+        move_to<GovernanceParameters>(
+            upgrade_and_govern, governance_parameters);
+    }
+
+    public fun get_parameters():
+    (u64, u64)
+    acquires GovernanceParameters {
+        let governance_parameters_ref =
+            borrow_global<GovernanceParameters>(@upgrade_and_govern);
+        (governance_parameters_ref.parameter_1,
+         governance_parameters_ref.parameter_2)
+    }
+
+}
+```
+
+As soon as the package is published, a `GovernanceParameters` resource is moved to the package account with the values specified by `GENESIS_PARAMETER_1` and `GENESIS_PARAMETER_2`.
+Then, the `get_parameters()` function can be used to look up the governance parameters, but note that in this version there is no setter function.
+The setter function will be added later.
+
+### Step 8.2: Publish v1.0.0
+
+Here, Alice and Chad will sign off on the publication transaction.
+
+All compilation and publication operations are handled via the ongoing Python script:
+
+```python
+:!: static/sdks/python/examples/multisig.py section_10
+```
+
+```zsh
+=== Publishing v1.0.0 ===
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xddc1b52bdb4b24771029e6781aac88ccc42d166a83659ea3a279a81aaa4ff0d5
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+
+Transaction hash: 0xd30797298c7bed5a302aad0b0ec7f3bc1a108234a64ed06f0a009e3db6f5e9fe
+
+Waiting for client to update...
+
+Package name from on-chain registry: UpgradeAndGovern
+On-chain upgrade number: 0
+```
+
+### Step 8.3: Upgrade to v1.1.0
+
+### Step 8.4: Invoke a governance script
