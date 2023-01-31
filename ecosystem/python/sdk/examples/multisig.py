@@ -1,6 +1,6 @@
 import time
 
-from aptos_sdk.account import Account
+from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
 from aptos_sdk.bcs import Serializer
@@ -17,7 +17,7 @@ from aptos_sdk.type_tag import TypeTag, StructTag
 
 from common import NODE_URL, FAUCET_URL
 
-wait_for_user = False
+wait_for_user = True
 
 if __name__ == '__main__':
 
@@ -163,20 +163,22 @@ if __name__ == '__main__':
     # :!:>section_8
     print("\n=== Signing rotation proof challenge ===")
 
-    sequence_number  = int(0).to_bytes(8, 'big') # 8 bytes, big endian.
-    originator       = deedee.address().address
-    current_auth_key = originator
-    new_public_key   = multisig_public_key.to_bytes()
+    rotation_proof_challenge = RotationProofChallenge(
+        sequence_number=0,
+        originator=deedee.address(),
+        current_auth_key=deedee.address(),
+        new_public_key=multisig_public_key.to_bytes())
 
-    rotation_proof_challenge = \
-        sequence_number + originator + current_auth_key + new_public_key
+    serializer = Serializer()
+    rotation_proof_challenge.serialize(serializer)
+    rotation_proof_challenge_serialized = serializer.output()
 
-    cap_rotate_key = deedee.sign(rotation_proof_challenge).data()
+    cap_rotate_key = deedee.sign(rotation_proof_challenge_serialized).data()
 
     cap_update_table = MultiEd25519Signature(
         multisig_public_key,
-        [(bob.public_key(),  bob.sign(rotation_proof_challenge)),
-         (chad.public_key(), chad.sign(rotation_proof_challenge))]
+        [(bob.public_key(),  bob.sign(rotation_proof_challenge_serialized)),
+         (chad.public_key(), chad.sign(rotation_proof_challenge_serialized))]
     ).to_bytes()
 
     cap_rotate_key_hex =   f"0x{cap_rotate_key.hex()}"
@@ -187,7 +189,7 @@ if __name__ == '__main__':
     if wait_for_user: input("\nPress Enter to continue...")
 
     # :!:>section_9
-    print("\n=== Rotating authentication key ===")
+    print("\n=== Submitting authentication key rotation transaction ===")
 
     from_scheme           = Authenticator.ED25519
     from_public_key_bytes = deedee.public_key().key.encode()
@@ -209,6 +211,17 @@ if __name__ == '__main__':
     signed_transaction = rest_client.create_bcs_signed_transaction(
         deedee, TransactionPayload(entry_function))
 
-    tx = rest_client.submit_bcs_transaction(signed_transaction)
+    auth_key = rest_client.account(deedee.address())['authentication_key']
 
-    print(f"https://explorer.aptoslabs.com/txn/{tx}") # <:!:section_9
+    print(f"Auth key pre-rotation: {auth_key}")
+
+    rest_client.submit_bcs_transaction(signed_transaction)
+
+    print(f"\nWaiting for client to update...")
+
+    time.sleep(2.5)
+
+    auth_key = rest_client.account(deedee.address())['authentication_key']
+
+    print(f"Auth key post-rotation: {auth_key}")
+    print(f"First multisig address: {multisig_address}") # <:!:section_9

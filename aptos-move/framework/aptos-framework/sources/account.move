@@ -68,6 +68,10 @@ module aptos_framework::account {
     /// Second, this struct is signed by the new public key that the account owner wants to rotate to, which proves
     /// knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
     /// context because they include the TXN's unique sequence number.
+    ///
+    /// Note that the challenge message to sign includes the `RotationProofChallenge` type info prepended to the
+    /// relevant bytes, such that serializing then signing only the below four struct fields will lead to rotation
+    /// failure. For the verification implementation, see `aptos-stdlib::ed25519::signature_verify_strict_t()`.
     struct RotationProofChallenge has copy, drop {
         sequence_number: u64, // the sequence number of the account whose key is being rotated
         originator: address, // the address of the account whose key is being rotated
