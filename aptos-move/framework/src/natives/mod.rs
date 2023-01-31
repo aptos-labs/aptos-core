@@ -130,7 +130,6 @@ impl GasParameters {
                     ark_g2_proj_add: 0.into(),
                     ark_g2_proj_sub: 0.into(),
                     ark_g2_proj_scalar_mul: 0.into(),
-                    ark_g2_affine_eq_proj: 0.into(),
                     ark_g2_proj_eq: 0.into(),
                     ark_g2_affine_to_prepared: 0.into(),
                     ark_g2_proj_to_prepared: 0.into(),
@@ -149,6 +148,7 @@ impl GasParameters {
                     ark_g1_proj_double: 0.into(),
                     ark_g2_proj_double: 0.into(),
                     blst_g2_affine_ser: 0.into(),
+                    ark_g2_affine_eq: 0.into(),
                 },
             },
             ed25519: ed25519::GasParameters {

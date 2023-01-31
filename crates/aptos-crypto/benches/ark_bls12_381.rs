@@ -27,7 +27,7 @@ use ark_ec::ProjectiveCurve;
 use ark_ff::{Field, One, UniformRand, Zero};
 use ark_ff::PrimeField;
 use std::ops::{Mul, Neg};
-use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective};
+use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
@@ -43,6 +43,10 @@ fn random_bytes(len: usize) -> Vec<u8> {
 fn rand_g1_affine() -> G1Affine {
     let k = Fr::rand(&mut test_rng());
     G1Affine::prime_subgroup_generator().mul(k).into_affine()
+}
+
+fn rand_g2_affine() -> G2Affine {
+    G2Projective::rand(&mut test_rng()).into_affine()
 }
 
 fn bench_group(c: &mut Criterion) {
@@ -290,7 +294,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("g1_affine_deserialize_comp", move |b| {
+    group.bench_function("g1_affine_deser_comp", move |b| {
         b.iter_with_setup(
             || {
                 let p = rand_g1_affine();
@@ -304,7 +308,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("g1_affine_deserialize_uncomp", move |b| {
+    group.bench_function("g1_affine_deser_uncomp", move |b| {
         b.iter_with_setup(
             || {
                 let p = rand_g1_affine();
@@ -526,6 +530,255 @@ fn bench_group(c: &mut Criterion) {
             }
         )
     });
+
+    group.bench_function("g2_affine_add", move |b| {
+        b.iter_with_setup(
+            || {
+                (rand_g2_affine(), rand_g2_affine())
+            },
+            |(p1, p2)| {
+                let _p3 = p1 + p2;
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_deser_comp", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = rand_g2_affine();
+                let mut buf = vec![];
+                p.serialize(&mut buf).unwrap();
+                buf
+            },
+            |buf| {
+                let _p = G2Affine::deserialize_uncompressed(buf.as_slice());
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_deser_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = rand_g2_affine();
+                let mut buf = vec![];
+                p.serialize_uncompressed(&mut buf).unwrap();
+                buf
+            },
+            |buf| {
+                let _p = G2Affine::deserialize_uncompressed(buf.as_slice());
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_eq", move |b| {
+        b.iter_with_setup(
+            || {
+                let p1 = rand_g2_affine();
+                let p2 = p1.clone();
+                (p1, p2)
+            },
+            |(p1, p2)| {
+                let _res = p1 == p2;
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_generator", move |b| {
+        b.iter(
+            || {
+                let _res = G2Affine::prime_subgroup_generator();
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_infinity", move |b| {
+        b.iter(
+            || {
+                let _res = G2Affine::zero();
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_scalar_mul_to_proj", move |b| {
+        b.iter_with_setup(
+            || {
+                (rand_g2_affine(), Fr::rand(&mut test_rng()))
+            },
+            |(p, k)| {
+                let _res = p.mul(k);
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_neg", move |b| {
+        b.iter_with_setup(
+            || {
+                rand_g2_affine()
+            },
+            |p| {
+                let _res = p.neg();
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_ser_comp", move |b| {
+        b.iter_with_setup(
+            || {
+                rand_g2_affine()
+            },
+            |p_affine| {
+                let mut buf = vec![];
+                p_affine.serialize(&mut buf).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_ser_uncomp", move |b| {
+        b.iter_with_setup(
+            || {
+                rand_g2_affine()
+            },
+            |p_affine| {
+                let mut buf = vec![];
+                p_affine.serialize_uncompressed(&mut buf).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_to_prepared", move |b| {
+        b.iter_with_setup(
+            || {
+                rand_g2_affine()
+            },
+            |p_affine| {
+                let _res = ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(p_affine);
+            }
+        )
+    });
+
+    group.bench_function("g2_affine_to_proj", move |b| {
+        b.iter_with_setup(
+            || {
+                rand_g2_affine()
+            },
+            |p_affine| {
+                let _res = p_affine.into_projective();
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_add", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = G2Projective::rand(&mut test_rng());
+                let q = G2Projective::rand(&mut test_rng());
+                (p, q)
+            },
+            |(p, q)| {
+                let _res = p + q;
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_double", move |b| {
+        b.iter_with_setup(
+            || {
+                G2Projective::rand(&mut test_rng())
+            },
+            |p| {
+                let _q = ProjectiveCurve::double(&p);
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_eq", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = G2Projective::rand(&mut test_rng());
+                let q = p.clone();
+                (p, q)
+            },
+            |(p, q)| {
+                let _res = p == q;
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_generator", move |b| {
+        b.iter(
+            || {
+                let _res = G2Projective::prime_subgroup_generator();
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_infinity", move |b| {
+        b.iter(
+            || {
+                let _res = G2Projective::zero();
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_neg", move |b| {
+        b.iter_with_setup(
+            || {
+                G2Projective::rand(&mut test_rng())
+            },
+            |p| {
+                let _q = p.neg();
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_scalar_mul", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = G2Projective::rand(&mut test_rng());
+                let k = Fr::rand(&mut test_rng()).into_repr();
+                (p, k)
+            },
+            |(p, k)| {
+                let _q = p.mul(k);
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_sub", move |b| {
+        b.iter_with_setup(
+            || {
+                let p = G2Projective::rand(&mut test_rng());
+                let q = G2Projective::rand(&mut test_rng());
+                (p, q)
+            },
+            |(p, q)| {
+                let _r = p - q;
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_to_affine", move |b| {
+        b.iter_with_setup(
+            || {
+                G2Projective::rand(&mut test_rng())
+            },
+            |p_proj| {
+                let _ = p_proj.into_affine();
+            }
+        )
+    });
+
+    group.bench_function("g2_proj_to_prepared", move |b| {
+        b.iter_with_setup(
+            || {
+                G2Projective::rand(&mut test_rng())
+            },
+            |p| {
+                let _res = ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(p);
+            }
+        )
+    });
+
 
     for num_pairs in [1,2,4,8] {
         group.bench_function(

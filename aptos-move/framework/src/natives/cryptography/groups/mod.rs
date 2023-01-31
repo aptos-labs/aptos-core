@@ -124,7 +124,7 @@ pub struct Bls12381GasParameters {
     pub ark_g2_affine_add: InternalGasPerArg,
     pub ark_g2_affine_deser_comp: InternalGasPerArg,
     pub ark_g2_affine_deser_uncomp: InternalGasPerArg,
-    pub ark_g2_affine_eq_proj: InternalGasPerArg,
+    pub ark_g2_affine_eq: InternalGasPerArg,
     pub ark_g2_affine_generator: InternalGasPerArg,
     pub ark_g2_affine_infinity: InternalGasPerArg,
     pub ark_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
