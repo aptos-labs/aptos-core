@@ -332,6 +332,23 @@ const config = {
               },
             ],
           },
+          {
+            type: "dropdown",
+            label: "Contribute",
+            position: "left",
+            items: [
+              {
+                label: "Contribute to Aptos",
+                type: "doc",
+                docId: "contribute/index",
+              },
+              {
+                label: "Community Highlights",
+                type: "doc",
+                docId: "contribute/highlights",
+              },
+            ],
+          },
         ],
       },
       footer: {

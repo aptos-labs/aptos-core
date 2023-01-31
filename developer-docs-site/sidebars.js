@@ -409,6 +409,15 @@ const sidebars = {
     "reference/glossary",
     "issues-and-workarounds",
   ],
+  contribSidebar: [
+    {
+      type: "html",
+      value: "Contribute to Aptos",
+      className: "sidebar-title",
+    },
+    "contribute/index",
+    "contribute/highlights",
+  ],
 };
 
 module.exports = sidebars;
