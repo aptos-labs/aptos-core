@@ -104,3 +104,8 @@ __pycache__
 # Profiler outputs
 aptos-move/aptos-vm-profiling/**/*.log
 aptos-move/aptos-vm-profiling/**/*.txt
+
+# replay-verify script outputs
+metadata-cache
+replay-verify/run_*
+!replay-verify/run_*.py
