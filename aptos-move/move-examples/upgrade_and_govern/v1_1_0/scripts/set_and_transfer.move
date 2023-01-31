@@ -2,8 +2,8 @@ script {
     use upgrade_and_govern::parameters;
     use upgrade_and_govern::transfer;
 
-    const PARAMETER_1: u64 = 200;
-    const PARAMETER_2: u64 = 300;
+    const PARAMETER_1: u64 = 300;
+    const PARAMETER_2: u64 = 200;
 
     fun main(
         upgrade_and_govern: &signer,

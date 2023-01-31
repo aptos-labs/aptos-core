@@ -10,6 +10,8 @@ from aptos_sdk.ed25519 import MultiEd25519PublicKey, MultiEd25519Signature
 from aptos_sdk.transactions import (
     EntryFunction,
     RawTransaction,
+    Script,
+    ScriptArgument,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload
@@ -49,8 +51,10 @@ if __name__ == '__main__':
 
     # :!:>section_2
     threshold = 2
+
     multisig_public_key = MultiEd25519PublicKey(
         [alice.public_key(), bob.public_key(), chad.public_key()], threshold)
+
     multisig_address = AccountAddress.from_multisig_schema(
         [alice.public_key(), bob.public_key(), chad.public_key()], threshold)
 
@@ -66,15 +70,19 @@ if __name__ == '__main__':
     bob_start      = 20_000_000
     chad_start     = 30_000_000
     multisig_start = 40_000_000
-    faucet_client.fund_account(alice.address() , alice_start)
+
+    faucet_client.fund_account(alice.address(), alice_start)
     alice_balance = rest_client.account_balance(alice.address())
     print(f"Alice's balance:  {alice_balance}")
-    faucet_client.fund_account(bob.address()   , bob_start)
+
+    faucet_client.fund_account(bob.address(), bob_start)
     bob_balance = rest_client.account_balance(bob.address())
     print(f"Bob's balance:    {bob_balance}")
-    faucet_client.fund_account(chad.address()  , chad_start)
+
+    faucet_client.fund_account(chad.address(), chad_start)
     chad_balance = rest_client.account_balance(chad.address())
     print(f"Chad's balance:   {chad_balance}")
+
     faucet_client.fund_account(multisig_address, multisig_start)
     multisig_balance = rest_client.account_balance(multisig_address)
     print(f"Multisig balance: {multisig_balance}") # <:!:section_3
@@ -113,7 +121,7 @@ if __name__ == '__main__':
 
     # :!:>section_5
     signatures_map = [(alice.public_key(), alice_signature),
-                      (bob.public_key(),   bob_signature)]
+                      (bob.public_key(), bob_signature)]
 
     multisig_signature = MultiEd25519Signature(multisig_public_key,
                                                signatures_map)
@@ -124,22 +132,28 @@ if __name__ == '__main__':
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
     print("\n=== Submitting transaction ===")
+
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+
     print(f"Transaction hash: {tx_hash}") # <:!:section_5
 
     if wait_for_user: input("\nPress Enter to continue...")
 
-    print(f"\nWaiting for client to update...")
+    print(f"\nWaiting for API server to update...")
     time.sleep(2.5)
 
     # :!:>section_6
     print("\n=== New account balances===")
+
     alice_balance = rest_client.account_balance(alice.address())
     print(f"Alice's balance:  {alice_balance}")
+
     bob_balance = rest_client.account_balance(bob.address())
     print(f"Bob's balance:    {bob_balance}")
+
     chad_balance = rest_client.account_balance(chad.address())
     print(f"Chad's balance:   {chad_balance}")
+
     multisig_balance = rest_client.account_balance(multisig_address)
     print(f"Multisig balance: {multisig_balance}") # <:!:section_6
 
@@ -149,12 +163,15 @@ if __name__ == '__main__':
     print("\n=== Funding vanity address ===")
 
     deedee = Account.generate()
+
     while (deedee.address().hex()[2:4] != 'dd'):
         deedee = Account.generate()
+
     print(f"Deedee's address:    {deedee.address()}")
     print(f"Deedee's public key: {deedee.public_key()}")
 
     deedee_start = 50_000_000
+
     faucet_client.fund_account(deedee.address(), deedee_start)
     deedee_balance = rest_client.account_balance(deedee.address())
     print(f"Deedee's balance: {deedee_balance}") # <:!:section_7
@@ -178,12 +195,13 @@ if __name__ == '__main__':
 
     cap_update_table = MultiEd25519Signature(
         multisig_public_key,
-        [(bob.public_key(),  bob.sign(rotation_proof_challenge_serialized)),
+        [(bob.public_key(), bob.sign(rotation_proof_challenge_serialized)),
          (chad.public_key(), chad.sign(rotation_proof_challenge_serialized))]
     ).to_bytes()
 
     cap_rotate_key_hex =   f"0x{cap_rotate_key.hex()}"
     cap_update_table_hex = f"0x{cap_update_table.hex()}"
+
     print(f"cap_rotate_key:   {cap_rotate_key_hex}")
     print(f"cap_update_table: {cap_update_table_hex}") # <:!:section_8
 
@@ -218,8 +236,7 @@ if __name__ == '__main__':
 
     rest_client.submit_bcs_transaction(signed_transaction)
 
-    print(f"\nWaiting for client to update...")
-
+    print(f"\nWaiting for API server to update...\n")
     time.sleep(2.5)
 
     auth_key = rest_client.account(deedee.address())['authentication_key']
@@ -231,6 +248,7 @@ if __name__ == '__main__':
 
     # :!:>section_10
     print("\n=== Publishing v1.0.0 ===")
+
     packages_dir = "../../../../aptos-move/move-examples/upgrade_and_govern/"
 
     command = f"aptos move compile --save-metadata " \
@@ -271,7 +289,7 @@ if __name__ == '__main__':
     chad_signature = chad.sign(raw_transaction.keyed())
 
     signatures_map = [(alice.public_key(), alice_signature),
-                      (chad.public_key(),  chad_signature)]
+                      (chad.public_key(), chad_signature)]
 
     multisig_signature = MultiEd25519Signature(multisig_public_key,
                                                signatures_map)
@@ -284,8 +302,7 @@ if __name__ == '__main__':
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
     print(f"\nTransaction hash: {tx_hash}")
 
-    print(f"\nWaiting for client to update...\n")
-
+    print(f"\nWaiting for API server to update...\n")
     time.sleep(2.5)
 
     registry = rest_client.account_resource(
@@ -296,3 +313,125 @@ if __name__ == '__main__':
 
     print(f"Package name from on-chain registry: {package_name}")
     print(f"On-chain upgrade number: {upgrade_number}") # <:!:section_10
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_11
+    print("\n=== Publishing v1.1.0 ===")
+
+    command = f"aptos move compile --save-metadata " \
+              f"--package-dir {packages_dir}v1_1_0 " \
+              f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
+
+    print(f"Running aptos CLI command: {command}\n")
+    subprocess.run(command.split(), stdout=subprocess.PIPE)
+
+    build_path = f"{packages_dir}v1_1_0/build/UpgradeAndGovern/"
+
+    with open(f"{build_path}package-metadata.bcs", "rb") as f:
+        package_metadata = f.read()
+
+    with open(f"{build_path}bytecode_modules/parameters.mv", "rb") as f:
+        parameters_module = f.read()
+
+    with open(f"{build_path}bytecode_modules/transfer.mv", "rb") as f:
+        transfer_module = f.read()
+
+    payload = EntryFunction.natural(
+        module="0x1::code",
+        function="publish_package_txn",
+        ty_args=[],
+        args=[TransactionArgument(package_metadata, Serializer.to_bytes),
+              TransactionArgument(
+                [parameters_module, transfer_module],
+                Serializer.sequence_serializer(Serializer.to_bytes))])
+
+    raw_transaction = RawTransaction(
+        sender=deedee.address(),
+        sequence_number=2,
+        payload=TransactionPayload(payload),
+        max_gas_amount=rest_client.client_config.max_gas_amount,
+        gas_unit_price=rest_client.client_config.gas_unit_price,
+        expiration_timestamps_secs=(
+            int(time.time()) + rest_client.client_config.expiration_ttl),
+        chain_id=rest_client.chain_id)
+
+    alice_signature = alice.sign(raw_transaction.keyed())
+    bob_signature = bob.sign(raw_transaction.keyed())
+    chad_signature = chad.sign(raw_transaction.keyed())
+
+    signatures_map = [(alice.public_key(), alice_signature),
+                      (bob.public_key(), bob_signature),
+                      (chad.public_key(), chad_signature)]
+
+    multisig_signature = MultiEd25519Signature(multisig_public_key,
+                                               signatures_map)
+
+    authenticator = Authenticator(MultiEd25519Authenticator(
+        multisig_public_key, multisig_signature))
+
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
+
+    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    print(f"\nTransaction hash: {tx_hash}")
+
+    print(f"\nWaiting for API server to update...\n")
+    time.sleep(2.5)
+
+    registry = rest_client.account_resource(
+        deedee.address(), '0x1::code::PackageRegistry')
+
+    upgrade_number = registry['data']['packages'][0]['upgrade_number']
+
+    print(f"On-chain upgrade number: {upgrade_number}") # <:!:section_11
+
+    if wait_for_user: input("\nPress Enter to continue...")
+
+    # :!:>section_12
+    print("\n=== Invoking Move script ===")
+
+    with open(f"{build_path}bytecode_scripts/main.mv", "rb") as f:
+        script_code = f.read()
+
+    payload = Script(
+        code=script_code,
+        ty_args=[],
+        args=[ScriptArgument(ScriptArgument.ADDRESS, alice.address()),
+              ScriptArgument(ScriptArgument.ADDRESS, bob.address())])
+
+    raw_transaction = RawTransaction(
+        sender=deedee.address(),
+        sequence_number=3,
+        payload=TransactionPayload(payload),
+        max_gas_amount=rest_client.client_config.max_gas_amount,
+        gas_unit_price=rest_client.client_config.gas_unit_price,
+        expiration_timestamps_secs=(
+            int(time.time()) + rest_client.client_config.expiration_ttl),
+        chain_id=rest_client.chain_id)
+
+    alice_signature = alice.sign(raw_transaction.keyed())
+    bob_signature = bob.sign(raw_transaction.keyed())
+
+    signatures_map = [(alice.public_key(), alice_signature),
+                      (bob.public_key(), bob_signature)]
+
+    multisig_signature = MultiEd25519Signature(multisig_public_key,
+                                               signatures_map)
+
+    authenticator = Authenticator(MultiEd25519Authenticator(
+        multisig_public_key, multisig_signature))
+
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
+
+    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    print(f"Transaction hash: {tx_hash}")
+
+    print(f"\nWaiting for API server to update...\n")
+    time.sleep(2.5)
+
+    alice_balance = rest_client.account_balance(alice.address())
+    print(f"Alice's balance: {alice_balance}")
+    bob_balance = rest_client.account_balance(bob.address())
+    print(f"Bob's balance:   {bob_balance}")
+    chad_balance = rest_client.account_balance(chad.address())
+    print(f"Chad's balance:  {chad_balance}") # <:!:section_12

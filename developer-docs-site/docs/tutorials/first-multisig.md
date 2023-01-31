@@ -29,7 +29,7 @@ Navigate to the Python SDK directory:
 cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/examples
 ```
 
-Run the [`multisig.py`](../../../ecosystem/python/sdk/examples/multisig.py) example:
+Run the `multisig.py` example:
 
 ```zsh
 python multisig.py
@@ -47,19 +47,19 @@ Fresh accounts are generated for each example run, but the output should resembl
 
 ```zsh
 === Account addresses ===
-Alice: 0xf07c9ef4c19a60462441e3cab0c823ef4c3e74fafa0504eab21a8f6ef623d3f4
-Bob:   0x7c7beba6f5d597c34d1fc8ab123d766382009482d1b7735e57a8b7ad657db0b3
-Chad:  0x5f587d416b661e115d14153dd711368f328d64a716525027be6ffce7e8239cd8
+Alice: 0xb6a60cf0af64152a0c305dc4dc93a0298c2b373782cd4880e10091acdcc7f315
+Bob:   0x41ac06b3faceef0d018b8e9be59b3e5cfee5a858e420f25b703b37a9af6ef718
+Chad:  0xf4f6c6949a903e3055ab05d220eea75d29ba56abb5a744476fd37214b3d11000
 
 === Authentication keys ===
-Alice: 0xf07c9ef4c19a60462441e3cab0c823ef4c3e74fafa0504eab21a8f6ef623d3f4
-Bob:   0x7c7beba6f5d597c34d1fc8ab123d766382009482d1b7735e57a8b7ad657db0b3
-Chad:  0x5f587d416b661e115d14153dd711368f328d64a716525027be6ffce7e8239cd8
+Alice: 0xb6a60cf0af64152a0c305dc4dc93a0298c2b373782cd4880e10091acdcc7f315
+Bob:   0x41ac06b3faceef0d018b8e9be59b3e5cfee5a858e420f25b703b37a9af6ef718
+Chad:  0xf4f6c6949a903e3055ab05d220eea75d29ba56abb5a744476fd37214b3d11000
 
 === Public keys ===
-Alice: 0xb2cf7ad02bcea120d25a5c1250235d759ec652c07967f38048988d7be41967d1
-Bob:   0xce1912ed9a6ecadca634112c60dba9e124884e9b67006a9e089df299824f3a23
-Chad:  0x6f941d55c33dcc3be13d34cc5d168dbf129ebf1208fa087dc4031160b2dd298a
+Alice: 0xe44af056dc3eea75d2c750ace58a8d5f5164a7f5fd52eda18c16d1c7cc355c59
+Bob:   0x554868a66a50a220f1b1065572406ec5ecb587b4bcab2e6434b022303b3094bc
+Chad:  0x2f414aecc6a7dd204ae81fd2e4f33934cdb00b80d1abe2a7568c85c43870373f
 ```
 
 For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
@@ -77,7 +77,7 @@ The multisig account address depends on the public keys of the single signers. (
 ```zsh
 === 2-of-3 Multisig account ===
 Account public key: 2-of-3 Multi-Ed25519 public key
-Account address:    0xeec99e7567cceebcbdffdffd5248d5c6dde6e332ca7c1fa04d5cc42f228fb3c2
+Account address:    0x12133ea3b7d710216881a01f9f9cd59693f6a9c81c88a200b90123fc11a2b984
 ```
 
 ## Step 5: Fund all accounts
@@ -113,8 +113,8 @@ Again, signatures vary for each example run:
 
 ```zsh
 === Individual signatures ===
-Alice: 0x0564f37fdff4d59fd75e604f2c895329004e3c36b4943f5760b8fd0632155f53b8ddbe7132e874bf22be5af32de212d6670bd07f285128c5148a33fee7fdcd0f
-Bob:   0x935e5aaab2bdfd3a8c97ad91491092a259203d7ff11cd5522af1bcdda8be0fb92712ba3eb65ba51cd03686570284e2cde78d1c6d2574eb39ce8b0662c9abe10a
+Alice: 0x8ccfbab4eb72fda7d10c4b9e4dfc4c2f34bcef78cccef4bb7e3d6666b778de70b9368429dcbd04e677c0e283a27cdfe72622aaf6e99d7dd7a002c9d8adac440c
+Bob:   0xfa9bec52c7d1c8b8a68691a1a08c7e41cb6f66037e717cc99c533c5e7059c527077749403968c2b673e5460dc23f34af34f88158535f26fd796f8b4d1f6ad104
 ```
 
 ### Step 6.2: Submit the multisig transaction
@@ -128,7 +128,7 @@ Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisi
 
 ```zsh
 === Submitting transaction ===
-Transaction hash: 0x2e41b00a8d32e1bbb9369aa3fa5b633c9f413adf3a2feb007bb1446551072358
+Transaction hash: 0xa0d59cb79b4a6ea5392381d2de1140adf9a779d3541d25d3a6d39ebf5ac4c2f5
 ```
 
 ### Step 6.3: Check balances
@@ -164,8 +164,8 @@ A fourth user, Deedee, wants her account address to start with `0xdd..`, so she 
 
 ```zsh
 === Funding vanity address ===
-Deedee's address:    0xddb819d72eca401eb4d5d894a3d72540fd1ee47fef2daa0867c9c05fc469925f
-Deedee's public key: 0x6b4cd64ae76b751c0ee3d475cb024b6774a45030a5a2a127ff9e01777cadffe9
+Deedee's address:    0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
+Deedee's public key: 0x54daba7e8c6e54217ff54cd2af3735099f5fb89dcbb22f5c0f670203b449b6c4
 Deedee's balance: 50000000
 ```
 
@@ -189,7 +189,7 @@ cap_update_table: 0x0702a4754c7653fe8e56e82af631a21db4a2672f01a5443bb86638aea035
 ### Step 7.3 Rotate the authentication key
 
 Now that the relevant signatures have been gathered, the authentication key rotation transaction can be submitted.
-After it executes, the rotated authentication key matches the address of the multisig account that sent octas to Chad:
+After it executes, the rotated authentication key matches the address of the first multisig account (the one that sent octas to Chad):
 
 ```python
 :!: static/sdks/python/examples/multisig.py section_9
@@ -218,7 +218,7 @@ Here, [semantic versioning](https://semver.org/) is used to distinguish between 
 
 Version 1.0.0 of the `UpgradeAndGovern` package contains a simple manifest and a single Move source file:
 
-```toml
+```toml title="Move.toml"
 [package]
 name = 'UpgradeAndGovern'
 version = '1.0.0'
@@ -230,7 +230,7 @@ upgrade_and_govern = '_'
 local = '../../../framework/aptos-framework'
 ```
 
-```rust
+```rust title="parameters.move"
 /// Mock on-chain governance parameters.
 module upgrade_and_govern::parameters {
 
@@ -280,7 +280,7 @@ All compilation and publication operations are handled via the ongoing Python sc
 
 ```zsh
 === Publishing v1.0.0 ===
-Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xddc1b52bdb4b24771029e6781aac88ccc42d166a83659ea3a279a81aaa4ff0d5
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
 
 Compiling, may take a little while to download git dependencies...
 INCLUDING DEPENDENCY AptosFramework
@@ -288,14 +288,156 @@ INCLUDING DEPENDENCY AptosStdlib
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING UpgradeAndGovern
 
-Transaction hash: 0xd30797298c7bed5a302aad0b0ec7f3bc1a108234a64ed06f0a009e3db6f5e9fe
+Transaction hash: 0xa71189804cf90ecbe8ec011a3e89feddc8910529a390ce6bdd311c3224ad9d48
 
-Waiting for client to update...
+Waiting for API server to update...
 
 Package name from on-chain registry: UpgradeAndGovern
 On-chain upgrade number: 0
 ```
 
-### Step 8.3: Upgrade to v1.1.0
+### Step 8.3: Review v1.1.0
 
-### Step 8.4: Invoke a governance script
+Version 1.1.0 of the `UpgradeAndGovern` packages adds the following parameter setter functionality at the end of `parameters.move`:
+
+```rust
+use std::signer::address_of;
+
+const E_INVALID_AUTHORITY: u64 = 0;
+
+public entry fun set_parameters(
+    upgrade_and_govern: &signer,
+    parameter_1: u64,
+    parameter_2: u64
+) acquires GovernanceParameters {
+    assert!(address_of(upgrade_and_govern) == @upgrade_and_govern,
+            E_INVALID_AUTHORITY);
+    let governance_parameters_ref_mut =
+        borrow_global_mut<GovernanceParameters>(@upgrade_and_govern);
+    governance_parameters_ref_mut.parameter_1 = parameter_1;
+    governance_parameters_ref_mut.parameter_2 = parameter_2;
+}
+```
+
+Here, the account that the package is published under has the authority to change the `GovernanceParameter` values from the genesis values set in `v1.0.0` to the new `parameter_1` and `parameter_2` values.
+
+There is also a new module, `transfer.move`:
+
+```rust
+/// Mock coin transfer module that invokes governance parameters.
+module upgrade_and_govern::transfer {
+
+    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::coin;
+    use upgrade_and_govern::parameters;
+
+    public entry fun transfer_octas(
+        from: &signer,
+        to_1: address,
+        to_2: address
+    ) {
+        let (amount_1, amount_2) = parameters::get_parameters();
+        coin::transfer<AptosCoin>(from, to_1, amount_1);
+        coin::transfer<AptosCoin>(from, to_2, amount_2);
+    }
+
+}
+```
+
+This module simply looks up the `GovernanceParamter` values, and treats them as the amount of octas to send to two recipients.
+
+Lastly, the manifest has been updated with the new version number:
+
+```toml
+[package]
+name = 'UpgradeAndGovern'
+version = '1.1.0'
+
+[addresses]
+upgrade_and_govern = '_'
+
+[dependencies.AptosFramework]
+local = '../../../framework/aptos-framework'
+```
+
+### Step 8.4: Upgrade to v1.1.0
+
+Alice, Bob, and Chad will all sign off on this publication transaction, which results in an upgrade.
+This process is almost identical to that of the `v1.0.0` publication:
+
+```python
+:!: static/sdks/python/examples/multisig.py section_11
+```
+
+```zsh
+=== Publishing v1.1.0 ===
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+
+Transaction hash: 0x874fdb388b64dfaccd27a8a12a85cab59237bf172ddca3f1c16e1f09db466a9f
+
+Waiting for API server to update...
+
+On-chain upgrade number: 1
+```
+
+Note that the on-chain upgrade number has been incremented by 1.
+
+### Step 8.6: Review the governance script
+
+`UpgradeAndGovern` version 1.1.0 also includes a Move script defined in `set_and_transfer.move`:
+
+```rust
+script {
+    use upgrade_and_govern::parameters;
+    use upgrade_and_govern::transfer;
+
+    const PARAMETER_1: u64 = 300;
+    const PARAMETER_2: u64 = 200;
+
+    fun main(
+        upgrade_and_govern: &signer,
+        to_1: address,
+        to_2: address
+    ) {
+        parameters::set_parameters(
+            upgrade_and_govern, PARAMETER_1, PARAMETER_2);
+        transfer::transfer_octas(upgrade_and_govern, to_1, to_2);
+    }
+}
+```
+
+This script calls the governance parameter setter using hard-coded values defined at the top of the script, then calls the octa transfer function.
+The script accepts as arguments the signature of the account hosting the package, as well as two target addresses for the transfer operation.
+
+Note that both functions in the script are `public entry fun` functions, which means that everything achieved in the script could be performed without a script.
+However, a non-script approach would require two transactions instead of just one, and would complicate the signature aggregation process:
+in practical terms, Alice, Bob, and/or Chad would likely have to send single-signer transaction signatures around through off-chain communication channels, and a "scribe" for the group would then have to submit a multisig `Authenticator` (for *each* `public entry fun` call).
+Hence in a non-script approach, extra operational complexity can quickly introduce opportunities for consensus failure.
+
+A Move script, by contrast, collapses multiple governance function calls into a single transaction, and moreover, Move scripts can be published in a public forum like GitHub so that all signatories can review the actual function calls before they sign the script.
+
+### Step 8.5: Execute the governance script
+
+Alice and Bob sign off on the Move script, which sends coins from the vanity multisig account to their personal accounts.
+Here, the amounts sent to each account are specified in the hard-coded values from the script.
+
+```python
+:!: static/sdks/python/examples/multisig.py section_12
+```
+
+```zsh
+=== Invoking Move script ===
+Transaction hash: 0x98f8e74a505f5905b0336d97df60f3dd8972214a154d4f5fa945c1335814a74b
+
+Waiting for API server to update...
+
+Alice's balance: 10000300
+Bob's balance:   20000200
+Chad's balance:  30000100
+```
