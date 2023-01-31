@@ -195,6 +195,6 @@ fn test_bad_view_attribute_in_compiled_module() {
 // We need this because we cannot produce a KnownAttribute directly.
 #[derive(Serialize)]
 pub struct FakeKnownAttribute {
-    kind: u16,
+    kind: u8,
     args: Vec<String>,
 }
