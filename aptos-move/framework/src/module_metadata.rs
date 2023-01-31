@@ -44,7 +44,7 @@ pub struct RuntimeModuleMetadataV1 {
 /// Enumeration of potentially known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct KnownAttribute {
-    kind: u16,
+    kind: u8,
     args: Vec<String>,
 }
 
@@ -57,13 +57,13 @@ pub enum KnownAttributeKind {
 impl KnownAttribute {
     pub fn view_function() -> Self {
         Self {
-            kind: KnownAttributeKind::ViewFunction as u16,
+            kind: KnownAttributeKind::ViewFunction as u8,
             args: vec![],
         }
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == (KnownAttributeKind::ViewFunction as u16)
+        self.kind == (KnownAttributeKind::ViewFunction as u8)
     }
 }
 
