@@ -811,6 +811,7 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
+            rest_with_profile_options: Default::default(),
         }
         .execute()
         .await

@@ -24,6 +24,7 @@ use aptos_rest_client::{aptos_api_types::HashValue, error::RestError, Client, Tr
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
+    on_chain_config::Features,
     transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
 };
 use async_trait::async_trait;
@@ -848,6 +849,14 @@ impl SaveFile {
     }
 }
 
+#[derive(Debug, Default, Parser)]
+pub struct RestWithProfileOptions {
+    #[clap(flatten)]
+    pub rest_options: RestOptions,
+    #[clap(flatten)]
+    pub profile_options: ProfileOptions,
+}
+
 /// Options specific to using the Rest endpoint
 #[derive(Debug, Default, Parser)]
 pub struct RestOptions {
@@ -951,8 +960,28 @@ impl MovePackageDir {
             .collect()
     }
 
-    pub fn bytecode_version_or_detault(&self) -> u32 {
-        self.bytecode_version.unwrap_or(5)
+    pub async fn bytecode_version_or_detault(
+        &self,
+        rest_options: &RestOptions,
+        profile_options: &ProfileOptions,
+    ) -> CliTypedResult<u32> {
+        let version = if let Some(version) = self.bytecode_version {
+            version
+        } else {
+            let client = rest_options.client(profile_options)?;
+            let features: Features = client
+                .get_resource(AccountAddress::ONE, "0x1::features::Features")
+                .await?
+                .into_inner();
+            if features.is_v6_bytecode_enabled() {
+                6
+            } else {
+                5
+            }
+        };
+
+        eprintln!("Using bytecode version {}", version);
+        Ok(version)
     }
 
     pub fn add_named_address(&mut self, key: String, value: String) {

@@ -7,11 +7,12 @@ use crate::{
     common::{
         types::{
             CliError, CliTypedResult, MovePackageDir, PoolAddressArgs, ProfileOptions,
-            PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
+            PromptOptions, RestOptions, RestWithProfileOptions, TransactionOptions,
+            TransactionSummary,
         },
         utils::prompt_yes_with_override,
     },
-    move_tool::{FrameworkPackageArgs, IncludedArtifacts},
+    move_tool::{set_bytecode_version, FrameworkPackageArgs, IncludedArtifacts},
     CliCommand, CliResult,
 };
 use aptos_cached_packages::aptos_stdlib;
@@ -455,7 +456,7 @@ pub struct SubmitVote {
     pub(crate) no: bool,
 
     /// Space separated list of pool addresses.
-    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, multiple_values = true, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) pool_addresses: Vec<AccountAddress>,
 
     #[clap(flatten)]
@@ -779,6 +780,9 @@ pub struct GenerateUpgradeProposal {
 
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+
+    #[clap(flatten)]
+    pub rest_with_profile_options: RestWithProfileOptions,
 }
 
 #[async_trait]
@@ -795,12 +799,21 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             output,
             testnet,
             next_execution_hash,
+            rest_with_profile_options,
         } = self;
+        let bytecode_version = move_options
+            .bytecode_version_or_detault(
+                &rest_with_profile_options.rest_options,
+                &rest_with_profile_options.profile_options,
+            )
+            .await?;
+        set_bytecode_version(Some(bytecode_version));
+
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;

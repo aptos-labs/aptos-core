@@ -13,7 +13,7 @@ use crate::{
         types::{
             load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
             MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            RestWithProfileOptions, TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -109,7 +109,7 @@ impl MoveTool {
 
 const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
 
-fn set_bytecode_version(version: Option<u32>) {
+pub(crate) fn set_bytecode_version(version: Option<u32>) {
     // Note: this is a bit of a hack to get the compiler emit bytecode with the right
     //       version. In the future, we should add an option to the Move package system
     //       that would allow us to configure this directly instead of relying on
@@ -276,6 +276,8 @@ pub struct CompilePackage {
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+    #[clap[flatten]]
+    pub rest_with_profile_options: RestWithProfileOptions,
 }
 
 #[async_trait]
@@ -294,7 +296,12 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .build_options(
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
-                    self.move_options.bytecode_version_or_detault(),
+                    self.move_options
+                        .bytecode_version_or_detault(
+                            &self.rest_with_profile_options.rest_options,
+                            &self.rest_with_profile_options.profile_options,
+                        )
+                        .await?,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -322,7 +329,7 @@ pub struct TestPackage {
     pub filter: Option<String>,
 
     /// A boolean value to skip warnings.
-    #[clap(long, short = 'w')]
+    #[clap(long)]
     pub ignore_compile_warnings: bool,
 
     #[clap(flatten)]
@@ -453,6 +460,9 @@ pub struct DocumentPackage {
 
     #[clap(flatten)]
     docgen_options: DocgenOptions,
+
+    #[clap(flatten)]
+    rest_with_profile_options: RestWithProfileOptions,
 }
 
 #[async_trait]
@@ -466,6 +476,7 @@ impl CliCommand<&'static str> for DocumentPackage {
         let DocumentPackage {
             move_options,
             docgen_options,
+            rest_with_profile_options,
         } = self;
         let build_options = BuildOptions {
             with_srcs: false,
@@ -477,7 +488,14 @@ impl CliCommand<&'static str> for DocumentPackage {
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
-            bytecode_version: Some(move_options.bytecode_version_or_detault()),
+            bytecode_version: Some(
+                move_options
+                    .bytecode_version_or_detault(
+                        &rest_with_profile_options.rest_options,
+                        &rest_with_profile_options.profile_options,
+                    )
+                    .await?,
+            ),
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -610,7 +628,12 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options
+                .bytecode_version_or_detault(
+                    &txn_options.rest_options,
+                    &txn_options.profile_options,
+                )
+                .await?,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -697,7 +720,12 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options
+                .bytecode_version_or_detault(
+                    &txn_options.rest_options,
+                    &txn_options.profile_options,
+                )
+                .await?,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -822,11 +850,17 @@ impl CliCommand<&'static str> for VerifyPackage {
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            bytecode_version: Some(self.move_options.bytecode_version_or_detault()),
+            bytecode_version: Some(
+                self.move_options
+                    .bytecode_version_or_detault(&self.rest_options, &self.profile_options)
+                    .await?,
+            ),
             ..self.included_artifacts.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.bytecode_version_or_detault(),
+                self.move_options
+                    .bytecode_version_or_detault(&self.rest_options, &self.profile_options)
+                    .await?,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)

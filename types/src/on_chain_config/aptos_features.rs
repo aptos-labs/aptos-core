@@ -47,6 +47,10 @@ impl Features {
         byte_index < self.features.len() && (self.features[byte_index] & bit_mask != 0)
     }
 
+    pub fn is_v6_bytecode_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6)
+    }
+
     pub fn are_resource_groups_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
