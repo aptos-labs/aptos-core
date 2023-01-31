@@ -1,0 +1,9 @@
+[package]
+name = "ArgumentExample"
+version = "0.0.0"
+
+[addresses]
+deploy_address = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

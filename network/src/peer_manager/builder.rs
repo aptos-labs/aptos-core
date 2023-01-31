@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::storage::PeersAndMetadata,
     counters,
     counters::NETWORK_RATE_LIMIT_METRICS,
     noise::{stream::NoiseStream, HandshakeAuthMode},
@@ -73,7 +73,7 @@ struct PeerManagerContext {
     connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     trusted_peers: Arc<RwLock<PeerSet>>,
     upstream_handlers:
         HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
@@ -97,7 +97,7 @@ impl PeerManagerContext {
         connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         upstream_handlers: HashMap<
             ProtocolId,
@@ -120,7 +120,7 @@ impl PeerManagerContext {
             connection_reqs_tx,
             connection_reqs_rx,
 
-            peer_metadata_storage,
+            peers_and_metadata,
             trusted_peers,
             upstream_handlers,
             connection_event_handlers,
@@ -182,7 +182,7 @@ impl PeerManagerBuilder {
         time_service: TimeService,
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
@@ -220,7 +220,7 @@ impl PeerManagerBuilder {
                 pm_reqs_rx,
                 connection_reqs_tx,
                 connection_reqs_rx,
-                peer_metadata_storage,
+                peers_and_metadata,
                 trusted_peers,
                 HashMap::new(),
                 Vec::new(),
@@ -366,7 +366,7 @@ impl PeerManagerBuilder {
             // TODO(philiphayes): peer manager should take `Vec<NetworkAddress>`
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
-            pm_context.peer_metadata_storage,
+            pm_context.peers_and_metadata,
             pm_context.trusted_peers,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,

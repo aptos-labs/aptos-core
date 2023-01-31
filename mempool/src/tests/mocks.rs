@@ -18,7 +18,7 @@ use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeerMetadataStorage,
+        storage::PeersAndMetadata,
     },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -129,13 +129,13 @@ impl MockSharedMempool {
                 on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
             })
             .unwrap();
-        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
+        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
         let network_senders = hashmap! {NetworkId::Validator => network_sender};
         let network_client = NetworkClient::new(
             vec![MempoolDirectSend],
             vec![],
             network_senders,
-            peer_metadata_storage,
+            peers_and_metadata,
         );
         let network_and_events = hashmap! {NetworkId::Validator => network_events};
         let network_service_events = NetworkServiceEvents::new(network_and_events);

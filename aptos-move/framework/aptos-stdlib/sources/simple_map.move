@@ -23,17 +23,17 @@ module aptos_std::simple_map {
         value: Value,
     }
 
-    public fun length<Key: store, Value: store>(map: &SimpleMap<Key, Value>): u64 {
+    public fun length<Key, Value>(map: &SimpleMap<Key, Value>): u64 {
         vector::length(&map.data)
     }
 
-    public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
+    public fun create<Key, Value>(): SimpleMap<Key, Value> {
         SimpleMap {
             data: vector::empty(),
         }
     }
 
-    public fun borrow<Key: store, Value: store>(
+    public fun borrow<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): &Value {
@@ -43,7 +43,7 @@ module aptos_std::simple_map {
         &vector::borrow(&map.data, idx).value
     }
 
-    public fun borrow_mut<Key: store, Value: store>(
+    public fun borrow_mut<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): &mut Value {
@@ -53,7 +53,7 @@ module aptos_std::simple_map {
         &mut vector::borrow_mut(&mut map.data, idx).value
     }
 
-    public fun contains_key<Key: store, Value: store>(
+    public fun contains_key<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): bool {
@@ -61,12 +61,12 @@ module aptos_std::simple_map {
         option::is_some(&maybe_idx)
     }
 
-    public fun destroy_empty<Key: store, Value: store>(map: SimpleMap<Key, Value>) {
+    public fun destroy_empty<Key, Value>(map: SimpleMap<Key, Value>) {
         let SimpleMap { data } = map;
         vector::destroy_empty(data);
     }
 
-    public fun add<Key: store, Value: store>(
+    public fun add<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: Key,
         value: Value,
@@ -77,7 +77,7 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
-    public fun remove<Key: store, Value: store>(
+    public fun remove<Key, Value>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): (Key, Value) {
@@ -88,7 +88,7 @@ module aptos_std::simple_map {
         (key, value)
     }
 
-    fun find<Key: store, Value: store>(
+    fun find<Key, Value>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
     ): option::Option<u64>{
@@ -103,6 +103,93 @@ module aptos_std::simple_map {
         };
         option::none<u64>()
     }
+
+    /// Apply the function to each key-value pair in the map, consuming it.
+    public inline fun for_each<Key, Value>(map: SimpleMap<Key, Value>, f: |Key, Value|) {
+        let SimpleMap {data} = map;
+        vector::for_each(data, |elem| {
+            let Element {key, value} = elem;
+            f(key, value)
+        })
+    }
+
+    /// Apply the function to a reference of each key-value pair in the map.
+    public inline fun for_each_ref<Key, Value>(map: &SimpleMap<Key, Value>, f: |&Key, &Value|) {
+        vector::for_each_ref(&map.data, |elem| {
+            let e : &Element<Key, Value> = elem;
+            f(&e.key, &e.value)
+        })
+    }
+
+    /// Apply the function to a reference of each key-value pair in the map.
+    public inline fun for_each_mut<Key, Value>(map: &mut SimpleMap<Key, Value>, f: |&Key, &mut Value|) {
+        vector::for_each_mut(&mut map.data, |elem| {
+            let e : &mut Element<Key, Value> = elem;
+            f(&mut e.key, &mut e.value)
+        })
+    }
+
+    /// Fold the function over the key-value pairs of the map.
+    public inline fun fold<Accumulator, Key, Value>(
+        map: SimpleMap<Key, Value>,
+        init: Accumulator,
+        f: |Accumulator,Key,Value|Accumulator
+    ): Accumulator {
+        for_each(map, |key, value| init = f(init, key, value));
+        init
+    }
+
+    /// Map the function over the key-value pairs of the map.
+    public inline fun map<Key, Value1, Value2>(
+        map: SimpleMap<Key, Value1>,
+        f: |Value1|Value2
+    ): SimpleMap<Key, Value2> {
+        let data = vector::empty();
+        for_each(map, |key, value| vector::push_back(&mut data, Element {key, value: f(value)}));
+        SimpleMap {data}
+    }
+
+    /// Filter entries in the map.
+    public inline fun filter<Key:drop, Value:drop>(
+        map: SimpleMap<Key, Value>,
+        p: |&Value|bool
+    ): SimpleMap<Key, Value> {
+        let data = vector::empty();
+        for_each(map, |key, value| {
+            if (p(&value)) {
+                vector::push_back(&mut data, Element {key, value});
+            }
+        });
+        SimpleMap {data}
+    }
+
+    /// Return true if any key-value pair in the map satisfies the predicate.
+    public inline fun any<Key, Value>(
+        map: &SimpleMap<Key, Value>,
+        p: |&Key, &Value|bool
+    ): bool {
+        let SimpleMap {data} = map;
+        let result = false;
+        let i = 0;
+        while (i < vector::length(data)) {
+            let Element {key, value} = vector::borrow(data, i);
+            result = p(key, value);
+            if (result) {
+                break
+            };
+            i = i + 1
+        };
+        result
+    }
+
+    /// Return true if all key-value pairs in the map satisfies the predicate.
+    public inline fun all<Key, Value>(
+        map: &SimpleMap<Key, Value>,
+        p: |&Key, &Value|bool
+    ): bool {
+        !any(map, |k, v| !p(k, v))
+    }
+
 
     #[test]
     public fun add_remove_many() {
@@ -157,5 +244,81 @@ module aptos_std::simple_map {
         remove(&mut map, &3);
 
         destroy_empty(map);
+    }
+
+    #[test_only]
+    fun make(k1: u64, v1: u64, k2: u64, v2: u64): SimpleMap<u64, u64> {
+        let m = create();
+        add(&mut m, k1, v1);
+        add(&mut m, k2, v2);
+        m
+    }
+
+    #[test]
+    fun test_for_each() {
+        let m = make(1, 4, 2, 5);
+        let s = 0;
+        for_each(m, |x, y| {
+            s = s + x + y;
+        });
+        assert!(s == 12, 0)
+    }
+
+    #[test]
+    fun test_for_each_ref() {
+        let m = make(1, 4, 2, 5);
+        let s = 0;
+        for_each_ref(&m, |x, y| {
+            s = s + *x + *y;
+        });
+        assert!(s == 12, 0)
+    }
+
+    #[test]
+    fun test_for_each_mut() {
+        let m = make(1, 4, 2, 5);
+        for_each_mut(&mut m, |_key, val| {
+            let val : &mut u64 = val;
+            *val = *val + 1
+        });
+        assert!(*borrow(&m, &1) == 5, 1)
+    }
+
+    #[test]
+    fun test_fold() {
+        let m = make(1, 4, 2, 5);
+        let r = fold(m, 0, |accu, key, val| {
+            accu + key + val
+        });
+        assert!(r == 12, 0);
+    }
+
+    #[test]
+    fun test_map() {
+        let m = make(1, 4, 2, 5);
+        let r = map(m, |val| val + 1);
+        assert!(*borrow(&r, &1) == 5, 1)
+    }
+
+    #[test]
+    fun test_filter() {
+        let m = make(1, 4, 2, 5);
+        let r = filter(m, |val| *val > 4);
+        assert!(length(&r) == 1, 1);
+        assert!(*borrow(&r, &2) == 5, 1)
+    }
+
+    #[test]
+    fun test_any() {
+        let m = make(1, 4, 2, 5);
+        let r = any(&m, |_k, v| *v > 4);
+        assert!(r, 1)
+    }
+
+    #[test]
+    fun test_all() {
+        let m = make(1, 4, 2, 5);
+        let r = all(&m, |_k, v| *v > 4);
+        assert!(!r, 1)
     }
 }

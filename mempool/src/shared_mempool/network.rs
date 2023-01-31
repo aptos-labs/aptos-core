@@ -18,11 +18,11 @@ use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::PeerNetworkId,
 };
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{error::Error, interface::NetworkClientInterface, storage::LockingHashMap},
+    application::{error::Error, interface::NetworkClientInterface},
     transport::ConnectionMetadata,
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -32,7 +32,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{hash_map::RandomState, BTreeMap, BTreeSet},
+    collections::{hash_map::RandomState, BTreeMap, BTreeSet, HashMap},
     hash::{BuildHasher, Hasher},
     ops::Add,
     sync::Arc,
@@ -79,7 +79,7 @@ pub enum BroadcastError {
 #[derive(Clone, Debug)]
 pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     network_client: NetworkClient,
-    sync_states: Arc<LockingHashMap<PeerNetworkId, PeerSyncState>>,
+    sync_states: Arc<RwLock<HashMap<PeerNetworkId, PeerSyncState>>>,
     prioritized_peers: Arc<Mutex<Vec<PeerNetworkId>>>,
     role: RoleType,
     mempool_config: MempoolConfig,
@@ -94,7 +94,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> MempoolNetworkInterface<NetworkClient> {
         Self {
             network_client,
-            sync_states: Arc::new(LockingHashMap::new()),
+            sync_states: Arc::new(RwLock::new(HashMap::new())),
             prioritized_peers: Arc::new(Mutex::new(Vec::new())),
             role,
             mempool_config,
@@ -104,7 +104,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
     /// Add a peer to sync states, and returns `false` if the peer already is in storage
     pub fn add_peer(&self, peer: PeerNetworkId, metadata: ConnectionMetadata) -> bool {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
         let is_new_peer = !sync_states.contains_key(&peer);
         if self.is_upstream_peer(&peer, Some(&metadata)) {
             // If we have a new peer, let's insert new data, otherwise, let's just update the current state
@@ -128,7 +128,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     /// Disables a peer if it can be restarted, otherwise removes it
     pub fn disable_peer(&self, peer: PeerNetworkId) {
         // All other nodes have their state immediately restarted anyways, so let's free them
-        if self.sync_states.write_lock().remove(&peer).is_some() {
+        if self.sync_states.write().remove(&peer).is_some() {
             counters::active_upstream_peers(&peer.network_id()).dec();
         }
 
@@ -144,8 +144,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         // Retrieve just what's needed for the peer ordering
         let peers: Vec<_> = {
-            let peer_states = self.sync_states.read_all();
-            peer_states
+            self.sync_states
+                .read()
                 .iter()
                 .map(|(peer, state)| (*peer, state.metadata.role))
                 .collect()
@@ -193,7 +193,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         backoff: bool,
         timestamp: SystemTime,
     ) {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
             state
@@ -245,7 +245,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     }
 
     pub fn is_backoff_mode(&self, peer: &PeerNetworkId) -> bool {
-        if let Some(state) = self.sync_states.write_lock().get(peer) {
+        if let Some(state) = self.sync_states.write().get(peer) {
             state.broadcast_info.backoff_mode
         } else {
             // If we don't have sync state, we shouldn't backoff
@@ -280,7 +280,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         scheduled_backoff: bool,
         smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     ) -> Result<(MultiBatchId, Vec<SignedTransaction>, Option<&str>), BroadcastError> {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
         // If we don't have any info about the node, we shouldn't broadcast to it
         let state = sync_states
             .get_mut(&peer)
@@ -416,7 +416,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         batch_id: MultiBatchId,
         send_time: SystemTime,
     ) -> Result<usize, BroadcastError> {
-        let mut sync_states = self.sync_states.write_lock();
+        let mut sync_states = self.sync_states.write();
         let state = sync_states
             .get_mut(&peer)
             .ok_or(BroadcastError::PeerNotFound(peer))?;
@@ -478,7 +478,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     }
 
     pub fn sync_states_exists(&self, peer: &PeerNetworkId) -> bool {
-        self.sync_states.read(peer).is_some()
+        self.sync_states.read().get(peer).is_some()
     }
 }
 

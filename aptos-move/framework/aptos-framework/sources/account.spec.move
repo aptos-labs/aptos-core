@@ -4,13 +4,6 @@ spec aptos_framework::account {
         pragma aborts_if_is_strict;
     }
 
-    /// Convert address to singer and return.
-    spec create_signer(addr: address): signer {
-        pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] signer::address_of(result) == addr;
-    }
-
     /// Only the address `@aptos_framework` can call.
     /// OriginatingAddress does not exist under `@aptos_framework` before the call.
     spec initialize(aptos_framework: &signer) {
@@ -215,7 +208,12 @@ spec aptos_framework::account {
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
 
     spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
-        pragma verify = false;
+        let source_addr = signer::address_of(source);
+        let resource_addr = spec_create_resource_address(source_addr, seed);
+
+        aborts_if len(ZERO_AUTH_KEY) != 32;
+        include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
+        include !exists_at(resource_addr) ==> CreateAccount {addr: resource_addr};
     }
 
     /// Check if the bytes of the new address is 32.
@@ -269,5 +267,12 @@ spec aptos_framework::account {
     spec create_signer_with_capability(capability: &SignerCapability): signer {
         let addr = capability.account;
         ensures signer::address_of(result) == addr;
+    }
+
+    spec schema CreateResourceAccountAbortsIf {
+        resource_addr: address;
+        let account = global<Account>(resource_addr);
+        aborts_if len(account.signer_capability_offer.for.vec) != 0;
+        aborts_if account.sequence_number != 0;
     }
 }

@@ -44,7 +44,7 @@ evaluator_args:
       txn_expiration_time_secs: 30
       duration: 10
       invalid_tx: 0
-      transaction_type: P2P
+      transaction_type: coin_transfer
     mint_args:
       mint_key:
         key: {{ .Values.node_health_checker.mint_key }}

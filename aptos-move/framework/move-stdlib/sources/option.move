@@ -244,6 +244,66 @@ module std::option {
         aborts_if false;
         ensures result == t.vec;
     }
+    /// Apply the function to the optional element, consuming it. Does nothing if no value present.
+    public inline fun for_each<Element>(o: Option<Element>, f: |Element|) {
+        if (is_some(&o)) {
+            f(destroy_some(o))
+        } else {
+            destroy_none(o)
+        }
+    }
+
+    /// Apply the function to the optional element reference. Does nothing if no value present.
+    public inline fun for_each_ref<Element>(o: &Option<Element>, f: |&Element|) {
+        if (is_some(o)) {
+            f(borrow(o))
+        }
+    }
+
+    /// Apply the function to the optional element reference. Does nothing if no value present.
+    public inline fun for_each_mut<Element>(o: &mut Option<Element>, f: |&mut Element|) {
+        if (is_some(o)) {
+            f(borrow_mut(o))
+        }
+    }
+
+    /// Folds the function over the optional element.
+    public inline fun fold<Accumulator, Element>(
+        o: Option<Element>,
+        init: Accumulator,
+        f: |Accumulator,Element|Accumulator
+    ): Accumulator {
+        if (is_some(&o)) {
+            f(init, destroy_some(o))
+        } else {
+            destroy_none(o);
+            init
+        }
+    }
+
+    /// Maps the content of an option.
+    public inline fun map<Element, OtherElement>(o: Option<Element>, f: |Element|OtherElement): Option<OtherElement> {
+        if (is_some(&o)) {
+            some(f(destroy_some(o)))
+        } else {
+            destroy_none(o);
+            none()
+        }
+    }
+
+    /// Filters the content of an option
+    public inline fun filter<Element:drop>(o: Option<Element>, f: |&Element|bool): Option<Element> {
+        if (is_some(&o) && f(borrow(&o))) {
+            o
+        } else {
+            none()
+        }
+    }
+
+    /// Returns true if the option contains an element which satisfies predicate.
+    public inline fun any<Element>(o: &Option<Element>, p: |&Element|bool): bool {
+        is_some(o) && p(borrow(o))
+    }
 
     spec module {} // switch documentation context back to module level
 

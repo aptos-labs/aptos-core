@@ -1,9 +1,9 @@
 ---
-title: "Use CLI for Configuration"
+title: "Using the Aptos CLI"
 id: "use-aptos-cli"
 ---
 
-# Use Aptos CLI for Configuration
+# Using the Aptos CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To install the CLI, see [Install Aptos CLI](install-aptos-cli).
 
