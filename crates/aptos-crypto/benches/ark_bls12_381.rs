@@ -77,6 +77,39 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
+    group.bench_function("fr_deserialize_invalid_4_bytes", move |b| {
+        b.iter_with_setup(
+            || {
+                vec![0xff_u8; 4]
+            },
+            |buf| {
+                let _k = Fr::deserialize_uncompressed(buf.as_slice());
+            }
+        )
+    });
+
+    group.bench_function("fr_deserialize_invalid_4000_bytes", move |b| {
+        b.iter_with_setup(
+            || {
+                vec![0xff_u8; 4000]
+            },
+            |buf| {
+                let _k = Fr::deserialize_uncompressed(buf.as_slice());
+            }
+        )
+    });
+
+    group.bench_function("fr_deserialize_invalid_4000000_bytes", move |b| {
+        b.iter_with_setup(
+            || {
+                vec![0xff_u8; 4000000]
+            },
+            |buf| {
+                let _k = Fr::deserialize_uncompressed(buf.as_slice());
+            }
+        )
+    });
+
     group.bench_function("fr_div", move |b| {
         b.iter_with_setup(
             || {

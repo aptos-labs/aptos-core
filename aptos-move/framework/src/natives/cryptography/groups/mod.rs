@@ -71,6 +71,10 @@ pub mod abort_codes {
 
 #[derive(Debug, Clone)]
 pub struct Bls12381GasParameters {
+    pub blst_g1_msm_base: InternalGasPerArg,
+    pub blst_g1_msm_per_pair: InternalGasPerArg,
+    pub blst_g2_msm_base: InternalGasPerArg,
+    pub blst_g2_msm_per_pair: InternalGasPerArg,
     pub blst_hash_to_g1_proj_base: InternalGasPerArg,
     pub blst_hash_to_g1_proj_per_byte: InternalGasPerByte,
     pub blst_hash_to_g2_proj_base: InternalGasPerArg,
@@ -1337,7 +1341,8 @@ fn element_multi_scalar_mul_internal(
             let ark_g1_proj = ark_g1_affine.into_projective();
             let new_handle = store_bls12_381_g1!(context, ark_g1_proj);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_scalar_mul + gas_params.bls12_381.ark_g1_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
+                gas_params.bls12_381.blst_g1_msm_per_pair * NumArgs::from(num_elements as u64)
+                    + gas_params.bls12_381.blst_g1_msm_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1363,7 +1368,8 @@ fn element_multi_scalar_mul_internal(
             let ark_g2_proj = ark_g2_affine.into_projective();
             let new_handle = store_bls12_381_g2!(context, ark_g2_proj);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_scalar_mul + gas_params.bls12_381.ark_g2_proj_add) * NumArgs::from(num_elements as u64), //TODO: update gas cost.
+                gas_params.bls12_381.blst_g2_msm_per_pair * NumArgs::from(num_elements as u64)
+                    + gas_params.bls12_381.blst_g2_msm_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1518,7 +1524,7 @@ fn pairing_product_internal(
             let new_element = ark_bls12_381::Bls12_381::product_of_pairings(input_pairs.as_slice());
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_affine_to_prepared + gas_params.bls12_381.ark_g2_affine_to_prepared + gas_params.bls12_381.ark_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.bls12_381.ark_pairing_product_base * NumArgs::one(),
+                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_to_prepared + gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_to_prepared + gas_params.bls12_381.ark_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.bls12_381.ark_pairing_product_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }

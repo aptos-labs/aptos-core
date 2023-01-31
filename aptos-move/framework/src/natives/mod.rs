@@ -75,6 +75,10 @@ impl GasParameters {
             },
             groups: groups::GasParameters {
                 bls12_381: Bls12381GasParameters {
+                    blst_g1_msm_base: 0.into(),
+                    blst_g1_msm_per_pair: 0.into(),
+                    blst_g2_msm_base: 0.into(),
+                    blst_g2_msm_per_pair: 0.into(),
                     blst_hash_to_g1_proj_base: 0.into(),
                     blst_hash_to_g1_proj_per_byte: 0.into(),
                     blst_hash_to_g2_proj_base: 0.into(),
