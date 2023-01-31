@@ -1,6 +1,5 @@
 import argparse
 from glob import glob
-from math import log2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,32 +41,21 @@ def rand_linear_solution():
     sol, residuals, _, _ = np.linalg.lstsq(A, y_values, rcond=None)
     return x_values, y_values, sol, residuals
 
-def rand_q_over_log_q_solution():
-    data_points = rand_dataset()
-    x_values, y_values = zip(*data_points)
-    x_values = [x/log2(x) for x in x_values]
-    x_values = np.array(x_values)
-    y_values = np.array(y_values)
-    A = np.vstack([x_values, np.ones(len(x_values))]).T
-    sol, residuals, _, _ = np.linalg.lstsq(A, y_values, rcond=None)
-    return x_values, y_values, sol, residuals
-
 num_rounds = 1000
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('model', choices=['linear', 'q_over_log_q'])
     parser.add_argument('action', choices=['show_rand_sol', '1000_sample_avg_residual'])
     args = parser.parse_args()
     if args.action=='show_rand_sol':
-        x, y, sol, residuals = globals()[f'rand_{args.model}_solution']()
+        x, y, sol, residuals = globals()[f'rand_linear_solution']()
         m,c = sol
         plt.plot(x, y, 'o', label='Original data', markersize=10)
         plt.plot(x, m*x + c, 'r', label='Fitted line')
         plt.legend()
         plt.show(block=True)
     elif args.action=='1000_sample_avg_residual':
-        avg = sum(globals()[f'rand_{args.model}_solution']()[3] for _ in range(num_rounds))/num_rounds
+        avg = sum(globals()[f'rand_linear_solution']()[3] for _ in range(num_rounds))/num_rounds
         print(avg)
     else:
         assert False
