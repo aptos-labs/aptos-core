@@ -7,6 +7,7 @@ use crate::{
         victoria_metrics_api::Client as MetricsClient,
     },
     types::common::EpochedPeerStore,
+    MetricsEndpointsConfig,
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
@@ -14,11 +15,44 @@ use aptos_types::{chain_id::ChainId, PeerId};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, TokenData, Validation};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     convert::Infallible,
     sync::Arc,
 };
 use warp::Filter;
+
+/// Container that holds various metric clients used for sending metrics from
+/// various sources to appropriate backends.
+#[derive(Clone, Default)]
+pub struct GroupedMetricsClients {
+    /// Client(s) for exporting metrics of the running telemetry service
+    pub telemetry_service_metrics_clients: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated known nodes
+    pub ingest_metrics_client: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated unknown nodes
+    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsClient>,
+}
+
+impl GroupedMetricsClients {
+    #[cfg(test)]
+    pub fn new_empty() -> Self {
+        Self {
+            telemetry_service_metrics_clients: HashMap::new(),
+            ingest_metrics_client: HashMap::new(),
+            untrusted_ingest_metrics_clients: HashMap::new(),
+        }
+    }
+}
+
+impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
+    fn from(config: MetricsEndpointsConfig) -> GroupedMetricsClients {
+        GroupedMetricsClients {
+            telemetry_service_metrics_clients: config.telemetry_service_metrics.make_client(),
+            ingest_metrics_client: config.ingest_metrics.make_client(),
+            untrusted_ingest_metrics_clients: config.untrusted_ingest_metrics.make_client(),
+        }
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct PeerStoreTuple {
@@ -56,14 +90,14 @@ impl PeerStoreTuple {
 #[derive(Clone)]
 pub struct ClientTuple {
     bigquery_client: Option<TableWriteClient>,
-    victoria_metrics_clients: Option<BTreeMap<String, MetricsClient>>,
+    victoria_metrics_clients: Option<GroupedMetricsClients>,
     humio_client: Option<HumioClient>,
 }
 
 impl ClientTuple {
     pub(crate) fn new(
         bigquery_client: Option<TableWriteClient>,
-        victoria_metrics_clients: Option<BTreeMap<String, MetricsClient>>,
+        victoria_metrics_clients: Option<GroupedMetricsClients>,
         humio_client: Option<HumioClient>,
     ) -> ClientTuple {
         Self {
@@ -157,12 +191,12 @@ impl Context {
         &self.jwt_service
     }
 
-    pub fn metrics_client(&self) -> &BTreeMap<String, MetricsClient> {
+    pub fn metrics_client(&self) -> &GroupedMetricsClients {
         self.clients.victoria_metrics_clients.as_ref().unwrap()
     }
 
     #[cfg(test)]
-    pub fn metrics_client_mut(&mut self) -> &mut BTreeMap<String, MetricsClient> {
+    pub fn metrics_client_mut(&mut self) -> &mut GroupedMetricsClients {
         self.clients.victoria_metrics_clients.as_mut().unwrap()
     }
 

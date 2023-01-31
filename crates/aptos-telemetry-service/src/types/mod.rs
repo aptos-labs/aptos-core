@@ -41,6 +41,8 @@ pub mod common {
         ValidatorFullNode,
         PublicFullNode,
         Unknown,
+        UnknownValidator,
+        UnknownFullNode,
     }
 
     impl NodeType {
@@ -50,6 +52,8 @@ pub mod common {
                 NodeType::ValidatorFullNode => "validator_fullnode",
                 NodeType::PublicFullNode => "public_fullnode",
                 NodeType::Unknown => "unknown_peer",
+                NodeType::UnknownValidator => "unknown_validator",
+                NodeType::UnknownFullNode => "unknown_fullnode",
             }
         }
     }
