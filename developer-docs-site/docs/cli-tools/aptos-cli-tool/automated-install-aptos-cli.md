@@ -16,6 +16,8 @@ Python 3.9.13
 ```
 If it is not installed, you can find installation instructions on [python.org](https://www.python.org/downloads/).
 
+Optionally, [install the Rust programming language and Cargo package manager](https://doc.rust-lang.org/cargo/getting-started/installation.html) for your operating system to enable automatic [updates](#update).
+
 ## Install
 
 Follow these instructions to install Aptos CLI on various operating systems. Regardless of the operating system, you will always be directed to the latest release of the Aptos CLI. 
