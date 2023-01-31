@@ -70,7 +70,7 @@ pub mod abort_codes {
 }
 
 #[derive(Debug, Clone)]
-pub struct Bls12381GasParameters {
+pub struct GasParameters {
     pub blst_g1_msm_base: InternalGasPerArg,
     pub blst_g1_msm_per_pair: InternalGasPerArg,
     pub blst_g2_msm_base: InternalGasPerArg,
@@ -83,75 +83,75 @@ pub struct Bls12381GasParameters {
     pub blst_g1_affine_ser: InternalGasPerArg,
     pub blst_g2_proj_to_affine: InternalGasPerArg,
     pub blst_g2_affine_ser: InternalGasPerArg,
-    pub ark_fr_add: InternalGasPerArg,
-    pub ark_fr_deser: InternalGasPerArg,
-    pub ark_fr_div: InternalGasPerArg,
-    pub ark_fr_eq: InternalGasPerArg,
-    pub ark_fr_from_u128: InternalGasPerArg,
-    pub ark_fr_inv: InternalGasPerArg,
-    pub ark_fr_mul: InternalGasPerArg,
-    pub ark_fr_neg: InternalGasPerArg,
-    pub ark_fr_serialize: InternalGasPerArg,
-    pub ark_fr_sub: InternalGasPerArg,
-    pub ark_fr_to_repr: InternalGasPerArg,
-    pub ark_fq12_clone: InternalGasPerArg,
-    pub ark_fq12_deserialize: InternalGasPerArg,
-    pub ark_fq12_eq: InternalGasPerArg,
-    pub ark_fq12_inv: InternalGasPerArg,
-    pub ark_fq12_mul: InternalGasPerArg,
-    pub ark_fq12_one: InternalGasPerArg,
-    pub ark_fq12_pow_fr: InternalGasPerArg,
-    pub ark_fq12_serialize: InternalGasPerArg,
-    pub ark_fq12_square: InternalGasPerArg,
-    pub ark_g1_affine_add: InternalGasPerArg,
-    pub ark_g1_affine_deser_comp: InternalGasPerArg,
-    pub ark_g1_affine_deser_uncomp: InternalGasPerArg,
-    pub ark_g1_affine_eq_proj: InternalGasPerArg,
-    pub ark_g1_affine_generator: InternalGasPerArg,
-    pub ark_g1_affine_infinity: InternalGasPerArg,
-    pub ark_g1_affine_scalar_mul_to_proj: InternalGasPerArg,
-    pub ark_g1_affine_neg: InternalGasPerArg,
-    pub ark_g1_affine_ser_comp: InternalGasPerArg,
-    pub ark_g1_affine_ser_uncomp: InternalGasPerArg,
-    pub ark_g1_affine_to_prepared: InternalGasPerArg,
-    pub ark_g1_affine_to_proj: InternalGasPerArg,
-    pub ark_g1_proj_add: InternalGasPerArg,
-    pub ark_g1_proj_double: InternalGasPerArg,
-    pub ark_g1_proj_eq: InternalGasPerArg,
-    pub ark_g1_proj_generator: InternalGasPerArg,
-    pub ark_g1_proj_infinity: InternalGasPerArg,
-    pub ark_g1_proj_neg: InternalGasPerArg,
-    pub ark_g1_proj_scalar_mul: InternalGasPerArg,
-    pub ark_g1_proj_sub: InternalGasPerArg,
-    pub ark_g1_proj_to_affine: InternalGasPerArg,
-    pub ark_g1_proj_to_prepared: InternalGasPerArg,
-    pub ark_g2_affine_add: InternalGasPerArg,
-    pub ark_g2_affine_deser_comp: InternalGasPerArg,
-    pub ark_g2_affine_deser_uncomp: InternalGasPerArg,
-    pub ark_g2_affine_eq: InternalGasPerArg,
-    pub ark_g2_affine_generator: InternalGasPerArg,
-    pub ark_g2_affine_infinity: InternalGasPerArg,
-    pub ark_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
-    pub ark_g2_affine_neg: InternalGasPerArg,
-    pub ark_g2_affine_ser_comp: InternalGasPerArg,
-    pub ark_g2_affine_ser_uncomp: InternalGasPerArg,
-    pub ark_g2_affine_to_prepared: InternalGasPerArg,
-    pub ark_g2_affine_to_proj: InternalGasPerArg,
-    pub ark_g2_proj_add: InternalGasPerArg,
-    pub ark_g2_proj_double: InternalGasPerArg,
-    pub ark_g2_proj_eq: InternalGasPerArg,
-    pub ark_g2_proj_generator: InternalGasPerArg,
-    pub ark_g2_proj_infinity: InternalGasPerArg,
-    pub ark_g2_proj_neg: InternalGasPerArg,
-    pub ark_g2_proj_scalar_mul: InternalGasPerArg,
-    pub ark_g2_proj_sub: InternalGasPerArg,
-    pub ark_g2_proj_to_affine: InternalGasPerArg,
-    pub ark_g2_proj_to_prepared: InternalGasPerArg,
-    pub ark_pairing_product_base: InternalGasPerArg,
-    pub ark_pairing_product_per_pair: InternalGasPerArg,
+    pub ark_bls12_381_fr_add: InternalGasPerArg,
+    pub ark_bls12_381_fr_deser: InternalGasPerArg,
+    pub ark_bls12_381_fr_div: InternalGasPerArg,
+    pub ark_bls12_381_fr_eq: InternalGasPerArg,
+    pub ark_bls12_381_fr_from_u128: InternalGasPerArg,
+    pub ark_bls12_381_fr_inv: InternalGasPerArg,
+    pub ark_bls12_381_fr_mul: InternalGasPerArg,
+    pub ark_bls12_381_fr_neg: InternalGasPerArg,
+    pub ark_bls12_381_fr_serialize: InternalGasPerArg,
+    pub ark_bls12_381_fr_sub: InternalGasPerArg,
+    pub ark_bls12_381_fr_to_repr: InternalGasPerArg,
+    pub ark_bls12_381_fq12_clone: InternalGasPerArg,
+    pub ark_bls12_381_fq12_deserialize: InternalGasPerArg,
+    pub ark_bls12_381_fq12_eq: InternalGasPerArg,
+    pub ark_bls12_381_fq12_inv: InternalGasPerArg,
+    pub ark_bls12_381_fq12_mul: InternalGasPerArg,
+    pub ark_bls12_381_fq12_one: InternalGasPerArg,
+    pub ark_bls12_381_fq12_pow_fr: InternalGasPerArg,
+    pub ark_bls12_381_fq12_serialize: InternalGasPerArg,
+    pub ark_bls12_381_fq12_square: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_add: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_deser_comp: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_deser_uncomp: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_eq_proj: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_generator: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_infinity: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_scalar_mul_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_neg: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_ser_comp: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_ser_uncomp: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_to_prepared: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_add: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_double: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_eq: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_generator: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_infinity: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_neg: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_scalar_mul: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_sub: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_to_affine: InternalGasPerArg,
+    pub ark_bls12_381_g1_proj_to_prepared: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_add: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_deser_comp: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_deser_uncomp: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_eq: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_generator: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_infinity: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_neg: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_ser_comp: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_ser_uncomp: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_to_prepared: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_add: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_double: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_eq: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_generator: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_infinity: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_neg: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_scalar_mul: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_sub: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_to_affine: InternalGasPerArg,
+    pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
+    pub ark_bls12_381_pairing_product_base: InternalGasPerArg,
+    pub ark_bls12_381_pairing_product_per_pair: InternalGasPerArg,
 }
 
-impl Bls12381GasParameters {
+impl GasParameters {
     fn blst_hash_to_g1_proj(&self, num_input_bytes: usize) -> InternalGas {
         self.blst_hash_to_g1_proj_per_byte * NumBytes::from(num_input_bytes as u64) + self.blst_hash_to_g1_proj_base * NumArgs::one()
     }
@@ -164,11 +164,6 @@ impl Bls12381GasParameters {
         //TODO
         InternalGas::zero()
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub bls12_381: Bls12381GasParameters,
 }
 
 #[derive(Tid)]
@@ -305,7 +300,7 @@ fn element_serialize_uncompressed_internal(
             let element = borrow_bls12_381_g1!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_ser_uncomp) * NumArgs::one(),
+                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_ser_uncomp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -314,7 +309,7 @@ fn element_serialize_uncompressed_internal(
             let element = borrow_bls12_381_g2!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_ser_uncomp) * NumArgs::one(),
+                (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_uncomp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -323,7 +318,7 @@ fn element_serialize_uncompressed_internal(
             let element = borrow_bls12_381_gt!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_serialize * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -347,7 +342,7 @@ fn element_serialize_compressed_internal(
             let element = borrow_bls12_381_g1!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_ser_comp) * NumArgs::one(),
+                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_ser_comp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -355,7 +350,7 @@ fn element_serialize_compressed_internal(
             let element = borrow_bls12_381_g2!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_ser_comp) * NumArgs::one(),
+                (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_comp) * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -363,7 +358,7 @@ fn element_serialize_compressed_internal(
             let element = borrow_bls12_381_gt!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_serialize * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -389,13 +384,13 @@ fn element_deserialize_uncompressed_internal(
                 Ok(element) => {
                     let handle = store_bls12_381_g1!(context, element.into_projective());
                     Ok(NativeResult::ok(
-                        (gas_params.bls12_381.ark_g1_affine_deser_uncomp + gas_params.bls12_381.ark_g1_affine_to_proj) * NumArgs::one(),
+                        (gas_params.ark_bls12_381_g1_affine_deser_uncomp + gas_params.ark_bls12_381_g1_affine_to_proj) * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_g1_affine_deser_uncomp * NumArgs::one(),
+                        gas_params.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -407,13 +402,13 @@ fn element_deserialize_uncompressed_internal(
                 Ok(element) => {
                     let handle = store_bls12_381_g2!(context, element.into_projective());
                     Ok(NativeResult::ok(
-                        (gas_params.bls12_381.ark_g2_affine_deser_uncomp + gas_params.bls12_381.ark_g2_affine_to_proj) * NumArgs::one(),
+                        (gas_params.ark_bls12_381_g2_affine_deser_uncomp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_g2_affine_deser_uncomp * NumArgs::one(),
+                        gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -423,7 +418,7 @@ fn element_deserialize_uncompressed_internal(
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             match Fq12::deserialize(bytes.as_slice()) {
                 Ok(element) => {
-                    let cost = (gas_params.bls12_381.ark_fq12_deserialize + gas_params.bls12_381.ark_fq12_pow_fr + gas_params.bls12_381.ark_fq12_eq) * NumArgs::one();
+                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_fr + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
                     if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
                         let handle = store_bls12_381_gt!(context, element);
                         Ok(NativeResult::ok(
@@ -439,7 +434,7 @@ fn element_deserialize_uncompressed_internal(
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fq12_deserialize * NumArgs::one(),
+                        gas_params.ark_bls12_381_fq12_deserialize * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -467,13 +462,13 @@ fn element_deserialize_compressed_internal(
                 Ok(element) => {
                     let handle = store_bls12_381_g1!(context, element.into_projective());
                     Ok(NativeResult::ok(
-                        (gas_params.bls12_381.ark_g1_affine_deser_comp + gas_params.bls12_381.ark_g1_affine_to_proj) * NumArgs::one(),
+                        (gas_params.ark_bls12_381_g1_affine_deser_comp + gas_params.ark_bls12_381_g1_affine_to_proj) * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_g1_affine_deser_comp * NumArgs::one(),
+                        gas_params.ark_bls12_381_g1_affine_deser_comp * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -485,13 +480,13 @@ fn element_deserialize_compressed_internal(
                 Ok(element) => {
                     let handle = store_bls12_381_g2!(context, element.into_projective());
                     Ok(NativeResult::ok(
-                        (gas_params.bls12_381.ark_g2_affine_deser_comp + gas_params.bls12_381.ark_g2_affine_to_proj) * NumArgs::one(),
+                        (gas_params.ark_bls12_381_g2_affine_deser_comp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_g2_affine_deser_comp * NumArgs::one(),
+                        gas_params.ark_bls12_381_g2_affine_deser_comp * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -501,7 +496,7 @@ fn element_deserialize_compressed_internal(
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             match ark_bls12_381::Fq12::deserialize(bytes.as_slice()) {
                 Ok(element) => {
-                    let cost = (gas_params.bls12_381.ark_fq12_deserialize + gas_params.bls12_381.ark_fq12_pow_fr + gas_params.bls12_381.ark_fq12_eq) * NumArgs::one();
+                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_fr + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
                     if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
                         let handle = store_bls12_381_gt!(context, element);
                         Ok(NativeResult::ok(
@@ -517,7 +512,7 @@ fn element_deserialize_compressed_internal(
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fq12_deserialize * NumArgs::one(),
+                        gas_params.ark_bls12_381_fq12_deserialize * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -544,13 +539,13 @@ fn scalar_deserialize_internal(
                 Ok(scalar) => {
                     let handle = store_bls12_381_fr!(context, scalar);
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fr_deser * NumArgs::one(),
+                        gas_params.ark_bls12_381_fr_deser * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
                     ))
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fr_deser * NumArgs::one(),
+                        gas_params.ark_bls12_381_fr_deser * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 },
@@ -577,7 +572,7 @@ fn scalar_serialize_internal(
             let element = borrow_bls12_381_fr!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_serialize * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_serialize * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -602,7 +597,7 @@ fn scalar_from_u64_internal(
             let element = ark_bls12_381::Fr::from(value as u128);
             let handle = store_bls12_381_fr!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_from_u128 * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_from_u128 * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -630,7 +625,7 @@ fn scalar_add_internal(
             let result = scalar_1.add(scalar_2);
             let result_handle = store_bls12_381_fr!(context, result);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_add * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_add * NumArgs::one(),
                 smallvec![Value::u64(result_handle as u64)],
             ))
         }
@@ -658,7 +653,7 @@ fn scalar_mul_internal(
             let new_scalar = scalar_1.mul(scalar_2);
             let new_handle = store_bls12_381_fr!(context, new_scalar);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_mul * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -684,7 +679,7 @@ fn scalar_neg_internal(
             let result = scalar.neg();
             let result_handle = store_bls12_381_fr!(context, result);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_neg * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_neg * NumArgs::one(),
                 smallvec![Value::u64(result_handle as u64)],
             ))
         }
@@ -710,13 +705,13 @@ fn scalar_inv_internal(
                 Some(scalar) => {
                     let result_handle = store_bls12_381_fr!(context, scalar);
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fr_inv * NumArgs::one(),
+                        gas_params.ark_bls12_381_fr_inv * NumArgs::one(),
                         smallvec![Value::bool(true), Value::u64(result_handle as u64)],
                     ))
                 }
                 None => {
                     Ok(NativeResult::ok(
-                        gas_params.bls12_381.ark_fr_inv * NumArgs::one(),
+                        gas_params.ark_bls12_381_fr_inv * NumArgs::one(),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 },
@@ -744,13 +739,13 @@ fn scalar_eq_internal(
             let scalar_1 = borrow_bls12_381_fr!(context, handle_1);
             let scalar_2 = borrow_bls12_381_fr!(context, handle_2);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fr_eq * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
                 smallvec![Value::bool(scalar_1 == scalar_2)],
             ))
         }
         _ => {
             Ok(NativeResult::err(
-                gas_params.bls12_381.ark_fr_eq * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
                 NOT_IMPLEMENTED,
             ))
         }
@@ -771,7 +766,7 @@ fn group_identity_internal(
             let element = G1Projective::zero();
             let handle = store_bls12_381_g1!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_infinity * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_infinity * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -780,7 +775,7 @@ fn group_identity_internal(
             let element = G2Projective::zero();
             let handle = store_bls12_381_g2!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_infinity * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_infinity * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -789,7 +784,7 @@ fn group_identity_internal(
             let element = Fq12::one();
             let handle = store_bls12_381_gt!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_one * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_one * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -829,7 +824,7 @@ fn group_generator_internal(
             let element = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g1!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_generator * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_generator * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -838,7 +833,7 @@ fn group_generator_internal(
             let element = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g2!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_generator * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_generator * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -847,7 +842,7 @@ fn group_generator_internal(
             let element = BLS12381_GT_GENERATOR.clone();
             let handle = store_bls12_381_gt!(context, element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_clone * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_clone * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -996,7 +991,7 @@ fn element_eq_internal(
             let element_1 = borrow_bls12_381_g1!(context, handle_1);
             let element_2 = borrow_bls12_381_g1!(context, handle_2);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_eq * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_eq * NumArgs::one(),
                 smallvec![Value::bool(element_1.eq(element_2))],
             ))
         }
@@ -1005,7 +1000,7 @@ fn element_eq_internal(
             let element_1 = borrow_bls12_381_g2!(context, handle_1);
             let element_2 = borrow_bls12_381_g2!(context, handle_2);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_eq * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_eq * NumArgs::one(),
                 smallvec![Value::bool(element_1.eq(element_2))],
             ))
         }
@@ -1014,7 +1009,7 @@ fn element_eq_internal(
             let element_1 = borrow_bls12_381_gt!(context, handle_1);
             let element_2 = borrow_bls12_381_gt!(context, handle_2);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_eq * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_eq * NumArgs::one(),
                 smallvec![Value::bool(element_1.eq(element_2))],
             ))
         }
@@ -1042,7 +1037,7 @@ fn element_add_internal(
             let new_element = element_1.add(element_2);
             let new_handle = store_bls12_381_g1!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_add * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_add * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1053,7 +1048,7 @@ fn element_add_internal(
             let new_element = element_1.add(element_2);
             let new_handle = store_bls12_381_g2!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_add * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_add * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1064,7 +1059,7 @@ fn element_add_internal(
             let new_element = element_1.mul(element_2);
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_mul * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1093,7 +1088,7 @@ fn element_scalar_mul_internal(
             let new_element = element.mul(scalar.into_repr());
             let new_handle = store_bls12_381_g1!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_scalar_mul * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1104,7 +1099,7 @@ fn element_scalar_mul_internal(
             let new_element = element.mul(scalar.into_repr());
             let new_handle = store_bls12_381_g2!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_scalar_mul * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1115,7 +1110,7 @@ fn element_scalar_mul_internal(
             let new_element = element.pow(scalar.into_repr().as_ref());
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_fr_to_repr + gas_params.bls12_381.ark_fq12_pow_fr) * NumArgs::one(),
+                (gas_params.ark_bls12_381_fr_to_repr + gas_params.ark_bls12_381_fq12_pow_fr) * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1341,8 +1336,8 @@ fn element_multi_scalar_mul_internal(
             let ark_g1_proj = ark_g1_affine.into_projective();
             let new_handle = store_bls12_381_g1!(context, ark_g1_proj);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.blst_g1_msm_per_pair * NumArgs::from(num_elements as u64)
-                    + gas_params.bls12_381.blst_g1_msm_base * NumArgs::one(),
+                gas_params.blst_g1_msm_per_pair * NumArgs::from(num_elements as u64)
+                    + gas_params.blst_g1_msm_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1368,8 +1363,8 @@ fn element_multi_scalar_mul_internal(
             let ark_g2_proj = ark_g2_affine.into_projective();
             let new_handle = store_bls12_381_g2!(context, ark_g2_proj);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.blst_g2_msm_per_pair * NumArgs::from(num_elements as u64)
-                    + gas_params.bls12_381.blst_g2_msm_base * NumArgs::one(),
+                gas_params.blst_g2_msm_per_pair * NumArgs::from(num_elements as u64)
+                    + gas_params.blst_g2_msm_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1407,7 +1402,7 @@ fn element_double_internal(
             let new_element = element.double();
             let new_handle = store_bls12_381_g1!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_double * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_double * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1417,7 +1412,7 @@ fn element_double_internal(
             let new_element = element.double();
             let new_handle = store_bls12_381_g2!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_double * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_double * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1427,7 +1422,7 @@ fn element_double_internal(
             let new_element = element.square();
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_square * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_square * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1453,7 +1448,7 @@ fn element_neg_internal(
             let new_element = element.neg();
             let new_handle = store_bls12_381_g1!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g1_proj_neg * NumArgs::one(),
+                gas_params.ark_bls12_381_g1_proj_neg * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1463,7 +1458,7 @@ fn element_neg_internal(
             let new_element = element.neg();
             let new_handle = store_bls12_381_g2!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_g2_proj_neg * NumArgs::one(),
+                gas_params.ark_bls12_381_g2_proj_neg * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1473,7 +1468,7 @@ fn element_neg_internal(
             let new_element = element.inverse().unwrap();
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.ark_fq12_inv * NumArgs::one(),
+                gas_params.ark_bls12_381_fq12_inv * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1524,7 +1519,7 @@ fn pairing_product_internal(
             let new_element = ark_bls12_381::Bls12_381::product_of_pairings(input_pairs.as_slice());
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.bls12_381.ark_g1_proj_to_affine + gas_params.bls12_381.ark_g1_affine_to_prepared + gas_params.bls12_381.ark_g2_proj_to_affine + gas_params.bls12_381.ark_g2_affine_to_prepared + gas_params.bls12_381.ark_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.bls12_381.ark_pairing_product_base * NumArgs::one(),
+                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_to_prepared + gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_to_prepared + gas_params.ark_bls12_381_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.ark_bls12_381_pairing_product_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1582,12 +1577,12 @@ fn hash_to_element_internal(
             let ark_g1_proj = ark_g1_affine.into_projective();
             let new_handle = store_bls12_381_g1!(context, ark_g1_proj);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.blst_hash_to_g1_proj(bytes.len())
+                gas_params.blst_hash_to_g1_proj(bytes.len())
                     + (
-                    gas_params.bls12_381.blst_g1_proj_to_affine
-                        + gas_params.bls12_381.blst_g1_affine_ser
-                        + gas_params.bls12_381.ark_g1_affine_deser_uncomp
-                        + gas_params.bls12_381.ark_g1_affine_to_proj
+                    gas_params.blst_g1_proj_to_affine
+                        + gas_params.blst_g1_affine_ser
+                        + gas_params.ark_bls12_381_g1_affine_deser_uncomp
+                        + gas_params.ark_bls12_381_g1_affine_to_proj
                 ) * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)]
             ))
@@ -1601,11 +1596,11 @@ fn hash_to_element_internal(
             let ark_g2_proj = ark_g2_affine.into_projective();
             let new_handle = store_bls12_381_g2!(context, ark_g2_proj);
             Ok(NativeResult::ok(
-                gas_params.bls12_381.blst_hash_to_g2_proj(bytes.len())
-                    + (gas_params.bls12_381.blst_g2_proj_to_affine
-                    + gas_params.bls12_381.blst_g2_affine_ser
-                    + gas_params.bls12_381.ark_g2_affine_deser_uncomp
-                    + gas_params.bls12_381.ark_g2_affine_to_proj
+                gas_params.blst_hash_to_g2_proj(bytes.len())
+                    + (gas_params.blst_g2_proj_to_affine
+                    + gas_params.blst_g2_affine_ser
+                    + gas_params.ark_bls12_381_g2_affine_deser_uncomp
+                    + gas_params.ark_bls12_381_g2_affine_to_proj
                 ) * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)]
             ))
