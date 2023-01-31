@@ -18,6 +18,7 @@ use crate::{
 use anyhow::Result;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
+    VerifyExecutionMode,
 };
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -37,7 +38,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use fail::fail_point;
-use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -363,7 +364,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         transaction_infos: Vec<TransactionInfo>,
         writesets: Vec<WriteSet>,
         events: Vec<Vec<ContractEvent>>,
-        txns_to_skip: Arc<BTreeSet<Version>>,
+        verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
         self.maybe_initialize()?;
         self.inner.read().as_ref().expect("not reset").replay(
@@ -371,7 +372,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
             transaction_infos,
             writesets,
             events,
-            txns_to_skip,
+            verify_execution_mode,
         )
     }
 
@@ -387,14 +388,17 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         mut transaction_infos: Vec<TransactionInfo>,
         writesets: Vec<WriteSet>,
         events: Vec<Vec<ContractEvent>>,
-        txns_to_skip: Arc<BTreeSet<Version>>,
+        verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
         let (_parent_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
         let first_version = latest_view.num_transactions() as Version;
         let mut offset = first_version;
         let total_length = transactions.len();
 
-        for version in txns_to_skip.range(first_version..first_version + total_length as u64) {
+        for version in verify_execution_mode
+            .txns_to_skip()
+            .range(first_version..first_version + total_length as u64)
+        {
             let version = *version;
             let remaining = transactions.split_off((version - offset + 1) as usize);
             let remaining_info = transaction_infos.split_off((version - offset + 1) as usize);

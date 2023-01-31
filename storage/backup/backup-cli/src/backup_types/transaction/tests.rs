@@ -15,6 +15,7 @@ use crate::{
     },
 };
 use aptos_db::AptosDB;
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
@@ -90,7 +91,7 @@ fn end_to_end() {
             .unwrap(),
             store,
             None, /* epoch_history */
-            vec![],
+            VerifyExecutionMode::verify_all(),
         )
         .run(),
     )
