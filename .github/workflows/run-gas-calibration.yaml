@@ -25,10 +25,12 @@ jobs:
   run-gas-calibration:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: install Valgrind
         shell: bash
         run: sudo apt-get -y install valgrind

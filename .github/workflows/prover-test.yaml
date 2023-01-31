@@ -38,10 +38,12 @@ jobs:
   prover-test:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: install Prover dependencies
         shell: bash
         run: scripts/dev_setup.sh -b -p -y

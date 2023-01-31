@@ -1,7 +1,11 @@
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/rust-setup
+    - uses: aptos-labs/actions/rust-setup@v0.1
+      with:
+        CHECKOUT_REPOSITORY: ${{ github.repository }}
+        CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+        GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
     - name: install dependencies
       shell: bash
       run: |

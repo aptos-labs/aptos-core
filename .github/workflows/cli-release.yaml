@@ -24,10 +24,11 @@ jobs:
     name: "Build Ubuntu 20.04 binary"
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: ./.github/actions/rust-setup
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.event.inputs.source_git_ref_override || github.head_ref || github.ref_name }} # the branch name
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu"
       - name: Upload Binary
@@ -40,10 +41,11 @@ jobs:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - uses: ./.github/actions/rust-setup
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.event.inputs.source_git_ref_override || github.head_ref || github.ref_name }} # the branch name
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
       - name: Upload Binary

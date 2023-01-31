@@ -39,14 +39,21 @@ jobs:
       APTOS_FAUCET_URL: http://127.0.0.1:8081
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          ref: ${{ inputs.GIT_SHA }}
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: ./.github/actions/gar-auth
+      - uses: aptos-labs/actions/docker-setup@v0.1
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
@@ -114,7 +121,6 @@ jobs:
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
 
       # Confirm the Rust API client examples pass.
-      - uses: ./.github/actions/rust-setup
       - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
       # Test and build.

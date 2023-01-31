@@ -82,18 +82,24 @@ jobs:
   rust-cryptohasher-domain-separation-check:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
+        with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
-      - uses: ./.github/actions/rust-setup
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   rust-lint:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Install nightly build of rustfmt
+        run: rustup toolchain install nightly && rustup component add rustfmt --toolchain nightly
       - uses: pre-commit/action@v3.0.0
       - run: cargo install cargo-sort
       - run: scripts/rust_lint.sh --check
@@ -101,22 +107,22 @@ jobs:
   rust-doc-test:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
-        with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
 
   rust-unit-test:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
-        with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - uses: taiki-e/install-action@v1.5.6
@@ -131,11 +137,11 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
-      - uses: actions/checkout@v3
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
-        with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
+          CHECKOUT_GIT_DEPTH: 0 # get all the history because cargo xtest --change-since origin/main requires it.
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: taiki-e/install-action@v1.5.6
         with:
@@ -145,9 +151,10 @@ jobs:
   rust-smoke-test:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - uses: taiki-e/install-action@v1.5.6
@@ -175,9 +182,10 @@ jobs:
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: taiki-e/install-action@v1.5.6
         with:
@@ -202,9 +210,10 @@ jobs:
   check-vm-features:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/actions/rust-setup@v0.1
         with:
+          CHECKOUT_REPOSITORY: ${{ github.repository }}
+          CHECKOUT_GIT_REF: ${{ github.head_ref || github.ref_name }} # the branch name
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --features check-vm-features -p aptos-node
 
