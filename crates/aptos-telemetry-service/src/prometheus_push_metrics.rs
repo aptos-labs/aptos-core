@@ -67,9 +67,9 @@ pub async fn handle_metrics_ingest(
 
     let client = match claims.node_type {
         NodeType::UnknownValidator | NodeType::UnknownFullNode => {
-            &context.metrics_client().unclassified_ingest_metrics
+            &context.metrics_client().untrusted_ingest_metrics_clients
         },
-        _ => &context.metrics_client().ingest_metrics,
+        _ => &context.metrics_client().ingest_metrics_client,
     };
 
     let start_timer = Instant::now();
@@ -227,11 +227,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );
@@ -263,11 +263,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );
@@ -299,11 +299,11 @@ mod test {
         });
 
         let clients = test_context.inner.metrics_client_mut();
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default1".into(),
             MetricsClient::new(Url::parse(&server1.base_url()).unwrap(), "token1".into()),
         );
-        clients.ingest_metrics.insert(
+        clients.ingest_metrics_client.insert(
             "default2".into(),
             MetricsClient::new(Url::parse(&server2.base_url()).unwrap(), "token2".into()),
         );

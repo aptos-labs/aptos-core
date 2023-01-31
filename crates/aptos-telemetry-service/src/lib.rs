@@ -81,7 +81,7 @@ impl AptosTelemetryServiceArgs {
         let metrics_clients: GroupedMetricsClients = config.metrics_endpoints_config.clone().into();
 
         let telemetry_metrics_client = metrics_clients
-            .telemetry_service_metrics
+            .telemetry_service_metrics_clients
             .values()
             .next()
             .cloned()
@@ -158,10 +158,13 @@ impl AptosTelemetryServiceArgs {
     }
 }
 
+/// Per metric endpoint configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsEndpoint {
+    /// Map of endpoint canonical name to Urls
     endpoint_urls: HashMap<String, Url>,
+    /// Environment variable that holds the secrets
     keys_env_var: String,
 }
 
@@ -208,6 +211,8 @@ impl MetricsEndpoint {
     }
 }
 
+/// Metrics endpoints configuration for metrics from
+/// different datasources.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsEndpointsConfig {

@@ -21,20 +21,25 @@ use std::{
 };
 use warp::Filter;
 
+/// Container that holds various metric clients used for sending metrics from
+/// various sources to appropriate backends.
 #[derive(Clone, Default)]
 pub struct GroupedMetricsClients {
-    pub telemetry_service_metrics: HashMap<String, MetricsClient>,
-    pub ingest_metrics: HashMap<String, MetricsClient>,
-    pub unclassified_ingest_metrics: HashMap<String, MetricsClient>,
+    /// Client(s) for exporting metrics of the running telemetry service
+    pub telemetry_service_metrics_clients: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated known nodes
+    pub ingest_metrics_client: HashMap<String, MetricsClient>,
+    /// Clients for sending metrics from authenticated unknown nodes
+    pub untrusted_ingest_metrics_clients: HashMap<String, MetricsClient>,
 }
 
 impl GroupedMetricsClients {
     #[cfg(test)]
     pub fn new_empty() -> Self {
         Self {
-            telemetry_service_metrics: HashMap::new(),
-            ingest_metrics: HashMap::new(),
-            unclassified_ingest_metrics: HashMap::new(),
+            telemetry_service_metrics_clients: HashMap::new(),
+            ingest_metrics_client: HashMap::new(),
+            untrusted_ingest_metrics_clients: HashMap::new(),
         }
     }
 }
@@ -42,9 +47,9 @@ impl GroupedMetricsClients {
 impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
     fn from(config: MetricsEndpointsConfig) -> GroupedMetricsClients {
         GroupedMetricsClients {
-            telemetry_service_metrics: config.telemetry_service_metrics.make_client(),
-            ingest_metrics: config.ingest_metrics.make_client(),
-            unclassified_ingest_metrics: config.untrusted_ingest_metrics.make_client(),
+            telemetry_service_metrics_clients: config.telemetry_service_metrics.make_client(),
+            ingest_metrics_client: config.ingest_metrics.make_client(),
+            untrusted_ingest_metrics_clients: config.untrusted_ingest_metrics.make_client(),
         }
     }
 }
