@@ -63,6 +63,9 @@ pub struct KnownAttribute {
 /// Enumeration of known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
+    // An older compiler placed view functions at 0. This was then published to
+    // Testnet and now we need to recognize this as a legacy index.
+    LegacyViewFunction = 0,
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
@@ -77,7 +80,8 @@ impl KnownAttribute {
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == (KnownAttributeKind::ViewFunction as u8)
+        self.kind == (KnownAttributeKind::LegacyViewFunction as u8)
+            || self.kind == (KnownAttributeKind::ViewFunction as u8)
     }
 
     pub fn resource_group(scope: ResourceGroupScope) -> Self {
@@ -201,7 +205,6 @@ pub fn is_valid_resource_group(
             {
                 return Ok(());
             }
-            println!("group {:?}", mod_struct);
         }
     }
 
@@ -220,7 +223,6 @@ pub fn is_valid_resource_group_member(
             if mod_struct.abilities.has_ability(Ability::Key) {
                 return Ok(());
             }
-            println!("member {:?}", mod_struct);
         }
     }
 
