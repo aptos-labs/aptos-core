@@ -30,4 +30,5 @@ mod token_event_store;
 mod token_objects;
 mod transaction_fee;
 mod type_too_large;
+mod v5_module_v1_metadata;
 mod vector_numeric_address;
