@@ -116,18 +116,21 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
     let node_type = match peer_role {
         PeerRole::Validator => NodeType::Validator,
         PeerRole::ValidatorFullNode => NodeType::ValidatorFullNode,
-        PeerRole::Unknown => context
-            .peers()
-            .public_fullnodes()
-            .get(&body.chain_id)
-            .map(|peer_set| {
-                if peer_set.contains_key(&body.peer_id) {
-                    NodeType::PublicFullNode
-                } else {
-                    NodeType::Unknown
-                }
-            })
-            .unwrap_or(NodeType::Unknown),
+        PeerRole::Unknown => match body.role_type {
+            RoleType::Validator => NodeType::UnknownValidator,
+            RoleType::FullNode => context
+                .peers()
+                .public_fullnodes()
+                .get(&body.chain_id)
+                .and_then(|peer_set| {
+                    if peer_set.contains_key(&body.peer_id) {
+                        Some(NodeType::PublicFullNode)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(NodeType::UnknownFullNode),
+        },
         _ => NodeType::Unknown,
     };
 

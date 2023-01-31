@@ -60,4 +60,5 @@ bcs = { workspace = true }
 claims = { workspace = true }
 mockall = { workspace = true }
 move-core-types = { workspace = true }
+ntest = { workspace = true }
 rand = { workspace = true }

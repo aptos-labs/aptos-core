@@ -10,7 +10,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, Version},
+    transaction::{Transaction, TransactionInfo, Version},
 };
 use std::collections::BTreeMap;
 
@@ -87,25 +87,27 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<Vec<Transaction>> {
-        let mut ret = vec![];
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+        let mut txns = Vec::with_capacity(limit as usize);
+        let mut txn_infos = Vec::with_capacity(limit as usize);
 
-        while ret.len() < limit as usize {
-            ret.extend(
-                self.0
-                    .get_transactions_bcs(
-                        Some(start + ret.len() as u64),
-                        Some(limit as u16 - ret.len() as u16),
-                    )
-                    .await?
-                    .into_inner()
-                    .into_iter()
-                    .map(|txn| txn.transaction),
-            );
-            println!("Got {}/{} txns from RestApi.", ret.len(), limit);
+        while txns.len() < limit as usize {
+            self.0
+                .get_transactions_bcs(
+                    Some(start + txns.len() as u64),
+                    Some(limit as u16 - txns.len() as u16),
+                )
+                .await?
+                .into_inner()
+                .into_iter()
+                .for_each(|txn| {
+                    txns.push(txn.transaction);
+                    txn_infos.push(txn.info);
+                });
+            println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        Ok(ret)
+        Ok((txns, txn_infos))
     }
 
     async fn get_latest_version(&self) -> Result<Version> {

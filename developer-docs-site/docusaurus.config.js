@@ -156,6 +156,11 @@ const config = {
                 label: "Integrate with Wallets",
                 docId: "concepts/wallet-adapter-concept",
               },
+              {
+                type: "doc",
+                label: "Build E2E Dapp on Aptos",
+                docId: "tutorials/build-e2e-dapp/index",
+              },
             ],
           },
           {

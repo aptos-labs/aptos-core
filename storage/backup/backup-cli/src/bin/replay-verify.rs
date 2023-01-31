@@ -67,6 +67,7 @@ async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
 
     let opt = Opt::from_args();
+
     let restore_handler = Arc::new(AptosDB::open(
         opt.db_dir,
         false,                       /* read_only */

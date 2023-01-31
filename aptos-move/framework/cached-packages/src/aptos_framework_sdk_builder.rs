@@ -271,6 +271,12 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
+    ObjectTransferCall {
+        object_id: AccountAddress,
+        to: AccountAddress,
+    },
+
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
@@ -714,6 +720,7 @@ impl EntryFunctionCall {
                 amount,
             } => managed_coin_mint(coin_type, dst_addr, amount),
             ManagedCoinRegister { coin_type } => managed_coin_register(coin_type),
+            ObjectTransferCall { object_id, to } => object_transfer_call(object_id, to),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1548,6 +1555,25 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("register").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
+pub fn object_transfer_call(object_id: AccountAddress, to: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("object").to_owned(),
+        ),
+        ident_str!("transfer_call").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&object_id).unwrap(),
+            bcs::to_bytes(&to).unwrap(),
+        ],
     ))
 }
 
@@ -2914,6 +2940,17 @@ mod decoder {
         }
     }
 
+    pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ObjectTransferCall {
+                object_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                to: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -3636,6 +3673,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "managed_coin_register".to_string(),
             Box::new(decoder::managed_coin_register),
+        );
+        map.insert(
+            "object_transfer_call".to_string(),
+            Box::new(decoder::object_transfer_call),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),
