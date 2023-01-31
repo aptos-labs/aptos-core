@@ -55,7 +55,7 @@ use crate::{
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
     pruner::{
-        ledger_pruner_manager::LedgerPrunerManager,
+        db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
         pruner_utils, state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
     },
@@ -1920,17 +1920,48 @@ impl DbWriter for AptosDB {
             )?;
 
             // Delete the genesis transaction
-            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut batch)?;
             LedgerPruner::prune_genesis(
                 self.ledger_db.clone(),
                 self.state_store.clone(),
                 &mut batch,
             )?;
 
+            self.ledger_pruner
+                .pruner()
+                .save_min_readable_version(version, &batch)?;
+
+            let mut state_merkle_batch = SchemaBatch::new();
+            StateMerklePruner::prune_genesis(
+                self.state_merkle_db.clone(),
+                &mut state_merkle_batch,
+            )?;
+
+            self.state_store
+                .state_pruner
+                .pruner()
+                .save_min_readable_version(version, &state_merkle_batch)?;
+            self.state_store
+                .epoch_snapshot_pruner
+                .pruner()
+                .save_min_readable_version(version, &state_merkle_batch)?;
+
             // Apply the change set writes to the database (atomically) and update in-memory state
             self.ledger_db.clone().write_schemas(batch)?;
+            self.state_merkle_db
+                .clone()
+                .write_schemas(state_merkle_batch)?;
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
+
+            self.ledger_pruner.pruner().record_progress(version);
+            self.state_store
+                .state_pruner
+                .pruner()
+                .record_progress(version);
+            self.state_store
+                .epoch_snapshot_pruner
+                .pruner()
+                .record_progress(version);
 
             Ok(())
         })
