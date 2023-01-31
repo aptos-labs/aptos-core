@@ -71,7 +71,7 @@ module aptos_framework::account {
     ///
     /// Note that the challenge message to sign includes the `RotationProofChallenge` type info prepended to the
     /// relevant bytes, such that serializing then signing only the below four struct fields will lead to rotation
-    /// failure. For the verification implementation, see `aptos-stdlib::ed25519::signature_verify_strict_t()`.
+    /// failure. For the verification implementation, see `aptos_stdlib::ed25519::signature_verify_strict_t()`.
     struct RotationProofChallenge has copy, drop {
         sequence_number: u64, // the sequence number of the account whose key is being rotated
         originator: address, // the address of the account whose key is being rotated
