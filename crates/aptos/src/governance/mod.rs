@@ -11,7 +11,7 @@ use crate::{
         },
         utils::prompt_yes_with_override,
     },
-    move_tool::{FrameworkPackageArgs, IncludedArtifacts},
+    move_tool::{set_bytecode_version, FrameworkPackageArgs, IncludedArtifacts},
     CliCommand, CliResult,
 };
 use aptos_cached_packages::aptos_stdlib;
@@ -708,6 +708,7 @@ impl CompileScriptFunction {
         script_name: &str,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        set_bytecode_version(self.bytecode_version);
         if let Some(compiled_script_path) = &self.compiled_script_path {
             let bytes = std::fs::read(compiled_script_path).map_err(|e| {
                 CliError::IO(format!("Unable to read {:?}", self.compiled_script_path), e)
