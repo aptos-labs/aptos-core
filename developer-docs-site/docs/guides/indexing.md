@@ -1,12 +1,14 @@
 ---
-title: "Index Aptos Data"
+title: "Use the Aptos Indexer"
 slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Index the Aptos Blockchain Data
+# Use the Aptos Indexer
+
+This page describes how to employ data from the Aptos Indexer in your apps. To instead operate an indexer, follow [Run an Indexer](../nodes/indexer-fullnode.md).
 
 An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
 
