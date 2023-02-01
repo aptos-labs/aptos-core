@@ -8,7 +8,7 @@ import subprocess
 from typing import IO
 
 
-def find_latest_version_from_db_backup_output(output: IO[bytes]):
+def find_latest_version_from_db_backup_output(output: IO[bytes] | None):
     latest_version = -1
     for line in iter(output.readline, b""):
         log_line = line.decode("utf-8")

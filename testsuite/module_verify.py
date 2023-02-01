@@ -41,7 +41,7 @@ def main():
 
     # run verify-modules
     os.mkdir("local")
-    shutil.copytree("metadata-cache", "local")
+    shutil.copytree("metadata-cache", "local/metadata-cache")
     subprocess.run(
         [
             "target/release/replay-verify",
