@@ -116,6 +116,7 @@ members = [
     "storage/aptosdb",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
+    "storage/db-tool",
     "storage/indexer",
     "storage/jellyfish-merkle",
     "storage/rocksdb-options",

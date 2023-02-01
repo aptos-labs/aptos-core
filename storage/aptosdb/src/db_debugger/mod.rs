@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod checkpoint;
+pub mod checkpoint;
 mod common;
-mod ledger;
-mod state_tree;
-mod truncate;
+pub mod ledger;
+pub mod state_tree;
+pub mod truncate;
 
 use anyhow::Result;
 use clap::Parser;

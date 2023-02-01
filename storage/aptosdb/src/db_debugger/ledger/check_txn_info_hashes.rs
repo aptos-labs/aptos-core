@@ -32,10 +32,10 @@ impl Cmd {
         );
 
         println!("Checking that TransactionInfo hashes matches accumulator leaf hashes...");
-        let mut txn_info_iter =
+        let txn_info_iter =
             store.get_transaction_info_iter(self.start_version, self.num_versions)?;
         let mut version = self.start_version;
-        while let Some(res) = txn_info_iter.next() {
+        for res in txn_info_iter {
             let txn_info = res?;
             let leaf_hash =
                 db.get::<TransactionAccumulatorSchema>(&Position::from_leaf_index(version))?;

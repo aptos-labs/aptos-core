@@ -847,6 +847,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-db-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-backup-cli",
+ "aptos-config",
+ "aptos-db",
+ "aptos-executor-types",
+ "aptos-logger",
+ "aptos-push-metrics",
+ "aptos-temppath",
+ "aptos-types",
+ "clap 3.2.23",
+ "owo-colors",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
