@@ -123,7 +123,7 @@ pub async fn sync_and_load(
     for h in stale_local_hashes {
         let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
-        info!("Deleted stale metadata files in cache.");
+        info!(file_name = h, "Deleted stale metadata file in cache.");
     }
 
     let num_new_files = new_remote_hashes.len();

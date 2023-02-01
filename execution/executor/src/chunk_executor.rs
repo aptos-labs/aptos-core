@@ -355,7 +355,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
             transactions = remaining;
             transaction_infos = remaining_info;
-            offset = version;
+            offset = version + 1;
         }
         self.replay_impl(transactions, transaction_infos)
     }
@@ -412,7 +412,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         info!(
             "Overiding the output of txn at version: {:?}",
-            latest_view.version().unwrap(),
+            latest_view.version().map_or(0, |v| v + 1),
         );
 
         let chunk_output = ChunkOutput::by_transaction_output(
