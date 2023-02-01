@@ -24,6 +24,7 @@ bcs = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 serde = { workspace = true }

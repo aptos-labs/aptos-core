@@ -1983,6 +1983,7 @@ dependencies = [
  "clap 3.2.23",
  "futures",
  "hex",
+ "move-binary-format",
  "move-core-types",
  "move-model",
  "serde 1.0.149",
