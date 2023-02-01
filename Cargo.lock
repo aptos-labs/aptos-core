@@ -1477,6 +1477,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-log-derive",
+ "aptos-node-identity",
  "backtrace",
  "chrono",
  "console-subscriber",
@@ -1766,6 +1767,7 @@ dependencies = [
  "aptos-mempool-notifications",
  "aptos-network",
  "aptos-network-builder",
+ "aptos-node-identity",
  "aptos-runtimes",
  "aptos-secure-storage",
  "aptos-state-sync-driver",
@@ -1822,6 +1824,17 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-node-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "claims",
+ "hostname",
+ "once_cell",
 ]
 
 [[package]]

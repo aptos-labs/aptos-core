@@ -62,6 +62,8 @@ pub struct LogEntry {
     timestamp: String,
     data: BTreeMap<Key, serde_json::Value>,
     message: Option<String>,
+    peer_id: Option<&'static str>,
+    chain_id: Option<u8>,
 }
 
 // implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top-level `level` field
@@ -92,6 +94,9 @@ impl Serialize for LogEntry {
         }
         if let Some(backtrace) = &self.backtrace {
             state.serialize_field("backtrace", backtrace)?;
+        }
+        if let Some(peer_id) = &self.peer_id {
+            state.serialize_field("peer_id", peer_id)?;
         }
         state.end()
     }
@@ -137,6 +142,8 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
         let namespace = NAMESPACE.as_deref();
+        let peer_id = aptos_node_identity::peer_id_as_str();
+        let chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();
@@ -164,6 +171,8 @@ impl LogEntry {
             timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true),
             data,
             message,
+            peer_id,
+            chain_id,
         }
     }
 
@@ -197,6 +206,14 @@ impl LogEntry {
 
     pub fn message(&self) -> Option<&str> {
         self.message.as_deref()
+    }
+
+    pub fn peer_id(&self) -> Option<&str> {
+        self.peer_id
+    }
+
+    pub fn chain_id(&self) -> Option<u8> {
+        self.chain_id
     }
 }
 
