@@ -142,18 +142,15 @@ async fn spawn_telemetry_service(
         }
     });
 
-    let base_url = match Url::parse(&telemetry_svc_url) {
-        Ok(url) => url,
-        Err(err) => {
-            error!(
-                "Unable to parse telemetry service URL {}. Make sure {} is unset or is set properly: {}. Defaulting to {}.",
-                telemetry_svc_url,
-                ENV_TELEMETRY_SERVICE_URL, err, TELEMETRY_SERVICE_URL
-            );
+    let base_url = Url::parse(&telemetry_svc_url).unwrap_or_else(|err| {
+        warn!(
+            "Unable to parse telemetry service URL {}. Make sure {} is unset or is set properly: {}. Defaulting to {}.",
+            telemetry_svc_url,
+            ENV_TELEMETRY_SERVICE_URL, err, TELEMETRY_SERVICE_URL
+        );
             Url::parse(TELEMETRY_SERVICE_URL)
                 .expect("unable to parse telemetry service default URL")
-        },
-    };
+    });
 
     let telemetry_sender = TelemetrySender::new(base_url, chain_id, &node_config);
 
