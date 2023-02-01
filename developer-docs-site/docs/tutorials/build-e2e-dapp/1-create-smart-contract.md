@@ -1,11 +1,13 @@
 ---
-title: "Create a Smart Contract"
+title: "1. Create a Smart Contract"
 id: "create-a-smart-contract"
 ---
 
-# Create a Smart Contract
+# 1. Create a Smart Contract
 
-If you haven’t done it, [install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). Make sure you use CLI version 1.0.4 or later as this what we use in this tutorial.
+This is the first chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md). If you haven’t done it, review that introduction, and ensure your environment meets the [prerequisites](../../cli-tools/aptos-cli-tool/index.md) listed there.
+
+Now that you are all set up and at your terminal:
 
 1.  `cd` into the `my-first-dapp` root directory, and create a new `move` directory.
 2.  `cd` into the new `move` directory and run: `aptos move init --name my_todo_list`
@@ -599,4 +601,4 @@ use std::string; // add this
 
 6. You can now head to the [Aptos Explorer](https://explorer.aptoslabs.com/), change the dropdown on the top right to the _Devnet_ network and look for that `transaction_hash` value - this will show you the transaction details.
 
-Now let's [set up a React app](./2-set-up-react-app.md).
+Now let's [set up a React app](./2-set-up-react-app.md) in chapter 2.
