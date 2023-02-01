@@ -454,7 +454,12 @@ impl BufferManager {
                     let new_item = match item.add_signature_if_matched(*vote) {
                         Ok(()) => item.try_advance_to_aggregated(&self.verifier),
                         Err(e) => {
-                            error!("Failed to add commit vote {:?} from author {:?} with commit info {:?}", e, author, commit_info);
+                            error!(
+                                error = ?e,
+                                author = author,
+                                commit_info = commit_info,
+                                "Failed to add commit vote",
+                            );
                             item
                         },
                     };
