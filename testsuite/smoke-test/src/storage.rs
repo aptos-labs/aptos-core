@@ -196,6 +196,8 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
             "local-fs",
             "--dir",
             backup_path.to_str().unwrap(),
@@ -203,7 +205,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .current_dir(workspace_root())
         .status()
         .unwrap();
-    assert!(status.success());
+    assert!(status.success(), "{}", status);
     info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
@@ -227,6 +229,8 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
             "--target-db-dir",
             target_db_dir.path().to_str().unwrap(),
             "local-fs",
@@ -236,7 +240,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .current_dir(workspace_root())
         .status()
         .unwrap();
-    assert!(status.success());
+    assert!(status.success(), "{}", status);
     info!(
         "Backup replay-verified in {} seconds.",
         now.elapsed().as_secs()
@@ -265,6 +269,8 @@ fn wait_for_backups(
                 "backup-storage-state",
                 "--metadata-cache-dir",
                 metadata_cache_path.to_str().unwrap(),
+                "--concurrent-downloads",
+                "4",
                 "local-fs",
                 "--dir",
                 backup_path.to_str().unwrap(),
@@ -332,6 +338,8 @@ pub(crate) fn db_backup(
             &state_snapshot_interval_epochs.to_string(),
             "--metadata-cache-dir",
             metadata_cache_path1.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
             "local-fs",
             "--dir",
             backup_path.path().to_str().unwrap(),
@@ -372,6 +380,8 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
         .args([
             "--target-db-dir",
             db_path.to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
             "auto",
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
@@ -382,6 +392,6 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
         .current_dir(workspace_root())
         .status()
         .unwrap();
-    assert!(status.success());
+    assert!(status.success(), "{}", status);
     info!("Backup restored in {} seconds.", now.elapsed().as_secs());
 }
