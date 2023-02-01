@@ -329,10 +329,36 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
+        let (ledger_db, state_merkle_db, kv_db) =
+            Self::open_dbs(db_root_path.as_ref(), rocksdb_configs, readonly)?;
+
+        let mut myself = Self::new_with_dbs(
+            ledger_db,
+            state_merkle_db,
+            kv_db,
+            pruner_config,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            readonly,
+        );
+
+        if !readonly && enable_indexer {
+            myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
+        }
+
+        Ok(myself)
+    }
+
+    pub fn open_dbs<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        rocksdb_configs: RocksdbConfigs,
+        readonly: bool,
+    ) -> Result<(DB, DB, Option<DB>)> {
+        let instant = Instant::now();
+
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let kv_db_path = db_root_path.as_ref().join(KV_DB_NAME);
-        let instant = Instant::now();
 
         let (ledger_db, state_merkle_db, kv_db) = if readonly {
             (
@@ -386,20 +412,6 @@ impl AptosDB {
             )
         };
 
-        let mut myself = Self::new_with_dbs(
-            ledger_db,
-            state_merkle_db,
-            kv_db,
-            pruner_config,
-            buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
-            readonly,
-        );
-
-        if !readonly && enable_indexer {
-            myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
-        }
-
         if rocksdb_configs.use_kv_db {
             info!(kv_db_path = kv_db_path, "Opened K/V DB.",);
         }
@@ -409,7 +421,8 @@ impl AptosDB {
             time_ms = %instant.elapsed().as_millis(),
             "Opened AptosDB (LedgerDB + StateMerkleDB).",
         );
-        Ok(myself)
+
+        Ok((ledger_db, state_merkle_db, kv_db))
     }
 
     fn open_indexer(
