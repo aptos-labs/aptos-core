@@ -133,7 +133,7 @@ jobs:
           # For posting a rich message using Block Kit
           payload: |
             {
-              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
+              "text": "${{ ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

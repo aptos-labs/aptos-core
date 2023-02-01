@@ -13,45 +13,11 @@ on:
 
 jobs:
   fullnode-fast-testnet-stable:
-    timeout-minutes: 300 # Run for at most 5 hours
-    runs-on: high-perf-docker-with-local-ssd
-    steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-
-      - uses: ./.github/actions/fullnode-sync
-        with:
-          TIMEOUT_MINUTES: 300 # Run for at most 5 hours
-          BRANCH: testnet
-          NETWORK: testnet
-          BOOTSTRAPPING_MODE: DownloadLatestStates
-          CONTINUOUS_SYNCING_MODE: ExecuteTransactions
-          DATA_DIR_FILE_PATH: /tmp/
-          NODE_LOG_FILE_PATH: /tmp/node_log
-
-      - name: Upload node logs as an artifact
-        uses: actions/upload-artifact@v3
-        if: ${{ always() }}
-        with:
-          name: node_log
-          path: |
-            /tmp/node_log
-          retention-days: 14
-
-      - name: Post to a Slack channel on failure
-        if: failure()
-        id: slack
-        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
-        with:
-          payload: |
-            {
-              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} `${{ github.job }}`: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
-
-      # Because we have to checkout the actions and then check out a different
-      # branch, it's possible the actions directory will be modified. So, we
-      # need to check it out again for the Post Run actions/checkout to succeed.
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        with:
-          path: actions
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-fast-testnet-stable
+      BRANCH: testnet
+      NETWORK: testnet
+      BOOTSTRAPPING_MODE: DownloadLatestStates
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactions
