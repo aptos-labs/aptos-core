@@ -8,40 +8,39 @@ use aptos_backup_cli::{
         state_snapshot::backup::{StateSnapshotBackupController, StateSnapshotBackupOpt},
         transaction::backup::{TransactionBackupController, TransactionBackupOpt},
     },
-    coordinators::backup::{BackupCoordinator, BackupCoordinatorOpt},
+    coordinators::{
+        backup::{BackupCoordinator, BackupCoordinatorOpt},
+        verify::VerifyCoordinator,
+    },
     metadata::{cache, cache::MetadataCacheOpt},
-    storage::StorageOpt,
+    storage::{DBToolStorageOpt, StorageOpt},
     utils::{
         backup_service_client::{BackupServiceClient, BackupServiceClientOpt},
-        ConcurrentDownloadsOpt, GlobalBackupOpt,
+        ConcurrentDownloadsOpt, GlobalBackupOpt, TrustedWaypointOpt,
     },
 };
-use aptos_logger::{prelude::*, Level, Logger};
+use aptos_logger::{Level, Logger};
 use aptos_push_metrics::MetricsPusher;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::sync::Arc;
 
-#[derive(Parser)]
-#[clap(about = "Ledger backup tool.")]
+/// Supports one-time and continuous backup, including querying the backup service and verifying the backup.
+#[derive(Subcommand)]
 pub enum Command {
-    #[clap(subcommand, about = "Manually run one shot commands.")]
-    OneShot(OneShotCommand),
+    #[clap(about = "Manually run one shot commands.")]
+    Oneoff(OneoffBackupOpt),
     #[clap(
-        subcommand,
-        about = "Long running process backing up the chain continuously."
+        about = "Run the backup coordinator which backs up blockchain data continuously off \
+    a Aptos Node."
     )]
-    Coordinator(CoordinatorCommand),
-}
-
-#[derive(Parser)]
-pub enum OneShotCommand {
+    Continuously(CoordinatorRunOpt),
     #[clap(
         subcommand,
         about = "Query the backup service builtin in the local node."
     )]
     Query(OneShotQueryType),
-    #[clap(about = "Do a one shot backup of either of the backup types.")]
-    Backup(OneShotBackupOpt),
+    #[clap(about = "verify the backup through restoring with the backup files")]
+    Verify(VerifyOpt),
 }
 
 #[derive(Parser)]
@@ -74,7 +73,7 @@ pub struct OneShotQueryBackupStorageStateOpt {
 }
 
 #[derive(Parser)]
-pub struct OneShotBackupOpt {
+pub struct OneoffBackupOpt {
     #[clap(flatten)]
     global: GlobalBackupOpt,
 
@@ -90,30 +89,21 @@ enum BackupType {
     EpochEnding {
         #[clap(flatten)]
         opt: EpochEndingBackupOpt,
-        #[clap(subcommand)]
-        storage: StorageOpt,
+        #[clap[flatten]]
+        storage: DBToolStorageOpt,
     },
     StateSnapshot {
         #[clap(flatten)]
         opt: StateSnapshotBackupOpt,
-        #[clap(subcommand)]
-        storage: StorageOpt,
+        #[clap[flatten]]
+        storage: DBToolStorageOpt,
     },
     Transaction {
         #[clap(flatten)]
         opt: TransactionBackupOpt,
-        #[clap(subcommand)]
-        storage: StorageOpt,
+        #[clap[flatten]]
+        storage: DBToolStorageOpt,
     },
-}
-
-#[derive(Parser)]
-pub enum CoordinatorCommand {
-    #[clap(
-        about = "Run the backup coordinator which backs up blockchain data continuously off \
-    a Aptos Node."
-    )]
-    Run(CoordinatorRunOpt),
 }
 
 #[derive(Parser)]
@@ -127,46 +117,29 @@ pub struct CoordinatorRunOpt {
     #[clap(flatten)]
     coordinator: BackupCoordinatorOpt,
 
-    #[clap(subcommand)]
-    storage: StorageOpt,
+    #[clap[flatten]]
+    storage: DBToolStorageOpt,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    main_impl().await.map_err(|e| {
-        error!("main_impl() failed: {}", e);
-        e
-    })
+#[derive(Parser)]
+pub struct VerifyOpt {
+    #[clap(flatten)]
+    metadata_cache_opt: MetadataCacheOpt,
+    #[clap(flatten)]
+    trusted_waypoints_opt: TrustedWaypointOpt,
+    #[clap(flatten)]
+    storage: DBToolStorageOpt,
+    #[clap(flatten)]
+    concurrent_downloads: ConcurrentDownloadsOpt,
 }
 
-async fn main_impl() -> Result<()> {
-    Logger::new().level(Level::Info).init();
-    #[allow(deprecated)]
-    let _mp = MetricsPusher::start();
-
-    let cmd = Command::from_args();
-    match cmd {
-        Command::OneShot(one_shot_cmd) => match one_shot_cmd {
-            OneShotCommand::Query(typ) => match typ {
-                OneShotQueryType::NodeState(opt) => {
-                    let client = BackupServiceClient::new_with_opt(opt.client);
-                    if let Some(db_state) = client.get_db_state().await? {
-                        println!("{}", db_state)
-                    } else {
-                        println!("DB not bootstrapped.")
-                    }
-                },
-                OneShotQueryType::BackupStorageState(opt) => {
-                    let view = cache::sync_and_load(
-                        &opt.metadata_cache,
-                        opt.storage.init_storage().await?,
-                        opt.concurrent_downloads.get(),
-                    )
-                    .await?;
-                    println!("{}", view.get_storage_state()?)
-                },
-            },
-            OneShotCommand::Backup(opt) => {
+impl Command {
+    pub async fn run(self) -> Result<()> {
+        Logger::new().level(Level::Info).init();
+        #[allow(deprecated)]
+        let _mp = MetricsPusher::start();
+        match self {
+            Command::Oneoff(opt) => {
                 let client = Arc::new(BackupServiceClient::new_with_opt(opt.client));
                 let global_opt = opt.global;
 
@@ -203,9 +176,7 @@ async fn main_impl() -> Result<()> {
                     },
                 }
             },
-        },
-        Command::Coordinator(coordinator_cmd) => match coordinator_cmd {
-            CoordinatorCommand::Run(opt) => {
+            Command::Continuously(opt) => {
                 BackupCoordinator::new(
                     opt.coordinator,
                     opt.global,
@@ -215,7 +186,36 @@ async fn main_impl() -> Result<()> {
                 .run()
                 .await?;
             },
-        },
+            Command::Query(typ) => match typ {
+                OneShotQueryType::NodeState(opt) => {
+                    let client = BackupServiceClient::new_with_opt(opt.client);
+                    if let Some(db_state) = client.get_db_state().await? {
+                        println!("{}", db_state)
+                    } else {
+                        println!("DB not bootstrapped.")
+                    }
+                },
+                OneShotQueryType::BackupStorageState(opt) => {
+                    let view = cache::sync_and_load(
+                        &opt.metadata_cache,
+                        opt.storage.init_storage().await?,
+                        opt.concurrent_downloads.get(),
+                    )
+                    .await?;
+                    println!("{}", view.get_storage_state()?)
+                },
+            },
+            Command::Verify(opt) => {
+                VerifyCoordinator::new(
+                    opt.storage.init_storage().await?,
+                    opt.metadata_cache_opt,
+                    opt.trusted_waypoints_opt,
+                    opt.concurrent_downloads.get(),
+                )?
+                .run()
+                .await?
+            },
+        }
+        Ok(())
     }
-    Ok(())
 }

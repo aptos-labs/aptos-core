@@ -135,10 +135,12 @@ impl Cmd {
                 &state_merkle_db,
                 self.target_version,
             )?
-            .expect(&format!(
-                "Could not find a valid root before or at version {}, maybe it was pruned?",
-                self.target_version
-            ));
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not find a valid root before or at version {}, maybe it was pruned?",
+                    self.target_version
+                )
+            });
 
             println!(
                 "Starting state merkle db truncation... target_version: {}",
@@ -394,7 +396,7 @@ impl Cmd {
         let status = StatusLine::new(Progress::new(target_version));
         loop {
             let batch = SchemaBatch::new();
-            let current_version = Self::get_current_version_in_state_merkle_db(&state_merkle_db)?
+            let current_version = Self::get_current_version_in_state_merkle_db(state_merkle_db)?
                 .expect("Current version of state merkle db must exist.");
             status.set_current_version(current_version);
             assert_ge!(current_version, target_version);
@@ -502,8 +504,9 @@ mod test {
             prop_assert_eq!(txn_list_with_proof.events.unwrap().len() as u64, db_version + 1);
             prop_assert_eq!(txn_list_with_proof.first_transaction_version, Some(0));
 
-            let state_leaf_count = db.get_state_leaf_count(db_version).unwrap();
-            let state_value_chunk_with_proof = db.get_state_value_chunk_with_proof(db_version, 0, state_leaf_count).unwrap();
+            let state_checkpoint_version = db.get_latest_state_checkpoint_version().unwrap().unwrap();
+            let state_leaf_count = db.get_state_leaf_count(state_checkpoint_version).unwrap();
+            let state_value_chunk_with_proof = db.get_state_value_chunk_with_proof(state_checkpoint_version, 0, state_leaf_count).unwrap();
             prop_assert_eq!(state_value_chunk_with_proof.first_index, 0);
             prop_assert_eq!(state_value_chunk_with_proof.last_index as usize, state_leaf_count - 1);
             prop_assert_eq!(state_value_chunk_with_proof.raw_values.len(), state_leaf_count);

@@ -1,0 +1,26 @@
+[package]
+name = "aptos-db-tool"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-backup-cli = { workspace = true }
+aptos-config = { workspace = true }
+aptos-db = { workspace = true, features = ["db-debugger"] }
+aptos-executor-types = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-push-metrics = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+clap = { workspace = true }
+owo-colors = { workspace = true }
+tokio = { workspace = true }

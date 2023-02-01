@@ -59,7 +59,6 @@ impl VerifyCoordinator {
             info!("Verify coordinator exiting with success.");
             VERIFY_COORDINATOR_SUCC_TS.set(unix_timestamp_sec());
         }
-
         ret
     }
 

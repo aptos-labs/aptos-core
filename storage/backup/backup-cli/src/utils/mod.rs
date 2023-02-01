@@ -56,25 +56,25 @@ pub struct GlobalBackupOpt {
 
 #[derive(Clone, Parser)]
 pub struct RocksdbOpt {
-    #[clap(long, default_value = "5000")]
+    #[clap(long, hidden(true), default_value = "5000")]
     ledger_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     ledger_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "5000")]
+    #[clap(long, hidden(true), default_value = "5000")]
     state_merkle_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
-    #[clap(long)]
+    #[clap(long, hidden(true))]
     use_kv_db: bool,
-    #[clap(long, default_value = "5000")]
+    #[clap(long, hidden(true), default_value = "5000")]
     kv_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     kv_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "1000")]
+    #[clap(long, hidden(true), default_value = "1000")]
     index_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     index_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "16")]
+    #[clap(long, hidden(true), default_value = "16")]
     max_background_jobs: i32,
 }
 
