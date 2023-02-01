@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use crate::{db_debugger::common::DbDir, AptosDB};
 use anyhow::{ensure, Result};
 use clap::Parser;
 use std::{fs, path::PathBuf};
@@ -21,17 +21,6 @@ impl Cmd {
         ensure!(!self.output_dir.exists(), "Output dir already exists.");
         fs::create_dir_all(&self.output_dir)?;
 
-        // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
-        // https://github.com/facebook/rocksdb/issues/11167
-        {
-            let ledger_db = self.db_dir.open_ledger_db_rw()?;
-            ledger_db.create_checkpoint(&self.output_dir.join(LEDGER_DB_NAME))?;
-        }
-        {
-            let state_merkle_db = self.db_dir.open_state_merkle_db_rw()?;
-            state_merkle_db.create_checkpoint(&self.output_dir.join(STATE_MERKLE_DB_NAME))?;
-        }
-
-        Ok(())
+        AptosDB::create_checkpoint(self.db_dir, self.output_dir)
     }
 }
