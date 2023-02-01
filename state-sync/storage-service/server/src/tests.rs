@@ -3,7 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{metrics, network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
+use crate::{
+    get_peers_with_ready_subscriptions, metrics, network::StorageServiceNetworkEvents,
+    remove_expired_data_subscriptions, DataSubscriptionRequest, ResponseSender, StorageReader,
+    StorageServiceServer,
+};
 use anyhow::{format_err, Result};
 use aptos_bitvec::BitVec;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -12,6 +16,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_network::{
     application::interface::NetworkServiceEvents,
@@ -44,8 +49,10 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
         TransactionAccumulatorSummary,
@@ -61,11 +68,13 @@ use aptos_types::{
         TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
         TransactionWithProof, Version,
     },
+    validator_verifier::ValidatorVerifier,
     write_set::WriteSet,
     PeerId,
 };
 use claims::{assert_matches, assert_none};
 use futures::channel::{oneshot, oneshot::Receiver};
+use lru::LruCache;
 use mockall::{
     mock,
     predicate::{always, eq},
@@ -78,6 +87,172 @@ use tokio::time::timeout;
 /// Various test constants for storage
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
 const PROTOCOL_VERSION: u64 = 1;
+
+#[tokio::test]
+async fn test_peers_with_ready_subscriptions() {
+    // Create a mock time service
+    let time_service = TimeService::mock();
+
+    // Create two peers and data subscriptions
+    let peer_network_1 = PeerNetworkId::random();
+    let peer_network_2 = PeerNetworkId::random();
+    let data_subscription_1 = create_subscription_request(time_service.clone(), Some(1), Some(1));
+    let data_subscription_2 = create_subscription_request(time_service.clone(), Some(10), Some(1));
+
+    // Insert the data subscriptions into the pending map
+    let data_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+    data_subscriptions
+        .lock()
+        .insert(peer_network_1, data_subscription_1);
+    data_subscriptions
+        .lock()
+        .insert(peer_network_2, data_subscription_2);
+
+    // Create epoch ending test data
+    let epoch_ending_ledger_info = create_epoch_ending_ledger_info(1, 5);
+    let epoch_change_proof = EpochChangeProof {
+        ledger_info_with_sigs: vec![epoch_ending_ledger_info],
+        more: false,
+    };
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    expect_get_epoch_ending_ledger_infos(&mut db_reader, 1, 2, epoch_change_proof);
+
+    // Create the storage reader
+    let storage_reader = StorageReader::new(StorageServiceConfig::default(), Arc::new(db_reader));
+
+    // Create test data with an empty storage server summary
+    let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+    let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(0)));
+
+    // Verify that there are no peers with ready subscriptions
+    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
+        cached_storage_server_summary.clone(),
+        data_subscriptions.clone(),
+        lru_storage_cache.clone(),
+        storage_reader.clone(),
+        time_service.clone(),
+    )
+    .unwrap();
+    assert!(peers_with_ready_subscriptions.is_empty());
+
+    // Update the storage server summary so that there is new data for subscription 1
+    let mut storage_server_summary = StorageServerSummary::default();
+    let synced_ledger_info = create_test_ledger_info_with_sigs(1, 2);
+    storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info.clone());
+    *cached_storage_server_summary.write() = storage_server_summary;
+
+    // Verify that subscription 1 is ready
+    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
+        cached_storage_server_summary.clone(),
+        data_subscriptions.clone(),
+        lru_storage_cache.clone(),
+        storage_reader.clone(),
+        time_service.clone(),
+    )
+    .unwrap();
+    assert_eq!(peers_with_ready_subscriptions, vec![(
+        peer_network_1,
+        synced_ledger_info
+    )]);
+
+    // Manually remove subscription 1 from the map
+    data_subscriptions.lock().remove(&peer_network_1);
+
+    // Update the storage server summary so that there is new data for subscription 2,
+    // but the subscription is invalid because it doesn't respect an epoch boundary.
+    let mut storage_server_summary = StorageServerSummary::default();
+    let synced_ledger_info = create_test_ledger_info_with_sigs(2, 100);
+    storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info);
+    *cached_storage_server_summary.write() = storage_server_summary;
+
+    // Verify that subscription 2 is not returned because it was invalid
+    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
+        cached_storage_server_summary,
+        data_subscriptions,
+        lru_storage_cache,
+        storage_reader,
+        time_service,
+    )
+    .unwrap();
+    assert_eq!(peers_with_ready_subscriptions, vec![]);
+
+    // Verify that data subscriptions no longer contains peer 2
+    assert!(peers_with_ready_subscriptions.is_empty());
+}
+
+#[tokio::test]
+async fn test_remove_expired_subscriptions() {
+    // Create a storage service config
+    let max_subscription_period_ms = 100;
+    let storage_service_config = StorageServiceConfig {
+        max_subscription_period_ms,
+        ..Default::default()
+    };
+
+    // Create a mock time service
+    let time_service = TimeService::mock();
+
+    // Create the first batch of test data subscriptions
+    let num_subscriptions_in_batch = 10;
+    let data_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+    for _ in 0..num_subscriptions_in_batch {
+        let data_subscription = create_subscription_request(time_service.clone(), None, None);
+        data_subscriptions
+            .lock()
+            .insert(PeerNetworkId::random(), data_subscription);
+    }
+
+    // Verify the number of active data subscriptions
+    assert_eq!(data_subscriptions.lock().len(), num_subscriptions_in_batch);
+
+    // Elapse a small amount of time (not enough to expire the subscriptions)
+    time_service
+        .clone()
+        .into_mock()
+        .advance_async(Duration::from_millis(max_subscription_period_ms / 2))
+        .await;
+
+    // Remove the expired subscriptions and verify none were removed
+    remove_expired_data_subscriptions(storage_service_config, data_subscriptions.clone());
+    assert_eq!(data_subscriptions.lock().len(), num_subscriptions_in_batch);
+
+    // Create another batch of data subscriptions
+    for _ in 0..num_subscriptions_in_batch {
+        let data_subscription = create_subscription_request(time_service.clone(), None, None);
+        data_subscriptions
+            .lock()
+            .insert(PeerNetworkId::random(), data_subscription);
+    }
+
+    // Verify the new number of active data subscriptions
+    assert_eq!(
+        data_subscriptions.lock().len(),
+        num_subscriptions_in_batch * 2
+    );
+
+    // Elapse enough time to expire the first batch of subscriptions
+    time_service
+        .clone()
+        .into_mock()
+        .advance_async(Duration::from_millis(max_subscription_period_ms))
+        .await;
+
+    // Remove the expired subscriptions and verify the first batch was removed
+    remove_expired_data_subscriptions(storage_service_config, data_subscriptions.clone());
+    assert_eq!(data_subscriptions.lock().len(), num_subscriptions_in_batch);
+
+    // Elapse enough time to expire the second batch of subscriptions
+    time_service
+        .into_mock()
+        .advance_async(Duration::from_millis(max_subscription_period_ms))
+        .await;
+
+    // Remove the expired subscriptions and verify the second batch was removed
+    remove_expired_data_subscriptions(storage_service_config, data_subscriptions.clone());
+    assert!(data_subscriptions.lock().is_empty());
+}
 
 #[tokio::test]
 async fn test_cachable_requests_compression() {
@@ -2915,6 +3090,29 @@ async fn send_storage_request(
     mock_client.process_request(storage_request).await
 }
 
+/// Creates a random data subscription request
+fn create_subscription_request(
+    time_service: TimeService,
+    known_version: Option<u64>,
+    known_epoch: Option<u64>,
+) -> DataSubscriptionRequest {
+    // Create a storage service request
+    let data_request = create_subscription_data_request(known_version, known_epoch);
+    let storage_service_request = StorageServiceRequest::new(data_request, true);
+
+    // Create the response sender
+    let (callback, _) = oneshot::channel();
+    let response_sender = ResponseSender::new(callback);
+
+    // Create and return the data subscription request
+    DataSubscriptionRequest::new(
+        ProtocolId::StorageServiceRpc,
+        storage_service_request,
+        response_sender,
+        time_service,
+    )
+}
+
 /// Creates a mock db with the basic expectations required to handle subscription requests
 fn create_mock_db_for_subscription(
     highest_ledger_info_clone: LedgerInfoWithSignatures,
@@ -3029,6 +3227,28 @@ fn configure_network_chunk_limit(
     }
 }
 
+/// Creates a test epoch ending ledger info
+pub fn create_epoch_ending_ledger_info(epoch: u64, version: u64) -> LedgerInfoWithSignatures {
+    // Create a new epoch state
+    let verifier = ValidatorVerifier::from(&ValidatorSet::empty());
+    let next_epoch_state = EpochState { epoch, verifier };
+
+    // Create a mock ledger info with signatures
+    let ledger_info = LedgerInfo::new(
+        BlockInfo::new(
+            epoch,
+            0,
+            HashValue::zero(),
+            HashValue::zero(),
+            version,
+            0,
+            Some(next_epoch_state),
+        ),
+        HashValue::zero(),
+    );
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
+}
+
 /// Creates a test epoch change proof
 fn create_epoch_ending_ledger_infos(
     start_epoch: Epoch,
@@ -3080,6 +3300,41 @@ fn create_state_keys_and_values(
             (StateKey::Raw(vec![]), state_value)
         })
         .collect()
+}
+
+/// Creates a random data request for subscription data
+fn create_subscription_data_request(
+    known_version: Option<u64>,
+    known_epoch: Option<u64>,
+) -> DataRequest {
+    let known_version = known_version.unwrap_or_default();
+    let known_epoch = known_epoch.unwrap_or_default();
+
+    // Generate the random data request
+    let mut rng = OsRng;
+    let random_number: u8 = rng.gen();
+    match random_number % 3 {
+        0 => DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version,
+            known_epoch,
+            include_events: false,
+        }),
+        1 => {
+            DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+            })
+        },
+        2 => DataRequest::GetNewTransactionsOrOutputsWithProof(
+            NewTransactionsOrOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events: true,
+                max_num_output_reductions: 1,
+            },
+        ),
+        num => panic!("This shouldn't be possible! Got num: {:?}", num),
+    }
 }
 
 /// Creates a test ledger info with signatures
