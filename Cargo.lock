@@ -8598,13 +8598,12 @@ dependencies = [
 
 [[package]]
 name = "reqwest-middleware"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69539cea4148dce683bec9dc95be3f0397a9bb2c248a49c8296a9d21659a8cdd"
+checksum = "4a1c03e9011a8c59716ad13115550469e081e2e9892656b0ba6a47c907921894"
 dependencies = [
  "anyhow",
  "async-trait",
- "futures",
  "http",
  "reqwest",
  "serde 1.0.149",
@@ -8614,9 +8613,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest-retry"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce246a729eaa6aff5e215aee42845bf5fed9893cc6cd51aeeb712f34e04dd9f3"
+checksum = "db161043fcfae3bdf30768bb1fa833853cd55ddf2411b1acb03e0c72bf86a9ea"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -14,23 +14,6 @@ use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
-/// TODO: Cleanup after v1 API is ramped up
-pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("push-metrics")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-        ]))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::bytes())
-        .and_then(handle_metrics_ingest)
-        .boxed()
-}
-
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
         .and(warp::post())

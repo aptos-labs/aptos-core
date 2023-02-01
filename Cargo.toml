@@ -402,8 +402,8 @@ rand_core = "0.5.1"
 rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
-reqwest-middleware = "0.1.6"
-reqwest-retry = "0.1.5"
+reqwest-middleware = "0.2.0"
+reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.19.0", features = ["lz4"] }
