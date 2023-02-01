@@ -16,11 +16,9 @@ Python 3.9.13
 ```
 If it is not installed, you can find installation instructions on [python.org](https://www.python.org/downloads/).
 
-Optionally, [install the Rust programming language and Cargo package manager](https://doc.rust-lang.org/cargo/getting-started/installation.html) for your operating system to enable automatic [updates](#update).
-
 ## Install
 
-Follow these instructions to install Aptos CLI on various operating systems. Regardless of the operating system, you will always be directed to the latest release of the Aptos CLI. 
+Follow these instructions to install the Aptos CLI on various operating systems. Regardless of the operating system, you will always be directed to the latest release of the Aptos CLI. 
 
 <details>
 <summary>macOS / Linux / Windows Subsystem for Linux (WSL)</summary>
@@ -59,6 +57,13 @@ iwr "https://aptos.dev/scripts/install_cli.py" -useb | Select-Object -ExpandProp
 
 ## Update
 
+To trigger automatic updates, run: `aptos update` and see output indicating success:
+```
+{
+  "Result": "CLI already up to date (v1.0.4)"
+}
+```
+
 To manually update your version of the Aptos CLI, run `python3 install_cli.py` and receive output resembling:
 
 ```
@@ -66,17 +71,6 @@ Latest CLI release: 1.0.4
 Currently installed CLI: 1.0.4
 
 The latest version (1.0.4) is already installed.
-```
-
-To trigger automatic updates, run `cargo build -p aptos` and see similar output indicating success:
-as shown in the output:
-```
-cargo build -p aptos
-cp target/debug/aptos
-/tmp/aptos update
-{
-  "Result": "CLI already up to date (v1.0.4)"
-}
 ```
 
 
