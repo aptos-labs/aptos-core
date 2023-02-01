@@ -200,7 +200,7 @@ proptest! {
 
     #[test]
     #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
-    fn test_end_to_end(d in test_data_strategy()) {
+    fn test_end_to_end(d in test_data_strategy().no_shrink()) {
         test_end_to_end_impl(d)
     }
 }

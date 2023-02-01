@@ -924,6 +924,67 @@ impl TransactionOutput {
         } = self;
         (write_set, events, gas_used, status)
     }
+
+    pub fn ensure_match_transaction_info(
+        &self,
+        version: Version,
+        txn_info: &TransactionInfo,
+        expected_write_set: Option<&WriteSet>,
+        expected_events: Option<&[ContractEvent]>,
+    ) -> Result<()> {
+        const ERR_MSG: &str = "TransactionOutput does not match TransactionInfo";
+
+        let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
+        ensure!(
+            self.status() == &expected_txn_status,
+            "{}: version:{}, status:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.status(),
+            expected_txn_status,
+        );
+
+        ensure!(
+            self.gas_used() == txn_info.gas_used(),
+            "{}: version:{}, gas_used:{:?}, expected:{:?}",
+            ERR_MSG,
+            version,
+            self.gas_used(),
+            txn_info.gas_used(),
+        );
+
+        let write_set_hash = CryptoHash::hash(self.write_set());
+        ensure!(
+            write_set_hash == txn_info.state_change_hash(),
+            "{}: version:{}, write_set_hash:{:?}, expected:{:?}, write_set: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            write_set_hash,
+            txn_info.state_change_hash(),
+            self.write_set,
+            expected_write_set,
+        );
+
+        let event_hashes = self
+            .events()
+            .iter()
+            .map(CryptoHash::hash)
+            .collect::<Vec<_>>();
+        let event_root_hash =
+            InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+        ensure!(
+            event_root_hash == txn_info.event_root_hash(),
+            "{}: version:{}, event_root_hash:{:?}, expected:{:?}, events: {:?}, expected(if known): {:?}",
+            ERR_MSG,
+            version,
+            event_root_hash,
+            txn_info.event_root_hash(),
+            self.events(),
+            expected_events,
+        );
+
+        Ok(())
+    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
