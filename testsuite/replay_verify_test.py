@@ -7,7 +7,7 @@ import os
 import unittest
 import subprocess
 
-from .replay_verify import find_latest_version_from_db_backup_output
+from verify_core.common import find_latest_version_from_db_backup_output
 
 
 class ReplayVerifyHarnessTests(unittest.TestCase):

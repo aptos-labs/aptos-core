@@ -1,18 +1,12 @@
-name: "Replay Verify"
+name: "Module Verify"
 description: |
-  Runs the replay-verify tool from aptos-core, assuming it is already checked out in the current working directory.
+  Runs the module-verify tool from aptos-core, assuming it is already checked out in the current working directory.
 inputs:
   BUCKET:
     description: "The name of the bucket to download the ledger from."
     required: true
   SUB_DIR:
     description: "The subdirectory of the bucket to download the ledger from."
-    required: true
-  HISTORY_START:
-    description: "The starting history index to replay from."
-    required: true
-  TXNS_TO_SKIP:
-    description: "A list of transaction indices to skip during replay."
     required: true
   BACKUP_CONFIG_TEMPLATE_PATH:
     description: "The path to the backup config template to use."
@@ -22,7 +16,6 @@ runs:
   using: composite
   steps:
     - uses: ./.github/actions/rust-setup
-
     - name: Install AWS CLI
       shell: bash
       run: |
@@ -33,12 +26,10 @@ runs:
       shell: bash
       run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
 
-    - name: Run replay-verify in parallel
+    - name: Run module-verify in parallel
       shell: bash
-      run: testsuite/replay_verify.py
+      run: testsuite/module_verify.py
       env:
         BUCKET: ${{ inputs.BUCKET }}
         SUB_DIR: ${{ inputs.SUB_DIR }}
-        HISTORY_START: ${{ inputs.HISTORY_START }}
-        TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
         BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}

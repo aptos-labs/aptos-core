@@ -1,7 +1,7 @@
 # This defines a workflow to verify all modules that have been published on chain with the latest aptos node software.
 # In order to trigger it go to the Actions Tab of the Repo, click "Verify Modules" and then "Run Workflow".
 
-name: "Verify Modules"
+name: "verify-modules-testnet"
 on:
   # Allow triggering manually
   workflow_dispatch:
@@ -9,25 +9,26 @@ on:
       GIT_SHA:
         required: false
         type: string
-        description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
+        description: The git SHA1 to test. If not specified, it will use the latest commit on main.
   pull_request:
     paths:
-      - ".github/workflows/verify-on-chain-modules-mainnet.yaml"
+      - ".github/workflows/module-verify-testnet.yaml"
 
 env:
-  BUCKET:  aptos-mainnet-backup-backup-831a69a8
+  BUCKET: aptos-testnet-backup-2223d95b
   SUB_DIR: e1
   CONFIG_TEMPLATE_NAME: s3-public.yaml
 
 jobs:
-  replay-transactions:
-    timeout-minutes: 10
+  module-verify:
+    timeout-minutes: 720
     runs-on: high-perf-docker-with-local-ssd
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/verify-modules
+      - uses: ./.github/actions/module-verify
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          BUCKET: aptos-testnet-backup-2223d95b
+          SUB_DIR: e1
+          BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml

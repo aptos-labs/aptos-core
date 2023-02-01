@@ -30,7 +30,7 @@ on:
       - ".github/workflows/replay-verify-testnet.yaml"
 
 jobs:
-  replay-transactions:
+  replay-verify:
     # if we're running on a PR, it's only for testing purposes, so we can set a shorter timeout
     timeout-minutes: ${{ github.event_name == 'pull_request' && 20 || 720 }}
     runs-on: high-perf-docker-with-local-ssd
