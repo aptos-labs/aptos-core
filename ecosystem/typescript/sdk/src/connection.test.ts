@@ -15,6 +15,13 @@ describe("IndexerClient", () => {
     await faucetClient.fundAccount(alice.address(), 100000000);
   });
 
+  test("gets genesis account", async () => {
+    const connection = new Connection("devnet");
+    const genesisAccount = await connection.getAccount("0x1");
+    expect(genesisAccount.authentication_key.length).toBe(66);
+    expect(genesisAccount.sequence_number).not.toBeNull();
+  });
+
   it("gets account NFTs", async () => {
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
