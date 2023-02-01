@@ -2,7 +2,7 @@
 testnet: true
 remote_endpoint: ~
 framework_release:
-  bytecode_version: 5
+  bytecode_version: 6
 gas_schedule:
   feature_version: 6
   entries:
