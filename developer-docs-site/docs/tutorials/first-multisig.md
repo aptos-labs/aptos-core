@@ -210,7 +210,7 @@ Then Deedee and the Alice/Bob/Chad group (under the authority of Bob and Chad) a
 
 ## Step 8: Perform Move package governance
 
-In this section the multisig vanity account will publish a simple package, upgrade it, then invoke a Move governance script.
+In this section the multisig vanity account will publish a simple package, upgrade it, then invoke a Move governance](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) script.
 
 Here, [semantic versioning](https://semver.org/) is used to distinguish between versions `v1.0.0` and `v1.1.0` of the `UpgradeAndGovern` example package from the `move-examples` folder.
 
