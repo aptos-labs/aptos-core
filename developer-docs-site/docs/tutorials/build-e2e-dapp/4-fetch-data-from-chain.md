@@ -1,9 +1,11 @@
 ---
-title: "Fetch Data from Chain"
+title: "4. Fetch Data from Chain"
 id: "fetch-data-from-chain"
 ---
 
-# Fetch Data from Chain
+# 4. Fetch Data from Chain
+
+In the fourth chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will be learning to fetch data from chain.
 
 Our UI logic relies on whether the connected account has created a todo list. If the account has created a todo list, our app should display that list; if not, the app should display a button offering the option to create a new list.
 
@@ -136,4 +138,4 @@ We now have an **Add new list** button that appears only if the account doesn’
 
 Start the local server with `npm start`. You should see the **Add new list** button.
 
-Next, let’s understand how to create a new list by [submitting data to chain](./5-submit-data-to-chain.md).
+Next, let’s understand how to create a new list by [submitting data to chain](./5-submit-data-to-chain.md) in chapter 5.
