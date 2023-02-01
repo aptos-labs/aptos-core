@@ -11,6 +11,7 @@ use aptos_types::{
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
+use std::{path::PathBuf, process::Command};
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -352,4 +353,53 @@ fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<Fe
     } else {
         assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
     }
+}
+
+/// Test compilation without source code
+#[test]
+fn build_with_bytecode() {
+    let execute_cmd = |cmd: &str, path: &PathBuf| {
+        let external_cmd = cmd.trim_start();
+        let mut cmd_iter = external_cmd.split_ascii_whitespace();
+        let external_program = cmd_iter.next().expect("empty external command");
+        let mut command = Command::new(external_program);
+        command.args(cmd_iter);
+        command.current_dir::<&PathBuf>(path);
+        command.output().unwrap();
+    };
+
+    // Compile C
+    let path_c = common::test_dir_path("code_publishing.data/pack_compile_bytecode/C");
+    assert!(aptos_framework::BuiltPackage::build(
+        path_c.to_owned(),
+        aptos_framework::BuildOptions::default(),
+    )
+    .is_ok());
+
+    // remove/rename sources for using bytecode
+    execute_cmd("mv ./sources/Foo.move ./sources/Foo.move_old", &path_c);
+    execute_cmd("rm -rf ./build/Foo/sources", &path_c);
+
+    // Compile B
+    let path_b = common::test_dir_path("code_publishing.data/pack_compile_bytecode/B");
+    assert!(aptos_framework::BuiltPackage::build(
+        path_b.to_owned(),
+        aptos_framework::BuildOptions::default(),
+    )
+    .is_ok());
+
+    // remove/rename sources for using bytecode
+    execute_cmd("mv ./sources/Bar.move ./sources/Bar.move_old", &path_b);
+    execute_cmd("rm -rf ./build/Bar/sources", &path_b);
+
+    // Compile A using bytecode in B and C
+    let path_a = common::test_dir_path("code_publishing.data/pack_compile_bytecode/A");
+    assert!(
+        aptos_framework::BuiltPackage::build(path_a, aptos_framework::BuildOptions::default(),)
+            .is_ok()
+    );
+
+    // Change the name back
+    execute_cmd("mv ./sources/Bar.move_old ./sources/Bar.move", &path_b);
+    execute_cmd("mv ./sources/Foo.move_old ./sources/Foo.move", &path_c);
 }
