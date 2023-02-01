@@ -1,59 +1,44 @@
+name: "Replay Verify"
+description: |
+  Runs the replay-verify tool from aptos-core, assuming it is already checked out in the current working directory.
+inputs:
+  BUCKET:
+    description: "The name of the bucket to download the ledger from."
+    required: true
+  SUB_DIR:
+    description: "The subdirectory of the bucket to download the ledger from."
+    required: true
+  HISTORY_START:
+    description: "The starting history index to replay from."
+    required: true
+  TXNS_TO_SKIP:
+    description: "A list of transaction indices to skip during replay."
+    required: true
+  BACKUP_CONFIG_TEMPLATE_PATH:
+    description: "The path to the backup config template to use."
+    required: true
+
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/rust-setup
-    - name: install dependencies
+
+    - name: Install AWS CLI
       shell: bash
       run: |
+        scripts/dev_setup.sh -b -i awscli
         echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
-        scripts/dev_setup.sh -b -i awscli # install individual tool awscli in batch mode
-        sudo apt-get update -y && sudo apt-get install -y expect
+
     - name: Build CLI binaries in release mode
       shell: bash
       run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
-    - name: query latest version in backup, at the same time, pre-heat metadata cache
-      shell: bash
-      run: |
-        set -o nounset -o errexit -o pipefail
-        target/release/db-backup one-shot query backup-storage-state \
-        --metadata-cache-dir ./metadata-cache \
-        command-adapter --config terraform/helm/fullnode/files/backup/$CONFIG_TEMPLATE_NAME \
-        | echo LATEST_VERSION=`grep -Po '(?<=latest_transaction_version: )\d+'` \
-        | tee -a $GITHUB_ENV
-    - name: run replay-verify in parallel
-      shell: bash
-      run: |
-        set -o nounset -o errexit -o pipefail
-        N=8
-        PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
-        for n in `seq 1 $N`
-        do
-          END=$(( $HISTORY_START + $n * $PER_PARTITION ))
-          END=$(($n == $N && $LATEST_VERSION > $END ? $LATEST_VERSION : $END))
-          START=$(($END - $PER_PARTITION))
-          NAME=run_${n}_${START}_$END
- 
-          mkdir $NAME
-          cp -r metadata-cache $NAME/
-
-          echo [main process] spawning $NAME
-          unbuffer target/release/replay-verify \
-          --txns-to-skip $TXNS_TO_SKIP \
-          --concurrent-downloads 8 \
-          --replay-concurrency-level 8 \
-          --metadata-cache-dir ./$NAME/metadata-cache \
-          --target-db-dir ./$NAME/db \
-          --start-version $START \
-          --end-version $END \
-          command-adapter --config terraform/helm/fullnode/files/backup/s3-public.yaml 2>&1 \
-          | sed --unbuffered -e "s/^/[partition $NAME] /" &
-        done
- 
-        # wait for subprocesses
-        for n in `seq 1 $N`
-        do
-          wait -n
-          echo [main process] $n out of $N runs finished.
-        done
-        echo [main process] finished.
+    - name: Run replay-verify in parallel
+      shell: bash
+      run: scripts/replay-verify/replay_verify.py
+      env:
+        BUCKET: ${{ inputs.BUCKET }}
+        SUB_DIR: ${{ inputs.SUB_DIR }}
+        HISTORY_START: ${{ inputs.HISTORY_START }}
+        TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
+        BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
