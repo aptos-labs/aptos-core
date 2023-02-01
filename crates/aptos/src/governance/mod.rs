@@ -633,7 +633,8 @@ fn compile_script(
         ..BuildOptions::default()
     };
 
-    let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)?;
+    let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)
+        .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
 
     let scripts_count = pack.script_count();
 
