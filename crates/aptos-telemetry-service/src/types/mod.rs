@@ -15,6 +15,7 @@ pub mod common {
     pub type EpochNum = u64;
     pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
     pub type PeerStore = HashMap<ChainId, PeerSet>;
+    pub type ChainCommonName = String;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct EventIdentity {
