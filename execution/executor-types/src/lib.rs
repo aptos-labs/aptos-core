@@ -146,6 +146,10 @@ impl VerifyExecutionMode {
             VerifyExecutionMode::Verify { txns_to_skip } => txns_to_skip.clone(),
         }
     }
+
+    pub fn should_verify(&self) -> bool {
+        !matches!(self, Self::NoVerify)
+    }
 }
 
 pub trait TransactionReplayer: Send {
@@ -153,8 +157,8 @@ pub trait TransactionReplayer: Send {
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
-        writesets: Vec<WriteSet>,
-        events: Vec<Vec<ContractEvent>>,
+        write_sets: Vec<WriteSet>,
+        event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 

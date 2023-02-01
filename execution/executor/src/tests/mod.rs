@@ -11,6 +11,7 @@ use crate::{
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
 };
+use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
@@ -649,7 +650,7 @@ proptest! {
                 Just(num_user_txns),
                 0..num_user_txns - 1 // avoid state checkpoint right after reconfig
             )
-        })) {
+        }).no_shrink()) {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
             let num_txns = block.txns.len() as LeafCount;
@@ -691,11 +692,13 @@ proptest! {
             let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
+            let write_sets = db.get_write_set_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
+            let event_vecs = db.get_events_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
 
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], &VerifyExecutionMode::verify_all()).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
