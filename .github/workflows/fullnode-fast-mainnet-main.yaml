@@ -37,6 +37,18 @@ jobs:
             /tmp/node_log
           retention-days: 14
 
+      - name: Post to a Slack channel on failure
+        if: failure()
+        id: slack
+        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} `${{ github.job }}`: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
+
       # Because we have to checkout the actions and then check out a different
       # branch, it's possible the actions directory will be modified. So, we
       # need to check it out again for the Post Run actions/checkout to succeed.

@@ -15,7 +15,7 @@ FULLNODE_CONFIG_TEMPLATE_PATH = "config/src/config/test_data/public_full_node.ya
 GENESIS_BLOB_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/genesis.blob" # Location inside the aptos-networks repo
 LOCAL_REST_ENDPOINT = "http://127.0.0.1:8080/v1" # The rest endpoint running on the local host
 LEDGER_VERSION_API_STRING = "ledger_version" # The string to fetch the ledger version from the REST API
-MAX_TIME_BETWEEN_VERSION_INCREASES_SECS = 3600 # The number of seconds after which to fail if the node isn't syncing
+MAX_TIME_BETWEEN_VERSION_INCREASES_SECS = 1800 # The number of seconds after which to fail if the node isn't syncing
 REMOTE_REST_ENDPOINTS = "https://fullnode.{network}.aptoslabs.com/v1" # The remote rest endpoint
 SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highest known at the job start
 WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/waypoint.txt" # Location inside the aptos-networks repo
@@ -59,7 +59,7 @@ def check_fullnode_is_still_running(fullnode_process_handle):
     print_error_and_exit("Exiting! The fullnode process terminated prematurely with return code: {return_code}!".format(return_code=return_code))
 
 
-def monitor_fullnode_syncing(fullnode_process_handle, node_log_file_path, public_version, target_version):
+def monitor_fullnode_syncing(fullnode_process_handle, bootstrapping_mode, node_log_file_path, public_version, target_version):
   """Monitors the ability of the fullnode to sync"""
   print("Waiting for the node to synchronize!")
   last_synced_version = 0 # The most recent synced version
@@ -90,11 +90,15 @@ def monitor_fullnode_syncing(fullnode_process_handle, node_log_file_path, public
       print("Successfully synced to the target! Target version: {target_version}, Synced version: {synced_version}".format(target_version=target_version, synced_version=synced_version))
       sys.exit(0)
 
-    # Ensure we're actually making syncing progress
+    # Ensure we're actually making syncing progress (depending on the sync mode)
     if synced_version <= last_synced_version:
       time_since_last_version_increase = time.time() - last_sync_update_time
       if time_since_last_version_increase > MAX_TIME_BETWEEN_VERSION_INCREASES_SECS:
-        print_error_and_exit("Exiting! The fullnode is not making any syncing progress!")
+        if bootstrapping_mode == "DownloadLatestStates":
+          if synced_version != 0: # Fast sync will take long to initialize the synced_version
+            print_error_and_exit("Exiting! The fullnode is not making any syncing progress, despite using fast sync!")
+        else:
+          print_error_and_exit("Exiting! The fullnode is not making any syncing progress!")
     else:
       last_synced_version = synced_version
       last_sync_update_time = time.time()
@@ -245,7 +249,7 @@ def main():
   wait_for_fullnode_to_start(fullnode_process_handle)
 
   # Monitor the ability for the fullnode to sync
-  monitor_fullnode_syncing(fullnode_process_handle, NODE_LOG_FILE_PATH, public_version, target_version)
+  monitor_fullnode_syncing(fullnode_process_handle, BOOTSTRAPPING_MODE, NODE_LOG_FILE_PATH, public_version, target_version)
 
 
 if __name__ == "__main__":
