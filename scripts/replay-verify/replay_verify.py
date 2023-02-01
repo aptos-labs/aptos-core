@@ -74,7 +74,7 @@ def replay_verify_partition(
         print(f"[partition {n}] {line}", flush=True)
 
 
-def find_latest_version_from_db_back_log_line(log_line: str):
+def find_latest_version_from_db_backup_log_line(log_line: str):
     match = re.search("latest_transaction_version: (\d+)", log_line)
     if match:
         print(match.group(1))
@@ -87,7 +87,7 @@ def find_latest_version_from_db_backup_output(output: IO[bytes]):
     latest_version = -1
     for line in iter(output.readline, b""):
         log_line = line.decode("utf-8")
-        latest_version = find_latest_version_from_db_back_log_line(log_line)
+        latest_version = find_latest_version_from_db_backup_log_line(log_line)
         print(log_line.strip(), flush=True)
         if latest_version > 0:
             break
@@ -128,11 +128,11 @@ def main():
         if "aws" in config and shutil.which("aws") is None:
             raise Exception("Missing required AWS CLI for pulling backup data from S3")
 
-    if os.environ.get("CLEAR_BACKUP_ARTIFACTS", "true") == "true":
-        print("[main process] clearing artifacts")
+    if os.environ.get("REUSE_BACKUP_ARTIFACTS", "true") == "true":
+        print("[main process] clearing existing backup artifacts")
         clear_artifacts()
     else:
-        print("[main process] skipping clearing artifacts")
+        print("[main process] skipping clearing backup artifacts")
 
     # query latest version in backup, at the same time, pre-heat metadata cache
     db_backup_result = subprocess.Popen(
