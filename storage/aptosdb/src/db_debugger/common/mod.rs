@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const PAGE_SIZE: usize = 10;
 
@@ -28,15 +28,6 @@ impl DbDir {
         )
     }
 
-    pub fn open_state_merkle_db_rw(&self) -> Result<aptos_schemadb::DB> {
-        aptos_schemadb::DB::open(
-            self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
-            STATE_MERKLE_DB_NAME,
-            state_merkle_db_column_families(),
-            &aptos_schemadb::Options::default(),
-        )
-    }
-
     #[allow(unused)]
     pub fn open_ledger_db(&self) -> Result<aptos_schemadb::DB> {
         aptos_schemadb::DB::open_cf_readonly(
@@ -46,14 +37,11 @@ impl DbDir {
             ledger_db_column_families(),
         )
     }
+}
 
-    pub fn open_ledger_db_rw(&self) -> Result<aptos_schemadb::DB> {
-        aptos_schemadb::DB::open(
-            self.db_dir.join(LEDGER_DB_NAME).as_path(),
-            LEDGER_DB_NAME,
-            ledger_db_column_families(),
-            &aptos_schemadb::Options::default(),
-        )
+impl AsRef<Path> for DbDir {
+    fn as_ref(&self) -> &Path {
+        self.db_dir.as_path()
     }
 }
 

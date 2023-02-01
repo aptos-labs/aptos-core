@@ -699,17 +699,40 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
         let start = Instant::now();
-        let ledger_db_path = path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = path.as_ref().join(STATE_MERKLE_DB_NAME);
-        std::fs::remove_dir_all(&ledger_db_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_merkle_db_path).unwrap_or(());
-        self.ledger_db.create_checkpoint(&ledger_db_path)?;
-        self.state_merkle_db
-            .create_checkpoint(&state_merkle_db_path)?;
+        let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
+        let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
+        let state_merkle_db_path = db_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_merkle_cp_path = cp_path.as_ref().join(STATE_MERKLE_DB_NAME);
+
+        std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
+        std::fs::remove_dir_all(&state_merkle_cp_path).unwrap_or(());
+
+        // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
+        // https://github.com/facebook/rocksdb/issues/11167
+        {
+            let ledger_db = aptos_schemadb::DB::open(
+                ledger_db_path,
+                LEDGER_DB_NAME,
+                ledger_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            ledger_db.create_checkpoint(ledger_cp_path)?;
+        }
+        {
+            let state_merkle_db = aptos_schemadb::DB::open(
+                state_merkle_db_path,
+                STATE_MERKLE_DB_NAME,
+                state_merkle_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            state_merkle_db.create_checkpoint(state_merkle_cp_path)?;
+        }
+
         info!(
-            path = path.as_ref(),
+            db_path = db_path.as_ref(),
+            cp_path = cp_path.as_ref(),
             time_ms = %start.elapsed().as_millis(),
             "Made AptosDB checkpoint."
         );
