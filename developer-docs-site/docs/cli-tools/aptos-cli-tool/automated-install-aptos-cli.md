@@ -57,14 +57,14 @@ iwr "https://aptos.dev/scripts/install_cli.py" -useb | Select-Object -ExpandProp
 
 ## Update
 
-To trigger automatic updates, run: `aptos update` and see output indicating success:
+To trigger an update to the Aptos CLI, run `aptos update` and see output indicating success:
 ```
 {
   "Result": "CLI already up to date (v1.0.4)"
 }
 ```
 
-To manually update your version of the Aptos CLI, run `python3 install_cli.py` and receive output resembling:
+Alternatively, you may update your CLI by running the `python3 install_cli.py` installation script again and receiving output resembling:
 
 ```
 Latest CLI release: 1.0.4
