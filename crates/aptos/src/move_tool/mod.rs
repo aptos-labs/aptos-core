@@ -24,6 +24,7 @@ use crate::{
     move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     CliCommand, CliResult,
 };
+use aptos_crypto::HashValue;
 use aptos_framework::{
     docgen::DocgenOptions, natives::code::UpgradePolicy, prover::ProverOptions, BuildOptions,
     BuiltPackage,
@@ -69,6 +70,7 @@ use transactional_tests_runner::TransactionalTestOpts;
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
+    CompileScript(CompileScript),
     Init(InitPackage),
     Publish(PublishPackage),
     Download(DownloadPackage),
@@ -88,6 +90,7 @@ impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
+            MoveTool::CompileScript(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
@@ -309,6 +312,76 @@ impl CliCommand<Vec<String>> for CompilePackage {
             .collect::<Vec<_>>();
         Ok(ids)
     }
+}
+
+/// Compiles a Move script into bytecode
+///
+/// Compiles a script into bytecode and provides a hash of the bytecode.
+/// This can then be run with `aptos move run-script`
+#[derive(Parser)]
+pub struct CompileScript {
+    #[clap(long, parse(from_os_str))]
+    pub output_file: Option<PathBuf>,
+    #[clap(flatten)]
+    pub move_options: MovePackageDir,
+}
+
+#[async_trait]
+impl CliCommand<CompileScriptOutput> for CompileScript {
+    fn command_name(&self) -> &'static str {
+        "CompileScript"
+    }
+
+    async fn execute(self) -> CliTypedResult<CompileScriptOutput> {
+        let (bytecode, script_hash) = self.compile_script().await?;
+        let script_location = self.output_file.unwrap_or_else(|| {
+            self.move_options
+                .get_package_path()
+                .unwrap()
+                .join("script.mv")
+        });
+        write_to_file(script_location.as_path(), "Script", bytecode.as_slice())?;
+        Ok(CompileScriptOutput {
+            script_location,
+            script_hash,
+        })
+    }
+}
+
+impl CompileScript {
+    async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        set_bytecode_version(self.move_options.bytecode_version);
+        let build_options = BuildOptions {
+            install_dir: self.move_options.output_dir.clone(),
+            ..IncludedArtifacts::None.build_options(
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version_or_detault(),
+            )
+        };
+        let package_dir = self.move_options.get_package_path()?;
+        let pack = BuiltPackage::build(package_dir, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+
+        let scripts_count = pack.script_count();
+        if scripts_count != 1 {
+            return Err(CliError::UnexpectedError(format!(
+                "Only one script can be prepared a time. Make sure one and only one script file \
+                is included in the Move package. Found {} scripts.",
+                scripts_count
+            )));
+        }
+
+        let bytecode = pack.extract_script_code().pop().unwrap();
+        let script_hash = HashValue::sha3_256_of(bytecode.as_slice());
+        Ok((bytecode, script_hash))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct CompileScriptOutput {
+    pub script_location: PathBuf,
+    pub script_hash: HashValue,
 }
 
 /// Runs Move unit tests for a package
