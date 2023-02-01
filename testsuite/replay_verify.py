@@ -4,11 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import re
 import subprocess
 import shutil
 from multiprocessing import Pool, freeze_support
-from typing import IO, Tuple
+from typing import Tuple
+
+from verify_core.common import clear_artifacts, query_backup_latest_version
 
 # This script runs the replay-verify from the root of aptos-core
 # It assumes the aptos-backup-cli, replay-verify, and db-backup binaries are already built with the release profile
@@ -74,36 +75,6 @@ def replay_verify_partition(
         print(f"[partition {n}] {line}", flush=True)
 
 
-def find_latest_version_from_db_backup_log_line(log_line: str):
-    match = re.search("latest_transaction_version: (\d+)", log_line)
-    if match:
-        print(match.group(1))
-        return int(match.group(1))
-    else:
-        return -1
-
-
-def find_latest_version_from_db_backup_output(output: IO[bytes]):
-    latest_version = -1
-    for line in iter(output.readline, b""):
-        log_line = line.decode("utf-8")
-        latest_version = find_latest_version_from_db_backup_log_line(log_line)
-        print(log_line.strip(), flush=True)
-        if latest_version > 0:
-            break
-
-    return latest_version
-
-
-def clear_artifacts():
-    """Clears artifacts from previous runs"""
-    shutil.rmtree("metadata-cache", ignore_errors=True)
-    files = [f for f in os.listdir(".") if re.match(r"run_[0-9]+_[0-9]+", f)]
-
-    for f in files:
-        shutil.rmtree(f)
-
-
 def main():
 
     # collect all required ENV variables
@@ -134,25 +105,7 @@ def main():
     else:
         print("[main process] skipping clearing backup artifacts")
 
-    # query latest version in backup, at the same time, pre-heat metadata cache
-    db_backup_result = subprocess.Popen(
-        [
-            "target/release/db-backup",
-            "one-shot",
-            "query",
-            "backup-storage-state",
-            "--metadata-cache-dir",
-            "./metadata-cache",
-            "command-adapter",
-            "--config",
-            BACKUP_CONFIG_TEMPLATE_PATH,
-        ],
-        stdout=subprocess.PIPE,
-    )
-    LATEST_VERSION = find_latest_version_from_db_backup_output(db_backup_result.stdout)
-    if LATEST_VERSION < 0:
-        raise Exception("Failed to find latest version")
-    db_backup_result.wait()
+    LATEST_VERSION = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
 
     # run replay-verify in parallel
     N = 32
