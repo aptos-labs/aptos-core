@@ -977,23 +977,8 @@ mod tests {
             .read()
             .telemetry_filter
             .enabled(debug_metadata));
-    }
-
-    #[test]
-    fn test_logger_filter_updater_invalid_value() {
-        let (logger_builder, logger) = new_async_logger();
-
-        let debug_metadata = &Metadata::new(Level::Debug, "target", "module_path", "source_path");
-
-        assert!(!logger
-            .filter
-            .read()
-            .telemetry_filter
-            .enabled(debug_metadata));
 
         std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
-
-        let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
         updater.update_filter();
 
         assert!(!logger
