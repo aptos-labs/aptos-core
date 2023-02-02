@@ -1,11 +1,11 @@
 ---
-title: "Aptos Token Standard Overview"
-id: "aptos-token-overview"
+title: "Compare Token Standards"
+id: "aptos-token-comparison"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos Token Standard Overview
+# Compare the Aptos Token Standards"
 
 :::tip Aptos token standard
 For details, see the official [Aptos Token](./aptos-token.md) standard.

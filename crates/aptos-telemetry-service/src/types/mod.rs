@@ -15,6 +15,7 @@ pub mod common {
     pub type EpochNum = u64;
     pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
     pub type PeerStore = HashMap<ChainId, PeerSet>;
+    pub type ChainCommonName = String;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct EventIdentity {
@@ -41,6 +42,8 @@ pub mod common {
         ValidatorFullNode,
         PublicFullNode,
         Unknown,
+        UnknownValidator,
+        UnknownFullNode,
     }
 
     impl NodeType {
@@ -50,6 +53,8 @@ pub mod common {
                 NodeType::ValidatorFullNode => "validator_fullnode",
                 NodeType::PublicFullNode => "public_fullnode",
                 NodeType::Unknown => "unknown_peer",
+                NodeType::UnknownValidator => "unknown_validator",
+                NodeType::UnknownFullNode => "unknown_fullnode",
             }
         }
     }

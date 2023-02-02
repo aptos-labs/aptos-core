@@ -18,12 +18,14 @@ pub struct Features {
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
     CodeDependencyCheck,
+    CollectAndDistributeGasFees,
     TreatFriendAsPrivate,
     Sha512AndRipeMd160Natives,
     AptosStdChainIdNatives,
     VMBinaryFormatV6,
     MultiEd25519PkValidateV2Natives,
     Blake2b256Native,
+    ResourceGroups,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -70,7 +72,7 @@ pub fn generate_feature_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash,
+        next_execution_hash.clone(),
         "std::features",
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
@@ -81,10 +83,17 @@ pub fn generate_feature_upgrade_proposal(
             generate_features_blob(writer, &disabled);
             emitln!(writer, ";\n");
 
-            emitln!(
-                writer,
-                "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
+                );
+            }
         },
     );
 
@@ -96,6 +105,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
     fn from(f: FeatureFlag) -> Self {
         match f {
             FeatureFlag::CodeDependencyCheck => AptosFeatureFlag::CODE_DEPENDENCY_CHECK,
+            FeatureFlag::CollectAndDistributeGasFees => {
+                AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES
+            },
             FeatureFlag::TreatFriendAsPrivate => AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE,
             FeatureFlag::Sha512AndRipeMd160Natives => {
                 AptosFeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES
@@ -106,6 +118,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
+            FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
         }
     }
 }
@@ -115,6 +128,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
     fn from(f: AptosFeatureFlag) -> Self {
         match f {
             AptosFeatureFlag::CODE_DEPENDENCY_CHECK => FeatureFlag::CodeDependencyCheck,
+            AptosFeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES => {
+                FeatureFlag::CollectAndDistributeGasFees
+            },
             AptosFeatureFlag::TREAT_FRIEND_AS_PRIVATE => FeatureFlag::TreatFriendAsPrivate,
             AptosFeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES => {
                 FeatureFlag::Sha512AndRipeMd160Natives
@@ -125,6 +141,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
+            AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
         }
     }
 }

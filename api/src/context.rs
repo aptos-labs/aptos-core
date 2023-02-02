@@ -37,12 +37,15 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
-use aptos_vm::data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned};
+use aptos_vm::{
+    data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
+    move_vm_ext::MoveResolverExt,
+};
 use futures::{channel::oneshot, SinkExt};
 use itertools::Itertools;
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::{Arc, RwLock},
 };
 
@@ -277,12 +280,21 @@ impl Context {
             prev_state_key,
             version,
         )?;
+        // TODO: Consider rewriting this to consider resource groups:
+        // * If a resource group is found, expand
+        // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
+        // * Count resources and only include a resource group if it can completely fit
+        // * Get next_key as the first struct_tag not included
         let mut resource_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k {
                     StateKey::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
+                                Some(Ok((struct_tag, v.into_bytes())))
+                            }
+                            // TODO: Consider expanding to Path::Resource
+                            Ok(Path::ResourceGroup(struct_tag)) => {
                                 Some(Ok((struct_tag, v.into_bytes())))
                             }
                             Ok(Path::Code(_)) => None,
@@ -300,7 +312,33 @@ impl Context {
         let kvs = resource_iter
             .by_ref()
             .take(limit as usize)
-            .collect::<Result<_>>()?;
+            .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
+
+        // We should be able to do an unwrap here, otherwise the above db read would fail.
+        let resolver = self.state_view_at_version(version)?.into_move_resolver();
+
+        // Extract resources from resource groups and flatten into all resources
+        let kvs = kvs
+            .into_iter()
+            .map(|(key, value)| {
+                if resolver.is_resource_group(&key) {
+                    // An error here means a storage invariant has been violated
+                    bcs::from_bytes::<BTreeMap<StructTag, Vec<u8>>>(&value)
+                        .map(|map| {
+                            map.into_iter()
+                                .map(|(key, value)| (key, value))
+                                .collect::<Vec<_>>()
+                        })
+                        .map_err(|e| e.into())
+                } else {
+                    Ok(vec![(key, value)])
+                }
+            })
+            .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
         let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
             StateKey::AccessPath(AccessPath::new(
                 address,
@@ -328,7 +366,7 @@ impl Context {
                     StateKey::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
-                            Ok(Path::Resource(_)) => None,
+                            Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }
                     }

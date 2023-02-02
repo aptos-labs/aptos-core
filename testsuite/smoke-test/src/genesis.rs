@@ -18,6 +18,7 @@ use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use std::{
     fs,
+    path::PathBuf,
     process::Command,
     str::FromStr,
     time::{Duration, Instant},
@@ -136,6 +137,13 @@ async fn test_genesis_transaction_flow() {
     let genesis_blob_path = TempPath::new();
     genesis_blob_path.create_as_file().unwrap();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
         .args(&vec![
@@ -147,8 +155,8 @@ async fn test_genesis_transaction_flow() {
             CORE_CODE_ADDRESS.clone().to_hex().as_str(),
             "--script-path",
             move_script_path.as_path().to_str().unwrap(),
-            "--framework-git-rev",
-            "HEAD",
+            "--framework-local-dir",
+            framework_path.as_os_str().to_str().unwrap(),
             "--assume-yes",
         ])
         .output()

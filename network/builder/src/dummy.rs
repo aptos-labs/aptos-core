@@ -13,7 +13,7 @@ use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_infallible::RwLock;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::builder::AuthenticationMode,
     protocols::network::{
         Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkServiceConfig,
@@ -97,7 +97,7 @@ pub fn setup_network() -> DummyNetwork {
 
     let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
     let authentication_mode = AuthenticationMode::Mutual(listener_identity_private_key);
-    let peer_metadata_storage = PeerMetadataStorage::new(&[network_id]);
+    let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     // Set up the listener network
     let network_context = NetworkContext::new(role, network_id, listener_peer.peer_id());
     let mut network_builder = NetworkBuilder::new_for_test(
@@ -108,7 +108,7 @@ pub fn setup_network() -> DummyNetwork {
         TimeService::real(),
         listener_addr,
         authentication_mode,
-        peer_metadata_storage.clone(),
+        peers_and_metadata.clone(),
     );
 
     let (listener_sender, mut listener_events) =
@@ -118,7 +118,7 @@ pub fn setup_network() -> DummyNetwork {
         vec![TEST_DIRECT_SEND_PROTOCOL],
         vec![TEST_RPC_PROTOCOL],
         hashmap! {network_id => listener_sender},
-        peer_metadata_storage,
+        peers_and_metadata,
     );
 
     // Add the listener address with port
@@ -130,7 +130,7 @@ pub fn setup_network() -> DummyNetwork {
 
     let authentication_mode = AuthenticationMode::Mutual(dialer_identity_private_key);
 
-    let peer_metadata_storage = PeerMetadataStorage::new(&[network_id]);
+    let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     // Set up the dialer network
     let network_context = NetworkContext::new(role, network_id, dialer_peer.peer_id());
 
@@ -144,7 +144,7 @@ pub fn setup_network() -> DummyNetwork {
         TimeService::real(),
         dialer_addr,
         authentication_mode,
-        peer_metadata_storage.clone(),
+        peers_and_metadata.clone(),
     );
 
     let (dialer_sender, mut dialer_events) =
@@ -154,7 +154,7 @@ pub fn setup_network() -> DummyNetwork {
         vec![TEST_DIRECT_SEND_PROTOCOL],
         vec![TEST_RPC_PROTOCOL],
         hashmap! {network_id => dialer_sender},
-        peer_metadata_storage,
+        peers_and_metadata,
     );
 
     // Wait for establishing connection

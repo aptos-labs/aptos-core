@@ -1,12 +1,14 @@
 ---
-title: "Index Aptos Data"
+title: "Use the Aptos Indexer"
 slug: "indexing"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Index the Aptos Blockchain Data
+# Use the Aptos Indexer
+
+This page describes how to employ data from the Aptos Indexer in your apps. To instead operate an indexer, follow [Run an Indexer](../nodes/indexer-fullnode.md).
 
 An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
 
@@ -282,7 +284,7 @@ In the below detailed description, an example of indexing and querying for the c
 
 ### 1. Define new table schemas
 
-In this example we use [PostgreSQL](https://www.postgresql.org/) and [Diesel](https://diesel.rs/) as the ORM. To make sure that we make backward-compatible changes without having to reset the database at every upgrade, we use [Diesel migrations](https://docs.diesel.rs/diesel_migrations/index.html) to manage the schema. This is why it is very important to start with generating a new Diesel migration before doing anything else. 
+In this example we use [PostgreSQL](https://www.postgresql.org/) and [Diesel](https://diesel.rs/) as the ORM. To make sure that we make backward-compatible changes without having to reset the database at every upgrade, we use [Diesel migrations](https://docs.rs/diesel_migrations/latest/diesel_migrations/) to manage the schema. This is why it is very important to start with generating a new Diesel migration before doing anything else. 
 
 Make sure you clone the Aptos-core repo by running `git clone https://github.com/aptos-labs/aptos-core.git` and then `cd` into `aptos-core/tree/main/crates/indexer` directory. Then proceed as below. 
 

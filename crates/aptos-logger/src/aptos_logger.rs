@@ -427,15 +427,19 @@ impl AptosData {
     }
 
     pub fn init_for_testing() {
-        if env::var(RUST_LOG).is_err() {
-            return;
-        }
-
-        Self::builder()
+        // Create the Aptos Data Builder
+        let mut builder = Self::builder();
+        builder
             .is_async(false)
             .enable_backtrace()
-            .printer(Box::new(StdoutWriter::new()))
-            .build();
+            .printer(Box::new(StdoutWriter::new()));
+
+        // If RUST_LOG wasn't specified, default to Debug logging
+        if env::var(RUST_LOG).is_err() {
+            builder.level(Level::Debug);
+        }
+
+        builder.build();
     }
 
     pub fn set_filter(&self, filter_tuple: FilterTuple) {

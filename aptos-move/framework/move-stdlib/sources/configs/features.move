@@ -111,6 +111,16 @@ module std::features {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
+    /// Whether resource groups are enabled.
+    /// This is needed because of new attributes for structs and a change in storage representation.
+    const RESOURCE_GROUPS: u64 = 9;
+
+    public fun get_resource_groups_feature(): u64 { RESOURCE_GROUPS }
+
+    public fun resource_groups_enabled(): bool acquires Features {
+        is_enabled(RESOURCE_GROUPS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

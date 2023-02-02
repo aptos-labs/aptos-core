@@ -113,7 +113,8 @@ impl CliCommand<()> for InitTool {
             Network::Testnet => {
                 profile_config.rest_url =
                     Some("https://fullnode.testnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = None;
+                profile_config.faucet_url =
+                    Some("https://faucet.testnet.aptoslabs.com".to_string());
             },
             Network::Devnet => {
                 profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
@@ -216,8 +217,6 @@ impl CliCommand<()> for InitTool {
             }
         } else if account_exists {
             eprintln!("Account {} has been already found onchain", address);
-        } else if network == Network::Testnet {
-            eprintln!("Account {} does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account", address);
         } else if network == Network::Mainnet {
             eprintln!("Account {} does not exist, you will need to create and fund the account through a faucet or by transferring funds from another account", address);
         } else {

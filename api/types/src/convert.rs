@@ -245,6 +245,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
     }
 
+    // TODO: Consider expanding ResourceGroup into Resource and returning Vec<WriteSetChange>
     pub fn try_access_path_into_write_set_change(
         &self,
         state_key_hash: String,
@@ -263,6 +264,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     state_key_hash,
                     resource: typ.into(),
                 }),
+                Path::ResourceGroup(typ) => WriteSetChange::DeleteResource(DeleteResource {
+                    address: access_path.address.into(),
+                    state_key_hash,
+                    resource: typ.into(),
+                }),
             },
             WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
@@ -271,6 +277,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
                 }),
                 Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
+                    address: access_path.address.into(),
+                    state_key_hash,
+                    data: self.try_into_resource(&typ, &val)?,
+                }),
+                Path::ResourceGroup(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,

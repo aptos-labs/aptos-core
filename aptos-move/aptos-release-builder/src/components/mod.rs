@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use self::framework::FrameworkReleaseConfig;
 use crate::components::feature_flags::Features;
 use anyhow::{anyhow, Result};
 use aptos::governance::GenerateExecutionHash;
@@ -23,13 +24,14 @@ pub mod consensus_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
+pub mod transaction_fee;
 pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ReleaseConfig {
     pub testnet: bool,
     pub remote_endpoint: Option<Url>,
-    pub framework_release: bool,
+    pub framework_release: Option<FrameworkReleaseConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_schedule: Option<GasScheduleV2>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,9 +125,10 @@ impl ReleaseConfig {
         _client: &Option<Client>,
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
-        if self.framework_release {
+        if let Some(framework_release) = &self.framework_release {
             result.append(
                 &mut framework::generate_upgrade_proposals(
+                    framework_release,
                     self.testnet,
                     if self.is_multi_step {
                         get_execution_hash(result)
@@ -187,7 +190,7 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(feature_flags) = &self.feature_flags {
-            let mut needs_update = false;
+            let mut needs_update = true;
             if let Some(client) = client {
                 let features = block_on(async {
                     client
@@ -221,7 +224,7 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(consensus_config) = &self.consensus_config {
-            if fetch_and_equals(client, consensus_config)? {
+            if !fetch_and_equals(client, consensus_config)? {
                 result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
                     consensus_config,
                     self.testnet,
@@ -278,7 +281,9 @@ impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
             testnet: true,
-            framework_release: true,
+            framework_release: Some(FrameworkReleaseConfig {
+                bytecode_version: 6,
+            }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
             feature_flags: None,

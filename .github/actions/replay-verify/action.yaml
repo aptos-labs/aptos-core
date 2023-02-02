@@ -24,7 +24,7 @@ runs:
       shell: bash
       run: |
         set -o nounset -o errexit -o pipefail
-        N=32
+        N=8
         PER_PARTITION=$(( ($LATEST_VERSION - $HISTORY_START) / $N ))
 
         for n in `seq 1 $N`
@@ -40,8 +40,8 @@ runs:
           echo [main process] spawning $NAME
           unbuffer target/release/replay-verify \
           --txns-to-skip $TXNS_TO_SKIP \
-          --concurrent-downloads 2 \
-          --replay-concurrency-level 2 \
+          --concurrent-downloads 8 \
+          --replay-concurrency-level 8 \
           --metadata-cache-dir ./$NAME/metadata-cache \
           --target-db-dir ./$NAME/db \
           --start-version $START \

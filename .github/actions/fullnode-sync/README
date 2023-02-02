@@ -1,0 +1,19 @@
+## Description
+
+Runs a fullnode from aptos-core, assuming it is already checked out in the current working directory.
+
+## Inputs
+
+| parameter | description | required | default |
+| --- | --- | --- | --- |
+| TIMEOUT_MINUTES | The number of minutes to wait for fullnode sync to finish. | `true` |  |
+| BRANCH | The aptos-core branch to switch to before running the fullnode. | `true` |  |
+| NETWORK | The network to connect the fullnode to: devnet, testnet, or mainnet. | `true` |  |
+| BOOTSTRAPPING_MODE | The state sync bootstrapping mode for the fullnode. | `true` |  |
+| CONTINUOUS_SYNCING_MODE |  The state sync continuous syncing mode for the fullnode. | `true` |  |
+| DATA_DIR_FILE_PATH | The file path for the node data directory. | `true` |  |
+| NODE_LOG_FILE_PATH | The file path for the node logs to be written to. | `true` |  |
+
+## Runs
+
+This action is a `composite` action.

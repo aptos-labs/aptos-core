@@ -4,9 +4,16 @@
 use crate::components::get_execution_hash;
 use anyhow::Result;
 use aptos_temppath::TempPath;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct FrameworkReleaseConfig {
+    pub bytecode_version: u32,
+}
+
 pub fn generate_upgrade_proposals(
+    config: &FrameworkReleaseConfig,
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
@@ -46,6 +53,8 @@ pub fn generate_upgrade_proposals(
             .unwrap()
             .to_string();
 
+        let bytecode_version = format!("{:?}", config.bytecode_version);
+
         let mut args = vec![
             "run",
             "--bin",
@@ -59,6 +68,8 @@ pub fn generate_upgrade_proposals(
             move_script_path.to_str().unwrap(),
             "--package-dir",
             package_path.to_str().unwrap(),
+            "--bytecode-version",
+            bytecode_version.as_str(),
         ];
 
         if is_testnet {

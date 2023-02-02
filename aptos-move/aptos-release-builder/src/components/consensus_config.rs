@@ -20,7 +20,7 @@ pub fn generate_consensus_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash,
+        next_execution_hash.clone(),
         "aptos_framework::consensus_config",
         |writer| {
             let consensus_config_blob = bcs::to_bytes(consensus_config).unwrap();
@@ -30,10 +30,17 @@ pub fn generate_consensus_upgrade_proposal(
             generate_blob(writer, &consensus_config_blob);
             emitln!(writer, ";\n");
 
-            emitln!(
-                writer,
-                "consensus_config::set(framework_signer, consensus_blob);"
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "consensus_config::set(framework_signer, consensus_blob);"
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "consensus_config::set(&framework_signer, consensus_blob);"
+                );
+            }
         },
     );
 

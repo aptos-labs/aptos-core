@@ -42,6 +42,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
@@ -500,9 +501,7 @@ impl StateStore {
 
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
-        let cache = Arc::new(Mutex::new(
-            HashMap::<StateKey, (Version, Option<StateValue>)>::new(),
-        ));
+        let cache = Arc::new(DashMap::<StateKey, (Version, Option<StateValue>)>::new());
 
         if let Some(base_version) = base_version {
             let _timer = OTHER_TIMERS_SECONDS
@@ -525,9 +524,9 @@ impl StateStore {
                             .get_state_value_with_version_by_version(key, base_version)
                             .expect("Must succeed.");
                         if let Some((version, value)) = version_and_value {
-                            cache.lock().insert(key.clone(), (version, Some(value)));
+                            cache.insert(key.clone(), (version, Some(value)));
                         } else {
-                            cache.lock().insert(key.clone(), (base_version, None));
+                            cache.insert(key.clone(), (base_version, None));
                         }
                     });
                 }
@@ -557,7 +556,7 @@ impl StateStore {
                 }
 
                 let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
-                    cache.lock().insert(key.clone(), (version, value.clone()))
+                    cache.insert(key.clone(), (version, value.clone()))
                 {
                     old_value_opt.map(|value| (old_version, value))
                 } else {

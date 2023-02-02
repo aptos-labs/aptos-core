@@ -24,7 +24,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle},
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::{
+    language_storage::{ModuleId, StructTag},
+    resolver::ResourceResolver,
+};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -244,11 +247,13 @@ impl StateApi {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
         let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
-        let access_path = AccessPath::resource_access_path(address.into(), resource_type.clone());
-        let state_key = StateKey::AccessPath(access_path);
-        let bytes = state_view
-            .get_state_value(&state_key)
-            .context(format!("Failed to query DB to check for {:?}", state_key))
+        let resolver = state_view.as_move_resolver();
+        let bytes = resolver
+            .get_resource(&address.into(), &resource_type)
+            .context(format!(
+                "Failed to query DB to check for {} at {}",
+                resource_type, address
+            ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
