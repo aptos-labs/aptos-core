@@ -199,6 +199,11 @@ const config = {
                 docId: "tutorials/first-move-module",
               },
               {
+                label: "Use Remix IDE Plugin",
+                type: "doc",
+                docId: "tutorials/remix-ide-plugin",
+              },
+              {
                 label: "Upgrade Move Code",
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",

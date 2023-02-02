@@ -163,6 +163,7 @@ const sidebars = {
         "concepts/base-gas",
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
+        "tutorials/remix-ide-plugin",
         "guides/move-guides/upgrading-move-code",
       ],
     },

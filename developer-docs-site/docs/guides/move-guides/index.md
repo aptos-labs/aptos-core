@@ -22,6 +22,7 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
 - ### [Your First Move module](../../tutorials/first-move-module.md)
+- ### [Use Remix IDE Plugin](../../tutorials/remix-ide-plugin.md)
 - ### [Mint NFT with Aptos CLI](./mint-nft-cli.md)
 - ### [Upgrading Move Code](upgrading-move-code.md)
 - ### [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
