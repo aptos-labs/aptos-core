@@ -11,7 +11,7 @@ use crate::{
     storage::BackupStorage,
     utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
@@ -156,11 +156,15 @@ impl ReplayVerifyCoordinator {
             txn_manifests,
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
-            self.verify_execution_mode,
+            self.verify_execution_mode.clone(),
         )
         .run()
         .await?;
 
-        Ok(())
+        if self.verify_execution_mode.seen_error() {
+            bail!("Seen replay errors, check out logs.")
+        } else {
+            Ok(())
+        }
     }
 }
