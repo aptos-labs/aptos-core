@@ -244,8 +244,8 @@ pub enum Scheme {
     // ... add more schemes here
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
-    /// separation, an adversary could create (and get a signer for) a these accounts
-    /// when a their address matches matches an existing address of a MultiEd25519 wallet.
+    /// separation, an adversary could create (and get a signer for) these accounts
+    /// when their address matches matches an existing address of a MultiEd25519 wallet.
     DeriveObjectId = 254,
     DeriveResourceAccountAddress = 255,
 }
