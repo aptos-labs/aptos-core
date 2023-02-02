@@ -54,6 +54,8 @@ struct Opt {
         help = "Skip the execution for txns that are known to break compatibility."
     )]
     txns_to_skip: Vec<Version>,
+    #[clap(long, help = "Do not quit right away when a replay issue is detected.")]
+    lazy_quit: bool,
 }
 
 #[tokio::main]
@@ -89,7 +91,7 @@ async fn main_impl() -> Result<()> {
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
         opt.validate_modules,
-        VerifyExecutionMode::verify_except(opt.txns_to_skip),
+        VerifyExecutionMode::verify_except(opt.txns_to_skip).set_lazy_quit(opt.lazy_quit),
     )?
     .run()
     .await

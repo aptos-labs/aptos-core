@@ -476,7 +476,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             }
 
             // Try to run the transactions with the VM
-            if verify_execution_mode.should_verify() {
+            let next_begin = if verify_execution_mode.should_verify() {
                 self.verify_execution(
                     latest_view,
                     transactions,
@@ -485,8 +485,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     event_vecs,
                     batch_begin,
                     batch_end,
-                )?;
-            }
+                    verify_execution_mode,
+                )?
+            } else {
+                batch_end
+            };
             self.remove_and_apply(
                 executed_chunk,
                 latest_view,
@@ -495,9 +498,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 write_sets,
                 event_vecs,
                 batch_begin,
-                batch_end,
+                next_begin,
             )?;
-            batch_begin = batch_end;
+            batch_begin = next_begin;
         }
 
         Ok(())
@@ -512,7 +515,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         event_vecs: &[Vec<ContractEvent>],
         begin_version: Version,
         end_version: Version,
-    ) -> Result<()> {
+        verify_execution_mode: &VerifyExecutionMode,
+    ) -> Result<Version> {
         // Execute transactions.
         let state_view = self.state_view(latest_view)?;
         let txns = transactions
@@ -530,14 +534,22 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             write_sets.iter(),
             event_vecs.iter(),
         )) {
-            txn_out.ensure_match_transaction_info(
+            if let Err(err) = txn_out.ensure_match_transaction_info(
                 version,
                 txn_info,
                 Some(write_set),
                 Some(events),
-            )?;
+            ) {
+                if verify_execution_mode.is_lazy_quit() {
+                    error!("(Not quitting right away.) {}", err);
+                    verify_execution_mode.mark_seen_error();
+                    return Ok(version + 1);
+                } else {
+                    return Err(err);
+                }
+            }
         }
-        Ok(())
+        Ok(end_version)
     }
 
     fn remove_and_apply(
