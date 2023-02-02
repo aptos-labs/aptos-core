@@ -134,7 +134,7 @@ impl BuiltPackage {
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
-
+        println!("BCHO build 1");
         // Build the Move model for extra processing and run extended checks as well derive
         // runtime metadata
         let model = &build_model(
@@ -142,7 +142,9 @@ impl BuiltPackage {
             options.named_addresses.clone(),
             None,
         )?;
+        println!("BCHO build 2");
         let runtime_metadata = extended_checks::run_extended_checks(model);
+        println!("BCHO build 3");
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
             model.report_diag(&mut error_writer, Severity::Warning);
@@ -150,6 +152,7 @@ impl BuiltPackage {
                 bail!("extended checks failed")
             }
         }
+        println!("BCHO build 4");
         inject_runtime_metadata(
             package_path
                 .join(CompiledPackageLayout::Root.path())
@@ -159,6 +162,7 @@ impl BuiltPackage {
             options.bytecode_version,
         )?;
 
+        println!("BCHO build 5");
         // If enabled generate docs.
         if options.with_docs {
             let docgen = if let Some(opts) = options.docgen_options.clone() {
@@ -183,6 +187,8 @@ impl BuiltPackage {
                 .collect::<Vec<_>>();
             docgen.run(package_path.display().to_string(), dep_paths, model)?
         }
+
+        println!("BCHO build end");
 
         Ok(Self {
             options,
