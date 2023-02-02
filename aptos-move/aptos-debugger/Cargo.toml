@@ -11,6 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-resource-viewer = { workspace = true }

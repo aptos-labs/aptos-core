@@ -7,16 +7,30 @@ slug: "e2e-dapp-index"
 
 A common way to learn a new framework or programming language is to build a simple todo list. In this tutorial, we will learn how to build an end-to-end todo list dapp, starting from the smart contract side through the front-end side and finally use of a wallet to interact with the two.
 
+See the completed code in the [todolist-dapp-tutorial](https://github.com/aptos-labs/todolist-dapp-tutorial).
+
+## Chapters
+
+After meeting the [prerequisites](#prerequisites) and [getting set up](#setup) as described below, you will follow this tutorial in this order:
+
+1. [Create a smart contract](./1-create-smart-contract.md)
+2. [Set up React app](./2-set-up-react-app.md)
+3. [Add Wallet support](3-add-wallet-support.md)
+4. [Fetch Data from Chain](4-fetch-data-from-chain.md)
+5. [Submit data to chain](./5-submit-data-to-chain.md)
+6. [Handle Tasks](./6-handle-tasks.md)
+
 ## Prerequisites
 
 You must have:
 
-1. [Aptos CLI](../../cli-tools/aptos-cli-tool/index.md) `@1.0.4`
-2. [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md) `@1.6.0`
-3. [Aptos Wallet Adapter](../../concepts/wallet-adapter-concept.md) `@0.2.2`
-4. [Create React App](https://create-react-app.dev/)
+* [Aptos CLI](../../cli-tools/aptos-cli-tool/index.md) `@1.0.4` or later
+* [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md) `@1.6.0` or later
+* [Aptos Wallet Adapter](../../concepts/wallet-adapter-concept.md) `@0.2.2` or later
+* [Create React App](https://create-react-app.dev/)
+* [node and npm](https://nodejs.org/en/)
 
-See also the completed code is in the [todolist-dapp-tutorial](https://github.com/aptos-labs/todolist-dapp-tutorial).
+Although we will explain some React decisions, we are not going to deep dive into how React works; so we assume you have some previous experience with React.
 
 ## Setup
 
@@ -32,15 +46,4 @@ In this section, we will create a `my-first-dapp` directory to hold our project 
   cd my-first-dapp
   ```
 
-## Chapters
-
-Follow this tutorial in this order:
-
-1. [Create a smart contract](./1-create-smart-contract.md)
-2. [Set up React app](./2-set-up-react-app.md)
-3. [Add Wallet support](3-add-wallet-support.md)
-4. [Fetch Data from Chain](4-fetch-data-from-chain.md)
-5. [Submit data to chain](./5-submit-data-to-chain.md)
-6. [Handle Tasks](./6-handle-tasks.md)
-
-Now let's [create a smart contract](./1-create-smart-contract.md).
+  Now let's [create a smart contract](./1-create-smart-contract.md).

@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -765,6 +765,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
+ "clap 3.2.23",
  "dashmap",
  "itertools",
  "lru",
@@ -772,6 +773,7 @@ dependencies = [
  "move-resource-viewer",
  "num-derive",
  "once_cell",
+ "owo-colors",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -833,6 +835,7 @@ name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-gas",
  "aptos-logger",
  "aptos-resource-viewer",
@@ -1980,6 +1983,7 @@ dependencies = [
  "clap 3.2.23",
  "futures",
  "hex",
+ "move-binary-format",
  "move-core-types",
  "move-model",
  "serde 1.0.149",
@@ -2663,6 +2667,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
+ "itertools",
  "lru",
  "move-binary-format",
  "tokio",
@@ -7475,6 +7480,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "owo-colors"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
+
+[[package]]
 name = "parity-scale-codec"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8588,13 +8599,12 @@ dependencies = [
 
 [[package]]
 name = "reqwest-middleware"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69539cea4148dce683bec9dc95be3f0397a9bb2c248a49c8296a9d21659a8cdd"
+checksum = "4a1c03e9011a8c59716ad13115550469e081e2e9892656b0ba6a47c907921894"
 dependencies = [
  "anyhow",
  "async-trait",
- "futures",
  "http",
  "reqwest",
  "serde 1.0.149",
@@ -8604,9 +8614,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest-retry"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce246a729eaa6aff5e215aee42845bf5fed9893cc6cd51aeeb712f34e04dd9f3"
+checksum = "db161043fcfae3bdf30768bb1fa833853cd55ddf2411b1acb03e0c72bf86a9ea"
 dependencies = [
  "anyhow",
  "async-trait",

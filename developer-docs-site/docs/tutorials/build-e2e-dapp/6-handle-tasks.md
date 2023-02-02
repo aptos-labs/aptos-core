@@ -1,13 +1,15 @@
 ---
-title: "Handle Tasks"
+title: "6. Handle Tasks"
 id: "handle-tasks"
 ---
 
-# Handle Tasks
+# 6. Handle Tasks
+
+In the sixth and final chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will add functionality to the app so the user interface is able to handle cases where an account has created a list.
 
 We have covered how to [fetch data](./4-fetch-data-from-chain.md) (an account’s todo list) from chain and how to [submit a transaction](./5-submit-data-to-chain.md) (new todo list) to chain using Wallet.
 
-Let’s continue building our app by implementing fetch tasks and adding a task function.
+Let’s finish building our app by implementing fetch tasks and adding a task function.
 
 ## Fetch tasks
 

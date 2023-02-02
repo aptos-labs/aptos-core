@@ -16,10 +16,7 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{
-    NodeConfig, PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
-    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-};
+use aptos_config::config::{NodeConfig, PrunerConfig, RocksdbConfigs};
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
@@ -59,18 +56,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::open(
-        &source_dir,
-        false,                       /* readonly */
-        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-        RocksdbConfigs::default(),
-        false,
-        BUFFERED_STATE_TARGET_ITEMS,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    )
-    .expect("db open failure.")
-    .create_checkpoint(checkpoint_dir.as_ref())
-    .expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(source_dir, checkpoint_dir).expect("db checkpoint creation fails.");
 }
 
 /// Runs the benchmark with given parameters.

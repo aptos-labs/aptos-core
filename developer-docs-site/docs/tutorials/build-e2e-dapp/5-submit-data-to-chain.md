@@ -1,9 +1,11 @@
 ---
-title: "Submit Data to Chain"
+title: "5. Submit Data to Chain"
 id: "submit-data-to-chain"
 ---
 
-# Submit Data to Chain
+# 5. Submit Data to Chain
+
+In the fifth chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will be submitting data to the chain.
 
 So now we have an **Add new list** button that appears if the connected account hasn’t created a list yet. We still don't have a way for an account to create a list, so let’s add that functionality.
 
@@ -140,6 +142,6 @@ return (
 );
 ```
 
-Now we can head over to our app, and add a new list!
+Now you can head over to our app, and add a new list!
 
-> **Note:** keep in mind that we haven’t handled our UI in case an account has created a list, we will do it in the next section on [handling tasks](./6-handle-tasks.md).
+Since you haven’t made the user interface able to handle cases where an account has created a list, you will do so next [handling tasks](./6-handle-tasks.md) in chapter 6.

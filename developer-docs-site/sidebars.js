@@ -302,12 +302,12 @@ const sidebars = {
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
-        "nodes/indexer-fullnode",
       ],
     },
+    "nodes/indexer-fullnode",
     {
       type: "category",
-      label: "Monitor a Node",
+      label: "Monitor Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/measure/index" },
@@ -320,7 +320,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Configure a Node",
+      label: "Configure Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/identity-and-configuration" },

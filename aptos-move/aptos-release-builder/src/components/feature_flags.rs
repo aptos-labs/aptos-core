@@ -72,7 +72,7 @@ pub fn generate_feature_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash,
+        next_execution_hash.clone(),
         "std::features",
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
@@ -83,10 +83,17 @@ pub fn generate_feature_upgrade_proposal(
             generate_features_blob(writer, &disabled);
             emitln!(writer, ";\n");
 
-            emitln!(
-                writer,
-                "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
+                );
+            }
         },
     );
 
