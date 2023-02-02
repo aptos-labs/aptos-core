@@ -47,6 +47,13 @@ interface PaginationArgs {
   limit?: number;
 }
 
+//array of transactions
+type Transaction = {
+  sender: AptosAccount;
+  payload: TxnBuilderTypes.TransactionPayload;
+  extraArgs?: OptionalTransactionArgs;
+};
+
 /**
  * Provides methods for retrieving data from Aptos node.
  * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
@@ -478,32 +485,30 @@ export class AptosClient {
     });
   }
 
-  async generateBatchTransactions(
-    sender: AptosAccount,
-    payloads: TxnBuilderTypes.TransactionPayload[],
-    extraArgs?: OptionalTransactionArgs,
+  @parseApiError
+  async batchTransactionsFromDifferentSenders(
+    transactions: Transaction[],
     batch_size: number = 10, // api.max_submit_transaction_batch_size config
-  ): Promise<Uint8Array> {
-    if (payloads.length > batch_size) {
+  ): Promise<Gen.UserTransaction[]> {
+    if (transactions.length > batch_size) {
       throw new Error("Max submit transaction batch size");
     }
 
     const serializer = new Serializer();
-    serializer.serializeU32AsUleb128(payloads.length);
-
-    let result = new Uint8Array();
+    serializer.serializeU32AsUleb128(transactions.length);
+    let result = new Uint8Array(serializer.getBytes());
     result.set(serializer.getBytes(), 0);
 
-    for (let i = 0; i < payloads.length; i++) {
-      const rawTransaction = await this.generateRawTransaction(sender.address(), payloads[i], extraArgs);
-      const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
+    for (let i = 0; i < transactions.length; i++) {
+      const txn = transactions[i];
+      const rawTransaction = await this.generateRawTransaction(txn.sender.address(), txn.payload, txn.extraArgs);
+      const bcsTxn = AptosClient.generateBCSTransaction(txn.sender, rawTransaction);
       result = new Uint8Array([...result, ...bcsTxn]);
     }
     console.log(result);
-    return result;
+    return this.submitBatchTransactions(result);
   }
 
-  @parseApiError
   async submitBatchTransactions(txnsArray: Uint8Array): Promise<Gen.UserTransaction[]> {
     return this.client.request.request<Gen.UserTransaction[]>({
       url: "/transactions/batch",
