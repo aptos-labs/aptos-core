@@ -129,7 +129,7 @@ impl<
                             if let DependencyStatus::ExecutionHalted = *dep_resolved {
                                 return ReadResult::ExecutionHalted;
                             }
-                        }
+                        },
                         DependencyResult::ExecutionHalted => {
                             return ReadResult::ExecutionHalted;
                         },

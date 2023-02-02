@@ -542,7 +542,7 @@ impl Scheduler {
                     *lock.lock() = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
-                }
+                },
                 _ => (),
             }
             // Set the all transactions' status to be ExecutionHalted.
@@ -687,7 +687,7 @@ impl Scheduler {
             ExecutionStatus::Executing(incarnation) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
                 true
-            }
+            },
             ExecutionStatus::ExecutionHalted => false,
             _ => unreachable!(),
         }
