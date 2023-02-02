@@ -72,24 +72,25 @@ pub enum SchedulerTask {
 /// to 'ReadyToExecute(incarnation + 1)', allowing the scheduler to create an execution
 /// task for the next incarnation of the transaction.
 ///
-/// 'ExecutionHalted' is a transaction status caused by parallel execution halted earlier, due to
-/// reasons such as module r/w intersection or exceeding per-block gas limit. This status will be
-/// ignored during the transaction invariant checks, e.g., suspend(), resume(), set_executed_status().
+/// 'ExecutionHalted' is a transaction status marking that parallel execution is halted, due to
+/// reasons such as module r/w intersection or exceeding per-block gas limit. It is safe to ignore
+/// this status during the transaction invariant checks, e.g., suspend(), resume(), set_executed_status().
+/// When 'resolve_condvar' is called, all txns' statuses become ExecutionHalted.
 ///
 /// Status transition diagram:
-/// Ready(i)
-///    |  try_incarnate (incarnate successfully)
-///    |
-///    ↓         suspend (waiting on dependency)                resume
-/// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)
-///    |                                                    |             |
-///    |  finish_execution                  resolve_condvar |             | resolve_condvar
-///    ↓                                                    ↓             ↓
-/// Executed(i) ---------------> Committed(i)               ExecutionHalted
-///    |                                                                  ↑
-///    |  try_abort (abort successfully)                                  | resolve_condvar
-///    ↓                finish_abort                                      |
-/// Aborting(i) ---------------------------------------------------------> Ready(i+1)
+/// Ready(i)                                                                               ---
+///    |  try_incarnate (incarnate successfully)                                             |
+///    |                                                                                     |
+///    ↓         suspend (waiting on dependency)                resume                       |
+/// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)          |
+///    |                                                                                     | resolve_condvar
+///    |  finish_execution                                                                   |-----------------> ExecutionHalted
+///    ↓                                                                                     |
+/// Executed(i) (pending for (re)validations) ---------------------------> Committed(i)      |
+///    |                                                                                     |
+///    |  try_abort (abort successfully)                                                     |
+///    ↓                finish_abort                                                         |
+/// Aborting(i) ---------------------------------------------------------> Ready(i+1)      ---
 ///
 #[derive(Debug)]
 enum ExecutionStatus {
