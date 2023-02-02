@@ -71,12 +71,13 @@ def replay_verify_partition(
         ],
         stdout=subprocess.PIPE,
     )
+    if process.stdout is None:
+        raise Exception(f"[partition {n}] stdout is None")
     for line in iter(process.stdout.readline, b""):
         print(f"[partition {n}] {line}", flush=True)
 
 
 def main():
-
     # collect all required ENV variables
     REQUIRED_ENVS = [
         "BUCKET",

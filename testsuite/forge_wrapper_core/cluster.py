@@ -143,9 +143,9 @@ class ForgeCluster:
                 "get-credentials",
                 cluster_name,
                 "--zone",
-                # The default zone for now. 
+                # The default zone for now.
                 # The project must already be set via: gcloud config set project <project>
-                "us-central1-c", 
+                "us-central1-c",
             ]
         else:
             raise Exception("Unsupported cloud type")

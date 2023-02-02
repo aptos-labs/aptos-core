@@ -8,7 +8,7 @@ import subprocess
 from typing import IO
 
 
-def find_latest_version_from_db_backup_output(output: IO[bytes] | None):
+def find_latest_version_from_db_backup_output(output: IO[bytes]):
     latest_version = -1
     for line in iter(output.readline, b""):
         log_line = line.decode("utf-8")
@@ -21,7 +21,7 @@ def find_latest_version_from_db_backup_output(output: IO[bytes] | None):
 
 
 def find_latest_version_from_db_back_log_line(log_line: str):
-    match = re.search("latest_transaction_version: (\d+)", log_line)
+    match = re.search(r"latest_transaction_version: (\d+)", log_line)
     if match:
         print(match.group(1))
         return int(match.group(1))
@@ -55,6 +55,8 @@ def query_backup_latest_version(backup_config_template_path: str) -> int:
         ],
         stdout=subprocess.PIPE,
     )
+    if db_backup_result.stdout is None:
+        raise Exception("Failed to run db-backup. Cannot get stdout.")
     latest_version = find_latest_version_from_db_backup_output(db_backup_result.stdout)
     if latest_version < 0:
         raise Exception("Failed to find latest version")
