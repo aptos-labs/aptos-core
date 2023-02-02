@@ -37,6 +37,7 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
+#[allow(dead_code)]
 type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
