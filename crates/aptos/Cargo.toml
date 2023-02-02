@@ -28,6 +28,7 @@ aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
