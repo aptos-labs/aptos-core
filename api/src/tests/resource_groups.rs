@@ -5,6 +5,7 @@ use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
+use aptos_logger::info;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use serde_json::{json, Value};
@@ -23,29 +24,35 @@ use std::path::PathBuf;
 // 10. Read and ensure data is present
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_read_resoure_group() {
+    println!("BCHO 0");
     let mut context = new_test_context(current_function_name!());
 
     // Prepare accounts
+    println!("BCHO 1");
     let mut root = context.root_account();
     let mut admin0 = create_account(&mut context, &mut root).await;
     let mut admin1 = create_account(&mut context, &mut root).await;
     let mut user = create_account(&mut context, &mut root).await;
 
     // Publish packages
+    println!("BCHO 2");
     let named_addresses = vec![
         ("resource_groups_primary".to_string(), admin0.address()),
         ("resource_groups_secondary".to_string(), admin1.address()),
     ];
 
+    println!("BCHO 3");
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
         .join("../aptos-move/move-examples/resource_groups/primary");
     publish_package(&mut context, &mut admin0, path, named_addresses.clone()).await;
 
+    println!("BCHO 4");
     let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
         .join("../aptos-move/move-examples/resource_groups/secondary");
     publish_package(&mut context, &mut admin1, path, named_addresses.clone()).await;
 
     // Read default data
+    println!("BCHO 5");
     let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
     let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
 
@@ -56,12 +63,14 @@ async fn test_read_resoure_group() {
     assert_eq!(response.unwrap()["data"]["value"], "3");
 
     // Verify account is empty
+    println!("BCHO 6");
     let response = maybe_read_resource(&context, &user.address(), &primary).await;
     assert!(response.is_none());
     let response = maybe_read_resource(&context, &user.address(), &secondary).await;
     assert!(response.is_none());
 
     // Init secondary
+    println!("BCHO 7");
     execute_entry_function(
         &mut context,
         &mut user,
@@ -80,6 +89,7 @@ async fn test_read_resoure_group() {
     assert!(response.is_none());
 
     // Init primary
+    println!("BCHO 8");
     execute_entry_function(
         &mut context,
         &mut user,
@@ -156,25 +166,35 @@ async fn publish_package(
     path: PathBuf,
     named_addresses: Vec<(String, AccountAddress)>,
 ) {
+    println!("BCHO publish_package 0");
     let mut build_options = aptos_framework::BuildOptions::default();
     let _ = named_addresses
         .into_iter()
         .map(|(name, address)| build_options.named_addresses.insert(name, address))
         .collect::<Vec<_>>();
 
+    println!("BCHO publish_package 1");
     let package = BuiltPackage::build(path.to_owned(), build_options).unwrap();
+    println!("BCHO publish_package 2");
     let code = package.extract_code();
+    println!("BCHO publish_package 3");
     let metadata = package.extract_metadata().unwrap();
 
+    println!("BCHO publish_package 4");
     let payload = aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code);
+    println!("BCHO publish_package 5");
     let txn =
         publisher.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    println!("BCHO publish_package 6");
     let bcs_txn = bcs::to_bytes(&txn).unwrap();
+    println!("BCHO publish_package 7");
     context
         .expect_status_code(202)
         .post_bcs_txn("/transactions", bcs_txn)
         .await;
+    println!("BCHO publish_package 8");
     context.commit_mempool_txns(1).await;
+    println!("BCHO publish_package 9");
 }
 
 async fn execute_entry_function(
