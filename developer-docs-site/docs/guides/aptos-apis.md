@@ -40,7 +40,8 @@ View functions do not modify blockchain state. A [View](https://github.com/aptos
 
 The View function operates similar to the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
-In order to use the View functions, you need to pass `--bytecode-version 6` to the Aptos CLI.
+In order to use the View functions, you need to pass `--bytecode-version 6` to the Aptos CLI when publish the module.
+Note: Calling view functions is not supported in CLI yet.
 
 In the TypeScript SDK, a view function request would look like this:
 ```
