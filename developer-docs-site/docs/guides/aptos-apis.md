@@ -1,5 +1,5 @@
 ---
-title: "Use Aptos API"
+title: "Use the Aptos API"
 slug: "aptos-api"
 ---
 
@@ -33,6 +33,29 @@ The REST API offers querying transactions and events in these ways:
 * [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
 * [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
 * [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
+
+## Reading state with the View function
+
+View functions do not modify blockchain state. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. See [this file](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example, related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code, and [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+
+The View function operates similar to the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
+
+In order to use the View functions, you need to pass `--bytecode-version 6` to the Aptos CLI.
+
+In the TypeScript SDK, a view function request would look like this:
+```
+    const payload: Gen.ViewRequest = {
+      function: "0x1::coin::balance",
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      arguments: [alice.address().hex()],
+    };
+
+    const balance = await client.view(payload);
+
+    expect(balance[0]).toBe("100000000");
+```
+
+The view function returns a list of values as a vector. By default, the results are returned in JSON format; however, they can be optionally returned in Binary Canonical Serialization (BCS) encoded format.
 
 ## Exchanging and tracking coins
 

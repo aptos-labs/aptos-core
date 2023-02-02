@@ -19,6 +19,7 @@ pub struct PartitionedGuidedStrategy;
 
 impl PartitionStrategy for PartitionedGuidedStrategy {
     type Txn = AnnotatedTransaction;
+
     fn partition(&mut self, block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
         block
             .split(|atxn| atxn == &AnnotatedTransaction::Block)
@@ -40,6 +41,7 @@ pub struct UnPartitionedGuidedStrategy;
 
 impl PartitionStrategy for UnPartitionedGuidedStrategy {
     type Txn = AnnotatedTransaction;
+
     fn partition(&mut self, block: Block<Self::Txn>) -> Vec<Block<SignedTransaction>> {
         vec![block
             .into_iter()
@@ -66,8 +68,9 @@ impl<Strategy: PartitionStrategy> GuidedExecutor<Strategy> {
 }
 
 impl<Strategy: PartitionStrategy> Executor for GuidedExecutor<Strategy> {
-    type Txn = Strategy::Txn;
     type BlockResult = VMStatus;
+    type Txn = Strategy::Txn;
+
     fn execute_block(&mut self, block: Block<Self::Txn>) -> ExecutorResult<Self::BlockResult> {
         let mut outputs = vec![];
         for block in self.strategy.partition(block).into_iter() {

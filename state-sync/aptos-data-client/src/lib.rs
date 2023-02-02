@@ -3,8 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_storage_service_types::responses::TransactionOrOutputListWithProof;
-use aptos_storage_service_types::{responses::CompleteDataRange, Epoch};
+use aptos_storage_service_types::{
+    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    Epoch,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -51,6 +53,12 @@ impl Error {
             Self::TimeoutWaitingForResponse(_) => "timeout_waiting_for_response",
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
         }
+    }
+}
+
+impl From<aptos_storage_service_client::Error> for Error {
+    fn from(error: aptos_storage_service_client::Error) -> Self {
+        Self::UnexpectedErrorEncountered(error.to_string())
     }
 }
 

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
@@ -8,8 +9,6 @@ use crate::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -95,7 +94,7 @@ impl Checker for NodeIdentityChecker {
                     0,
                     format!("There was an error querying your node's API: {:#}", err),
                 )]);
-            }
+            },
         };
 
         let check_results = vec![

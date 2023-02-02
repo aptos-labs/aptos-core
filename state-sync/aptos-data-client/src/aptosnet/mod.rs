@@ -20,21 +20,18 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_network::{
-    application::interface::NetworkInterface,
-    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
-};
+use aptos_network::{application::interface::NetworkClient, protocols::rpc::error::RpcError};
 use aptos_storage_service_client::StorageServiceClient;
-use aptos_storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof},
+    Epoch, StorageServiceMessage,
 };
-use aptos_storage_service_types::responses::{
-    StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof,
-};
-use aptos_storage_service_types::Epoch;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -88,7 +85,7 @@ pub struct AptosNetDataClient {
     /// Config for AptosNet data client.
     data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
-    network_client: StorageServiceClient,
+    storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
     /// All of the data-client specific data we have on each network peer.
     peer_states: Arc<RwLock<PeerStates>>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
@@ -103,16 +100,16 @@ impl AptosNetDataClient {
         base_config: BaseConfig,
         storage_service_config: StorageServiceConfig,
         time_service: TimeService,
-        network_client: StorageServiceClient,
+        storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
         runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
             data_client_config,
-            network_client: network_client.clone(),
+            storage_service_client: storage_service_client.clone(),
             peer_states: Arc::new(RwLock::new(PeerStates::new(
                 base_config,
                 storage_service_config,
-                network_client.get_peer_metadata_storage(),
+                storage_service_client.get_peers_and_metadata(),
             ))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
@@ -251,25 +248,13 @@ impl AptosNetDataClient {
 
     /// Returns all peers connected to us
     fn get_all_connected_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
-        let network_peer_metadata = self.network_client.peer_metadata_storage();
-        let connected_peers = network_peer_metadata
-            .networks()
-            .flat_map(|network_id| {
-                network_peer_metadata
-                    .read_filtered(network_id, |(_, peer_metadata)| {
-                        peer_metadata.is_connected()
-                            && peer_metadata.supports_protocol(ProtocolId::StorageServiceRpc)
-                    })
-                    .into_keys()
-            })
-            .collect::<Vec<_>>();
-
-        // Ensure connected peers is not empty
+        let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
             return Err(Error::DataIsUnavailable(
                 "No connected AptosNet peers!".to_owned(),
             ));
         }
+
         Ok(connected_peers)
     }
 
@@ -363,7 +348,7 @@ impl AptosNetDataClient {
                     .response_callback
                     .notify_bad_response(ResponseError::InvalidPayloadDataType);
                 Err(err.into())
-            }
+            },
         }
     }
 
@@ -387,11 +372,11 @@ impl AptosNetDataClient {
 
         // Send the request and process the result
         let result = self
-            .network_client
+            .storage_service_client
             .send_request(
                 peer,
-                request.clone(),
                 Duration::from_millis(request_timeout_ms),
+                request.clone(),
             )
             .await;
         match result {
@@ -427,20 +412,25 @@ impl AptosNetDataClient {
                     response_callback: Box::new(response_callback),
                 };
                 Ok(Response::new(context, response))
-            }
+            },
             Err(error) => {
                 // Convert network error and storage service error types into
                 // data client errors. Also categorize the error type for scoring
                 // purposes.
                 let client_error = match error {
-                    aptos_storage_service_client::Error::RpcError(err) => match err {
-                        RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
-                        RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
-                        _ => Error::UnexpectedErrorEncountered(err.to_string()),
+                    aptos_storage_service_client::Error::RpcError(rpc_error) => match rpc_error {
+                        RpcError::NotConnected(_) => {
+                            Error::DataIsUnavailable(rpc_error.to_string())
+                        },
+                        RpcError::TimedOut => {
+                            Error::TimeoutWaitingForResponse(rpc_error.to_string())
+                        },
+                        _ => Error::UnexpectedErrorEncountered(rpc_error.to_string()),
                     },
                     aptos_storage_service_client::Error::StorageServiceError(err) => {
                         Error::UnexpectedErrorEncountered(err.to_string())
-                    }
+                    },
+                    _ => Error::UnexpectedErrorEncountered(error.to_string()),
                 };
 
                 warn!(
@@ -460,7 +450,7 @@ impl AptosNetDataClient {
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
                 Err(client_error)
-            }
+            },
         }
     }
 
@@ -871,7 +861,7 @@ pub(crate) fn poll_peer(
                         .peer(&peer))
                 );
                 return;
-            }
+            },
         };
 
         // Update the summary for the peer

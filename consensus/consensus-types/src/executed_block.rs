@@ -9,12 +9,11 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
-use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    transaction::{Transaction, TransactionStatus},
+    transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
 

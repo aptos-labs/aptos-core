@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::storage::PeersAndMetadata,
     counters,
     counters::NETWORK_RATE_LIMIT_METRICS,
     noise::{stream::NoiseStream, HandshakeAuthMode},
@@ -10,7 +10,10 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
+    protocols::{
+        network::{NetworkClientConfig, NetworkServiceConfig},
+        wire::handshake::v1::ProtocolIdSet,
+    },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
@@ -57,8 +60,9 @@ struct TransportContext {
 }
 
 impl TransportContext {
-    fn add_protocols(&mut self, protocols: &ProtocolIdSet) {
-        self.supported_protocols = self.supported_protocols.union(protocols);
+    fn add_protocols(&mut self, protocols: &Vec<ProtocolId>) {
+        let protocol_id_set = ProtocolIdSet::from_iter(protocols);
+        self.supported_protocols = self.supported_protocols.union(&protocol_id_set);
     }
 }
 
@@ -69,7 +73,7 @@ struct PeerManagerContext {
     connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     trusted_peers: Arc<RwLock<PeerSet>>,
     upstream_handlers:
         HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
@@ -93,7 +97,7 @@ impl PeerManagerContext {
         connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         upstream_handlers: HashMap<
             ProtocolId,
@@ -116,7 +120,7 @@ impl PeerManagerContext {
             connection_reqs_tx,
             connection_reqs_rx,
 
-            peer_metadata_storage,
+            peers_and_metadata,
             trusted_peers,
             upstream_handlers,
             connection_event_handlers,
@@ -178,7 +182,7 @@ impl PeerManagerBuilder {
         time_service: TimeService,
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
@@ -216,7 +220,7 @@ impl PeerManagerBuilder {
                 pm_reqs_rx,
                 connection_reqs_tx,
                 connection_reqs_rx,
-                peer_metadata_storage,
+                peers_and_metadata,
                 trusted_peers,
                 HashMap::new(),
                 Vec::new(),
@@ -303,7 +307,7 @@ impl PeerManagerBuilder {
                     ),
                     executor,
                 )))
-            }
+            },
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
                 AptosNetTransport::new(
@@ -362,7 +366,7 @@ impl PeerManagerBuilder {
             // TODO(philiphayes): peer manager should take `Vec<NetworkAddress>`
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
-            pm_context.peer_metadata_storage,
+            pm_context.peers_and_metadata,
             pm_context.trusted_peers,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,
@@ -422,28 +426,19 @@ impl PeerManagerBuilder {
             .tcp_buffer_cfg
     }
 
-    /// Register a peer-to-peer service (i.e., both client and service) for given
-    /// protocols.
-    pub fn add_p2p_service(
-        &mut self,
-        config: &AppConfig,
-    ) -> (
-        (PeerManagerRequestSender, ConnectionRequestSender),
-        (
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            conn_notifs_channel::Receiver,
-        ),
-    ) {
-        (self.add_client(config), self.add_service(config))
-    }
-
     /// Register a client that's interested in some set of protocols and return
     /// the outbound channels into network.
     pub fn add_client(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkClientConfig,
     ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
+
+        // Create the context and return the request senders
         let pm_context = self.peer_manager_context();
         (
             PeerManagerRequestSender::new(pm_context.pm_reqs_tx.clone()),
@@ -454,20 +449,26 @@ impl PeerManagerBuilder {
     /// Register a service for handling some protocols.
     pub fn add_service(
         &mut self,
-        config: &AppConfig,
+        config: &NetworkServiceConfig,
     ) -> (
         aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,
     ) {
-        self.transport_context().add_protocols(&config.protocols);
+        // Register the direct send and rpc protocols
+        self.transport_context()
+            .add_protocols(&config.direct_send_protocols_and_preferences);
+        self.transport_context()
+            .add_protocols(&config.rpc_protocols_and_preferences);
 
-        let (network_notifs_tx, network_notifs_rx) = config
-            .inbound_queue
-            .expect("Requires a service config")
-            .build();
+        // Create the context and register the protocols
+        let (network_notifs_tx, network_notifs_rx) = config.inbound_queue_config.build();
         let pm_context = self.peer_manager_context();
-        for protocol in config.protocols.iter() {
-            pm_context.add_upstream_handler(protocol, network_notifs_tx.clone());
+        for protocol in config
+            .direct_send_protocols_and_preferences
+            .iter()
+            .chain(&config.rpc_protocols_and_preferences)
+        {
+            pm_context.add_upstream_handler(*protocol, network_notifs_tx.clone());
         }
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 

@@ -80,14 +80,14 @@ impl<'a> NativeAggregatorContext<'a> {
                     let delta_op =
                         DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
-                }
+                },
                 AggregatorState::NegativeDelta => {
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
                         DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
-                }
+                },
             };
             changes.insert(id, change);
         }
@@ -108,7 +108,7 @@ impl AggregatorChangeSet {
                 // If something was changed only in `other` session, add it.
                 btree_map::Entry::Vacant(entry) => {
                     entry.insert(other_change);
-                }
+                },
                 // Otherwise, we might need to aggregate deltas.
                 btree_map::Entry::Occupied(mut entry) => {
                     use AggregatorChange::*;
@@ -122,7 +122,7 @@ impl AggregatorChangeSet {
                                 .apply_to(data)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
-                        }
+                        },
                         (Merge(delta1), Merge(mut delta2)) => {
                             // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
                             // one to the initial delta.
@@ -130,12 +130,12 @@ impl AggregatorChangeSet {
                                 .merge_onto(delta1)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Merge(delta2)
-                        }
+                        },
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.
                         (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
                     }
-                }
+                },
             }
         }
         Ok(())
@@ -167,7 +167,7 @@ mod test {
             .iter()
             .flat_map(|b| b.to_vec())
             .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(&bytes).unwrap());
+        let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
         AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 

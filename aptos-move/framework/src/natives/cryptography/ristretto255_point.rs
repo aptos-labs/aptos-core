@@ -4,12 +4,15 @@
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
 
-use crate::natives::cryptography::ristretto255::{pop_64_byte_slice, GasParameters};
-use crate::natives::cryptography::ristretto255::{pop_scalar_from_bytes, scalar_from_struct};
+use crate::natives::cryptography::ristretto255::{
+    pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, GasParameters,
+};
 use better_any::{Tid, TidAble};
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    traits::{Identity, VartimeMultiscalarMul},
+};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeContext;
@@ -21,8 +24,13 @@ use move_vm_types::{
 };
 use sha2::Sha512;
 use smallvec::smallvec;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use std::{cell::RefCell, collections::VecDeque, convert::TryFrom, fmt::Display};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    convert::TryFrom,
+    fmt::Display,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 //
 // Public Data Structures and Constants
@@ -41,7 +49,7 @@ impl Display for RistrettoPointHandle {
 
 /// The native RistrettoPoint context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this extension.
-#[derive(Tid)]
+#[derive(Default, Tid)]
 pub struct NativeRistrettoPointContext {
     point_data: RefCell<PointStore>,
 }
@@ -181,10 +189,9 @@ pub(crate) fn native_point_is_canonical(
     let mut cost = InternalGas::zero();
     let opt_point = gas_params.decompress_maybe_non_canonical_point_bytes(&mut cost, bytes);
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(opt_point.is_some())],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(
+        opt_point.is_some()
+    )]))
 }
 
 pub(crate) fn native_point_decompress(
@@ -205,11 +212,11 @@ pub(crate) fn native_point_decompress(
         Some(point) => point,
         None => {
             // NOTE: We return (u64::MAX, false) in this case.
-            return Ok(NativeResult::ok(
-                cost,
-                smallvec![Value::u64(u64::MAX), Value::bool(false)],
-            ));
-        }
+            return Ok(NativeResult::ok(cost, smallvec![
+                Value::u64(u64::MAX),
+                Value::bool(false)
+            ]));
+        },
     };
 
     // Take the # of points produced so far, which creates a unique and deterministic global ID
@@ -217,10 +224,10 @@ pub(crate) fn native_point_decompress(
     // a vector using this global ID as an index.
     let id = point_data.add_point(point);
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::u64(id), Value::bool(true)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![
+        Value::u64(id),
+        Value::bool(true)
+    ]))
 }
 
 pub(crate) fn native_point_compress(
@@ -237,10 +244,9 @@ pub(crate) fn native_point_compress(
     let cost = gas_params.point_compress * NumArgs::one();
     let point = point_data.get_point(&handle);
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::vector_u8(point.compress().to_bytes())],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
+        point.compress().to_bytes()
+    )]))
 }
 
 pub(crate) fn native_point_mul(
@@ -265,11 +271,11 @@ pub(crate) fn native_point_mul(
         false => {
             let point = point_data.get_point(&point_handle).mul(scalar);
             point_data.add_point(point)
-        }
+        },
         true => {
             point_data.get_point_mut(&point_handle).mul_assign(scalar);
             point_handle.0
-        }
+        },
     };
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -319,12 +325,12 @@ pub(crate) fn native_point_neg(
         false => {
             let point = point_data.get_point(&point_handle).neg();
             point_data.add_point(point)
-        }
+        },
         true => {
             let neg = point_data.get_point_mut(&point_handle).neg();
             point_data.set_point(&point_handle, neg);
             point_handle.0
-        }
+        },
     };
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -355,7 +361,7 @@ pub(crate) fn native_point_add(
 
             let point = a.add(b);
             point_data.add_point(point)
-        }
+        },
         true => {
             // NOTE: When calling Move's add_assign, Move's linear types ensure that we will never
             // get references to the same a and b RistrettoPoint, while our own invariants ensure
@@ -365,7 +371,7 @@ pub(crate) fn native_point_add(
 
             a.add_assign(&*b);
             a_handle.0
-        }
+        },
     };
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -396,7 +402,7 @@ pub(crate) fn native_point_sub(
 
             let point = a.sub(b);
             point_data.add_point(point)
-        }
+        },
         true => {
             // NOTE: When calling Move's sub_assign, Move's linear types ensure that we will never
             // get references to the same a and b RistrettoPoint, while our own invariants ensure
@@ -406,7 +412,7 @@ pub(crate) fn native_point_sub(
 
             a.sub_assign(&*b);
             a_handle.0
-        }
+        },
     };
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))

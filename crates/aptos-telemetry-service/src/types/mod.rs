@@ -6,17 +6,16 @@ pub mod telemetry;
 
 pub mod common {
 
-    use std::{collections::HashMap, fmt};
-
     use crate::types::auth::Claims;
     use aptos_config::config::PeerSet;
-    use aptos_types::chain_id::ChainId;
-    use aptos_types::PeerId;
+    use aptos_types::{chain_id::ChainId, PeerId};
     use serde::{Deserialize, Serialize};
+    use std::{collections::HashMap, fmt};
 
     pub type EpochNum = u64;
     pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
     pub type PeerStore = HashMap<ChainId, PeerSet>;
+    pub type ChainCommonName = String;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct EventIdentity {
@@ -43,6 +42,8 @@ pub mod common {
         ValidatorFullNode,
         PublicFullNode,
         Unknown,
+        UnknownValidator,
+        UnknownFullNode,
     }
 
     impl NodeType {
@@ -52,6 +53,8 @@ pub mod common {
                 NodeType::ValidatorFullNode => "validator_fullnode",
                 NodeType::PublicFullNode => "public_fullnode",
                 NodeType::Unknown => "unknown_peer",
+                NodeType::UnknownValidator => "unknown_validator",
+                NodeType::UnknownFullNode => "unknown_fullnode",
             }
         }
     }
@@ -70,11 +73,10 @@ pub mod common {
 }
 
 pub mod response {
+    use crate::errors::ServiceError;
     use aptos_crypto::x25519;
     use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};
-
-    use crate::errors::ServiceError;
 
     #[derive(Serialize, Deserialize)]
     pub struct IndexResponse {

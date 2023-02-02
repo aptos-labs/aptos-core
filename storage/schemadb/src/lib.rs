@@ -30,14 +30,13 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use std::{collections::HashMap, iter::Iterator, path::Path};
-
 use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
     SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
+use std::{collections::HashMap, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -148,7 +147,7 @@ impl DB {
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
-        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, &cfs, error_if_log_file_exists)?;
+        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, cfs, error_if_log_file_exists)?;
 
         Ok(Self::log_construct(name, inner))
     }
@@ -160,7 +159,7 @@ impl DB {
         name: &'static str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, &cfs)?;
+        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, cfs)?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -178,7 +177,7 @@ impl DB {
         let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
-        let result = self.inner.get_cf(cf_handle, &k)?;
+        let result = self.inner.get_cf(cf_handle, k)?;
         APTOS_SCHEMADB_GET_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
@@ -248,10 +247,10 @@ impl DB {
                         APTOS_SCHEMADB_PUT_BYTES
                             .with_label_values(&[cf_name])
                             .observe((key.len() + value.len()) as f64);
-                    }
+                    },
                     WriteOp::Deletion { key: _ } => {
                         APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
-                    }
+                    },
                 }
             }
         }

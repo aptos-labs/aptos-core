@@ -16,6 +16,8 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
+// Re-exposed for aptos-network-checker
+pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
 use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
@@ -31,9 +33,6 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
-
-// Re-exposed for aptos-network-checker
-pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
 
 #[cfg(test)]
 mod test;
@@ -66,6 +65,12 @@ impl<T> TSocket for T where T: AsyncRead + AsyncWrite + Send + fmt::Debug + Unpi
 /// Unique local identifier for a connection.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ConnectionId(u32);
+
+impl ConnectionId {
+    pub fn get_inner(&self) -> u32 {
+        self.0
+    }
+}
 
 impl From<u32> for ConnectionId {
     fn from(i: u32) -> ConnectionId {
@@ -488,7 +493,7 @@ where
                 let base_addr = NetworkAddress::try_from(base_transport_protos.to_vec())
                     .expect("base_transport_protos is always non-empty");
                 Ok((base_addr, *pubkey, *version))
-            }
+            },
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
@@ -629,12 +634,12 @@ where
     TTransport::Inbound: Send + 'static,
     TTransport::Listener: Send + 'static,
 {
-    type Output = Connection<NoiseStream<TTransport::Output>>;
     type Error = io::Error;
     type Inbound = Pin<Box<dyn Future<Output = io::Result<Self::Output>> + Send + 'static>>;
-    type Outbound = Pin<Box<dyn Future<Output = io::Result<Self::Output>> + Send + 'static>>;
     type Listener =
         Pin<Box<dyn Stream<Item = io::Result<(Self::Inbound, NetworkAddress)>> + Send + 'static>>;
+    type Outbound = Pin<Box<dyn Future<Output = io::Result<Self::Output>> + Send + 'static>>;
+    type Output = Connection<NoiseStream<TTransport::Output>>;
 
     fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> io::Result<Self::Outbound> {
         self.dial(peer_id, addr)

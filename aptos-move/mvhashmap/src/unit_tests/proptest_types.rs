@@ -87,6 +87,7 @@ where
             None => ExpectedOutput::NotInMap,
             Some(mut iter) => {
                 let mut acc: Option<DeltaOp> = None;
+                let mut failure = false;
                 while let Some((_, data)) = iter.next_back() {
                     match data {
                         Data::Write(v) => match acc {
@@ -99,32 +100,49 @@ where
                                     return ExpectedOutput::Deleted;
                                 }
 
+                                assert!(!failure); // acc should be none.
+
                                 match d.apply_to(maybe_value.unwrap()) {
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),
                                 }
-                            }
+                            },
                             None => match v {
-                                Value(Some(w)) => return ExpectedOutput::Value(w.clone()),
+                                Value(Some(w)) => {
+                                    return if failure {
+                                        ExpectedOutput::Failure
+                                    } else {
+                                        ExpectedOutput::Value(w.clone())
+                                    };
+                                },
                                 Value(None) => return ExpectedOutput::Deleted,
                             },
                         },
                         Data::Delta(d) => match acc.as_mut() {
                             Some(a) => {
                                 if a.merge_onto(*d).is_err() {
-                                    return ExpectedOutput::Failure;
+                                    failure = true;
                                 }
-                            }
+                            },
                             None => acc = Some(*d),
                         },
                     }
+
+                    if failure {
+                        // for overriding the delta failure if entry is deleted.
+                        acc = None;
+                    }
                 }
 
-                match acc {
-                    Some(d) => ExpectedOutput::Unresolved(d),
-                    None => ExpectedOutput::NotInMap,
+                if failure {
+                    ExpectedOutput::Failure
+                } else {
+                    match acc {
+                        Some(d) => ExpectedOutput::Unresolved(d),
+                        None => ExpectedOutput::NotInMap,
+                    }
                 }
-            }
+            },
         }
     }
 }
@@ -170,7 +188,7 @@ where
             Operator::Read => None,
             Operator::Insert(_) | Operator::Remove | Operator::Update(_) => {
                 Some((key.clone(), idx))
-            }
+            },
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
@@ -209,7 +227,7 @@ where
                                                 "{:?}",
                                                 idx
                                             );
-                                        }
+                                        },
                                         Value(None) => {
                                             assert_eq!(
                                                 baseline,
@@ -217,22 +235,22 @@ where
                                                 "{:?}",
                                                 idx
                                             );
-                                        }
+                                        },
                                     }
                                     break;
-                                }
+                                },
                                 Ok(Resolved(v)) => {
                                     assert_eq!(baseline, ExpectedOutput::Resolved(v), "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(NotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(DeltaApplicationFailure) => {
                                     assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
                                     break;
-                                }
+                                },
                                 Err(Unresolved(d)) => {
                                     assert_eq!(
                                         baseline,
@@ -241,7 +259,7 @@ where
                                         idx
                                     );
                                     break;
-                                }
+                                },
                                 Err(Dependency(_i)) => (),
                             }
                             retry_attempts += 1;
@@ -250,13 +268,13 @@ where
                             }
                             std::thread::sleep(std::time::Duration::from_millis(100));
                         }
-                    }
+                    },
                     Operator::Remove => {
                         map.add_write(key, (idx, 1), Value(None));
-                    }
+                    },
                     Operator::Insert(v) => {
                         map.add_write(key, (idx, 1), Value(Some(v.clone())));
-                    }
+                    },
                     Operator::Update(delta) => map.add_delta(key, idx, *delta),
                 }
             })

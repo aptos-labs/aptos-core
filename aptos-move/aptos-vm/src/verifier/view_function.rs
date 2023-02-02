@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{MoveResolverExt, SessionExt};
-use crate::verifier::transaction_arg_validation;
+use crate::{
+    move_vm_ext::{MoveResolverExt, SessionExt},
+    verifier::transaction_arg_validation,
+};
 use aptos_framework::{KnownAttribute, RuntimeModuleMetadataV1};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::identifier::IdentStr;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::loaded_data::runtime_types::Type;
 
@@ -61,7 +62,7 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
                 if validation {
                     needs_validation.push(idx);
                 }
-            }
+            },
         }
     }
     if !needs_validation.is_empty()

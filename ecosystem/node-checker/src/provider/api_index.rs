@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{sync::Arc, time::Duration};
-
 use super::{
     cache::OutputCache,
     traits::{Provider, ProviderError},
@@ -13,6 +11,7 @@ use aptos_rest_client::{aptos_api_types::IndexResponse, Client};
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

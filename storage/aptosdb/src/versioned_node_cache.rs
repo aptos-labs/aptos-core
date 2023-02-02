@@ -19,7 +19,7 @@ pub(crate) struct VersionedNodeCache {
 }
 
 impl VersionedNodeCache {
-    const NUM_VERSIONS_TO_CACHE: usize = 2;
+    pub(crate) const NUM_VERSIONS_TO_CACHE: usize = 2;
 
     pub fn new() -> Self {
         Self {

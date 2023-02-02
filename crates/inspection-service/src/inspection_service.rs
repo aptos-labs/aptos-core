@@ -18,7 +18,6 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     thread,
 };
-use tokio::runtime;
 
 // The message displayed when the endpoint is disabled.
 const DISABLED_ENDPOINT_MESSAGE: &str =
@@ -99,25 +98,25 @@ async fn serve_requests(
             } else {
                 *resp.body_mut() = Body::from(DISABLED_ENDPOINT_MESSAGE);
             }
-        }
+        },
         // Exposes JSON encoded metrics
         (&Method::GET, "/json_metrics") => {
             let encoder = JsonEncoder;
             let buffer = encode_metrics(encoder);
             *resp.body_mut() = Body::from(buffer);
-        }
+        },
         // Exposes text encoded metrics
         (&Method::GET, "/metrics") => {
             let encoder = TextEncoder::new();
             let buffer = encode_metrics(encoder);
             *resp.body_mut() = Body::from(buffer);
-        }
+        },
         // Exposes forge encoded metrics (this is currently only used by forge).
         (&Method::GET, "/forge_metrics") => {
             let metrics = get_all_metrics();
             let encoded_metrics = serde_json::to_string(&metrics).unwrap();
             *resp.body_mut() = Body::from(encoded_metrics);
-        }
+        },
         // Expose the system and build information
         (&Method::GET, "/system_information") => {
             if node_config.inspection_service.expose_system_information {
@@ -130,10 +129,10 @@ async fn serve_requests(
             } else {
                 *resp.body_mut() = Body::from(DISABLED_ENDPOINT_MESSAGE);
             }
-        }
+        },
         _ => {
             *resp.status_mut() = StatusCode::NOT_FOUND;
-        }
+        },
     };
 
     Ok(resp)
@@ -167,12 +166,7 @@ pub fn start_inspection_service(node_config: NodeConfig) {
             }
         });
 
-        let runtime = runtime::Builder::new_current_thread()
-            .thread_name("inspection")
-            .enable_io()
-            .disable_lifo_slot()
-            .build()
-            .unwrap();
+        let runtime = aptos_runtimes::spawn_named_runtime("inspection".into(), None);
         runtime
             .block_on(async {
                 let server = Server::bind(&addr).serve(make_service);

@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::chain_id::ChainId;
 use crate::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
+    chain_id::ChainId,
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};

@@ -22,7 +22,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkContext;
+use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
@@ -55,12 +55,13 @@ mod types;
 
 pub use self::error::PeerManagerError;
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::{error::Error, storage::PeersAndMetadata},
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::SerializedRequest,
 };
 use aptos_config::config::{PeerRole, PeerSet};
 use aptos_infallible::RwLock;
+use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
 
@@ -90,7 +91,7 @@ where
         ),
     >,
     /// Shared metadata storage about peers
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     /// Known trusted peers from discovery
     trusted_peers: Arc<RwLock<PeerSet>>,
     /// Channel to receive requests from other actors.
@@ -143,7 +144,7 @@ where
         transport: TTransport,
         network_context: NetworkContext,
         listen_addr: NetworkAddress,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
@@ -186,7 +187,7 @@ where
             listen_addr,
             transport_handler: Some(transport_handler),
             active_peers: HashMap::new(),
-            peer_metadata_storage,
+            peers_and_metadata,
             trusted_peers,
             requests_rx,
             connection_reqs_rx,
@@ -308,7 +309,7 @@ where
                                 conn.metadata
                             )
                         }
-                    }
+                    },
                     ConnectionOrigin::Inbound => {
                         // Everything below here is meant for unknown peers only, role comes from
                         // Noise handshake and if it's not `Unknown` it is trusted
@@ -352,7 +353,7 @@ where
                                 return;
                             }
                         }
-                    }
+                    },
                 }
 
                 // Add new peer, updating counters and all
@@ -361,9 +362,14 @@ where
                         .connection_metadata_with_address(&conn.metadata),
                     "{} New connection established: {}", self.network_context, conn.metadata
                 );
-                self.add_peer(conn);
+                if let Err(error) = self.add_peer(conn) {
+                    warn!(
+                        NetworkSchema::new(&self.network_context),
+                        "Failed to add peer. Error: {:?}", error
+                    )
+                }
                 self.update_connected_peers_metrics();
-            }
+            },
             TransportNotification::Disconnected(lost_conn_metadata, reason) => {
                 // See: https://github.com/aptos-labs/aptos-core/issues/3128#issuecomment-605351504 for
                 // detailed reasoning on `Disconnected` events should be handled correctly.
@@ -380,13 +386,11 @@ where
                 // If the active connection with the peer is lost, remove it from `active_peers`.
                 if let Entry::Occupied(entry) = self.active_peers.entry(peer_id) {
                     let (conn_metadata, _) = entry.get();
-                    if conn_metadata.connection_id == lost_conn_metadata.connection_id {
+                    let connection_id = conn_metadata.connection_id;
+                    if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
-                        self.peer_metadata_storage.remove_connection(
-                            self.network_context.network_id(),
-                            &lost_conn_metadata,
-                        )
+                        self.remove_peer_from_metadata(peer_id, connection_id);
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -429,7 +433,22 @@ where
                 self.inbound_rate_limiters.try_garbage_collect_key(&ip_addr);
                 self.outbound_rate_limiters
                     .try_garbage_collect_key(&ip_addr);
-            }
+            },
+        }
+    }
+
+    fn remove_peer_from_metadata(&mut self, peer_id: AccountAddress, connection_id: ConnectionId) {
+        let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
+        if let Err(error) = self
+            .peers_and_metadata
+            .remove_peer_metadata(peer_network_id, connection_id)
+        {
+            warn!(
+                NetworkSchema::new(&self.network_context),
+                "Failed to remove peer from peers and metadata. Peer: {:?}, error: {:?}",
+                peer_network_id,
+                error
+            );
         }
     }
 
@@ -470,14 +489,13 @@ where
                     let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
                     self.transport_reqs_tx.send(request).await.unwrap();
                 };
-            }
+            },
             ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
                     let connection_id = conn_metadata.connection_id;
-                    self.peer_metadata_storage
-                        .remove_connection(self.network_context.network_id(), &conn_metadata);
+                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
 
                     // This triggers a disconnect.
                     drop(sender);
@@ -502,7 +520,7 @@ where
                         );
                     }
                 }
-            }
+            },
         }
     }
 
@@ -519,10 +537,10 @@ where
         let (peer_id, protocol_id, peer_request) = match request {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                 (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
-            }
+            },
             PeerManagerRequest::SendRpc(peer_id, req) => {
                 (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))
-            }
+            },
         };
 
         if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
@@ -604,7 +622,7 @@ where
         self.executor.spawn(drop_fut);
     }
 
-    fn add_peer(&mut self, connection: Connection<TSocket>) {
+    fn add_peer(&mut self, connection: Connection<TSocket>) -> Result<(), Error> {
         let conn_meta = connection.metadata.clone();
         let peer_id = conn_meta.remote_peer_id;
 
@@ -617,7 +635,7 @@ where
                 "Received self-dial, disconnecting it"
             );
             self.disconnect(connection);
-            return;
+            return Ok(());
         }
 
         let mut send_new_peer_notification = true;
@@ -650,7 +668,7 @@ where
                 );
                 // Drop the new connection and keep the one already stored in active_peers
                 self.disconnect(connection);
-                return;
+                return Ok(());
             }
         }
 
@@ -700,13 +718,17 @@ where
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
-        self.peer_metadata_storage
-            .insert_connection(self.network_context.network_id(), conn_meta.clone());
+        self.peers_and_metadata.insert_connection_metadata(
+            PeerNetworkId::new(self.network_context.network_id(), peer_id),
+            conn_meta.clone(),
+        )?;
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
             let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
             self.send_conn_notification(peer_id, notif);
         }
+
+        Ok(())
     }
 
     /// Sends a `ConnectionNotification` to all event handlers, warns on failures

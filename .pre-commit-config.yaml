@@ -14,7 +14,8 @@ repos:
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
     hooks:
-    -   id: fmt
+      # - id: fmt // Not currently supported for the nightly build, e.g., https://github.com/doublify/pre-commit-rust/issues/15
+      - id: cargo-check
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.3.0
     hooks:

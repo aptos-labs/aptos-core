@@ -44,10 +44,10 @@ impl<T: CryptoKVStorage> CryptoStorage for T {
                 } else {
                     Err(Error::KeyVersionNotFound(name.into(), version.to_string()))
                 }
-            }
+            },
             Err(Error::KeyNotSet(_)) => {
                 Err(Error::KeyVersionNotFound(name.into(), version.to_string()))
-            }
+            },
             Err(e) => Err(e),
         }
     }

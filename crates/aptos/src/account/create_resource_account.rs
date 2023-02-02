@@ -61,7 +61,7 @@ impl From<Transaction> for CreateResourceAccountSummary {
                     } else {
                         None
                     }
-                }
+                },
                 _ => None,
             });
         }

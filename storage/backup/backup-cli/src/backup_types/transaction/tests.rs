@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::ReplayConcurrencyLevelOpt;
 use crate::{
     backup_types::transaction::{
         backup::{TransactionBackupController, TransactionBackupOpt},
@@ -11,7 +10,8 @@ use crate::{
     utils::{
         backup_service_client::BackupServiceClient,
         test_utils::{start_local_backup_service, tmp_db_with_random_content},
-        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
+        ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt,
+        RocksdbOpt, TrustedWaypointOpt,
     },
 };
 use aptos_db::AptosDB;

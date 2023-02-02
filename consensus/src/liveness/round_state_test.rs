@@ -7,7 +7,6 @@ use crate::{
     },
     util::mock_time_service::SimulatedTimeService,
 };
-
 use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
@@ -16,8 +15,8 @@ use aptos_consensus_types::{
     vote_data::VoteData,
 };
 use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };

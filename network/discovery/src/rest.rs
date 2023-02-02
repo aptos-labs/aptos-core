@@ -1,16 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::validator_set::extract_validator_set_updates;
-use crate::DiscoveryError;
-use aptos_config::config::PeerSet;
-use aptos_config::network_id::NetworkContext;
+use crate::{validator_set::extract_validator_set_updates, DiscoveryError};
+use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_logger::info;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::on_chain_config::ValidatorSet;
-use futures::executor::block_on;
-use futures::Stream;
+use aptos_types::{account_address::AccountAddress, on_chain_config::ValidatorSet};
+use futures::{executor::block_on, Stream};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -60,14 +56,14 @@ impl Stream for RestStream {
                     self.network_context,
                     validator_set,
                 )))
-            }
+            },
             Err(err) => {
                 info!(
                     "Failed to retrieve validator set by REST discovery {:?}",
                     err
                 );
                 Some(Err(DiscoveryError::Rest(err)))
-            }
+            },
         })
     }
 }

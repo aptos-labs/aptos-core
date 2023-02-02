@@ -5,6 +5,7 @@ pub mod account;
 pub mod aggregator_natives;
 pub mod any;
 pub mod code;
+pub mod create_signer;
 pub mod cryptography;
 pub mod event;
 pub mod hash;
@@ -18,7 +19,6 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
-
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
@@ -53,7 +53,7 @@ impl GasParameters {
         Self {
             account: account::GasParameters {
                 create_address: account::CreateAddressGasParameters { base: 0.into() },
-                create_signer: account::CreateSignerGasParameters { base: 0.into() },
+                create_signer: create_signer::CreateSignerGasParameters { base: 0.into() },
             },
             bls12381: cryptography::bls12381::GasParameters {
                 base: 0.into(),
@@ -193,7 +193,7 @@ pub fn all_natives(
     let mut natives = vec![];
 
     macro_rules! add_natives_from_module {
-        ($module_name: expr, $natives: expr) => {
+        ($module_name:expr, $natives:expr) => {
             natives.extend(
                 $natives.map(|(func_name, func)| ($module_name.to_string(), func_name, func)),
             );
@@ -201,8 +201,15 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
+    add_natives_from_module!(
+        "create_signer",
+        create_signer::make_all(gas_params.account.create_signer.clone())
+    );
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
-    add_natives_from_module!("genesis", account::make_all(gas_params.account));
+    add_natives_from_module!(
+        "genesis",
+        create_signer::make_all(gas_params.account.create_signer)
+    );
     add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
     add_natives_from_module!(
         "bls12381",

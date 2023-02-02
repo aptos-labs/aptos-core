@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::transaction_context::NativeTransactionContext;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
@@ -12,8 +13,6 @@ use move_vm_types::{
     natives::function::NativeResult,
     values::{Struct, Value},
 };
-
-use crate::natives::transaction_context::NativeTransactionContext;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
@@ -111,12 +110,9 @@ fn native_type_name(
 
     let cost = gas_params.base + gas_params.per_byte_in_str * NumBytes::new(type_name.len() as u64);
 
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
-            type_name.as_bytes().to_vec()
-        )]))],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::struct_(
+        Struct::pack(vec![Value::vector_u8(type_name.as_bytes().to_vec())])
+    )]))
 }
 
 pub fn make_native_type_name(gas_params: TypeNameGasParameters) -> NativeFunction {

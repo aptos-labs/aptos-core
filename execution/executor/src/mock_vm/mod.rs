@@ -4,9 +4,11 @@
 #[cfg(test)]
 mod mock_vm_test;
 
+use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
+use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_state_view::StateView;
-use aptos_types::transaction::NoOpChangeSetChecker;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -20,9 +22,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
+        ChangeSet, ExecutionStatus, NoOpChangeSetChecker, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionOutput, TransactionPayload,
+        TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -53,6 +55,15 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
 pub struct MockVM;
+
+impl TransactionBlockExecutor<Transaction> for MockVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
+    }
+}
 
 impl VMExecutor for MockVM {
     fn execute_block(
@@ -139,7 +150,7 @@ impl VMExecutor for MockVM {
                         0,
                         KEEP_STATUS.clone(),
                     ));
-                }
+                },
                 MockVMTransaction::Payment {
                     sender,
                     recipient,
@@ -180,7 +191,7 @@ impl VMExecutor for MockVM {
                         0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     ));
-                }
+                },
             }
         }
 
@@ -376,7 +387,7 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
                             recipient: *recipient,
                             amount: *amount,
                         }
-                    }
+                    },
                     _ => unimplemented!(
                         "The first argument for payment transaction must be recipient address \
                          and the second argument must be amount."
@@ -384,13 +395,13 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
                 },
                 _ => unimplemented!("Transaction must have one or two arguments."),
             }
-        }
+        },
         TransactionPayload::EntryFunction(_) => {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
-        }
+        },
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
-        }
+        },
     }
 }

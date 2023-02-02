@@ -86,7 +86,7 @@ impl Checker for BuildVersionChecker {
                     0,
                     format!("Failed to get system information from your node: {:#}", e),
                 )])
-            }
+            },
         };
 
         let mut check_results = vec![];
@@ -99,7 +99,7 @@ impl Checker for BuildVersionChecker {
                         BUILD_COMMIT_HASH_KEY,
                         anyhow!("The latest set of metrics from the baseline node did not contain the necessary key \"{}\"", BUILD_COMMIT_HASH_KEY),
                     ));
-            }
+            },
         };
 
         let target_build_commit_hash = match self.get_build_commit_hash(&target_information) {
@@ -107,7 +107,7 @@ impl Checker for BuildVersionChecker {
             GetValueResult::Missing(evaluation_result) => {
                 check_results.push(evaluation_result);
                 None
-            }
+            },
         };
 
         match target_build_commit_hash {
@@ -133,7 +133,7 @@ impl Checker for BuildVersionChecker {
                         )
                     }
                 });
-            }
+            },
             None => debug!(
                 "Not evaluating build commit hash because we're missing data from the target"
             ),

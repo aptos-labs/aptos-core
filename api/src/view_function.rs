@@ -91,7 +91,7 @@ impl ViewFunctionApi {
         match accept_type {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((return_vals, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
             AcceptType::Json => {
                 let return_types = resolver
                     .as_converter(self.context.db.clone())
@@ -127,7 +127,7 @@ impl ViewFunctionApi {
                     })?;
 
                 BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
-            }
+            },
         }
     }
 }

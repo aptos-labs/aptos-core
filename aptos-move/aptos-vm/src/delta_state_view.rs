@@ -4,8 +4,7 @@
 use anyhow::Result;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    state_store::state_key::StateKey,
-    state_store::state_storage_usage::StateStorageUsage,
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     write_set::{WriteOp, WriteSet},
 };
 

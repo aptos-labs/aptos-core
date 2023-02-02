@@ -1,12 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checker::CheckerConfig;
-use crate::provider::ProviderConfigs;
-use crate::runner::SyncRunnerConfig;
-use serde::{Deserialize, Serialize};
-
 use super::NodeAddress;
+use crate::{checker::CheckerConfig, provider::ProviderConfigs, runner::SyncRunnerConfig};
+use serde::{Deserialize, Serialize};
 
 /// This defines a single baseline configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]

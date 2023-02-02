@@ -3,9 +3,10 @@
 
 use anyhow::Result;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_storage_interface::state_view::DbStateView;
 use aptos_storage_interface::{
-    cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
+    cached_state_view::CachedDbStateView,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
 };
 use aptos_types::{
     account_address::AccountAddress,

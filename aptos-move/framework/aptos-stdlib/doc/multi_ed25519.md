@@ -25,7 +25,12 @@ This module has the exact same interface as the Ed25519 module.
 -  [Function `signature_verify_strict`](#0x1_multi_ed25519_signature_verify_strict)
 -  [Function `signature_verify_strict_t`](#0x1_multi_ed25519_signature_verify_strict_t)
 -  [Function `unvalidated_public_key_to_authentication_key`](#0x1_multi_ed25519_unvalidated_public_key_to_authentication_key)
+-  [Function `unvalidated_public_key_num_sub_pks`](#0x1_multi_ed25519_unvalidated_public_key_num_sub_pks)
+-  [Function `unvalidated_public_key_threshold`](#0x1_multi_ed25519_unvalidated_public_key_threshold)
 -  [Function `validated_public_key_to_authentication_key`](#0x1_multi_ed25519_validated_public_key_to_authentication_key)
+-  [Function `validated_public_key_num_sub_pks`](#0x1_multi_ed25519_validated_public_key_num_sub_pks)
+-  [Function `validated_public_key_threshold`](#0x1_multi_ed25519_validated_public_key_threshold)
+-  [Function `check_and_get_threshold`](#0x1_multi_ed25519_check_and_get_threshold)
 -  [Function `public_key_bytes_to_authentication_key`](#0x1_multi_ed25519_public_key_bytes_to_authentication_key)
 -  [Function `public_key_validate_internal`](#0x1_multi_ed25519_public_key_validate_internal)
 -  [Function `public_key_validate_v2_internal`](#0x1_multi_ed25519_public_key_validate_v2_internal)
@@ -35,6 +40,7 @@ This module has the exact same interface as the Ed25519 module.
     -  [Function `new_validated_public_key_from_bytes`](#@Specification_1_new_validated_public_key_from_bytes)
     -  [Function `new_validated_public_key_from_bytes_v2`](#@Specification_1_new_validated_public_key_from_bytes_v2)
     -  [Function `new_signature_from_bytes`](#@Specification_1_new_signature_from_bytes)
+    -  [Function `public_key_bytes_to_authentication_key`](#@Specification_1_public_key_bytes_to_authentication_key)
     -  [Function `public_key_validate_internal`](#@Specification_1_public_key_validate_internal)
     -  [Function `public_key_validate_v2_internal`](#@Specification_1_public_key_validate_v2_internal)
     -  [Function `signature_verify_strict_internal`](#@Specification_1_signature_verify_strict_internal)
@@ -263,7 +269,7 @@ NOTE: This function could have also checked that the # of sub-PKs is > 0, but it
 invalid PKs are rejected during signature verification  (see <code>bugfix_unvalidated_pk_from_zero_subpks</code>) they
 will not cause problems.
 
-We could fix this API by adding a new one that checks the # of sub PKs is > 0, but it is likely not a good idea
+We could fix this API by adding a new one that checks the # of sub-PKs is > 0, but it is likely not a good idea
 to reproduce the PK validation logic in Move. We should not have done so in the first place. Instead, we will
 leave it as is and continue assuming <code><a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a></code> objects could be invalid PKs that will safely be
 rejected during signature verification.
@@ -654,6 +660,64 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 </details>
 
+<a name="0x1_multi_ed25519_unvalidated_public_key_num_sub_pks"></a>
+
+## Function `unvalidated_public_key_num_sub_pks`
+
+Returns the number n of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK.
+If this <code><a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a></code> would pass validation in <code>public_key_validate</code>, then the returned # of sub-PKs
+can be relied upon as correct.
+
+We provide this API as a cheaper alternative to calling <code>public_key_validate</code> and then <code>validated_public_key_num_sub_pks</code>
+when the input <code>pk</code> is known to be valid.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_num_sub_pks">unvalidated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_num_sub_pks">unvalidated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a>): u8 {
+    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pk.bytes);
+
+    ((len / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>) <b>as</b> u8)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_multi_ed25519_unvalidated_public_key_threshold"></a>
+
+## Function `unvalidated_public_key_threshold`
+
+Returns the number t of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK (i.e., the threshold) or <code>None</code>
+if <code>bytes</code> does not correctly encode such a PK.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_threshold">unvalidated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_threshold">unvalidated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a>): Option&lt;u8&gt; {
+    <a href="multi_ed25519.md#0x1_multi_ed25519_check_and_get_threshold">check_and_get_threshold</a>(pk.bytes)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_multi_ed25519_validated_public_key_to_authentication_key"></a>
 
 ## Function `validated_public_key_to_authentication_key`
@@ -679,6 +743,104 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 </details>
 
+<a name="0x1_multi_ed25519_validated_public_key_num_sub_pks"></a>
+
+## Function `validated_public_key_num_sub_pks`
+
+Returns the number n of sub-PKs in a validated t-out-of-n MultiEd25519 PK.
+Since the format of this PK has been validated, the returned # of sub-PKs is guaranteed to be correct.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_num_sub_pks">validated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">multi_ed25519::ValidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_num_sub_pks">validated_public_key_num_sub_pks</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>): u8 {
+    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pk.bytes);
+
+    ((len / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>) <b>as</b> u8)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_multi_ed25519_validated_public_key_threshold"></a>
+
+## Function `validated_public_key_threshold`
+
+Returns the number t of sub-PKs in a validated t-out-of-n MultiEd25519 PK (i.e., the threshold).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_threshold">validated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">multi_ed25519::ValidatedPublicKey</a>): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_threshold">validated_public_key_threshold</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>): u8 {
+    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pk.bytes);
+    <b>let</b> threshold_byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&pk.bytes, len - 1);
+
+    threshold_byte
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_multi_ed25519_check_and_get_threshold"></a>
+
+## Function `check_and_get_threshold`
+
+Checks that the serialized format of a t-out-of-n MultiEd25519 PK correctly encodes 1 <= n <= 32 sub-PKs.
+(All <code><a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a></code> objects are guaranteed to pass this check.)
+Returns the threshold t <= n of the PK.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_check_and_get_threshold">check_and_get_threshold</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_check_and_get_threshold">check_and_get_threshold</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;u8&gt; {
+    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes);
+    <b>if</b> (len == 0) {
+        <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+    };
+
+    <b>let</b> threshold_num_of_bytes = len % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
+    <b>let</b> num_of_keys = len / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
+    <b>let</b> threshold_byte = *<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&bytes, len - 1);
+
+    <b>if</b> (num_of_keys == 0 || num_of_keys &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a> || threshold_num_of_bytes != 1) {
+        <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+    } <b>else</b> <b>if</b> (threshold_byte == 0 || threshold_byte &gt; (num_of_keys <b>as</b> u8)) {
+        <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+    } <b>else</b> {
+        <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(threshold_byte)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_multi_ed25519_public_key_bytes_to_authentication_key"></a>
 
 ## Function `public_key_bytes_to_authentication_key`
@@ -696,7 +858,7 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 
 <pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_public_key_bytes_to_authentication_key">public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::push_back(&<b>mut</b> pk_bytes, <a href="multi_ed25519.md#0x1_multi_ed25519_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pk_bytes, <a href="multi_ed25519.md#0x1_multi_ed25519_SIGNATURE_SCHEME_ID">SIGNATURE_SCHEME_ID</a>);
     std::hash::sha3_256(pk_bytes)
 }
 </code></pre>
@@ -714,7 +876,7 @@ DEPRECATED: Use <code>public_key_validate_internal_v2</code> instead. This funct
 1. It does not check that the # of sub public keys is > 0, which leads to invalid <code><a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a></code> objects
 against which no signature will verify, since <code>signature_verify_strict_internal</code> will reject such invalid PKs.
 This is not a security issue, but a correctness issue. See <code>bugfix_validated_pk_from_zero_subpks</code>.
-2. It charges too much gas: if the first sub PK is invalid, it will charge for verifying all remaining sub-PKs.
+2. It charges too much gas: if the first sub-PK is invalid, it will charge for verifying all remaining sub-PKs.
 
 DEPRECATES:
 - new_validated_public_key_from_bytes
@@ -746,7 +908,7 @@ Returns <code><b>false</b></code> otherwise.
 ## Function `public_key_validate_v2_internal`
 
 Return <code><b>true</b></code> if the bytes in <code>public_key</code> can be parsed as a valid MultiEd25519 public key: i.e., all underlying
-sub PKs pass point-on-curve and not-in-small-subgroup checks.
+sub-PKs pass point-on-curve and not-in-small-subgroup checks.
 Returns <code><b>false</b></code> otherwise.
 
 
@@ -813,10 +975,22 @@ Returns <code><b>false</b></code> if either:
 
 
 
-<pre><code><b>let</b> length = len(bytes);
-<b>aborts_if</b> length / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a>;
-<b>aborts_if</b> length % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> != <a href="multi_ed25519.md#0x1_multi_ed25519_THRESHOLD_SIZE_BYTES">THRESHOLD_SIZE_BYTES</a>;
+<pre><code><b>include</b> <a href="multi_ed25519.md#0x1_multi_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">NewUnvalidatedPublicKeyFromBytesAbortsIf</a>;
 <b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a> { bytes };
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="multi_ed25519.md#0x1_multi_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">NewUnvalidatedPublicKeyFromBytesAbortsIf</a> {
+    bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> length = len(bytes);
+    <b>aborts_if</b> length / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a>;
+    <b>aborts_if</b> length % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> != <a href="multi_ed25519.md#0x1_multi_ed25519_THRESHOLD_SIZE_BYTES">THRESHOLD_SIZE_BYTES</a>;
+}
 </code></pre>
 
 
@@ -832,8 +1006,7 @@ Returns <code><b>false</b></code> if either:
 
 
 
-<pre><code><b>aborts_if</b> len(bytes) % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> == <a href="multi_ed25519.md#0x1_multi_ed25519_THRESHOLD_SIZE_BYTES">THRESHOLD_SIZE_BYTES</a>
-    && len(bytes) / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a>;
+<pre><code><b>aborts_if</b> <b>false</b>;
 <b>let</b> cond = len(bytes) % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> == <a href="multi_ed25519.md#0x1_multi_ed25519_THRESHOLD_SIZE_BYTES">THRESHOLD_SIZE_BYTES</a>
     && <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_internal">spec_public_key_validate_internal</a>(bytes);
 <b>ensures</b> cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>{bytes});
@@ -871,26 +1044,38 @@ Returns <code><b>false</b></code> if either:
 
 
 
-<pre><code><b>aborts_if</b> len(bytes) % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_SIGNATURE_NUM_BYTES">INDIVIDUAL_SIGNATURE_NUM_BYTES</a> != <a href="multi_ed25519.md#0x1_multi_ed25519_BITMAP_NUM_OF_BYTES">BITMAP_NUM_OF_BYTES</a>;
+<pre><code><b>include</b> <a href="multi_ed25519.md#0x1_multi_ed25519_NewSignatureFromBytesAbortsIf">NewSignatureFromBytesAbortsIf</a>;
 <b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_Signature">Signature</a> { bytes };
 </code></pre>
 
 
 
 
-<a name="0x1_multi_ed25519_spec_public_key_validate_internal"></a>
+<a name="0x1_multi_ed25519_NewSignatureFromBytesAbortsIf"></a>
 
 
-<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_internal">spec_public_key_validate_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+<pre><code><b>schema</b> <a href="multi_ed25519.md#0x1_multi_ed25519_NewSignatureFromBytesAbortsIf">NewSignatureFromBytesAbortsIf</a> {
+    bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>aborts_if</b> len(bytes) % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_SIGNATURE_NUM_BYTES">INDIVIDUAL_SIGNATURE_NUM_BYTES</a> != <a href="multi_ed25519.md#0x1_multi_ed25519_BITMAP_NUM_OF_BYTES">BITMAP_NUM_OF_BYTES</a>;
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_public_key_bytes_to_authentication_key"></a>
+
+### Function `public_key_bytes_to_authentication_key`
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_public_key_bytes_to_authentication_key">public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<a name="0x1_multi_ed25519_spec_public_key_validate_v2_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_v2_internal">spec_public_key_validate_v2_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key">spec_public_key_bytes_to_authentication_key</a>(pk_bytes);
 </code></pre>
 
 
@@ -920,7 +1105,8 @@ Returns <code><b>false</b></code> if either:
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> len(bytes) / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a>;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> (len(bytes) / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a>) ==&gt; (result == <b>false</b>);
 <b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_internal">spec_public_key_validate_internal</a>(bytes);
 </code></pre>
 
@@ -957,6 +1143,46 @@ Returns <code><b>false</b></code> if either:
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_internal">spec_signature_verify_strict_internal</a>(multisignature, public_key, message);
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_spec_public_key_validate_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_internal">spec_public_key_validate_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_spec_public_key_validate_v2_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_v2_internal">spec_public_key_validate_v2_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_bytes_to_authentication_key">spec_public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_multi_ed25519_spec_signature_verify_strict_t"></a>
+
+
+<pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_t">spec_signature_verify_strict_t</a>&lt;T&gt;(signature: <a href="multi_ed25519.md#0x1_multi_ed25519_Signature">Signature</a>, public_key: <a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">UnvalidatedPublicKey</a>, data: T): bool {
+   <b>let</b> encoded = <a href="ed25519.md#0x1_ed25519_new_signed_message">ed25519::new_signed_message</a>&lt;T&gt;(data);
+   <b>let</b> message = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(encoded);
+   <a href="multi_ed25519.md#0x1_multi_ed25519_spec_signature_verify_strict_internal">spec_signature_verify_strict_internal</a>(signature.bytes, public_key.bytes, message)
+}
 </code></pre>
 
 

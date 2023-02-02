@@ -111,18 +111,18 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
-            }
+            },
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
-            }
+            },
             BlockMetadata(txn) => (&txn, info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
-            }
+            },
         })
     }
 
@@ -190,7 +190,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
-            }
+            },
         };
         Ok(ret)
     }
@@ -219,7 +219,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                         events: self.try_into_events(&events)?,
                     }),
                 }
-            }
+            },
         };
         Ok(ret)
     }
@@ -234,10 +234,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         match state_key {
             StateKey::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_change(hash, access_path, op)
-            }
+            },
             StateKey::TableItem { handle, key } => {
                 self.try_table_item_into_write_set_change(hash, handle, key, op)
-            }
+            },
             StateKey::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key
@@ -245,6 +245,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
     }
 
+    // TODO: Consider expanding ResourceGroup into Resource and returning Vec<WriteSetChange>
     pub fn try_access_path_into_write_set_change(
         &self,
         state_key_hash: String,
@@ -263,6 +264,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     state_key_hash,
                     resource: typ.into(),
                 }),
+                Path::ResourceGroup(typ) => WriteSetChange::DeleteResource(DeleteResource {
+                    address: access_path.address.into(),
+                    state_key_hash,
+                    resource: typ.into(),
+                }),
             },
             WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
@@ -271,6 +277,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
                 }),
                 Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
+                    address: access_path.address.into(),
+                    state_key_hash,
+                    data: self.try_into_resource(&typ, &val)?,
+                }),
+                Path::ResourceGroup(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
@@ -299,7 +310,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     key,
                     data,
                 })
-            }
+            },
             WriteOp::Modification(value) | WriteOp::Creation(value) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
@@ -311,7 +322,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     value: value.into(),
                     data,
                 })
-            }
+            },
         };
         Ok(ret)
     }
@@ -325,7 +336,16 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         if !self.db.indexer_enabled() {
             return Ok(None);
         }
-        let table_info = self.db.get_table_info(handle).unwrap();
+        let table_info = match self.db.get_table_info(handle) {
+            Ok(ti) => ti,
+            Err(_) => {
+                aptos_logger::warn!(
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
+        };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
 
@@ -345,7 +365,16 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         if !self.db.indexer_enabled() {
             return Ok(None);
         }
-        let table_info = self.db.get_table_info(handle).unwrap();
+        let table_info = match self.db.get_table_info(handle) {
+            Ok(ti) => ti,
+            Err(_) => {
+                aptos_logger::warn!(
+                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+                    handle
+                );
+                return Ok(None); // if table item not found return None anyway to avoid crash
+            },
+        };
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
         Ok(Some(DeletedTableData {
@@ -499,7 +528,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                         .collect::<Result<_>>()?,
                     args,
                 ))
-            }
+            },
             TransactionPayload::ModuleBundlePayload(payload) => {
                 Target::ModuleBundle(ModuleBundle::new(
                     payload
@@ -508,7 +537,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                         .map(|m| m.bytecode.into())
                         .collect(),
                 ))
-            }
+            },
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
                     code,
@@ -530,10 +559,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                                 .map(|arg| arg.try_into())
                                 .collect::<Result<_>>()?,
                         ))
-                    }
+                    },
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
-            }
+            },
         };
         Ok(ret)
     }
@@ -609,13 +638,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
-            }
+            },
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
-            }
+            },
             MoveTypeLayout::Signer => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            }
+            },
         })
     }
 
@@ -767,7 +796,7 @@ fn abort_location_to_str(loc: &AbortLocation) -> String {
     match loc {
         AbortLocation::Module(mid) => {
             format!("{}::{}", mid.address().to_hex_literal(), mid.name())
-        }
+        },
         _ => loc.to_string(),
     }
 }

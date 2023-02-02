@@ -3,14 +3,6 @@
 
 //! Support for running the VM to execute and verify transactions.
 
-use serde::Serialize;
-use std::{
-    env,
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
-
 use crate::{
     account::{Account, AccountData},
     data_store::{
@@ -28,8 +20,6 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -37,7 +27,8 @@ use aptos_types::{
         CORE_CODE_ADDRESS,
     },
     block_metadata::BlockMetadata,
-    on_chain_config::{OnChainConfig, ValidatorSet, Version},
+    chain_id::ChainId,
+    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -56,11 +47,18 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, ResourceKey, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     move_resource::MoveResource,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
+use serde::Serialize;
+use std::{
+    env,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -290,7 +288,7 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
+        let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
         let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
@@ -324,7 +322,7 @@ impl FakeExecutor {
                         .read_state_value(&state_key)
                         .expect("aggregator value must exist in data store");
                     bcs::from_bytes(&value_bytes).unwrap()
-                }
+                },
                 None => o.integer.as_ref().unwrap().value,
             })
     }
@@ -375,7 +373,7 @@ impl FakeExecutor {
                     status
                 );
                 output
-            }
+            },
             TransactionStatus::Discard(status) => panic!("transaction discarded with {:?}", status),
             TransactionStatus::Retry => panic!("transaction status is retry"),
         }
@@ -424,7 +422,7 @@ impl FakeExecutor {
                         let output_seq = Self::trace(trace_output_dir.as_path(), res);
                         trace_map.2.push(output_seq);
                     }
-                }
+                },
                 Err(e) => {
                     let mut error_file = OpenOptions::new()
                         .write(true)
@@ -432,7 +430,7 @@ impl FakeExecutor {
                         .open(trace_dir.join(TRACE_FILE_ERROR))
                         .unwrap();
                     error_file.write_all(e.to_string().as_bytes()).unwrap();
-                }
+                },
             }
             let trace_meta_dir = trace_dir.join(TRACE_DIR_META);
             Self::trace(trace_meta_dir.as_path(), &trace_map);
@@ -499,14 +497,17 @@ impl FakeExecutor {
         self.new_block_with_metadata(proposer, vec![])
     }
 
-    pub fn new_block_with_metadata(
+    pub fn run_block_with_metadata(
         &mut self,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
-    ) {
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<(TransactionStatus, u64)> {
+        let mut txn_block: Vec<Transaction> =
+            txns.into_iter().map(Transaction::UserTransaction).collect();
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
-        let new_block = BlockMetadata::new(
+        let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
             0,
             0,
@@ -515,16 +516,33 @@ impl FakeExecutor {
             failed_proposer_indices,
             self.block_time,
         );
-        let output = self
-            .execute_transaction_block(vec![Transaction::BlockMetadata(new_block)])
-            .expect("Executing block prologue should succeed")
-            .pop()
-            .expect("Failed to get the execution result for Block Prologue");
-        // check if we emit the expected event, there might be more events for transaction fees
-        let event = output.events()[0].clone();
+        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
+
+        let outputs = self
+            .execute_transaction_block(txn_block)
+            .expect("Must execute transactions");
+
+        // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
+        let event = outputs[0].events()[0].clone();
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
-        self.apply_write_set(output.write_set());
+
+        let mut results = vec![];
+        for output in outputs {
+            if !output.status().is_discarded() {
+                self.apply_write_set(output.write_set());
+            }
+            results.push((output.status().clone(), output.gas_used()));
+        }
+        results
+    }
+
+    pub fn new_block_with_metadata(
+        &mut self,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+    ) {
+        self.run_block_with_metadata(proposer, failed_proposer_indices, vec![]);
     }
 
     fn module(name: &str) -> ModuleId {
@@ -560,10 +578,8 @@ impl FakeExecutor {
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
-                self.features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
+                self.features.clone(),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -611,10 +627,8 @@ impl FakeExecutor {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            self.features
-                .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
+            self.features.clone(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

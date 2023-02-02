@@ -4,16 +4,16 @@
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
-use aptos_crypto::ed25519::ED25519_PUBLIC_KEY_LENGTH;
 #[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
-use aptos_crypto::{ed25519, traits::*};
+use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_core_types::gas_algebra::{InternalGasPerArg, NumArgs};
+use move_core_types::gas_algebra::{
+    InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
+};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -53,7 +53,7 @@ fn native_public_key_validate(
         Ok(slice) => slice,
         Err(_) => {
             return Ok(NativeResult::err(cost, abort_codes::E_WRONG_PUBKEY_SIZE));
-        }
+        },
     };
 
     // This deserialization only performs point-on-curve checks, so we check for small subgroup below
@@ -62,7 +62,7 @@ fn native_public_key_validate(
         Some(point) => point,
         None => {
             return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-        }
+        },
     };
 
     // Check if the point lies on a small subgroup. This is required when using curves with a
@@ -105,7 +105,7 @@ fn native_signature_verify_strict(
         Ok(pk) => pk,
         Err(_) => {
             return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-        }
+        },
     };
 
     cost += gas_params.per_sig_deserialize * NumArgs::one();
@@ -113,7 +113,7 @@ fn native_signature_verify_strict(
         Ok(sig) => sig,
         Err(_) => {
             return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-        }
+        },
     };
 
     // NOTE(Gas): hashing the message to the group and a size-2 multi-scalar multiplication
@@ -122,10 +122,9 @@ fn native_signature_verify_strict(
         + gas_params.per_msg_byte_hashing * NumBytes::new(msg.len() as u64);
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(verify_result)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(
+        verify_result
+    )]))
 }
 
 /***************************************************************************************************
@@ -181,13 +180,10 @@ fn native_test_only_generate_keys_internal(
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![
-            Value::vector_u8(key_pair.private_key.to_bytes()),
-            Value::vector_u8(key_pair.public_key.to_bytes())
-        ],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(key_pair.private_key.to_bytes()),
+        Value::vector_u8(key_pair.public_key.to_bytes())
+    ]))
 }
 
 #[cfg(feature = "testing")]
@@ -200,8 +196,7 @@ fn native_test_only_sign_internal(
     let sk_bytes = pop_arg!(args, Vec<u8>);
     let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![Value::vector_u8(sig.to_bytes())],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(sig.to_bytes())
+    ]))
 }

@@ -10,17 +10,19 @@ use aptos_data_client::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;
-use aptos_storage_service_types::requests::{
-    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-    NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
-    TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+use aptos_storage_service_types::{
+    requests::{
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
+    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    Epoch,
 };
-use aptos_storage_service_types::responses::{CompleteDataRange, TransactionOrOutputListWithProof};
-use aptos_storage_service_types::Epoch;
-use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     epoch_state::EpochState,
@@ -40,10 +42,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
-use std::cmp::min;
-use std::ops::DerefMut;
-use std::sync::Arc;
-use std::{collections::HashMap, thread, time::Duration};
+use std::{cmp::min, collections::HashMap, ops::DerefMut, sync::Arc, thread, time::Duration};
 use tokio::time::timeout;
 
 // TODO(joshlind): provide a better way to mock the data client.

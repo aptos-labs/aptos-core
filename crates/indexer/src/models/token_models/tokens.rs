@@ -152,7 +152,7 @@ impl Token {
                             table_handle_to_owner,
                         )
                         .unwrap()
-                    }
+                    },
                     APIWriteSetChange::DeleteTableItem(delete_table_item) => {
                         CurrentTokenPendingClaim::from_delete_table_item(
                             delete_table_item,
@@ -161,7 +161,7 @@ impl Token {
                             table_handle_to_owner,
                         )
                         .unwrap()
-                    }
+                    },
                     _ => None,
                 };
 
@@ -371,6 +371,7 @@ impl TableMetadataForToken {
         }
         table_handle_to_owner
     }
+
     /// Mapping from table handle to owner type, including type of the table (AKA resource type)
     fn get_table_handle_to_owner(
         write_resource: &APIWriteResource,
@@ -403,7 +404,7 @@ impl TableMetadataForToken {
         )? {
             TokenResource::CollectionResource(collection_resource) => {
                 collection_resource.collection_data.handle
-            }
+            },
             TokenResource::TokenStoreResource(inner) => inner.tokens.handle,
             TokenResource::PendingClaimsResource(inner) => inner.pending_claims.handle,
         };

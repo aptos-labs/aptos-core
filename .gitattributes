@@ -1,15 +1,23 @@
 # Ensure that text files that any contributor introduces to the repository
 # have their line endings normalized to LF
-* text=auto
+* text=auto eol=lf
 
 # All known text filetypes
-*.md text
-*.proto text
-*.rs text
-*.sh text
-*.toml text
-*.txt text
-*.yml text
+*.cfg text eol=lf 
+*.Dockerfile text eol=lf 
+*.hcl text eol=lf 
+*.json text eol=lf 
+*.md text eol=lf 
+*.move text eol=lf 
+*.proto text eol=lf 
+*.py text eol=lf 
+*.rs text eol=lf 
+*.sh text eol=lf 
+*.tf text eol=lf 
+*.toml text eol=lf 
+*.txt text eol=lf 
+*.yaml text eol=lf 
+*.yml text eol=lf 
 
 # Use Move syntax highlighter for Move IR code
 *.mvir linguist-language=Move

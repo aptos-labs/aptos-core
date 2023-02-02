@@ -1,37 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_notification::{
-    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
-};
-use crate::data_notification::{
-    NewTransactionsOrOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-};
-use crate::streaming_client::{
-    ContinuouslyStreamTransactionOutputsRequest, ContinuouslyStreamTransactionsOrOutputsRequest,
-    ContinuouslyStreamTransactionsRequest, GetAllTransactionOutputsRequest,
-    GetAllTransactionsOrOutputsRequest,
-};
-use crate::tests::utils::{
-    create_output_list_with_proof, MAX_ADVERTISED_TRANSACTION, MAX_NOTIFICATION_TIMEOUT_SECS,
-    MIN_ADVERTISED_TRANSACTION,
-};
 use crate::{
     data_notification::{
-        DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest, PendingClientResponse,
+        DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, PendingClientResponse, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     data_stream::{DataStream, DataStreamListener},
     streaming_client::{
-        GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionsRequest,
-        NotificationFeedback, StreamRequest,
+        ContinuouslyStreamTransactionOutputsRequest,
+        ContinuouslyStreamTransactionsOrOutputsRequest, ContinuouslyStreamTransactionsRequest,
+        GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionOutputsRequest,
+        GetAllTransactionsOrOutputsRequest, GetAllTransactionsRequest, NotificationFeedback,
+        StreamRequest,
     },
     tests::utils::{
-        create_data_client_response, create_ledger_info, create_random_u64,
-        create_transaction_list_with_proof, get_data_notification, initialize_logger,
-        MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
-        MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        create_data_client_response, create_ledger_info, create_output_list_with_proof,
+        create_random_u64, create_transaction_list_with_proof, get_data_notification,
+        initialize_logger, MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END,
+        MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION, MAX_ADVERTISED_TRANSACTION_OUTPUT,
+        MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
+        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
@@ -115,7 +106,7 @@ async fn test_stream_blocked() {
                         &NotificationFeedback::EndOfStream,
                     ));
                     return;
-                }
+                },
                 data_payload => panic!("Unexpected payload type: {:?}", data_payload),
             }
         }
@@ -1317,32 +1308,32 @@ async fn wait_for_notification_and_verify(
                 match data_notification.data_payload {
                     DataPayload::ContinuousTransactionsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || transaction_syncing);
-                    }
+                    },
                     DataPayload::ContinuousTransactionOutputsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || !transaction_syncing);
-                    }
+                    },
                     _ => {
                         panic!(
                             "Invalid data notification found: {:?}",
                             data_notification.data_payload
                         );
-                    }
+                    },
                 }
             } else {
                 // Verify we got the correct transaction data
                 match data_notification.data_payload {
                     DataPayload::TransactionsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || transaction_syncing);
-                    }
+                    },
                     DataPayload::TransactionOutputsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || !transaction_syncing);
-                    }
+                    },
                     _ => {
                         panic!(
                             "Invalid data notification found: {:?}",
                             data_notification.data_payload
                         );
-                    }
+                    },
                 }
             }
             break;

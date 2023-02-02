@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::account::create::DEFAULT_FUNDED_COINS;
-use aptos::common::types::GasOptions;
+use aptos::{account::create::DEFAULT_FUNDED_COINS, common::types::GasOptions};
 use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_keygen::KeyGen;
 
@@ -57,6 +56,7 @@ async fn test_account_flow() {
             Some(GasOptions {
                 gas_unit_price: Some(2),
                 max_gas: None,
+                expiration_secs: 30,
             }),
         )
         .await
@@ -78,6 +78,7 @@ async fn test_account_flow() {
             // NOTE(Gas): This should be equal to the min gas amount allowed.
             //            Read the comment above to understand why.
             max_gas: Some(150),
+            expiration_secs: 30,
         }),
     )
     .await

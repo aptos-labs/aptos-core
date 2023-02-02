@@ -9,7 +9,7 @@ use move_model::{code_writer::CodeWriter, emitln, model::Loc};
 pub fn generate_version_upgrade_proposal(
     version: &Version,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
@@ -18,14 +18,22 @@ pub fn generate_version_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        &next_execution_hash,
+        next_execution_hash.clone(),
         "aptos_framework::version",
         |writer| {
-            emitln!(
-                writer,
-                "version::set_version(framework_signer, {});",
-                version.major,
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "version::set_version(framework_signer, {});",
+                    version.major,
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "version::set_version(&framework_signer, {});",
+                    version.major,
+                );
+            }
         },
     );
 

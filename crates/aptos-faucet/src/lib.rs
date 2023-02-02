@@ -193,7 +193,7 @@ impl Service {
 
 pub fn routes(
     service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
     let health = health_route(service);
 
@@ -229,7 +229,7 @@ pub fn routes(
 
 fn health_route(
     service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path!("health")
         .and(warp::get())
         .and(warp::any().map(move || service.clone()))
@@ -262,22 +262,19 @@ pub async fn delegate_mint_account(
     let mut delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
 
     // Create the account
-    let response = mint::process(
-        &service,
-        mint::MintParams {
-            amount: 100_000_000_000,
-            auth_key: None,
-            address: Some(
-                delegated_account
-                    .authentication_key()
-                    .clone()
-                    .derived_address()
-                    .to_hex_literal(),
-            ),
-            pub_key: None,
-            return_txns: Some(true),
-        },
-    )
+    let response = mint::process(&service, mint::MintParams {
+        amount: 100_000_000_000,
+        auth_key: None,
+        address: Some(
+            delegated_account
+                .authentication_key()
+                .clone()
+                .derived_address()
+                .to_hex_literal(),
+        ),
+        pub_key: None,
+        return_txns: Some(true),
+    })
     .await
     .expect("Failed to create new account");
 
@@ -290,7 +287,7 @@ pub async fn delegate_mint_account(
                     .await
                     .unwrap();
             }
-        }
+        },
         _ => panic!("Expected a set of Response::SubmittedTxns"),
     }
 

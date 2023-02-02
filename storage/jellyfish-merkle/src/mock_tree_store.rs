@@ -84,7 +84,7 @@ where
             Entry::Occupied(o) => bail!("Key {:?} exists.", o.key()),
             Entry::Vacant(v) => {
                 v.insert(node);
-            }
+            },
         }
         Ok(())
     }

@@ -5,8 +5,7 @@
 
 use crate::AccountAddress;
 use aptos_types::event::EventHandle;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const ACCOUNT_MODULE: &str = "account";

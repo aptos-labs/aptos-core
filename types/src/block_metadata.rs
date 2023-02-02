@@ -56,7 +56,7 @@ impl BlockMetadata {
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
         vec![
             MoveValue::Signer(signer),
-            MoveValue::Address(AccountAddress::from_bytes(&self.id.to_vec()).unwrap()),
+            MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
             MoveValue::U64(self.epoch),
             MoveValue::U64(self.round),
             MoveValue::Address(self.proposer),

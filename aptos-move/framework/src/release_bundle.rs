@@ -1,22 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::built_package::BuiltPackage;
-use crate::natives::code::PackageMetadata;
-use crate::path_in_crate;
+use crate::{built_package::BuiltPackage, natives::code::PackageMetadata, path_in_crate};
 use anyhow::Context;
 use aptos_types::account_address::AccountAddress;
-use move_binary_format::access::ModuleAccess;
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::CompiledModule;
+use move_binary_format::{access::ModuleAccess, errors::PartialVMError, CompiledModule};
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
 use move_core_types::language_storage::ModuleId;
-use move_model::code_writer::CodeWriter;
-use move_model::model::Loc;
-use move_model::{emit, emitln};
+use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// A release bundle consists of a list of release packages.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,7 +150,7 @@ impl ReleasePackage {
             .collect::<BTreeMap<_, _>>();
         let mut order = vec![];
         for id in map.keys() {
-            self.sort_by_deps(&map, &mut order, id.clone());
+            sort_by_deps(&map, &mut order, id.clone());
         }
         let mut result = vec![];
         for id in order {
@@ -167,33 +160,12 @@ impl ReleasePackage {
         result
     }
 
-    fn sort_by_deps(
-        &self,
-        map: &BTreeMap<ModuleId, (&[u8], CompiledModule)>,
-        order: &mut Vec<ModuleId>,
-        id: ModuleId,
-    ) {
-        if order.contains(&id) {
-            return;
-        }
-        let compiled = &map.get(&id).unwrap().1;
-        for dep in compiled.immediate_dependencies() {
-            // Only consider deps which are actually in this package. Deps for outside
-            // packages are considered fine because of package deployment order. Note
-            // that because of this detail, we can't use existing topsort from Move utils.
-            if map.contains_key(&dep) {
-                self.sort_by_deps(map, order, dep);
-            }
-        }
-        order.push(id)
-    }
-
     pub fn generate_script_proposal(
         &self,
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, false, false, "".to_owned())
+        self.generate_script_proposal_impl(for_address, out, false, false, Vec::new())
     }
 
     pub fn generate_script_proposal_testnet(
@@ -201,14 +173,14 @@ impl ReleasePackage {
         for_address: AccountAddress,
         out: PathBuf,
     ) -> anyhow::Result<()> {
-        self.generate_script_proposal_impl(for_address, out, true, false, "".to_owned())
+        self.generate_script_proposal_impl(for_address, out, true, false, Vec::new())
     }
 
     pub fn generate_script_proposal_multi_step(
         &self,
         for_address: AccountAddress,
         out: PathBuf,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) -> anyhow::Result<()> {
         self.generate_script_proposal_impl(for_address, out, true, true, next_execution_hash)
     }
@@ -219,7 +191,7 @@ impl ReleasePackage {
         out: PathBuf,
         is_testnet: bool,
         is_multi_step: bool,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) -> anyhow::Result<()> {
         let writer = CodeWriter::new(Loc::default());
         emitln!(
@@ -271,7 +243,7 @@ impl ReleasePackage {
         // the result.
         let mut metadata = bcs::to_bytes(&self.metadata)?;
         let chunk_size = (u16::MAX / 2) as usize;
-        let num_of_chunks = (metadata.len() / chunk_size) as usize + 1;
+        let num_of_chunks = (metadata.len() / chunk_size) + 1;
 
         for i in 1..num_of_chunks + 1 {
             let to_drain = if i == num_of_chunks {
@@ -318,17 +290,16 @@ impl ReleasePackage {
     fn generate_next_execution_hash_blob(
         writer: &CodeWriter,
         for_address: AccountAddress,
-        next_execution_hash: String,
+        next_execution_hash: Vec<u8>,
     ) {
-        if next_execution_hash == "vector::empty<u8>()" {
+        if next_execution_hash == "vector::empty<u8>()".as_bytes() {
             emitln!(
                 writer,
                 "let framework_signer = aptos_governance::resolve_multi_step_proposal(proposal_id, @{}, {});\n",
                 for_address,
-                next_execution_hash,
+                "vector::empty<u8>()",
             );
         } else {
-            let next_execution_hash_bytes = next_execution_hash.as_bytes();
             emitln!(
                 writer,
                 "let framework_signer = aptos_governance::resolve_multi_step_proposal("
@@ -337,15 +308,32 @@ impl ReleasePackage {
             emitln!(writer, "proposal_id,");
             emitln!(writer, "@{},", for_address);
             emit!(writer, "vector[");
-            for (i, b) in next_execution_hash_bytes.iter().enumerate() {
-                if (i + 1) % 20 == 0 {
-                    emitln!(writer);
-                }
+            for (_, b) in next_execution_hash.iter().enumerate() {
                 emit!(writer, "{}u8,", b);
             }
             emitln!(writer, "],");
             writer.unindent();
-            emitln!(writer, "};");
+            emitln!(writer, ");");
         }
     }
+}
+
+fn sort_by_deps(
+    map: &BTreeMap<ModuleId, (&[u8], CompiledModule)>,
+    order: &mut Vec<ModuleId>,
+    id: ModuleId,
+) {
+    if order.contains(&id) {
+        return;
+    }
+    let compiled = &map.get(&id).unwrap().1;
+    for dep in compiled.immediate_dependencies() {
+        // Only consider deps which are actually in this package. Deps for outside
+        // packages are considered fine because of package deployment order. Note
+        // that because of this detail, we can't use existing topsort from Move utils.
+        if map.contains_key(&dep) {
+            sort_by_deps(map, order, dep);
+        }
+    }
+    order.push(id)
 }

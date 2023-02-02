@@ -22,7 +22,7 @@ fn coverage() {
         None => {
             let crate_dir = env!("CARGO_MANIFEST_DIR");
             PathBuf::from(&crate_dir).join("fuzz/corpus")
-        }
+        },
     };
 
     // check if it exists

@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
 use crate::{block_info::Round, on_chain_config::OnChainConfig};
 use anyhow::{format_err, Result};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -22,7 +21,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.exclude_round
-            }
+            },
         }
     }
 
@@ -31,7 +30,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.decoupled_execution
-            }
+            },
         }
     }
 
@@ -45,7 +44,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.back_pressure_limit
-            }
+            },
         }
     }
 
@@ -55,7 +54,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.max_failed_authors_to_store
-            }
+            },
         }
     }
 
@@ -64,7 +63,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 &config.proposer_election_type
-            }
+            },
         }
     }
 
@@ -208,11 +207,9 @@ pub struct ProposerAndVoterConfig {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
-    use crate::on_chain_config::OnChainConfigPayload;
-
     use super::*;
+    use crate::on_chain_config::OnChainConfigPayload;
+    use std::sync::Arc;
 
     #[test]
     fn test_config_yaml_serialization() {

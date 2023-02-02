@@ -3,25 +3,28 @@
 
 use crate::natives::any::Any;
 use anyhow::bail;
-use aptos_types::transaction::ModuleBundle;
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{transaction::ModuleBundle, vm_status::StatusCode};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMError;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::pop_arg;
-use move_vm_types::values::Struct;
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    pop_arg,
+    values::{Struct, Value},
 };
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt,
+    str::FromStr,
+    sync::Arc,
+};
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
 /// TODO: move this elsewhere for reuse?
@@ -101,9 +104,11 @@ impl UpgradePolicy {
     pub fn arbitrary() -> Self {
         UpgradePolicy { policy: 0 }
     }
+
     pub fn compat() -> Self {
         UpgradePolicy { policy: 1 }
     }
+
     pub fn immutable() -> Self {
         UpgradePolicy { policy: 2 }
     }
@@ -111,6 +116,7 @@ impl UpgradePolicy {
 
 impl FromStr for UpgradePolicy {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "arbitrary" => Ok(UpgradePolicy::arbitrary()),

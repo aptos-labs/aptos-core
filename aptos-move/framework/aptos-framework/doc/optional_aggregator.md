@@ -886,7 +886,8 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> opaque, verify = <b>false</b>;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

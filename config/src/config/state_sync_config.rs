@@ -30,11 +30,11 @@ impl BootstrappingMode {
         match self {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 "apply_transaction_outputs_from_genesis"
-            }
+            },
             BootstrappingMode::DownloadLatestStates => "download_latest_states",
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 "execute_transactions_from_genesis"
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
@@ -57,7 +57,7 @@ impl ContinuousSyncingMode {
             ContinuousSyncingMode::ExecuteTransactions => "execute_transactions",
             ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
                 "execute_transactions_or_apply_outputs"
-            }
+            },
         }
     }
 }
@@ -119,11 +119,11 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_concurrent_requests: 4000,
-            max_epoch_chunk_size: 100,
+            max_epoch_chunk_size: 200,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_state_chunk_size: 2000,
+            max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 2000,
             max_transaction_output_chunk_size: 1000,

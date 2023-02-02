@@ -5,6 +5,7 @@
 // we need to know the chain ID. This is pretty unfortunate, especially since
 // it's only really necessary for devnet. Try to find another approach.
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{noise::NoiseProvider, ProviderCollection},
@@ -12,8 +13,6 @@ use crate::{
 use anyhow::Result;
 use aptos_network_checker::args::HandshakeArgs;
 use serde::{Deserialize, Serialize};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

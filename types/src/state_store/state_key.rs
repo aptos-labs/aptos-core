@@ -45,12 +45,12 @@ impl StateKey {
         let (prefix, raw_key) = match self {
             StateKey::AccessPath(access_path) => {
                 (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
-            }
+            },
             StateKey::TableItem { handle, key } => {
                 let mut bytes = bcs::to_bytes(&handle)?;
                 bytes.extend(key);
                 (StateKeyTag::TableItem, bytes)
-            }
+            },
             StateKey::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
         };
         out.push(prefix as u8);
@@ -83,7 +83,7 @@ impl StateKey {
                 )?;
                 let key = val[1 + HANDLE_SIZE..].to_vec();
                 Ok(StateKey::table_item(handle, key))
-            }
+            },
             StateKeyTag::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
         }
     }

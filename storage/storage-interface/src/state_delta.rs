@@ -3,9 +3,10 @@
 
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
 };
 use std::collections::HashMap;

@@ -76,7 +76,7 @@ impl LedgerStore {
                 // transaction), so this normally doesn't happen. However this part of
                 // implementation doesn't need to rely on this assumption.
                 return Ok(0);
-            }
+            },
         };
         ensure!(
             epoch_end_version <= version,

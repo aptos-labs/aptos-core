@@ -6,15 +6,12 @@ use crate::{
     cluster::Cluster,
     emitter::{stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter},
     instance::Instance,
+    EntryPoints, TransactionType, TransactionTypeArg,
 };
 use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use rand::{rngs::StdRng, Rng};
-use rand_core::{OsRng, SeedableRng};
-use std::{
-    cmp::{max, min},
-    time::Duration,
-};
+use rand::{rngs::StdRng, SeedableRng};
+use std::time::Duration;
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
@@ -36,37 +33,102 @@ pub async fn emit_transactions_with_cluster(
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
     let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
-    let mut emitter = TxnEmitter::new(
+    let emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
-        StdRng::from_seed(OsRng.gen()),
+        StdRng::from_entropy(),
     );
 
-    let transaction_mix = if args.transaction_type_weights.is_empty() {
-        args.transaction_type.iter().map(|t| (*t, 1)).collect()
+    let arg_transaction_types = args
+        .transaction_type
+        .iter()
+        .map(|t| match t {
+            TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
+                invalid_transaction_ratio: args.invalid_tx,
+                sender_use_account_pool: false,
+            },
+            TransactionTypeArg::AccountGeneration => TransactionType::default_account_generation(),
+            TransactionTypeArg::AccountGenerationLargePool => TransactionType::AccountGeneration {
+                add_created_accounts_to_pool: true,
+                max_account_working_set: 50_000_000,
+                creation_balance: 200_000_000,
+            },
+            TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
+            TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
+                use_account_pool: false,
+            },
+            TransactionTypeArg::CustomFunctionLargeModuleWorkingSet => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::Nop,
+                    num_modules: 1000,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::CreateNewResource => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::BytesMakeOrChange {
+                    data_length: Some(32),
+                },
+                num_modules: 1,
+                use_account_pool: true,
+            },
+        })
+        .collect::<Vec<_>>();
+
+    let arg_transaction_weights = if args.transaction_weights.is_empty() {
+        vec![1; arg_transaction_types.len()]
     } else {
         assert_eq!(
-            args.transaction_type_weights.len(),
-            args.transaction_type.len(),
+            args.transaction_weights.len(),
+            arg_transaction_types.len(),
             "Transaction types and weights need to be the same length"
         );
-        args.transaction_type
-            .iter()
-            .cloned()
-            .zip(args.transaction_type_weights.iter().cloned())
-            .collect()
+        args.transaction_weights.clone()
     };
+    let arg_transaction_phases = if args.transaction_phases.is_empty() {
+        vec![0; arg_transaction_types.len()]
+    } else {
+        assert_eq!(
+            args.transaction_phases.len(),
+            arg_transaction_types.len(),
+            "Transaction types and phases need to be the same length"
+        );
+        args.transaction_phases.clone()
+    };
+
+    let mut transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>> = Vec::new();
+    for (transaction_type, (weight, phase)) in arg_transaction_types.into_iter().zip(
+        arg_transaction_weights
+            .into_iter()
+            .zip(arg_transaction_phases.into_iter()),
+    ) {
+        assert!(
+            phase <= transaction_mix_per_phase.len(),
+            "cannot skip phases ({})",
+            transaction_mix_per_phase.len()
+        );
+        if phase == transaction_mix_per_phase.len() {
+            transaction_mix_per_phase.push(Vec::new());
+        }
+        transaction_mix_per_phase
+            .get_mut(phase)
+            .unwrap()
+            .push((transaction_type, weight));
+    }
 
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)
-            .invalid_transaction_ratio(args.invalid_tx)
-            .transaction_mix(transaction_mix)
+            .transaction_mix_per_phase(transaction_mix_per_phase)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
+            .delay_after_minting(Duration::from_secs(args.delay_after_minting.unwrap_or(0)))
             .gas_price(aptos_global_constants::GAS_UNIT_PRICE);
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
+    }
+    if let Some(max_transactions_per_account) = args.max_transactions_per_account {
+        emit_job_request =
+            emit_job_request.max_transactions_per_account(max_transactions_per_account);
     }
     if let Some(expected_max_txns) = args.expected_max_txns {
         emit_job_request = emit_job_request.expected_max_txns(expected_max_txns);
@@ -82,7 +144,7 @@ pub async fn emit_transactions_with_cluster(
             &mut coin_source_account,
             emit_job_request,
             duration,
-            min(10, max(args.duration / 5, 1)),
+            (args.duration / 5).clamp(1, 10),
         )
         .await?;
     Ok(stats)

@@ -53,6 +53,8 @@ impl Default for RocksdbConfig {
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    pub use_kv_db: bool,
+    pub kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
 
@@ -61,6 +63,8 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
+            use_kv_db: false,
+            kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
@@ -269,7 +273,7 @@ mod test {
     use crate::config::PrunerConfig;
 
     #[test]
-    pub fn tset_default_prune_window() {
+    pub fn test_default_prune_window() {
         // Not that these can't be changed, but think twice -- make them safe for mainnet
 
         let config = PrunerConfig::default();

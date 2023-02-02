@@ -31,10 +31,10 @@ impl CurrentStakingPoolVoter {
             APITransaction::UserTransaction(txn) => (txn.info.version.0 as i64, &txn.info.changes),
             APITransaction::GenesisTransaction(txn) => {
                 (txn.info.version.0 as i64, &txn.info.changes)
-            }
+            },
             APITransaction::BlockMetadataTransaction(txn) => {
                 (txn.info.version.0 as i64, &txn.info.changes)
-            }
+            },
             _ => (0, &empty_change),
         };
         for wsc in changes {
@@ -45,14 +45,11 @@ impl CurrentStakingPoolVoter {
                     let staking_pool_address =
                         standardize_address(&write_resource.address.to_string());
                     let voter_address = standardize_address(&inner.delegated_voter);
-                    staking_pool_voters.insert(
-                        staking_pool_address.clone(),
-                        Self {
-                            staking_pool_address,
-                            voter_address,
-                            last_transaction_version: txn_version,
-                        },
-                    );
+                    staking_pool_voters.insert(staking_pool_address.clone(), Self {
+                        staking_pool_address,
+                        voter_address,
+                        last_transaction_version: txn_version,
+                    });
                 }
             }
         }

@@ -9,8 +9,7 @@ use crate::{
         verify_mempool_and_event_notification,
     },
 };
-use aptos_config::config::StateSyncDriverConfig;
-use aptos_config::config::{NodeConfig, RoleType};
+use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
@@ -22,7 +21,7 @@ use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::bootstrap_genesis;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
+use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
@@ -35,12 +34,11 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
-use std::time::Duration;
-use std::{collections::HashMap, sync::Arc};
-
-// TODO(joshlind): extend these tests to cover more functionality!
+use ntest::timeout;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_auto_bootstrapping() {
     // Create a driver for a validator with a waypoint at version 0
     let (validator_driver, consensus_notifier, _, _, _, time_service) =
@@ -71,6 +69,7 @@ async fn test_auto_bootstrapping() {
 }
 
 #[tokio::test]
+#[timeout(120_000)]
 async fn test_consensus_commit_notification() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
@@ -92,6 +91,7 @@ async fn test_consensus_commit_notification() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_mempool_commit_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let subscription_event_key = EventKey::random();
@@ -147,6 +147,7 @@ async fn test_mempool_commit_notifications() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_reconfiguration_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let (
@@ -211,6 +212,7 @@ async fn test_reconfiguration_notifications() {
 }
 
 #[tokio::test]
+#[timeout(120_000)]
 async fn test_consensus_sync_request() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
@@ -282,6 +284,9 @@ async fn create_driver_for_tests(
     EventNotificationListener,
     TimeService,
 ) {
+    // Initialize the logger for tests
+    aptos_logger::Logger::init_for_testing();
+
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
@@ -320,10 +325,12 @@ async fn create_driver_for_tests(
 
     // Create a test aptos data client
     let time_service = TimeService::mock();
-    let network_client = StorageServiceClient::new(
-        MultiNetworkSender::new(HashMap::new()),
-        PeerMetadataStorage::new(&[]),
-    );
+    let network_client = StorageServiceClient::new(NetworkClient::new(
+        vec![],
+        vec![],
+        HashMap::new(),
+        PeersAndMetadata::new(&[]),
+    ));
     let (aptos_data_client, _) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),

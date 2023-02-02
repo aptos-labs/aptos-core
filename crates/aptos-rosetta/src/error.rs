@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types, types::ErrorDetails};
-use aptos_rest_client::aptos_api_types::AptosErrorCode;
-use aptos_rest_client::error::RestError;
+use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError};
 use hex::FromHexError;
 use move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
@@ -256,41 +255,41 @@ impl From<RestError> for ApiError {
             RestError::Api(err) => match err.error.error_code {
                 AptosErrorCode::AccountNotFound => {
                     ApiError::AccountNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::ResourceNotFound => {
                     ApiError::ResourceNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::ModuleNotFound => ApiError::ModuleNotFound(Some(err.error.message)),
                 AptosErrorCode::StructFieldNotFound => {
                     ApiError::StructFieldNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::VersionNotFound => {
                     ApiError::VersionNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::TransactionNotFound => {
                     ApiError::TransactionNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::TableItemNotFound => {
                     ApiError::TableItemNotFound(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::BlockNotFound => ApiError::BlockNotFound(Some(err.error.message)),
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
                 AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
                 AptosErrorCode::InvalidTransactionUpdate => {
                     ApiError::InvalidInput(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::SequenceNumberTooOld => {
                     ApiError::SequenceNumberTooOld(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::VmError => ApiError::VmError(Some(err.error.message)),
                 AptosErrorCode::HealthCheckFailed => {
                     ApiError::InternalError(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::MempoolIsFull => ApiError::MempoolIsFull(Some(err.error.message)),
                 AptosErrorCode::WebFrameworkError => {
                     ApiError::InternalError(Some(err.error.message))
-                }
+                },
                 AptosErrorCode::BcsNotSupported => ApiError::InvalidInput(Some(err.error.message)),
                 AptosErrorCode::InternalError => ApiError::InternalError(Some(err.error.message)),
                 AptosErrorCode::ApiDisabled => ApiError::InternalError(Some(err.error.message)),

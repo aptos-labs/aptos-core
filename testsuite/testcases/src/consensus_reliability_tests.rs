@@ -3,14 +3,15 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use anyhow::{anyhow, bail, Context};
-use aptos_forge::test_utils::consensus_utils::{
-    test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
+use aptos_forge::{
+    test_utils::consensus_utils::{
+        test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
+    },
+    NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test,
 };
-use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test};
 use aptos_logger::{info, warn};
 use rand::Rng;
-use std::collections::HashSet;
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 use tokio::runtime::Runtime;
 
 pub struct ChangingWorkingQuorumTest {

@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::{Display, Formatter};
-
 use aptos_sdk::types::PeerId;
+use std::fmt::{Display, Formatter};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum SwarmChaos {

@@ -240,7 +240,7 @@ impl SafetyRules {
                     current_epoch,
                     epoch_state.epoch,
                 ));
-            }
+            },
             Ordering::Less => {
                 // start new epoch
                 self.persistent_storage.set_safety_data(SafetyData::new(
@@ -253,7 +253,7 @@ impl SafetyRules {
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
                     .epoch(epoch_state.epoch));
-            }
+            },
             Ordering::Equal => (),
         };
         self.epoch_state = Some(epoch_state.clone());
@@ -280,14 +280,14 @@ impl SafetyRules {
                             self.validator_signer =
                                 Some(ValidatorSigner::new(author, consensus_key));
                             Ok(())
-                        }
+                        },
                         Err(Error::SecureStorageMissingDataError(error)) => {
                             Err(Error::ValidatorKeyNotFound(error))
-                        }
+                        },
                         Err(error) => Err(error),
                     }
                 }
-            }
+            },
         };
         initialize_result.map_err(|error| {
             info!(

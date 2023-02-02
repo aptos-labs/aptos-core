@@ -72,6 +72,7 @@ impl CollectionDataIdType {
     pub fn new(creator: String, name: String) -> Self {
         Self { creator, name }
     }
+
     pub fn to_hash(&self) -> String {
         hash_str(&self.to_string())
     }
@@ -314,7 +315,7 @@ impl TokenWriteSet {
                 .map(|inner| Some(TokenWriteSet::TokenData(inner))),
             "0x3::token::Token" => {
                 serde_json::from_value(data.clone()).map(|inner| Some(TokenWriteSet::Token(inner)))
-            }
+            },
             "0x3::token::CollectionData" => serde_json::from_value(data.clone())
                 .map(|inner| Some(TokenWriteSet::CollectionData(inner))),
             "0x3::token_transfers::TokenOfferId" => serde_json::from_value(data.clone())

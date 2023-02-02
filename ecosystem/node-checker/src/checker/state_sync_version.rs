@@ -1,14 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 use crate::{
     get_provider,
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -102,7 +101,7 @@ impl StateSyncVersionChecker {
                         ),
                     )
                 }
-            }
+            },
         }
     }
 }
@@ -137,7 +136,7 @@ impl Checker for StateSyncVersionChecker {
                     0,
                     format!("There was an error querying your node's API: {:#}", err),
                 )]);
-            }
+            },
         };
 
         // Now wait.
@@ -152,7 +151,7 @@ impl Checker for StateSyncVersionChecker {
                     0,
                     format!("There was an error querying your node's API: {:#}", err),
                 )]);
-            }
+            },
         };
 
         // Get the latest version from the baseline node. In this case, if we

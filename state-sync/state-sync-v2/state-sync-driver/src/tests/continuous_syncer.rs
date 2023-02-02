@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::OutputFallbackHandler;
 use crate::{
     continuous_syncer::ContinuousSyncer,
     driver::DriverConfiguration,
@@ -17,14 +16,14 @@ use crate::{
             create_full_node_driver_configuration, create_transaction_info,
         },
     },
+    utils::OutputFallbackHandler,
 };
 use aptos_config::config::ContinuousSyncingMode;
 use aptos_consensus_notifications::ConsensusSyncNotification;
-use aptos_data_streaming_service::data_notification::DataNotification;
-use aptos_data_streaming_service::data_notification::DataPayload;
-use aptos_data_streaming_service::data_notification::NotificationId;
-use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
-use aptos_data_streaming_service::streaming_client::NotificationFeedback;
+use aptos_data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    streaming_client::{NotificationAndFeedback, NotificationFeedback},
+};
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::Epoch;
 use aptos_time_service::TimeService;
@@ -32,8 +31,7 @@ use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use claims::assert_matches;
 use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_critical_timeout() {

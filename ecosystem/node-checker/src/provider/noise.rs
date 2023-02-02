@@ -4,8 +4,6 @@
 //! There is only one noise based Checker right now, so this Provider is a bit light
 //! on features, it just makes it possible to make a noise connection.
 
-use std::sync::Arc;
-
 use super::{
     api_index::ApiIndexProvider,
     traits::{Provider, ProviderError},
@@ -19,6 +17,7 @@ use aptos_network_checker::{
 use aptos_sdk::types::{chain_id::ChainId, network_address::NetworkAddress};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

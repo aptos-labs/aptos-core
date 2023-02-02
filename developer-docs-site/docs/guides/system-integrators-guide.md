@@ -1,12 +1,12 @@
 ---
-title: "Integrate Aptos"
+title: "Integrate with Aptos"
 slug: "system-integrators-guide"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Integrate Aptos with Your Platform
+# Integrate with the Aptos Blockchain
 
 If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform.
 
@@ -98,7 +98,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * An [event handle](../concepts/events.md) for all new types of coins added to the account.
 * An event handle for all key rotations for the account.
 
-Read more in [Accounts](../concepts/accounts.md).
+Read more about [Accounts](../concepts/accounts.md) and [set one up with test funds](./get-test-funds.md).
 
 ## Transactions
 

@@ -43,12 +43,12 @@ pub enum SwarmDirectory {
 impl SwarmDirectory {
     pub fn persist(&mut self) {
         match self {
-            SwarmDirectory::Persistent(_) => {}
+            SwarmDirectory::Persistent(_) => {},
             SwarmDirectory::Temporary(_) => {
                 let mut temp = SwarmDirectory::Persistent(PathBuf::new());
                 mem::swap(self, &mut temp);
                 let _ = mem::replace(self, temp.into_persistent());
-            }
+            },
         }
     }
 
@@ -214,7 +214,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
 
         // We print out the root key to make it easy for users to deploy a local faucet
-        let encoded_root_key = hex::encode(&root_key.to_bytes());
+        let encoded_root_key = hex::encode(root_key.to_bytes());
         info!(
             "The root (or mint) key for the swarm is: 0x{}",
             encoded_root_key
@@ -288,18 +288,18 @@ impl LocalSwarm {
                             node.name(),
                             e
                         ));
-                    }
+                    },
                     Err(HealthCheckError::NotRunning(error)) => {
                         return Err(anyhow!(
                             "Node '{}' is not running! Error: {:?}",
                             node.name(),
                             error
                         ));
-                    }
+                    },
                     Err(HealthCheckError::Failure(e)) => {
                         warn!("health check failure: {}", e);
                         break;
-                    }
+                    },
                 }
             }
 

@@ -84,7 +84,7 @@ impl K8sSwarm {
             Err(e) => {
                 // Fail fast if prometheus is not configured. A test is meaningless if we do not have observability
                 bail!("Could not build prometheus client: {}", e);
-            }
+            },
         };
 
         let swarm = K8sSwarm {
@@ -533,12 +533,12 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                             "Node {} unhealthy: REST API returned version 0",
                             node.name()
                         );
-                    }
+                    },
                     Err(err) => {
                         let err = anyhow::Error::from(err);
                         info!("Node {} unhealthy: {}", node.name(), &err);
                         Err(err)
-                    }
+                    },
                 }
             })
         })

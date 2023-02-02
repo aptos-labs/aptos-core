@@ -374,11 +374,9 @@ fn verify_simple_payment() {
     let txn = sender
         .account()
         .transaction()
-        .script(Script::new(
-            empty_script.clone(),
-            vec![],
-            vec![TransactionArgument::U8(42)],
-        ))
+        .script(Script::new(empty_script.clone(), vec![], vec![
+            TransactionArgument::U8(42),
+        ]))
         .sequence_number(10)
         .max_gas_amount(100_000)
         .gas_unit_price(1)
@@ -729,7 +727,7 @@ fn test_script_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -765,7 +763,7 @@ fn test_module_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -817,7 +815,7 @@ fn test_type_tag_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -868,7 +866,7 @@ fn test_script_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -929,7 +927,7 @@ fn test_module_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }
@@ -986,7 +984,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Discard(status) => {
             assert_eq!(status, &StatusCode::UNEXPECTED_VERIFIER_ERROR);
-        }
+        },
         _ => panic!("Kept transaction with an invariant violation!"),
     }
 }

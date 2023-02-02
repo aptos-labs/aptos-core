@@ -3,7 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    logging::{LogEntry, LogSchema},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
@@ -11,33 +19,42 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
-use aptos_storage_interface::async_proof_fetcher::AsyncProofFetcher;
+use aptos_storage_interface::{
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
     transaction::Transaction,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
-use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
-use aptos_storage_interface::DbReaderWriter;
-
-pub struct BlockExecutor<V> {
-    pub db: DbReaderWriter,
-    inner: RwLock<Option<BlockExecutorInner<V>>>,
+pub trait TransactionBlockExecutor<T>: Send + Sync {
+    fn execute_transaction_block(
+        transactions: Vec<T>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput>;
 }
 
-impl<V> BlockExecutor<V>
+impl TransactionBlockExecutor<Transaction> for AptosVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+    }
+}
+
+pub struct BlockExecutor<V, T> {
+    pub db: DbReaderWriter,
+    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+}
+
+impl<V, T> BlockExecutor<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -62,9 +79,10 @@ where
     }
 }
 
-impl<V> BlockExecutorTrait for BlockExecutor<V>
+impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
@@ -82,7 +100,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
@@ -111,15 +129,16 @@ where
     }
 }
 
-struct BlockExecutorInner<V> {
+struct BlockExecutorInner<V, T> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<V>,
+    phantom: PhantomData<(V, T)>,
 }
 
-impl<V> BlockExecutorInner<V>
+impl<V, T> BlockExecutorInner<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
@@ -141,9 +160,10 @@ where
     }
 }
 
-impl<V> BlockExecutorInner<V>
+impl<V, T> BlockExecutorInner<V, T>
 where
-    V: VMExecutor,
+    V: TransactionBlockExecutor<T>,
+    T: Send + Sync,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
@@ -151,7 +171,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         let (block_id, transactions) = block;
@@ -204,7 +224,7 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
+                V::execute_transaction_block(transactions, state_view)?
             };
             chunk_output.trace_log_transaction_status();
 

@@ -4,12 +4,11 @@
 //! This module contains the official gas meter implementation, along with some top-level gas
 //! parameters and traits to help manipulate them.
 
-use crate::transaction::ChangeSetConfigs;
 use crate::{
     algebra::{AbstractValueSize, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
-    transaction::TransactionGasParameters,
+    transaction::{ChangeSetConfigs, TransactionGasParameters},
     StorageGasParameters,
 };
 use aptos_types::{
@@ -28,6 +27,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V6
+//   - Added a new native function - blake2b_256.
 // - V5
 //   - u16, u32, u256
 //   - free_write_bytes_quota
@@ -46,7 +47,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 5;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 6;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -246,11 +247,11 @@ impl AptosGasMeter {
             Some(new_balance) => {
                 self.balance = new_balance;
                 Ok(())
-            }
+            },
             None => {
                 self.balance = 0.into();
                 Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
-            }
+            },
         }
     }
 
@@ -261,11 +262,11 @@ impl AptosGasMeter {
                 Some(remaining_quota) => {
                     self.memory_quota = remaining_quota;
                     Ok(())
-                }
+                },
                 None => {
                     self.memory_quota = 0.into();
                     Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED))
-                }
+                },
             }
         } else {
             Ok(())

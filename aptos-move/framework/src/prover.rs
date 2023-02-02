@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::build_model;
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use std::collections::BTreeMap;
-use std::path::Path;
-use std::time::Instant;
+use std::{collections::BTreeMap, path::Path, time::Instant};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize)]

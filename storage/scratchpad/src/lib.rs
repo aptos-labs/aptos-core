@@ -5,9 +5,8 @@
 
 mod sparse_merkle;
 
+#[cfg(any(test, feature = "bench", feature = "fuzzing"))]
+pub use crate::sparse_merkle::test_utils;
 pub use crate::sparse_merkle::{
     FrozenSparseMerkleTree, ProofRead, SparseMerkleTree, StateStoreStatus,
 };
-
-#[cfg(any(test, feature = "bench", feature = "fuzzing"))]
-pub use crate::sparse_merkle::test_utils;

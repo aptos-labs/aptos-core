@@ -235,7 +235,7 @@ pub fn derive_enum_valid_crypto_material(input: TokenStream) -> TokenStream {
         Data::Enum(ref variants) => impl_enum_valid_crypto_material(name, variants),
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(ValidCryptoMaterial)] is only defined for enums")
-        }
+        },
     }
 }
 
@@ -249,7 +249,7 @@ pub fn derive_enum_publickey(input: TokenStream) -> TokenStream {
         Data::Enum(ref variants) => impl_enum_publickey(name, private_key_type, variants),
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(PublicKey)] is only defined for enums")
-        }
+        },
     }
 }
 
@@ -263,7 +263,7 @@ pub fn derive_enum_privatekey(input: TokenStream) -> TokenStream {
         Data::Enum(ref variants) => impl_enum_privatekey(name, public_key_type, variants),
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(PrivateKey)] is only defined for enums")
-        }
+        },
     }
 }
 
@@ -277,10 +277,10 @@ pub fn derive_enum_verifyingkey(input: TokenStream) -> TokenStream {
     match ast.data {
         Data::Enum(ref variants) => {
             impl_enum_verifyingkey(name, private_key_type, signature_type, variants)
-        }
+        },
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(PrivateKey)] is only defined for enums")
-        }
+        },
     }
 }
 
@@ -294,10 +294,10 @@ pub fn derive_enum_signingkey(input: TokenStream) -> TokenStream {
     match ast.data {
         Data::Enum(ref variants) => {
             impl_enum_signingkey(name, public_key_type, signature_type, variants)
-        }
+        },
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(PrivateKey)] is only defined for enums")
-        }
+        },
     }
 }
 
@@ -311,10 +311,10 @@ pub fn derive_enum_signature(input: TokenStream) -> TokenStream {
     match ast.data {
         Data::Enum(ref variants) => {
             impl_enum_signature(name, public_key_type, private_key_type, variants)
-        }
+        },
         Data::Struct(_) | Data::Union(_) => {
             panic!("#[derive(PrivateKey)] is only defined for enums")
-        }
+        },
     }
 }
 

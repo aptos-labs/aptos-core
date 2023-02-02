@@ -1,14 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{cell::Cell, sync::Arc};
-
+use super::proposer_election::ProposerElection;
+use crate::liveness::cached_proposer_election::CachedProposerElection;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-
-use crate::liveness::cached_proposer_election::CachedProposerElection;
-
-use super::proposer_election::ProposerElection;
+use std::{cell::Cell, sync::Arc};
 
 struct MockProposerElection {
     proposers: Vec<Author>,

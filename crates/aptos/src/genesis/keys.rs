@@ -1,23 +1,26 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::OptionalPoolAddressArgs;
-use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
-use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
-use crate::governance::CompileScriptFunction;
 use crate::{
     common::{
-        types::{CliError, CliTypedResult, PromptOptions, RngArgs},
-        utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
+        types::{CliError, CliTypedResult, OptionalPoolAddressArgs, PromptOptions, RngArgs},
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, current_dir, dir_default_to_current,
+            read_from_file, write_to_user_only_file,
+        },
     },
-    genesis::git::{from_yaml, to_yaml, GitOptions},
+    genesis::git::{from_yaml, to_yaml, GitOptions, LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE},
+    governance::CompileScriptFunction,
     CliCommand,
 };
-use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
-use aptos_genesis::keys::PublicIdentity;
-use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{Script, Transaction, WriteSetPayload};
+use aptos_genesis::{
+    config::{HostAndPort, Layout, OperatorConfiguration, OwnerConfiguration},
+    keys::{generate_key_objects, PublicIdentity},
+};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{Script, Transaction, WriteSetPayload},
+};
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::{Path, PathBuf};

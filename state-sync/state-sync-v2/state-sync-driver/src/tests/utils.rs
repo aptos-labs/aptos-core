@@ -14,16 +14,16 @@ use aptos_data_streaming_service::{
 use aptos_event_notifications::EventNotificationListener;
 use aptos_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use aptos_storage_service_types::responses::CompleteDataRange;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
     proof::{
         SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
@@ -36,11 +36,9 @@ use aptos_types::{
     waypoint::Waypoint,
     write_set::WriteSet,
 };
-use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{channel::mpsc, StreamExt};
 use move_core_types::language_storage::TypeTag;
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand::{rngs::OsRng, Rng};
 
 /// Creates a new data stream listener and notification sender pair
 pub fn create_data_stream_listener() -> (mpsc::Sender<DataNotification>, DataStreamListener) {
@@ -194,10 +192,9 @@ pub fn create_transaction_info() -> TransactionInfo {
 
 /// Creates a test transaction info list with proof
 pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof {
-    TransactionInfoListWithProof::new(
-        TransactionAccumulatorRangeProof::new_empty(),
-        vec![create_transaction_info()],
-    )
+    TransactionInfoListWithProof::new(TransactionAccumulatorRangeProof::new_empty(), vec![
+        create_transaction_info(),
+    ])
 }
 
 /// Creates a test transaction list with proof

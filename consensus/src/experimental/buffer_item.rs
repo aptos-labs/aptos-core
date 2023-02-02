@@ -1,25 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
-use itertools::zip_eq;
-
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
+    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
-
-use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
-use aptos_crypto::HashValue;
-use aptos_types::{
-    aggregate_signature::PartialSignatures, ledger_info::LedgerInfoWithPartialSignatures,
-};
+use itertools::zip_eq;
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -169,7 +164,7 @@ impl BufferItem {
                     Some(timestamp) if commit_info.timestamp_usecs() != timestamp => {
                         assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
                         commit_info.change_timestamp(timestamp);
-                    }
+                    },
                     _ => (),
                 }
                 if let Some(commit_proof) = commit_proof {
@@ -218,10 +213,10 @@ impl BufferItem {
                         )
                     }
                 }
-            }
+            },
             _ => {
                 panic!("Only ordered blocks can advance to executed blocks.")
-            }
+            },
         }
     }
 
@@ -249,10 +244,10 @@ impl BufferItem {
                     partial_commit_proof,
                     commit_vote,
                 }))
-            }
+            },
             _ => {
                 panic!("Only executed buffer items can advance to signed blocks.")
-            }
+            },
         }
     }
 
@@ -280,7 +275,7 @@ impl BufferItem {
                     callback,
                     commit_proof,
                 }))
-            }
+            },
             Self::Executed(executed_item) => {
                 let ExecutedItem {
                     executed_blocks,
@@ -298,7 +293,7 @@ impl BufferItem {
                     callback,
                     commit_proof,
                 }))
-            }
+            },
             Self::Ordered(ordered_item) => {
                 let ordered = *ordered_item;
                 assert!(ordered
@@ -314,10 +309,10 @@ impl BufferItem {
                     commit_proof: Some(commit_proof),
                     ..ordered
                 }))
-            }
+            },
             Self::Aggregated(_) => {
                 unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
-            }
+            },
         }
     }
 
@@ -340,7 +335,7 @@ impl BufferItem {
                 } else {
                     Self::Signed(signed_item)
                 }
-            }
+            },
             Self::Executed(executed_item) => {
                 if validator
                     .check_voting_power(executed_item.partial_commit_proof.signatures().keys())
@@ -358,7 +353,7 @@ impl BufferItem {
                 } else {
                     Self::Executed(executed_item)
                 }
-            }
+            },
             _ => self,
         }
     }
@@ -397,7 +392,7 @@ impl BufferItem {
                         .add_signature(author, signature);
                     return Ok(());
                 }
-            }
+            },
             Self::Executed(executed) => {
                 if executed.commit_info == *target_commit_info {
                     executed
@@ -405,20 +400,20 @@ impl BufferItem {
                         .add_signature(author, signature);
                     return Ok(());
                 }
-            }
+            },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
-            }
+            },
             Self::Aggregated(aggregated) => {
                 // we do not need to do anything for aggregated
                 // but return true is helpful to stop the outer loop early
                 if aggregated.commit_proof.commit_info() == target_commit_info {
                     return Ok(());
                 }
-            }
+            },
         }
         Err(anyhow!("Inconsistent commit info."))
     }

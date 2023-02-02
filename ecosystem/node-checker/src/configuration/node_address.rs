@@ -7,8 +7,7 @@ use aptos_rest_client::Client as AptosRestClient;
 use aptos_sdk::types::network_address::NetworkAddress;
 use reqwest::cookie::Jar;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

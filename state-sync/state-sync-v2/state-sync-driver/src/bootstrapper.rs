@@ -1,17 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::ExecutingComponent;
-use crate::utils::OutputFallbackHandler;
 use crate::{
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
     metrics,
+    metrics::ExecutingComponent,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
+    utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
@@ -106,7 +105,7 @@ impl VerifiedEpochStates {
             self.highest_fetched_epoch_ending_version =
                 epoch_ending_ledger_info.ledger_info().version();
             self.latest_epoch_state = next_epoch_state.clone();
-            self.insert_new_epoch_ending_ledger_info(epoch_ending_ledger_info.clone());
+            self.insert_new_epoch_ending_ledger_info(epoch_ending_ledger_info.clone())?;
 
             trace!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Updated the latest epoch state to epoch: {:?}",
@@ -151,7 +150,7 @@ impl VerifiedEpochStates {
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
                                     error, waypoint, ledger_info)
                         ));
-                    }
+                    },
                 }
             }
         }
@@ -163,7 +162,7 @@ impl VerifiedEpochStates {
     fn insert_new_epoch_ending_ledger_info(
         &mut self,
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
-    ) {
+    ) -> Result<(), Error> {
         let ledger_info = epoch_ending_ledger_info.ledger_info();
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
             "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}",
@@ -176,12 +175,14 @@ impl VerifiedEpochStates {
             .new_epoch_ending_ledger_infos
             .insert(version, epoch_ending_ledger_info)
         {
-            panic!(
+            Err(Error::UnexpectedError(format!(
                 "Duplicate epoch ending ledger info found!\
                  Version: {:?}, \
                  ledger info: {:?}",
                 version, epoch_ending_ledger_info,
-            );
+            )))
+        } else {
+            Ok(())
         }
     }
 
@@ -202,20 +203,21 @@ impl VerifiedEpochStates {
     }
 
     /// Returns the highest known ledger info we've fetched (if any)
-    pub fn get_highest_known_ledger_info(&self) -> Option<LedgerInfoWithSignatures> {
-        if !self.new_epoch_ending_ledger_infos.is_empty() {
+    pub fn get_highest_known_ledger_info(&self) -> Result<Option<LedgerInfoWithSignatures>, Error> {
+        let highest_known_ledger_info = if !self.new_epoch_ending_ledger_infos.is_empty() {
             let highest_fetched_ledger_info = self
                 .get_epoch_ending_ledger_info(self.highest_fetched_epoch_ending_version)
-                .unwrap_or_else(|| {
-                    panic!(
+                .ok_or_else(|| {
+                    Error::UnexpectedError(format!(
                         "The highest known ledger info for version: {:?} was not found!",
                         self.highest_fetched_epoch_ending_version
-                    )
-                });
+                    ))
+                })?;
             Some(highest_fetched_ledger_info)
         } else {
             None
-        }
+        };
+        Ok(highest_known_ledger_info)
     }
 
     /// Returns the next epoch ending version after the given version (if one
@@ -374,7 +376,9 @@ impl<
         bootstrap_notifier_channel: oneshot::Sender<Result<(), Error>>,
     ) -> Result<(), Error> {
         if self.bootstrap_notifier_channel.is_some() {
-            panic!("Only one boostrap subscriber is supported at a time!");
+            return Err(Error::UnexpectedError(
+                "Only one boostrap subscriber is supported at a time!".into(),
+            ));
         }
 
         self.bootstrap_notifier_channel = Some(bootstrap_notifier_channel);
@@ -478,7 +482,7 @@ impl<
                     highest_known_ledger_info,
                 )
                 .await
-            }
+            },
             _ => {
                 // We're either transaction or output syncing
                 self.fetch_missing_transaction_data(
@@ -486,7 +490,7 @@ impl<
                     highest_known_ledger_info,
                 )
                 .await
-            }
+            },
         }
     }
 
@@ -500,12 +504,12 @@ impl<
             // We're syncing a new node. Check the progress and fetch the missing data.
             if let Some(target) = self.metadata_storage.previous_snapshot_sync_target()? {
                 if self.metadata_storage.is_snapshot_sync_complete(&target)? {
-                    panic!(
+                    return Err(Error::UnexpectedError(format!(
                         "The snapshot sync for the target was marked as complete but \
-                    the highest synced version is genesis! Something has gone wrong! \
-                    Target snapshot sync: {:?}",
+                        the highest synced version is genesis! Something has gone wrong! \
+                        Target snapshot sync: {:?}",
                         target
-                    );
+                    )));
                 }
                 self.fetch_missing_state_values(target, true).await
             } else {
@@ -578,14 +582,14 @@ impl<
                         state_value_chunk_with_proof,
                     )
                     .await?;
-                }
+                },
                 DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
                     self.process_epoch_ending_payload(
                         data_notification.notification_id,
                         epoch_ending_ledger_infos,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
                     let payload_start_version = transactions_with_proof.first_transaction_version;
                     self.process_transaction_or_output_payload(
@@ -595,7 +599,7 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
                         transaction_outputs_with_proof.first_transaction_output_version;
@@ -606,12 +610,12 @@ impl<
                         payload_start_version,
                     )
                     .await?;
-                }
+                },
                 _ => {
                     return self
                         .handle_end_of_stream_or_invalid_payload(data_notification)
                         .await
-                }
+                },
             }
         }
 
@@ -627,10 +631,10 @@ impl<
         // Initialize the target ledger info and verify it never changes
         if let Some(ledger_info_to_sync) = &self.state_value_syncer.ledger_info_to_sync {
             if ledger_info_to_sync != &target_ledger_info {
-                panic!(
+                return Err(Error::UnexpectedError(format!(
                     "Mismatch in ledger info to sync! Given target: {:?}, stored target: {:?}",
                     target_ledger_info, ledger_info_to_sync
-                );
+                )));
             }
         } else {
             self.state_value_syncer
@@ -696,7 +700,9 @@ impl<
         let end_version = self
             .verified_epoch_states
             .next_epoch_ending_version(highest_synced_version)
-            .expect("No higher epoch ending version known!");
+            .ok_or_else(|| {
+                Error::UnexpectedError("No higher epoch ending version known!".into())
+            })?;
         let data_stream = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 self.streaming_client
@@ -706,7 +712,7 @@ impl<
                         highest_known_ledger_version,
                     )
                     .await?
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 self.streaming_client
                     .get_all_transactions(
@@ -716,7 +722,7 @@ impl<
                         false,
                     )
                     .await?
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if self.output_fallback_handler.in_fallback_mode() {
                     metrics::set_gauge(
@@ -746,10 +752,10 @@ impl<
                         )
                         .await?
                 }
-            }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
             utils::fetch_latest_epoch_state(self.storage.clone())?,
@@ -934,16 +940,8 @@ impl<
         }
 
         // Fetch the target ledger info and transaction info for bootstrapping
-        let ledger_info_to_sync = self
-            .state_value_syncer
-            .ledger_info_to_sync
-            .clone()
-            .expect("Ledger info to sync is missing!");
-        let transaction_output_to_sync = self
-            .state_value_syncer
-            .transaction_output_to_sync
-            .clone()
-            .expect("Transaction output to sync is missing!");
+        let ledger_info_to_sync = self.get_ledger_info_to_sync()?;
+        let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
 
         // Initialize the state value synchronizer (if not already done)
         if !self.state_value_syncer.initialized_state_snapshot_receiver {
@@ -964,13 +962,18 @@ impl<
             .await?;
 
         // Verify the chunk root hash matches the expected root hash
-        let expected_root_hash = transaction_output_to_sync
+        let first_transaction_info = transaction_output_to_sync
             .proof
             .transaction_infos
             .first()
-            .expect("Target transaction info should exist!")
+            .ok_or_else(|| {
+                Error::UnexpectedError("Target transaction info does not exist!".into())
+            })?;
+        let expected_root_hash = first_transaction_info
             .ensure_state_checkpoint_hash()
-            .expect("Must be at state checkpoint.");
+            .map_err(|error| {
+                Error::UnexpectedError(format!("State checkpoint must exist! Error: {:?}", error))
+            })?;
         if state_value_chunk_with_proof.root_hash != expected_root_hash {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,
@@ -1100,7 +1103,7 @@ impl<
 
         // Verify the payload starting version
         let expected_start_version = self
-            .get_speculative_stream_state()
+            .get_speculative_stream_state()?
             .expected_next_version()?;
         let payload_start_version = self
             .verify_payload_start_version(
@@ -1111,7 +1114,9 @@ impl<
             .await?;
 
         // Get the expected proof ledger info for the payload
-        let proof_ledger_info = self.get_speculative_stream_state().get_proof_ledger_info();
+        let proof_ledger_info = self
+            .get_speculative_stream_state()?
+            .get_proof_ledger_info()?;
 
         // Get the end of epoch ledger info if the payload ends the epoch
         let end_of_epoch_ledger_info = self
@@ -1145,7 +1150,7 @@ impl<
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -1166,7 +1171,7 @@ impl<
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
@@ -1197,16 +1202,16 @@ impl<
                         "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             bootstrapping_mode => {
                 unreachable!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
-        self.get_speculative_stream_state()
+        self.get_speculative_stream_state()?
             .update_synced_version(synced_version);
 
         Ok(())
@@ -1221,11 +1226,7 @@ impl<
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
-        let ledger_info_to_sync = self
-            .state_value_syncer
-            .ledger_info_to_sync
-            .clone()
-            .expect("Ledger info to sync is missing!");
+        let ledger_info_to_sync = self.get_ledger_info_to_sync()?;
         let expected_start_version = ledger_info_to_sync.ledger_info().version();
         let _ = self
             .verify_payload_start_version(
@@ -1246,7 +1247,7 @@ impl<
                     Ok(()) => {
                         self.state_value_syncer
                             .set_transaction_output_to_sync(transaction_outputs_with_proof);
-                    }
+                    },
                     Err(error) => {
                         self.reset_active_stream(Some(NotificationAndFeedback::new(
                             notification_id,
@@ -1257,7 +1258,7 @@ impl<
                             "Transaction outputs with proof is invalid! Error: {:?}",
                             error
                         )));
-                    }
+                    },
                 }
             } else {
                 self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -1343,7 +1344,7 @@ impl<
                         "Did not receive transaction outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
@@ -1357,7 +1358,7 @@ impl<
                         "Did not receive transactions with proof!".into(),
                     ));
                 }
-            }
+            },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     transaction_list_with_proof.transactions.len()
@@ -1373,10 +1374,10 @@ impl<
                         "Did not receive transactions or outputs with proof!".into(),
                     ));
                 }
-            }
+            },
             bootstrapping_mode => {
                 unimplemented!("Bootstrapping mode not supported: {:?}", bootstrapping_mode)
-            }
+            },
         };
         let payload_end_version = payload_start_version
             .checked_add(num_versions as u64)
@@ -1400,7 +1401,7 @@ impl<
         // Fetch the highest verified ledger info (from the network) and take
         // the maximum.
         if let Some(verified_ledger_info) =
-            self.verified_epoch_states.get_highest_known_ledger_info()
+            self.verified_epoch_states.get_highest_known_ledger_info()?
         {
             if verified_ledger_info.ledger_info().version()
                 > highest_known_ledger_info.ledger_info().version()
@@ -1436,11 +1437,29 @@ impl<
         }
     }
 
-    /// Returns the speculative stream state. Assumes that the state exists.
-    fn get_speculative_stream_state(&mut self) -> &mut SpeculativeStreamState {
-        self.speculative_stream_state
-            .as_mut()
-            .expect("Speculative stream state does not exist!")
+    /// Returns the speculative stream state
+    fn get_speculative_stream_state(&mut self) -> Result<&mut SpeculativeStreamState, Error> {
+        self.speculative_stream_state.as_mut().ok_or_else(|| {
+            Error::UnexpectedError("Speculative stream state does not exist!".into())
+        })
+    }
+
+    /// Returns the ledger info to sync
+    fn get_ledger_info_to_sync(&mut self) -> Result<LedgerInfoWithSignatures, Error> {
+        self.state_value_syncer
+            .ledger_info_to_sync
+            .clone()
+            .ok_or_else(|| Error::UnexpectedError("The ledger info to sync is missing!".into()))
+    }
+
+    /// Returns the transaction output to sync
+    fn get_transaction_output_to_sync(&mut self) -> Result<TransactionOutputListWithProof, Error> {
+        self.state_value_syncer
+            .transaction_output_to_sync
+            .clone()
+            .ok_or_else(|| {
+                Error::UnexpectedError("The transaction output to sync is missing!".into())
+            })
     }
 
     /// Handles the storage synchronizer error sent by the driver

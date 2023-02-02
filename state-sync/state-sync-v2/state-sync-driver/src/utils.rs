@@ -1,38 +1,38 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::driver::DriverConfiguration;
-use crate::storage_synchronizer::StorageSynchronizerInterface;
 use crate::{
+    driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, MempoolNotificationHandler,
     },
+    storage_synchronizer::StorageSynchronizerInterface,
 };
-use aptos_data_streaming_service::data_notification::NotificationId;
-use aptos_data_streaming_service::data_stream::DataStreamId;
-use aptos_data_streaming_service::streaming_client::NotificationAndFeedback;
 use aptos_data_streaming_service::{
-    data_notification::DataNotification, data_stream::DataStreamListener,
-    streaming_client::DataStreamingClient,
+    data_notification::{DataNotification, NotificationId},
+    data_stream::{DataStreamId, DataStreamListener},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback},
 };
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
-use aptos_time_service::TimeService;
-use aptos_time_service::TimeServiceTrait;
-use aptos_types::transaction::{TransactionListWithProof, TransactionOutputListWithProof};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
-    epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    transaction::Version,
+    epoch_change::Verifier,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use futures::StreamExt;
-use std::time::Instant;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::time::timeout;
 
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
@@ -71,11 +71,10 @@ impl SpeculativeStreamState {
 
     /// Returns the proof ledger info that all data along the stream should have
     /// proofs relative to. This assumes the proof ledger info exists!
-    pub fn get_proof_ledger_info(&self) -> LedgerInfoWithSignatures {
+    pub fn get_proof_ledger_info(&self) -> Result<LedgerInfoWithSignatures, Error> {
         self.proof_ledger_info
-            .as_ref()
-            .expect("Proof ledger info is missing!")
             .clone()
+            .ok_or_else(|| Error::UnexpectedError("The proof ledger info is missing!".into()))
     }
 
     /// Updates the currently synced version of the stream
@@ -195,14 +194,13 @@ impl OutputFallbackHandler {
 /// error if the data stream times out after `max_stream_wait_time_ms`. Also,
 /// tracks the number of consecutive timeouts to identify when the stream has
 /// timed out too many times.
-///
-/// Note: this assumes the `active_data_stream` exists.
 pub async fn get_data_notification(
     max_stream_wait_time_ms: u64,
     max_num_stream_timeouts: u64,
     active_data_stream: Option<&mut DataStreamListener>,
 ) -> Result<DataNotification, Error> {
-    let active_data_stream = active_data_stream.expect("The active data stream should exist!");
+    let active_data_stream = active_data_stream
+        .ok_or_else(|| Error::UnexpectedError("The active data stream does not exist!".into()))?;
 
     let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await
@@ -331,14 +329,14 @@ pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
                         .error(&error)
                         .message("Failed to fetch latest synced ledger info!"));
                     return;
-                }
+                },
             },
             Err(error) => {
                 error!(LogSchema::new(LogEntry::SynchronizerNotification)
                     .error(&error)
                     .message("Failed to fetch latest synced version!"));
                 return;
-            }
+            },
         };
 
     // Handle the commit notification

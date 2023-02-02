@@ -305,7 +305,7 @@ impl InboundRpcs {
             Err(err) => {
                 counters::rpc_messages(network_context, RESPONSE_LABEL, FAILED_LABEL).inc();
                 return Err(err);
-            }
+            },
         };
         let res_len = response.raw_response.len() as u64;
 
@@ -491,12 +491,12 @@ impl OutboundRpcs {
                 Ok(response_len) => {
                     let latency = timer.stop_and_record();
                     (request_id, Ok((latency, response_len)))
-                }
+                },
                 Err(err) => {
                     // don't record
                     timer.stop_and_discard();
                     (request_id, Err(err))
-                }
+                },
             }
         };
 
@@ -547,7 +547,7 @@ impl OutboundRpcs {
                     peer_id.short_str(),
                     latency,
                 );
-            }
+            },
             Err(error) => {
                 if let RpcError::UnexpectedResponseChannelCancel = error {
                     // We don't log when the application has dropped the RPC
@@ -565,7 +565,7 @@ impl OutboundRpcs {
                         error
                     );
                 }
-            }
+            },
         }
     }
 

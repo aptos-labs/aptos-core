@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{configuration::NodeAddress, CheckSummary};
 use anyhow::Result;
 use async_trait::async_trait;
-
-use crate::{configuration::NodeAddress, CheckSummary};
 
 /// This trait describes a Runner. The Runner is the top level coordinator
 /// reponsible for driving a check. It is expected to take in the information

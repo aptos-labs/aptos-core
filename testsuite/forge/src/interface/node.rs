@@ -224,8 +224,8 @@ pub trait NodeExt: Node {
                         self.peer_id(),
                         error,
                     ))
-                }
-                Err(_) => {} // For other errors we'll retry
+                },
+                Err(_) => {}, // For other errors we'll retry
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;

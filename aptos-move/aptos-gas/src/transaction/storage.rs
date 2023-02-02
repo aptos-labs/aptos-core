@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::transaction::{ChangeSet, CheckChangeSet};
 use aptos_types::{
-    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
+    on_chain_config::StorageGasSchedule,
+    state_store::state_key::StateKey,
+    transaction::{ChangeSet, CheckChangeSet},
+    write_set::WriteOp,
 };
-use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
+use move_core_types::{
+    gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
+    vm_status::{StatusCode, VMStatus},
 };
-use move_core_types::vm_status::{StatusCode, VMStatus};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
@@ -74,10 +76,10 @@ impl StoragePricingV1 {
                 Creation(data) => {
                     num_new_items += 1.into();
                     num_bytes_val += NumBytes::new(data.len() as u64);
-                }
+                },
                 Modification(data) => {
                     num_bytes_val += NumBytes::new(data.len() as u64);
-                }
+                },
                 Deletion => (),
             }
         }
@@ -184,11 +186,11 @@ impl StoragePricingV2 {
                 Creation(data) => {
                     num_items_create += 1.into();
                     num_bytes_create += self.write_op_size(key, data);
-                }
+                },
                 Modification(data) => {
                     num_items_write += 1.into();
                     num_bytes_write += self.write_op_size(key, data);
-                }
+                },
                 Deletion => (),
             }
         }
@@ -306,7 +308,7 @@ impl CheckChangeSet for ChangeSetConfigs {
                         return Err(VMStatus::Error(ERR));
                     }
                     write_set_size += write_op_size;
-                }
+                },
                 WriteOp::Deletion => (),
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
@@ -350,7 +352,7 @@ impl StorageGasParameters {
         let pricing = match storage_gas_schedule {
             Some(schedule) => {
                 StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params))
-            }
+            },
             None => StoragePricing::V1(StoragePricingV1::new(gas_params)),
         };
 

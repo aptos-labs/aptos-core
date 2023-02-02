@@ -19,9 +19,10 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 pub struct BlockSchema;
 
 impl Schema for BlockSchema {
-    const COLUMN_FAMILY_NAME: aptos_schemadb::ColumnFamilyName = BLOCK_CF_NAME;
     type Key = HashValue;
     type Value = Block;
+
+    const COLUMN_FAMILY_NAME: aptos_schemadb::ColumnFamilyName = BLOCK_CF_NAME;
 }
 
 impl KeyCodec<BlockSchema> for HashValue {

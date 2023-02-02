@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
+    test_utils::{create_and_fund_account, transfer_and_maybe_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
@@ -760,7 +760,7 @@ async fn execute_transactions(
 
     let transaction_factory = swarm.chain_info().transaction_factory();
     if execute_epoch_changes {
-        transfer_and_reconfig(
+        transfer_and_maybe_reconfig(
             client,
             &transaction_factory,
             swarm.chain_info().root_account,

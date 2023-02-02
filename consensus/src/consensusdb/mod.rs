@@ -80,15 +80,10 @@ impl ConsensusDB {
     )> {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
-        let consensus_blocks = self
-            .get_blocks()?
-            .into_iter()
-            .map(|(_block_hash, block_content)| block_content)
-            .collect::<Vec<_>>();
+        let consensus_blocks = self.get_blocks()?.into_values().collect::<Vec<_>>();
         let consensus_qcs = self
             .get_quorum_certificates()?
-            .into_iter()
-            .map(|(_block_hash, qc)| qc)
+            .into_values()
             .collect::<Vec<_>>();
         Ok((
             last_vote,
@@ -163,6 +158,7 @@ impl ConsensusDB {
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?;
         self.commit(batch)
     }
+
     /// Get serialized latest vote (if available)
     fn get_last_vote(&self) -> Result<Option<Vec<u8>>, DbError> {
         Ok(self

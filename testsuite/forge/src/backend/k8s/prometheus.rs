@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{create_k8s_client, Get, K8sApi, Result};
-
 use anyhow::bail;
 use aptos_logger::info;
 use k8s_openapi::api::core::v1::Secret;
@@ -31,7 +30,7 @@ async fn create_prometheus_client_from_environment(
         (Ok(url), Ok(token)) => {
             info!("Creating prometheus client from environment variables");
             (url, Some(token))
-        }
+        },
         _ => {
             // try reading a cluster-local secret
             match secrets_api.get("prometheus-read-only").await {
@@ -46,15 +45,15 @@ async fn create_prometheus_client_from_environment(
                                     String::from_utf8(url.0.clone()).unwrap(),
                                     Some(String::from_utf8(token.0.clone()).unwrap()),
                                 )
-                            }
+                            },
                             _ => {
                                 bail!("Failed to read prometheus-read-only url and token");
-                            }
+                            },
                         }
                     } else {
                         bail!("Failed to read prometheus-read-only secret data");
                     }
-                }
+                },
                 Err(e) => {
                     // There's no remote prometheus secret setup. Try reading from a local prometheus backend
                     info!("Failed to get prometheus-read-only secret: {}", e);
@@ -65,9 +64,9 @@ async fn create_prometheus_client_from_environment(
                     } else {
                         ("http://127.0.0.1:9090".to_string(), None)
                     }
-                }
+                },
             }
-        }
+        },
     };
 
     // add auth header if specified
@@ -135,6 +134,7 @@ pub async fn query_with_metadata(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use async_trait::async_trait;
     use k8s_openapi::ByteString;
     use kube::{api::ObjectMeta, error::ErrorResponse, Error as KubeError};
@@ -143,8 +143,6 @@ mod tests {
         env,
         time::{SystemTime, UNIX_EPOCH},
     };
-
-    use super::*;
 
     struct MockSecretApi {
         secret: Option<Secret>,
@@ -240,11 +238,11 @@ mod tests {
         match response {
             Ok(pres) => {
                 println!("{:?}", pres);
-            }
+            },
             Err(PrometheusError::Client(e)) => {
                 println!("Skipping test. Failed to create prometheus client: {}", e);
                 return;
-            }
+            },
             Err(e) => panic!("Expected PromqlResult: {}", e),
         }
 

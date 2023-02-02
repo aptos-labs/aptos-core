@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Context};
-use codespan_reporting::diagnostic::Severity;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use move_model::model::GlobalEnv;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 #[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize, Default)]
 pub struct DocgenOptions {

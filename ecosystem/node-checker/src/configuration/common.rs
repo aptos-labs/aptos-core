@@ -45,13 +45,13 @@ impl TryInto<BaselineConfiguration> for FileType {
                 let node_configuration: BaselineConfiguration = serde_yaml::from_reader(file)
                     .with_context(|| format!("{} was not valid YAML", path.display()))?;
                 Ok(node_configuration)
-            }
+            },
             FileType::Json(path) => {
                 let file = File::open(&path)?;
                 let node_configuration: BaselineConfiguration = serde_json::from_reader(file)
                     .with_context(|| format!("{} was not valid JSON", path.display()))?;
                 Ok(node_configuration)
-            }
+            },
         }
     }
 }

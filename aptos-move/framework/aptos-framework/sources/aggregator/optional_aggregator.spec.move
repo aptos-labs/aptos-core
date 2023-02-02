@@ -12,7 +12,9 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
-        pragma verify = false;
+        // TODO: temporary mockup
+        pragma opaque, verify = false;
+        aborts_if false;
     }
 
     spec read(optional_aggregator: &OptionalAggregator): u128 {

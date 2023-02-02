@@ -16,8 +16,8 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::{
+    collections::BTreeMap,
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
 };
@@ -284,6 +284,7 @@ impl LedgerInfoWithV0 {
                 .iter(),
         )
     }
+
     pub fn signatures(&self) -> &AggregateSignature {
         &self.signatures
     }
@@ -364,6 +365,8 @@ use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for LedgerInfoWithV0 {
     type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         let dummy_signature = bls12381::Signature::dummy_signature();
         (any::<LedgerInfo>(), (1usize..100))
@@ -382,8 +385,6 @@ impl Arbitrary for LedgerInfoWithV0 {
             })
             .boxed()
     }
-
-    type Strategy = BoxedStrategy<Self>;
 }
 
 #[cfg(test)]

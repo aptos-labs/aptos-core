@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{sync::Arc, time::Duration};
-
 use super::{
     cache::OutputCache,
     traits::{Provider, ProviderError},
@@ -15,6 +13,7 @@ use async_trait::async_trait;
 use prometheus_parse::{Scrape, Value};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -125,11 +124,11 @@ fn get_metric_value(
                             break;
                         }
                     }
-                }
+                },
                 None => {
                     discovered_sample = Some(sample);
                     break;
-                }
+                },
             }
         }
     }
@@ -141,7 +140,7 @@ fn get_metric_value(
             wildcard => {
                 warn!("Found unexpected metric type: {:?}", wildcard);
                 None
-            }
+            },
         },
         None => None,
     }
@@ -178,7 +177,7 @@ impl GetMetricResult {
             GetMetricResult::Missing(check_result) => {
                 check_results.push(check_result);
                 None
-            }
+            },
         }
     }
 }

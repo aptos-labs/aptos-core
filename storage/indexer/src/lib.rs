@@ -166,8 +166,9 @@ impl<'a> TableInfoParser<'a> {
                     match path {
                         Path::Code(_) => (),
                         Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,
+                        Path::ResourceGroup(_struct_tag) => (),
                     }
-                }
+                },
                 StateKey::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
                 StateKey::Raw(_) => (),
             },
@@ -188,13 +189,13 @@ impl<'a> TableInfoParser<'a> {
         match self.get_table_info(handle)? {
             Some(table_info) => {
                 self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
-            }
+            },
             None => {
                 self.pending_on
                     .entry(handle)
                     .or_insert_with(Vec::new)
                     .push(bytes);
-            }
+            },
         }
         Ok(())
     }
@@ -205,7 +206,7 @@ impl<'a> TableInfoParser<'a> {
                 for item in items {
                     self.parse_move_value(item)?;
                 }
-            }
+            },
             AnnotatedMoveValue::Struct(struct_value) => {
                 let struct_tag = &struct_value.type_;
                 if Self::is_table(struct_tag) {
@@ -218,7 +219,7 @@ impl<'a> TableInfoParser<'a> {
                         (name, AnnotatedMoveValue::Address(handle)) => {
                             assert_eq!(name.as_ref(), IdentStr::new("handle").unwrap());
                             TableHandle(*handle)
-                        }
+                        },
                         _ => bail!("Table struct malformed. {:?}", struct_value),
                     };
                     self.save_table_info(table_handle, table_info)?;
@@ -227,18 +228,18 @@ impl<'a> TableInfoParser<'a> {
                         self.parse_move_value(field)?;
                     }
                 }
-            }
+            },
 
             // there won't be tables in primitives
-            AnnotatedMoveValue::U8(_) => {}
-            AnnotatedMoveValue::U16(_) => {}
-            AnnotatedMoveValue::U32(_) => {}
-            AnnotatedMoveValue::U64(_) => {}
-            AnnotatedMoveValue::U128(_) => {}
-            AnnotatedMoveValue::U256(_) => {}
-            AnnotatedMoveValue::Bool(_) => {}
-            AnnotatedMoveValue::Address(_) => {}
-            AnnotatedMoveValue::Bytes(_) => {}
+            AnnotatedMoveValue::U8(_) => {},
+            AnnotatedMoveValue::U16(_) => {},
+            AnnotatedMoveValue::U32(_) => {},
+            AnnotatedMoveValue::U64(_) => {},
+            AnnotatedMoveValue::U128(_) => {},
+            AnnotatedMoveValue::U256(_) => {},
+            AnnotatedMoveValue::Bool(_) => {},
+            AnnotatedMoveValue::Address(_) => {},
+            AnnotatedMoveValue::Bytes(_) => {},
         }
         Ok(())
     }

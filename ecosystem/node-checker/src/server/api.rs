@@ -1,15 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use std::convert::TryInto;
-
 use super::{build::BaselineConfigurationRunners, common::ServerArgs};
 use crate::{configuration::NodeAddress, runner::Runner, CheckSummary};
 use anyhow::{anyhow, Context};
-use aptos_crypto::x25519;
-use aptos_crypto::ValidCryptoMaterialStringExt;
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_logger::error;
 use poem::http::StatusCode;
 use poem_openapi::{param::Query, payload::Json, Object, OpenApi, OpenApiService};
+use std::convert::TryInto;
 use url::Url;
 
 pub struct Api<R: Runner> {
@@ -54,7 +52,7 @@ impl<R: Runner> Api<R> {
                         StatusCode::BAD_REQUEST,
                         anyhow!("Invalid public key \"{}\": {:#}", public_key, e),
                     )))
-                }
+                },
             },
             None => None,
         };
@@ -106,7 +104,7 @@ impl<R: Runner> Api<R> {
                     StatusCode::INTERNAL_SERVER_ERROR,
                     anyhow!(e),
                 )))
-            }
+            },
         }
     }
 

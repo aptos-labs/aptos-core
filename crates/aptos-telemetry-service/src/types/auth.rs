@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::common::NodeType;
 use aptos_config::config::RoleType;
 use aptos_crypto::x25519;
 use aptos_types::{chain_id::ChainId, PeerId};
 use serde::{Deserialize, Serialize};
-
-use super::common::NodeType;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthRequest {
@@ -40,8 +39,7 @@ fn default_role_type() -> RoleType {
 impl Claims {
     #[cfg(test)]
     pub(crate) fn test() -> Self {
-        use chrono::Duration;
-        use chrono::Utc;
+        use chrono::{Duration, Utc};
 
         Self {
             chain_id: ChainId::test(),

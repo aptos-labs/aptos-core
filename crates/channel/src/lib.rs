@@ -62,11 +62,11 @@ impl<T> Sink<T> for Sender<T> {
     type Error = mpsc::SendError;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        (*self).inner.poll_ready(cx)
+        (self).inner.poll_ready(cx)
     }
 
     fn start_send(mut self: Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
-        (*self).inner.start_send(msg).map(|_| self.gauge.inc())
+        (self).inner.start_send(msg).map(|_| self.gauge.inc())
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -80,8 +80,7 @@ impl<T> Sink<T> for Sender<T> {
 
 impl<T> Sender<T> {
     pub fn try_send(&mut self, msg: T) -> Result<(), mpsc::SendError> {
-        (*self)
-            .inner
+        self.inner
             .try_send(msg)
             .map(|_| self.gauge.inc())
             .map_err(mpsc::TrySendError::into_send_error)

@@ -12,7 +12,6 @@ use futures::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     Future, SinkExt, StreamExt,
 };
-
 use std::{
     sync::Arc,
     time::{Duration, Instant},

@@ -16,10 +16,6 @@ mod traits;
 mod transaction_correctness;
 mod types;
 
-use serde::{Deserialize, Serialize};
-pub use traits::{Checker, CheckerError};
-pub use types::{CheckResult, CheckSummary};
-
 use self::{
     build_version::{BuildVersionChecker, BuildVersionCheckerConfig},
     consensus_proposals::{ConsensusProposalsChecker, ConsensusProposalsCheckerConfig},
@@ -34,6 +30,9 @@ use self::{
     tps::{TpsChecker, TpsCheckerConfig},
     transaction_correctness::{TransactionCorrectnessChecker, TransactionCorrectnessCheckerConfig},
 };
+use serde::{Deserialize, Serialize};
+pub use traits::{Checker, CheckerError};
+pub use types::{CheckResult, CheckSummary};
 
 /// This enum lets us represent all the different Checkers in a config.
 /// This should only be used at config reading time.
@@ -61,7 +60,7 @@ impl CheckerConfig {
             Self::BuildVersion(config) => Ok(Box::new(BuildVersionChecker::new(config))),
             Self::ConsensusProposals(config) => {
                 Ok(Box::new(ConsensusProposalsChecker::new(config)))
-            }
+            },
             Self::ConsensusRound(config) => Ok(Box::new(ConsensusRoundChecker::new(config))),
             Self::ConsensusTimeouts(config) => Ok(Box::new(ConsensusTimeoutsChecker::new(config))),
             Self::Handshake(config) => Ok(Box::new(HandshakeChecker::new(config))),
@@ -73,7 +72,7 @@ impl CheckerConfig {
             Self::Tps(config) => Ok(Box::new(TpsChecker::new(config)?)),
             Self::TransactionCorrectness(config) => {
                 Ok(Box::new(TransactionCorrectnessChecker::new(config)))
-            }
+            },
         }
     }
 }

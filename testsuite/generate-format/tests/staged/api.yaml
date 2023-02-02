@@ -170,6 +170,10 @@ Path:
       Resource:
         NEWTYPE:
           TYPENAME: StructTag
+    2:
+      ResourceGroup:
+        NEWTYPE:
+          TYPENAME: StructTag
 RawTransaction:
   STRUCT:
     - sender:

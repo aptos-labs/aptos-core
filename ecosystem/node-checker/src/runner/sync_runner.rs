@@ -142,7 +142,7 @@ impl Runner for SyncRunner {
                             0,
                             format!("Failed to build noise address: {:#}", err),
                         )]));
-                    }
+                    },
                 };
                 provider_collection.target_noise_provider = Some(NoiseProvider::new(
                     self.provider_configs.noise.clone(),
@@ -206,7 +206,7 @@ impl SyncRunner {
                         );
                         return Err(err);
                     }
-                }
+                },
             }
         };
         Ok(check_result)

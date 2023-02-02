@@ -3,15 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::{
-    cmp::max,
-    collections::{BTreeSet, HashMap},
-    sync::Arc,
-};
-
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
@@ -32,6 +24,12 @@ use aptos_types::{
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
+use serde::{Deserialize, Serialize};
+use std::{
+    cmp::max,
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 mod error;
 mod executed_chunk;
@@ -75,7 +73,7 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait: Send + Sync {
+pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
@@ -85,7 +83,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error>;
 

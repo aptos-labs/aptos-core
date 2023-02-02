@@ -251,7 +251,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit == <b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>.limit);
 </code></pre>
 
 
@@ -268,7 +269,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit == <b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>.limit);
 </code></pre>
 
 
@@ -285,7 +287,9 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> !<a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>ensures</b> result &lt;= <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit;
 </code></pre>
 
 
@@ -308,10 +312,10 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<a name="0x1_aggregator_spec_aggreator_exists"></a>
+<a name="0x1_aggregator_spec_read"></a>
 
 
-<pre><code><b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggreator_exists">spec_aggreator_exists</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): bool;
+<pre><code><b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
 </code></pre>
 
 

@@ -170,7 +170,7 @@ impl CollectionData {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                }
+                },
             }
         }
         Err(anyhow::anyhow!("Failed to get collection creator"))

@@ -95,11 +95,11 @@ impl HardwareChecker {
                             value, key, err
                         ),
                     )
-                }
+                },
             },
             GetValueResult::Missing(evaluation_result) => {
                 return evaluation_result;
-            }
+            },
         };
 
         if value_from_target < minimum {
@@ -147,7 +147,7 @@ impl Checker for HardwareChecker {
                     0,
                     format!("Failed to get system information from your node: {:#}", e),
                 )])
-            }
+            },
         };
 
         let check_results = vec![

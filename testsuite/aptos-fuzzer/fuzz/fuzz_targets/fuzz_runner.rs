@@ -18,7 +18,7 @@ static FUZZ_TARGET: Lazy<FuzzTarget> = Lazy::new(|| {
                 err
             );
             process::abort();
-        }
+        },
     }
 });
 

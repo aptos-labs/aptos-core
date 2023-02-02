@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 /// These Checkers are only valuable in certain contexts. For example, this is
 /// not a useful Checker for node registration for the AITs, since each node
 /// is running in their own isolated network, where no consensus is occurring.
@@ -17,8 +18,6 @@ use anyhow::Result;
 use once_cell::sync::Lazy;
 use prometheus_parse::Scrape;
 use serde::{Deserialize, Serialize};
-
-use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
 
 /// Checker for minimum number of peers.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -119,12 +118,12 @@ impl Checker for MinimumPeersChecker {
                     0,
                     format!("Failed to scrape metrics from your node: {:#}", e),
                 )])
-            }
+            },
         };
         let (inbound_connections, outbound_connections) = match get_metrics(&scrape) {
             Ok((inbound_connections, outbound_connections)) => {
                 (inbound_connections, outbound_connections)
-            }
+            },
             Err(evaluation_results) => return Ok(evaluation_results),
         };
 

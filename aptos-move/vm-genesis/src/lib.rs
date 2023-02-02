@@ -16,13 +16,13 @@ use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, InitialGasSchedule,
     NativeGasParameters, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
-use aptos_types::account_config::aptos_test_root_address;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
-    account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},
+    on_chain_config::{
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION,
+    },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
@@ -106,9 +106,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -215,9 +214,8 @@ pub fn encode_genesis_change_set(
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         ChainId::test().id(),
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -399,7 +397,16 @@ fn initialize(
 }
 
 fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
-    let features: Vec<u64> = vec![1, 2, 5];
+    let features: Vec<u64> = vec![
+        FeatureFlag::CODE_DEPENDENCY_CHECK as u64,
+        FeatureFlag::TREAT_FRIEND_AS_PRIVATE as u64,
+        FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES as u64,
+        FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES as u64,
+        FeatureFlag::VM_BINARY_FORMAT_V6 as u64,
+        FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES as u64,
+        FeatureFlag::BLAKE2B_256_NATIVE as u64,
+        FeatureFlag::RESOURCE_GROUPS as u64,
+    ];
 
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(bcs::to_bytes(&features).unwrap());
@@ -578,19 +585,13 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
         });
 
     // Call the initialize function with the metadata.
-    exec_function(
-        session,
-        CODE_MODULE_NAME,
-        "initialize",
-        vec![],
-        vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS)
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::Signer(addr).simple_serialize().unwrap(),
-            bcs::to_bytes(pack.package_metadata()).unwrap(),
-        ],
-    );
+    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
+        MoveValue::Signer(CORE_CODE_ADDRESS)
+            .simple_serialize()
+            .unwrap(),
+        MoveValue::Signer(addr).simple_serialize().unwrap(),
+        bcs::to_bytes(pack.package_metadata()).unwrap(),
+    ]);
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -654,7 +655,7 @@ pub fn generate_genesis_change_set_for_testing_with_count(
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
             aptos_framework::testnet_release_bundle()
-        }
+        },
     };
 
     generate_test_genesis(framework, Some(count as usize)).0
@@ -869,9 +870,8 @@ pub fn test_genesis_module_publishing() {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        false,
-        true,
         ChainId::test().id(),
+        Features::default(),
     )
     .unwrap();
     let id1 = HashValue::zero();

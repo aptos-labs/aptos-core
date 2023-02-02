@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cmp::Ordering;
-
+use super::proposer_election::ProposerElection;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
@@ -10,8 +9,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, SecurityEvent};
-
-use super::proposer_election::ProposerElection;
+use std::cmp::Ordering;
 
 // Wrapper around ProposerElection.
 //
@@ -68,7 +66,7 @@ impl UnequivocalProposerElection {
                     already_proposed.0 = block.round();
                     already_proposed.1 = block.id();
                     true
-                }
+                },
                 Ordering::Equal => {
                     if already_proposed.1 != block.id() {
                         error!(
@@ -83,11 +81,11 @@ impl UnequivocalProposerElection {
                     } else {
                         true
                     }
-                }
+                },
                 Ordering::Less => {
                     println!("Older Block");
                     false
-                }
+                },
             }
         })
     }

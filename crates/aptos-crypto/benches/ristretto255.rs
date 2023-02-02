@@ -4,15 +4,15 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::scalar::Scalar;
-
 use aptos_crypto::test_utils::random_bytes;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::traits::Identity;
-use rand::distributions::Uniform;
-use rand::{prelude::ThreadRng, thread_rng, Rng};
+use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    scalar::Scalar,
+    traits::Identity,
+};
+use rand::{distributions::Uniform, prelude::ThreadRng, thread_rng, Rng};
 use std::ops::{Add, Mul, Neg, Sub};
 
 fn benchmark_groups(c: &mut Criterion) {

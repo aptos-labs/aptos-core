@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::{Duration, Instant};
-
 use crate::{
     create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
@@ -13,6 +11,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
+use std::time::{Duration, Instant};
 
 pub struct TwoTrafficsTest {
     // cannot have 'static EmitJobRequest, like below, so need to have inner fields
@@ -43,7 +42,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
         let nodes_to_send_load_to = LoadDestination::AllFullnodes.get_destination_nodes(swarm);
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
-        let (mut emitter, emit_job_request) = create_emitter_and_request(
+        let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps {

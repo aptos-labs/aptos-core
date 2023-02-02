@@ -5,7 +5,7 @@ slug: "leaderboard-metrics"
 
 # Leaderboard Metrics
 
-This document explains how the rewards for validator are evaluated and displayed on the [Aptos Validator Status](https://aptoslabs.com/leaderboard/it3) page. 
+This document explains how the rewards for validator are evaluated and displayed on the [Aptos Validator Status](https://explorer.aptoslabs.com/validators) page. 
 
 ## How rewards are calculated
 

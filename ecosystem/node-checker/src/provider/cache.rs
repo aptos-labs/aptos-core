@@ -3,8 +3,10 @@
 
 use super::ProviderError;
 use futures::Future;
-use std::fmt::Debug;
-use std::time::{Duration, Instant};
+use std::{
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 use tokio::sync::RwLock;
 
 /// This struct helps with caching of Provider output.

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::payload_manager::PayloadManager;
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
     error::StateSyncError,
+    monitor,
+    payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     txn_notifier::TxnNotifier,
 };
@@ -28,8 +28,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
-use std::cmp::max;
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, cmp::max, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
 type NotificationType = (
@@ -38,12 +37,13 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
+#[allow(dead_code)]
 type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    executor: Arc<dyn BlockExecutorTrait>,
+    executor: Arc<dyn BlockExecutorTrait<Transaction>>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
@@ -54,7 +54,7 @@ pub struct ExecutionProxy {
 
 impl ExecutionProxy {
     pub fn new(
-        executor: Arc<dyn BlockExecutorTrait>,
+        executor: Arc<dyn BlockExecutorTrait<Transaction>>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,

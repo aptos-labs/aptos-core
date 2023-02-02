@@ -5,13 +5,14 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::{anyhow, Result};
-use aptos_types::account_address::AccountAddress;
-use aptos_types::account_config::AccountResource;
-use aptos_types::account_state::AccountState;
-use aptos_types::event::EventHandle;
-use aptos_types::state_store::state_value::StateValue;
 use aptos_types::{
-    proof::SparseMerkleProofExt, state_store::state_key::StateKey, transaction::Version,
+    account_address::AccountAddress,
+    account_config::AccountResource,
+    account_state::AccountState,
+    event::EventHandle,
+    proof::SparseMerkleProofExt,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
 };
 use move_core_types::move_resource::MoveResource;
 
@@ -44,7 +45,7 @@ impl DbReader for MockDbReaderWriter {
                     .get(&access_path.path)
                     .cloned()
                     .map(StateValue::from))
-            }
+            },
             StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
             _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
         }

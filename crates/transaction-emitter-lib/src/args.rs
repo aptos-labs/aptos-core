@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryFrom, path::Path};
-
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
 use clap::{ArgEnum, ArgGroup, Parser};
-
 use serde::{Deserialize, Serialize};
+use std::{convert::TryFrom, path::Path};
 use url::Url;
 
 const DEFAULT_API_PORT: u16 = 8080;
@@ -75,16 +73,20 @@ pub struct ClusterArgs {
     pub coin_source_args: CoinSourceArgs,
 }
 
-#[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize)]
-pub enum TransactionType {
-    P2P,
+#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
+pub enum TransactionTypeArg {
+    CoinTransfer,
     AccountGeneration,
+    AccountGenerationLargePool,
     NftMintAndTransfer,
+    PublishPackage,
+    CustomFunctionLargeModuleWorkingSet,
+    CreateNewResource,
 }
 
-impl Default for TransactionType {
+impl Default for TransactionTypeArg {
     fn default() -> Self {
-        TransactionType::P2P
+        TransactionTypeArg::CoinTransfer
     }
 }
 
@@ -119,20 +121,33 @@ pub struct EmitArgs {
     #[clap(
         long,
         arg_enum,
-        default_value = "p2p",
+        default_value = "coin-transfer",
         min_values = 1,
         ignore_case = true
     )]
-    pub transaction_type: Vec<TransactionType>,
+    pub transaction_type: Vec<TransactionTypeArg>,
 
     #[clap(long, min_values = 0)]
-    pub transaction_type_weights: Vec<usize>,
+    pub transaction_weights: Vec<usize>,
+
+    #[clap(long, min_values = 0)]
+    pub transaction_phases: Vec<usize>,
 
     #[clap(long)]
     pub expected_max_txns: Option<u64>,
 
     #[clap(long)]
     pub expected_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
+    pub max_transactions_per_account: Option<usize>,
+
+    // In cases you want to run txn emitter from multiple machines,
+    // and want to make sure that initialization succeeds
+    // (account minting and txn-specific initialization), before the
+    // loadtest puts significant load, you can add a delay here.
+    #[clap(long)]
+    pub delay_after_minting: Option<u64>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

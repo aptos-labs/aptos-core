@@ -6,49 +6,26 @@ use crate::{
     clients::humio::{CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
     constants::MAX_CONTENT_LENGTH,
     context::Context,
+    debug, error,
     errors::{LogIngestError, ServiceError},
     metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
 };
-use crate::{debug, error};
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::collections::HashMap;
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
-/// TODO: Cleanup after v1 API is ramped up
-pub fn log_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("log_ingest")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::aggregate())
-        .and_then(handle_log_ingest)
-        .boxed()
-}
-
 pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "logs")
         .and(warp::post())
         .and(context.clone().filter())
-        .and(with_auth(
-            context,
-            vec![
-                NodeType::Validator,
-                NodeType::ValidatorFullNode,
-                NodeType::PublicFullNode,
-            ],
-        ))
+        .and(with_auth(context, vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+        ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
         .and(warp::body::aggregate())
@@ -127,7 +104,7 @@ pub async fn handle_log_ingest(
                     LogIngestError::IngestionError.into(),
                 )));
             }
-        }
+        },
         Err(err) => {
             LOG_INGEST_BACKEND_REQUEST_DURATION
                 .with_label_values(&["Unknown"])
@@ -136,7 +113,7 @@ pub async fn handle_log_ingest(
             return Err(reject::custom(ServiceError::bad_request(
                 LogIngestError::IngestionError.into(),
             )));
-        }
+        },
     }
 
     Ok(reply::with_status(reply::reply(), StatusCode::CREATED))

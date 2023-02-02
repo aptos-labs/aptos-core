@@ -1,11 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use anyhow::Result;
-use clap::Parser;
-
 use aptos_backup_cli::{
     backup_types::{
         epoch_ending::backup::{EpochEndingBackupController, EpochEndingBackupOpt},
@@ -22,6 +18,8 @@ use aptos_backup_cli::{
 };
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
+use clap::Parser;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[clap(about = "Ledger backup tool.")]
@@ -157,7 +155,7 @@ async fn main_impl() -> Result<()> {
                     } else {
                         println!("DB not bootstrapped.")
                     }
-                }
+                },
                 OneShotQueryType::BackupStorageState(opt) => {
                     let view = cache::sync_and_load(
                         &opt.metadata_cache,
@@ -166,7 +164,7 @@ async fn main_impl() -> Result<()> {
                     )
                     .await?;
                     println!("{}", view.get_storage_state()?)
-                }
+                },
             },
             OneShotCommand::Backup(opt) => {
                 let client = Arc::new(BackupServiceClient::new_with_opt(opt.client));
@@ -182,7 +180,7 @@ async fn main_impl() -> Result<()> {
                         )
                         .run()
                         .await?;
-                    }
+                    },
                     BackupType::StateSnapshot { opt, storage } => {
                         StateSnapshotBackupController::new(
                             opt,
@@ -192,7 +190,7 @@ async fn main_impl() -> Result<()> {
                         )
                         .run()
                         .await?;
-                    }
+                    },
                     BackupType::Transaction { opt, storage } => {
                         TransactionBackupController::new(
                             opt,
@@ -202,9 +200,9 @@ async fn main_impl() -> Result<()> {
                         )
                         .run()
                         .await?;
-                    }
+                    },
                 }
-            }
+            },
         },
         Command::Coordinator(coordinator_cmd) => match coordinator_cmd {
             CoordinatorCommand::Run(opt) => {
@@ -216,7 +214,7 @@ async fn main_impl() -> Result<()> {
                 )
                 .run()
                 .await?;
-            }
+            },
         },
     }
     Ok(())
