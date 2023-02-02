@@ -19,7 +19,13 @@ spec:
     - |
       ulimit -n 1048576
       forge --suite banana --duration-secs 123 --num-validators 10 --num-validator-fullnodes 20 --forge-cli-arg test k8s-swarm --image-tag asdf --upgrade-image-tag upgrade_asdf --namespace forge-potato --test-arg
-
+    resources:
+      limits:
+        cpu: 15.5
+        memory: 26Gi
+      requests:
+        cpu: 15
+        memory: 26Gi
     env:
     - name: FORGE_TRIGGERED_BY
       value: github-actions

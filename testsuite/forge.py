@@ -690,7 +690,7 @@ class K8sForgeRunner(ForgeRunner):
             forge_image_repo = (
                 f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
             )
-            validator_node_selector = "" # no selector
+            validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
         else:
@@ -1267,15 +1267,15 @@ def test(
 
     # cloud
     if cloud.upper() == "AWS":
-        cloud = Cloud.AWS
+        cloud_enum = Cloud.AWS
     elif cloud.upper() == "GCP":
-        cloud = Cloud.GCP
+        cloud_enum = Cloud.GCP
     else:
         raise Exception(f"Unknown cloud: {cloud}")
 
-    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud.value}")
+    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
     temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud)
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
@@ -1362,7 +1362,7 @@ def test(
         processes=processes,
         time=time,
         # cluster auth
-        cloud=cloud,
+        cloud=cloud_enum,
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         gcp_zone=gcp_zone,
