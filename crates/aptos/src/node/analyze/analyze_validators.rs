@@ -11,7 +11,12 @@ use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
 };
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, ops::Add};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap, VecDeque},
+    convert::TryFrom,
+    ops::Add,
+};
 
 /// Single validator stats
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -100,6 +105,18 @@ impl Add for ValidatorStats {
     }
 }
 
+#[derive(Clone)]
+pub struct MaxTpsStats {
+    /// Max TPS
+    pub tps: f32,
+    /// End version of the interval at which Max TPS was achieved
+    pub end_version: u64,
+    /// Number of transactions in the interval at which Max TPS was achieved
+    pub txns: u32,
+    /// Duration of the interval in which Max TPS was achieved
+    pub duration: f32,
+}
+
 /// Statistics for all validators
 #[derive(Clone)]
 pub struct EpochStats {
@@ -117,6 +134,8 @@ pub struct EpochStats {
     pub nil_blocks: u32,
     /// Total voting power
     pub total_voting_power: u128,
+    /// Max TPS per block interval
+    pub max_tps_per_block_interval: BTreeMap<u32, MaxTpsStats>,
 }
 
 impl EpochStats {
@@ -182,6 +201,21 @@ impl Add for EpochStats {
             nil_blocks: self.nil_blocks + other.nil_blocks,
             total_transactions: self.total_transactions + other.total_transactions,
             total_voting_power: 0,
+            max_tps_per_block_interval: self
+                .max_tps_per_block_interval
+                .into_iter()
+                .map(|(k, v)| {
+                    let other_v = other.max_tps_per_block_interval.get(&k).unwrap();
+                    (
+                        k,
+                        if v.tps > other_v.tps {
+                            v
+                        } else {
+                            other_v.clone()
+                        },
+                    )
+                })
+                .collect(),
         }
     }
 }
@@ -267,6 +301,19 @@ impl AnalyzeValidators {
         let mut votes = HashMap::<AccountAddress, u32>::new();
         let mut transactions = HashMap::<AccountAddress, u32>::new();
 
+        // because we measure based on block timestamp, we need interval larger than when backpressure
+        // kicks in, to make sure we are measuring end-to-end throughput, not just ordering throughput.
+        let mut max_tps_tuples = vec![15, 30, 45, 60]
+            .into_iter()
+            .map(|v| {
+                (v, VecDeque::new(), MaxTpsStats {
+                    tps: 0.0,
+                    end_version: 0,
+                    txns: 0,
+                    duration: 0.0,
+                })
+            })
+            .collect::<Vec<_>>();
         let mut trimmed_rounds = 0;
         let mut nil_blocks = 0;
         let mut previous_round = 0;
@@ -313,6 +360,8 @@ impl AnalyzeValidators {
             let cur_transactions_option = blocks
                 .get(pos + 1)
                 .map(|next| u32::try_from(next.version - block.version - 2).unwrap());
+            let cur_end_timestamp_option =
+                blocks.get(pos + 1).map(|next| next.event.proposed_time());
             if let Some(cur_transactions) = cur_transactions_option {
                 if is_nil {
                     assert_eq!(
@@ -324,6 +373,30 @@ impl AnalyzeValidators {
                     );
                 }
                 *transactions.entry(event.proposer()).or_insert(0) += cur_transactions;
+            }
+
+            if let (Some(cur_transactions), Some(cur_end_timestamp)) =
+                (cur_transactions_option, cur_end_timestamp_option)
+            {
+                for (num_blocks_for_max_tps, max_tps_deque, max_tps) in &mut max_tps_tuples {
+                    max_tps_deque.push_back((cur_transactions, event.proposed_time()));
+                    if max_tps_deque.len() > *num_blocks_for_max_tps {
+                        max_tps_deque.pop_front();
+                    }
+
+                    if max_tps_deque.len() == *num_blocks_for_max_tps {
+                        let passed = (cur_end_timestamp - max_tps_deque.front().unwrap().1) as f32
+                            / 1000000.0;
+                        let txns: u32 = max_tps_deque.iter().map(|(txns, _)| *txns).sum();
+                        let tps = txns as f32 / passed;
+                        if tps > max_tps.tps {
+                            max_tps.tps = tps;
+                            max_tps.duration = passed;
+                            max_tps.end_version = block.version;
+                            max_tps.txns = txns;
+                        }
+                    }
+                }
             }
         }
         let total_successes: u32 = successes.values().sum();
@@ -362,6 +435,12 @@ impl AnalyzeValidators {
                 .iter()
                 .map(|validator| validator.voting_power as u128)
                 .sum(),
+            max_tps_per_block_interval: max_tps_tuples
+                .into_iter()
+                .map(|(num_blocks_for_max_tps, _, max_tps)| {
+                    (num_blocks_for_max_tps as u32, max_tps)
+                })
+                .collect(),
         };
     }
 
