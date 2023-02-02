@@ -5,6 +5,6 @@
 import type { PendingTransaction } from './PendingTransaction';
 
 export type Transaction_PendingTransaction = ({
-    type: string;
+    type: 'pending_transaction';
 } & PendingTransaction);
 

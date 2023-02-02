@@ -5,6 +5,6 @@
 import type { ScriptPayload } from './ScriptPayload';
 
 export type TransactionPayload_ScriptPayload = ({
-    type: string;
+    type: 'script_payload';
 } & ScriptPayload);
 

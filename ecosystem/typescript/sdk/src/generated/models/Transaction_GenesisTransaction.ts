@@ -5,6 +5,6 @@
 import type { GenesisTransaction } from './GenesisTransaction';
 
 export type Transaction_GenesisTransaction = ({
-    type: string;
+    type: 'genesis_transaction';
 } & GenesisTransaction);
 

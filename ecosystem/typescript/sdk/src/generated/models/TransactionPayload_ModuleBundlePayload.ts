@@ -5,6 +5,6 @@
 import type { ModuleBundlePayload } from './ModuleBundlePayload';
 
 export type TransactionPayload_ModuleBundlePayload = ({
-    type: string;
+    type: 'module_bundle_payload';
 } & ModuleBundlePayload);
 

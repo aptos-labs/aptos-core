@@ -5,6 +5,6 @@
 import type { StateCheckpointTransaction } from './StateCheckpointTransaction';
 
 export type Transaction_StateCheckpointTransaction = ({
-    type: string;
+    type: 'state_checkpoint_transaction';
 } & StateCheckpointTransaction);
 

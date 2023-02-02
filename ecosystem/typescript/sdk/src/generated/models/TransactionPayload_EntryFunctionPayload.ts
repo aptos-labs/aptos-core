@@ -5,6 +5,6 @@
 import type { EntryFunctionPayload } from './EntryFunctionPayload';
 
 export type TransactionPayload_EntryFunctionPayload = ({
-    type: string;
+    type: 'entry_function_payload';
 } & EntryFunctionPayload);
 

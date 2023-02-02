@@ -5,6 +5,6 @@
 import type { BlockMetadataTransaction } from './BlockMetadataTransaction';
 
 export type Transaction_BlockMetadataTransaction = ({
-    type: string;
+    type: 'block_metadata_transaction';
 } & BlockMetadataTransaction);
 

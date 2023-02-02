@@ -5,6 +5,6 @@
 import type { UserTransaction } from './UserTransaction';
 
 export type Transaction_UserTransaction = ({
-    type: string;
+    type: 'user_transaction';
 } & UserTransaction);
 
