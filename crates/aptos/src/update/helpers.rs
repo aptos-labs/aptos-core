@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Context, Result};
+use aptos_logger::debug;
 use self_update::{backends::github::ReleaseList, cargo_crate_version, version::bump_is_greater};
 
 #[derive(Debug)]
@@ -74,4 +75,61 @@ impl InstallationMethod {
         };
         Ok(installation_method)
     }
+
+    pub fn get_instructions(&self) -> Option<&'static str> {
+        match self {
+            // Don't tell people to upgrade when they're building from source.
+            InstallationMethod::Source => None,
+            InstallationMethod::Homebrew => Some("brew upgrade aptos"),
+            InstallationMethod::Other => Some("aptos update"),
+        }
+    }
+}
+
+/// Build a message telling the user to update if one is available. We tell them
+/// different update instructions depending on what we detect about how they installed
+/// the CLI. If something goes wrong we just return None, this shouldn't cause the CLI
+/// to stop working.
+
+pub fn get_update_message(repo_owner: &str, repo_name: &str) -> Option<String> {
+    // Check if there is an update available. If this fails, just log and return None.
+    let info = match check_if_update_required(repo_owner, repo_name) {
+        Ok(info) => info,
+        Err(e) => {
+            debug!("Failed to check if update required: {:#}", e);
+            return None;
+        },
+    };
+
+    if !info.update_required {
+        debug!("No update to the CLI required");
+        return None;
+    }
+
+    // Check how this CLI was installed. If this fails, just log and return None.
+    let installation_method = match InstallationMethod::from_env() {
+        Ok(method) => method,
+        Err(e) => {
+            debug!("Failed to determine installation method: {:#}", e);
+            return None;
+        },
+    };
+
+    // Build the message for the user.
+    let message = match installation_method.get_instructions() {
+        Some(instructions) => {
+            Some(
+                format!(
+                    "===\nA new version of the Aptos CLI is available: v{} -> v{}.\nRun this command to update: {}\n===\n",
+                    info.current_version, info.latest_version, instructions
+                )
+            )
+        }
+        None => {
+            debug!("Update required, but no recommendations for this installation method");
+            None
+        },
+    };
+
+    message
 }
