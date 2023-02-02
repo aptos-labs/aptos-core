@@ -3,14 +3,43 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import secrets
 import tempfile
 import unittest
 
-from . import ed25519
-from .account_address import AccountAddress
-from .bcs import Serializer
+from aptos_sdk import ed25519
+from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.bcs import Serializer
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
+    """Derive Fernet encryption key assistant from password and salt.
+
+    For password-protecting a private key on disk.
+
+    See also
+    --------
+    Account.store_private_key_password_protected
+    Account.load_private_key_password_protected
+
+    References
+    ----------
+    https://cryptography.io/en/latest/fernet
+    https://stackoverflow.com/questions/2490334
+    """
+    key_derivation_function = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=480_000)
+    derived_key = key_derivation_function.derive(password.encode())
+    return Fernet(base64.urlsafe_b64encode(derived_key))
 
 class Account:
     """Represents an account as well as the private, public key-pair for the Aptos blockchain."""
@@ -53,6 +82,27 @@ class Account:
             ed25519.PrivateKey.from_hex(data["private_key"]),
         )
 
+    @staticmethod
+    def load_private_key_password_protected(
+            path: str, password: str) -> Account:
+        """Load from disk a password-protected private key generated via
+        `store_private_key_password_protected`.
+
+        References
+        ----------
+        https://cryptography.io/en/latest/fernet
+        https://stackoverflow.com/questions/2490334
+        """
+        with open(path, 'rb') as file:
+            token = file.read()
+        salt, encrypted = token[:16], token[16:]
+        fernet = derive_password_protection_fernet(password, salt)
+        try:
+            decrypted = fernet.decrypt(encrypted)
+        except (InvalidSignature, InvalidToken):
+            raise ValueError("Invalid password") from None
+        return Account.load_key(f"0x{decrypted.hex()}")
+
     def store(self, path: str):
         data = {
             "account_address": self.account_address.hex(),
@@ -60,6 +110,23 @@ class Account:
         }
         with open(path, "w") as file:
             json.dump(data, file)
+
+    def store_private_key_password_protected(self, path: str, password: str):
+        """Store password-protected private key in text file at path.
+
+        Prepends random encryption salt to encrypted private key.
+
+        References
+        ----------
+        https://cryptography.io/en/latest/fernet
+        https://stackoverflow.com/questions/2490334
+        """
+        salt = secrets.token_bytes(16)
+        fernet = derive_password_protection_fernet(password, salt)
+        encrypted = fernet.encrypt(self.private_key.key.encode())
+        token = salt + encrypted
+        with open(path, 'wb') as file:
+            file.write(token)
 
     def address(self) -> AccountAddress:
         """Returns the address associated with the given account"""
@@ -124,3 +191,18 @@ class Test(unittest.TestCase):
         account = Account.generate()
         signature = account.sign(message)
         self.assertTrue(account.public_key().verify(message, signature))
+
+if __name__ == '__main__':
+    generated = Account.generate()
+    print(f"Pubkey: {generated.public_key()}")
+    password = "Foobly"
+    print(f"Password: {password}")
+    print("Storing on disk")
+    path = 'key.txt'
+    generated.store_private_key_password_protected(path, password)
+    print("Loading from disk")
+    loaded = Account.load_private_key_password_protected(path, password)
+    print(f"Pubkey: {loaded.public_key()}")
+    print("Loading from disk with invalid password")
+    loaded = Account.load_private_key_password_protected(path, 'foo')
+    print(f"Pubkey: {loaded.public_key()}")
