@@ -121,6 +121,8 @@ module aptos_framework::delegation_pool {
 
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
+    const NULL_SHAREHOLDER: address = @0x0;
+
     /// Capability that represents ownership over privileged operations on the underlying stake pool.
     struct DelegationPoolOwnership has key, store {
         /// equal to address of the resource account owning the stake pool
@@ -267,11 +269,20 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
-        active = pool_u64::shares_to_amount_with_total_coins(
+        let (_, _, pending_active, _) = stake::get_stake(pool_address);
+        active = shares_to_amount_with_total_stats(
             &pool.active_shares,
             pool_u64::shares(&pool.active_shares, delegator_address),
             // exclude operator active rewards not converted to shares yet
-            active - commission_active
+            active - commission_active,
+            pool_u64::total_shares(&pool.active_shares) -
+            if (pending_active == 0) {
+                // zero `pending_active` stake indicates that either there are no `add_stake` fees or
+                // previous epoch has ended and should identify shares owning these fees as released
+                pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER)
+            } else {
+                0
+            }
         );
         // get state and stake (0 if there is none) of the pending withdrawal
         let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
@@ -394,6 +405,15 @@ module aptos_framework::delegation_pool {
         ObservedLockupCycle { index }
     }
 
+    /// Return the number of coins `shares` are worth in `pool` with custom total coins and shares numbers
+    fun shares_to_amount_with_total_stats(pool: &pool_u64::Pool, shares: u64, total_coins: u64, total_shares: u64): u64 {
+        if (total_coins(pool) == 0 || total_shares == 0) {
+            0
+        } else {
+            multiply_then_divide(pool, shares, total_coins, total_shares)
+        }
+    }
+
     /// Allows an owner to change the operator of the underlying stake pool.
     public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership, DelegationPool {
         let pool_address = get_owned_pool_address(signer::address_of(owner));
@@ -433,10 +453,11 @@ module aptos_framework::delegation_pool {
         // but buy shares for delegator just for the remaining amount after fee
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount - add_stake_fee);
 
-        // commit coins from `add_stake` fee to the active shares pool
-        // in order to not mistake them for epoch active rewards to assign to operator from
-        let (active, _, pending_active, _) = stake::get_stake(pool_address);
-        pool_u64::update_total_coins(&mut pool.active_shares, active + pending_active);
+        // grant temporary ownership over `add_stake` fees to a separate shareholder in order to:
+        // - not mistake them for rewards to pay the operator from
+        // - distribute them together with the `active` rewards when this epoch ends
+        // in order to appreciate all shares on the active pool atomically
+        pool_u64::buy_in(&mut pool.active_shares, NULL_SHAREHOLDER, add_stake_fee);
 
         event::emit_event(
             &mut pool.add_stake_events,
@@ -747,6 +768,13 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
+        // zero `pending_active` stake indicates that either there are no `add_stake` fees or
+        // previous epoch has ended and should release the shares owning the existing fees
+        let (_, _, pending_active, _) = stake::get_stake(pool_address);
+        if (pending_active == 0) {
+            redeem_active_shares(pool, NULL_SHAREHOLDER, MAX_U64);
+        };
+
         // distribute rewards remaining after commission, to delegators (to already existing shares)
         // before buying shares for the operator for its entire commission fee
         // otherwise, operator's new shares would additionally appreciate from rewards it does not own
@@ -786,6 +814,9 @@ module aptos_framework::delegation_pool {
     const EPOCH_DURATION: u64 = 60;
     #[test_only]
     const LOCKUP_CYCLE_SECONDS: u64 = 3600;
+
+    #[test_only]
+    const ONE_APT: u64 = 100000000;
 
     #[test_only]
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -949,76 +980,100 @@ module aptos_framework::delegation_pool {
         event::counter<AddStakeEvent>(&borrow_global<DelegationPool>(pool_address).add_stake_events)
     }
 
-    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator = @0x010)]
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
     public entry fun test_add_stake_fee(
         aptos_framework: &signer,
         validator: &signer,
-        delegator: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
-        initialize_for_test_custom(aptos_framework, 100, 10000000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000000);
-        initialize_test_validator(validator, 1000, true, true);
+        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000000 * ONE_APT);
 
         let validator_address = signer::address_of(validator);
+        account::create_account_for_test(validator_address);
+        // create delegation pool with 37.35% operator commission
+        initialize_delegation_pool(validator, 3735, vector::empty<u8>());
+
         let pool_address = get_owned_pool_address(validator_address);
+        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
 
-        let delegator_address = signer::address_of(delegator);
-        account::create_account_for_test(delegator_address);
+        // add 1M APT, join the validator set and activate this stake
+        stake::mint(validator, 1000000 * ONE_APT);
+        add_stake(validator, pool_address, 1000000 * ONE_APT);
 
-        // entire stake on delegation pool is active
-        let previous_add_stake_fee = get_add_stake_fee(pool_address, 1000);
-        // `add_stake` fee: 1000 * 1%
-        assert!(previous_add_stake_fee == 9, 0);
+        stake::join_validator_set(validator, pool_address);
         end_aptos_epoch();
-        // still entire stake on delegation pool is active
-        assert!(get_add_stake_fee(pool_address, 1000) == previous_add_stake_fee, 0);
 
-        // add pending_active stake and check fee
-        stake::mint(delegator, 1000);
-        add_stake(delegator, pool_address, 1000);
-        stake::assert_stake_pool(pool_address, 1010, 0, 1000, 0);
-        // `add_stake` fee: 1000 * 1%
-        assert!(get_add_stake_fee(pool_address, 1000) == 9, 0);
+        let delegator1_address = signer::address_of(delegator1);
+        account::create_account_for_test(delegator1_address);
+
+        let delegator2_address = signer::address_of(delegator2);
+        account::create_account_for_test(delegator2_address);
+
+        assert!(get_add_stake_fee(pool_address, 100000 * ONE_APT) == 62259941466, 0);
+
+        // add pending_active stake from multiple delegators
+        stake::mint(delegator1, 100000 * ONE_APT);
+        add_stake(delegator1, pool_address, 100000 * ONE_APT);
+        stake::mint(delegator2, 10000 * ONE_APT);
+        add_stake(delegator2, pool_address, 10000 * ONE_APT);
+
         end_aptos_epoch();
-        // after epoch ends should receive at most what initially deposited
-        let (delegator_active, _, _) = get_stake(pool_address, delegator_address);
-        assert!(delegator_active <= 1000, 0);
+        // delegators should own the same amount as initially deposited
+        assert_delegation(delegator1_address, pool_address, 10000000000000, 0, 0);
+        assert_delegation(delegator2_address, pool_address, 1000000000000, 0, 0);
 
-        // add pending_active stake from other account
-        stake::mint(validator, 1000);
-        add_stake(validator, pool_address, 1000);
+        // add more stake from delegator 1
+        stake::mint(delegator1, 10000 * ONE_APT);
+        let (delegator1_active, _, _) = get_stake(pool_address, delegator1_address);
+        add_stake(delegator1, pool_address, 10000 * ONE_APT);
 
-        // add more pending_active stake over existing one and check fee
-        stake::mint(delegator, 1000);
-        add_stake(delegator, pool_address, 1000);
-        stake::assert_stake_pool(pool_address, 2020, 0, 2000, 0);
-        // `add_stake` fee: 1000 * 1%
-        assert!(get_add_stake_fee(pool_address, 1000) == 9, 0);
+        let fee = get_add_stake_fee(pool_address, 10000 * ONE_APT);
+        assert_delegation(delegator1_address, pool_address, delegator1_active + 10000 * ONE_APT - fee, 0, 0);
+
+        // delegator 2 should not benefit in any way from this new stake
+        assert_delegation(delegator2_address, pool_address, 1000000000000, 0, 0);
+
+        // add more stake from delegator 2
+        stake::mint(delegator2, 100000 * ONE_APT);
+        add_stake(delegator2, pool_address, 100000 * ONE_APT);
+
         end_aptos_epoch();
-        // after epoch ends should receive at most what initially deposited
-        (delegator_active, _, _) = get_stake(pool_address, delegator_address);
-        assert!(delegator_active <= 1010 + 1000, delegator_active);
+        // delegators should own the same amount as initially deposited + any rewards produced
+        // 10000000000000 * 1% * (100 - 37.35)%
+        assert_delegation(delegator1_address, pool_address, 11062650000000, 0, 0);
+        // 1000000000000 * 1% * (100 - 37.35)%
+        assert_delegation(delegator2_address, pool_address, 11006265000000, 0, 0);
 
-        // add pending_active stake from other account
-        stake::mint(validator, 1000);
-        add_stake(validator, pool_address, 1000);
-        // remove active stake from other account
-        unlock(validator, pool_address, 1500);
+        // operator rewards do not automatically compound
+        synchronize_delegation_pool(pool_address);
 
-        // add pending_active stake after active stake has decreased
-        stake::mint(delegator, 1000);
-        add_stake(delegator, pool_address, 1000);
+        // stakes should remain the same - `Self::get_stake` correctly calculates them
+        assert_delegation(delegator1_address, pool_address, 11062650000000, 0, 0);
+        assert_delegation(delegator2_address, pool_address, 11006265000000, 0, 0);
+
         end_aptos_epoch();
-        // after epoch ends should receive at most what initially deposited
-        (delegator_active, _, _) = get_stake(pool_address, delegator_address);
-        assert!(delegator_active <= 2030 + 1000, delegator_active);
+        // delegators should own previous stake * 1.006265
+        assert_delegation(delegator1_address, pool_address, 11131957502250, 0, 0);
+        assert_delegation(delegator2_address, pool_address, 11075219250225, 0, 0);
 
-        // add a larger amount of pending_active stake compared to the active one
-        stake::mint(delegator, 1000000);
-        add_stake(delegator, pool_address, 1000000);
+        // add more stake from delegator 1
+        stake::mint(delegator1, 20000 * ONE_APT);
+        (delegator1_active, _, _) = get_stake(pool_address, delegator1_address);
+        add_stake(delegator1, pool_address, 20000 * ONE_APT);
+
+        fee = get_add_stake_fee(pool_address, 20000 * ONE_APT);
+        assert_delegation(delegator1_address, pool_address, delegator1_active + 20000 * ONE_APT - fee, 0, 0);
+
+        // delegator 1 unlocks his entire newly added stake
+        unlock(delegator1, pool_address, 20000 * ONE_APT - fee);
         end_aptos_epoch();
-        // after epoch ends should receive at most what initially deposited
-        (delegator_active, _, _) = get_stake(pool_address, delegator_address);
-        assert!(delegator_active <= 3060 + 1000000, delegator_active);
+        // delegator 1 should own previous `active` * 1.006265 and 20000 * ONE_APT pending_inactive 
+        assert_delegation(delegator1_address, pool_address, 11201699216002, 0, 2000000000000);
+
+        // stakes should remain the same - `Self::get_stake` correctly calculates them
+        synchronize_delegation_pool(pool_address);
+        assert_delegation(delegator1_address, pool_address, 11201699216002, 0, 2000000000000);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
