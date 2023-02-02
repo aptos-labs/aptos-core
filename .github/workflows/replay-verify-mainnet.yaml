@@ -7,6 +7,22 @@ on:
         required: false
         type: string
         description: The git SHA1 to test. If not specified, it will use the latest commit on main.
+      BUCKET:
+        required: false
+        type: string
+        description: The bucket to use for the backup. If not specified, it will use the default bucket.
+      SUB_DIR:
+        required: false
+        type: string
+        description: The subdirectory to use for the backup. If not specified, it will use the default subdirectory.
+      HISTORY_START:
+        required: false
+        type: string
+        description: The history start to use for the backup. If not specified, it will use the default history start.
+      TXNS_TO_SKIP:
+        required: false
+        type: string
+        description: The number of transactions to skip. If not specified, it will use the default number of transactions to skip.
   schedule:
     - cron: "0 9,21 * * *" # notice this is UTC, which is 1am/1pm PST and 2am/2pm PDT
   pull_request:
@@ -25,8 +41,8 @@ jobs:
 
       - uses: ./.github/actions/replay-verify
         with:
-          BUCKET: aptos-mainnet-backup-backup-831a69a8
-          SUB_DIR: e1
-          HISTORY_START: 0
-          TXNS_TO_SKIP: 12253479 12277499
+          BUCKET: ${{ inputs.BUCKET || 'aptos-mainnet-backup-backup-831a69a8' }}
+          SUB_DIR: ${{ inputs.SUB_DIR || 'e1' }}
+          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
+          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP || '12253479 12277499' }}
           BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
