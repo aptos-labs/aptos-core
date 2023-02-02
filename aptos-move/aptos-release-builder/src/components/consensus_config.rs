@@ -16,6 +16,8 @@ pub fn generate_consensus_upgrade_proposal(
     let writer = CodeWriter::new(Loc::default());
 
     emitln!(writer, "// Consensus config upgrade proposal\n");
+    let config_comment = format!("// config: {:#?}", consensus_config).replace('\n', "\n// ");
+    emitln!(writer, "{}\n", config_comment);
 
     let proposal = generate_governance_proposal(
         &writer,
