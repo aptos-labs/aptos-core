@@ -23,7 +23,7 @@ def replay_verify_partition(
     latest_version: int,
     txns_to_skip: Tuple[int],
     backup_config_template_path: str,
-):
+) -> None:
     """
     Run replay-verify for a partition of the backup
 
