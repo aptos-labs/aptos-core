@@ -372,7 +372,6 @@ module dao_platform::nft_dao {
         assert!(exists<DAO>(nft_dao), error::not_found(EDAO_NOT_EXIST));
         let dao = borrow_global_mut<DAO>(nft_dao);
         let gtoken = &dao.governance_token;
-        assert!(exists<Proposals>(nft_dao), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposals = borrow_global<Proposals>(nft_dao);
 
         // assert the proposal hasn't ended, voter can can only vote for the proposal that starts and hasn't ended
@@ -434,7 +433,6 @@ module dao_platform::nft_dao {
         assert!(exists<DAO>(nft_dao), error::not_found(EDAO_NOT_EXIST));
         let dao = borrow_global<DAO>(nft_dao);
         // assert the proposal voting ended
-        assert!(exists<Proposals>(nft_dao), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposals = borrow_global<Proposals>(nft_dao);
         assert!(table::contains(&proposals.proposals, proposal_id), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposal = table::borrow(&proposals.proposals, proposal_id);
@@ -451,7 +449,6 @@ module dao_platform::nft_dao {
         let dao = borrow_global_mut<DAO>(nft_dao);
         assert!(dao.admin == signer::address_of(admin), error::permission_denied(EINVALID_ADMIN_ACCOUNT));
         // assert the proposal is still active
-        assert!(exists<Proposals>(nft_dao), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposals = borrow_global_mut<Proposals>(nft_dao);
         assert!(table::contains(&proposals.proposals, proposal_id), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposal = table::borrow_mut(&mut proposals.proposals, proposal_id);
@@ -471,7 +468,6 @@ module dao_platform::nft_dao {
     public entry fun admin_resolve(admin: &signer, proposal_id: u64, nft_dao: address, reason: String) acquires DAO, Proposals, ProposalVotingStatistics {
         let resolver = signer::address_of(admin);
         // assert the proposal voting ended
-        assert!(exists<Proposals>(nft_dao), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposals = borrow_global<Proposals>(nft_dao);
         assert!(table::contains(&proposals.proposals, proposal_id), error::not_found(EPROPOSAL_NOT_FOUND));
         let proposal = table::borrow(&proposals.proposals, proposal_id);
@@ -541,6 +537,7 @@ module dao_platform::nft_dao {
     /// Admin changes the DAO name
     public entry fun admin_change_dao_name(admin: &signer, dao: address, new_name: String) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
+        assert!(string::length(&new_name) < 128, error::invalid_argument(ESTRING_TOO_LONG));
         let admin_addr = signer::address_of(admin);
         let dao_config = borrow_global_mut<DAO>(dao);
         assert!(admin_addr == dao_config.admin, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
