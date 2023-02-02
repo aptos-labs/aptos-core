@@ -186,7 +186,7 @@ def setup_fullnode_config(bootstrapping_mode, continuous_syncing_mode, data_dir_
 
   # Add the state sync configurations to the config template
   state_sync_driver_config = {"bootstrapping_mode": bootstrapping_mode, "continuous_syncing_mode": continuous_syncing_mode}
-  data_streaming_service_config = {"max_concurrent_requests": 10}
+  data_streaming_service_config = {"max_concurrent_requests": 10, "max_concurrent_state_requests": 12}
   fullnode_config['state_sync'] = {"state_sync_driver": state_sync_driver_config, "data_streaming_service":data_streaming_service_config}
 
   # Write the config file back to disk
