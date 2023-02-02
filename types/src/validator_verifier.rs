@@ -216,7 +216,7 @@ impl ValidatorVerifier {
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
     }
 
-    pub fn validator_addresses(&self) -> Vec<AccountAddress> {
+    pub fn get_ordered_account_addresses(&self) -> Vec<AccountAddress> {
         self.get_ordered_account_addresses_iter().collect_vec()
     }
 
