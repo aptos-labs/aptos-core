@@ -7,9 +7,9 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_logger::info;
 use aptos_sdk::types::LocalAccount;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use serde_json::{json, Value};
-use std::path::PathBuf;
+use std::{path::PathBuf, thread};
 
 // This test verifies that both READ APIs can seamlessly translate from resource group to resource
 // 1. Create accounts
@@ -31,35 +31,45 @@ async fn test_read_resoure_group() {
     println!("BCHO 1");
     let mut root = context.root_account();
     let mut admin0 = create_account(&mut context, &mut root).await;
+    let admin0_address = admin0.address().clone();
     let mut admin1 = create_account(&mut context, &mut root).await;
+    let admin1_address = admin1.address().clone();
     let mut user = create_account(&mut context, &mut root).await;
 
     // Publish packages
     println!("BCHO 2");
     let named_addresses = vec![
-        ("resource_groups_primary".to_string(), admin0.address()),
-        ("resource_groups_secondary".to_string(), admin1.address()),
+        ("resource_groups_primary".to_string(), admin0_address),
+        ("resource_groups_secondary".to_string(), admin1_address),
     ];
 
-    println!("BCHO 3");
-    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-        .join("../aptos-move/move-examples/resource_groups/primary");
-    publish_package(&mut context, &mut admin0, path, named_addresses.clone()).await;
+    let named_addresses_clone = named_addresses.clone();
+    let txn = futures::executor::block_on(async move {
+        println!("BCHO 3");
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+            .join("../aptos-move/move-examples/resource_groups/primary");
+        build_package(path, named_addresses_clone)
+    });
+    publish_package(&mut context, &mut admin0, txn).await;
 
-    println!("BCHO 4");
-    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-        .join("../aptos-move/move-examples/resource_groups/secondary");
-    publish_package(&mut context, &mut admin1, path, named_addresses.clone()).await;
+    let named_addresses_clone = named_addresses.clone();
+    let txn = futures::executor::block_on(async move {
+        println!("BCHO 4");
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+            .join("../aptos-move/move-examples/resource_groups/secondary");
+        build_package(path, named_addresses_clone)
+    });
+    publish_package(&mut context, &mut admin1, txn).await;
 
     // Read default data
     println!("BCHO 5");
-    let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
-    let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
+    let primary = format!("0x{}::{}::{}", admin0_address, "primary", "Primary");
+    let secondary = format!("0x{}::{}::{}", admin1_address, "secondary", "Secondary");
 
-    let response = read_resource(&context, &admin0.address(), &primary).await;
+    let response = read_resource(&context, &admin0_address, &primary).await;
     assert_eq!(response["data"]["value"], "3");
 
-    let response = maybe_read_resource(&context, &admin0.address(), &primary).await;
+    let response = maybe_read_resource(&context, &admin0_address, &primary).await;
     assert_eq!(response.unwrap()["data"]["value"], "3");
 
     // Verify account is empty
@@ -74,7 +84,7 @@ async fn test_read_resoure_group() {
     execute_entry_function(
         &mut context,
         &mut user,
-        &format!("0x{}::secondary::init", admin1.address()),
+        &format!("0x{}::secondary::init", admin1_address),
         json!([]),
         json!([55]),
     )
@@ -93,7 +103,7 @@ async fn test_read_resoure_group() {
     execute_entry_function(
         &mut context,
         &mut user,
-        &format!("0x{}::primary::init", admin0.address()),
+        &format!("0x{}::primary::init", admin0_address),
         json!([]),
         json!(["35"]),
     )
@@ -160,12 +170,10 @@ async fn read_resource(
     context.get(&request).await
 }
 
-async fn publish_package(
-    context: &mut TestContext,
-    publisher: &mut LocalAccount,
+fn build_package(
     path: PathBuf,
     named_addresses: Vec<(String, AccountAddress)>,
-) {
+) -> TransactionPayload {
     println!("BCHO publish_package 0");
     let mut build_options = aptos_framework::BuildOptions::default();
     let _ = named_addresses
@@ -181,7 +189,14 @@ async fn publish_package(
     let metadata = package.extract_metadata().unwrap();
 
     println!("BCHO publish_package 4");
-    let payload = aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code);
+    aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
+}
+
+async fn publish_package(
+    context: &mut TestContext,
+    publisher: &mut LocalAccount,
+    payload: TransactionPayload,
+) {
     println!("BCHO publish_package 5");
     let txn =
         publisher.sign_with_transaction_builder(context.transaction_factory().payload(payload));
