@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosValidatorInterface;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -13,7 +13,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::{Transaction, Version},
+    transaction::{Transaction, TransactionInfo, Version},
 };
 use std::{path::Path, sync::Arc};
 
@@ -72,11 +72,13 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<Vec<Transaction>> {
-        Ok(self
-            .0
-            .get_transactions(start, limit, self.get_latest_version().await?, false)?
-            .transactions)
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+        let txn_iter = self.0.get_transaction_iterator(start, limit)?;
+        let txn_info_iter = self.0.get_transaction_info_iterator(start, limit)?;
+        let txns = txn_iter.collect::<Result<Vec<_>>>()?;
+        let txn_infos = txn_info_iter.collect::<Result<Vec<_>>>()?;
+        ensure!(txns.len() == txn_infos.len());
+        Ok((txns, txn_infos))
     }
 
     async fn get_latest_version(&self) -> Result<Version> {

@@ -60,6 +60,13 @@ async fn test_upgrade_flow() {
     gas_script_path.set_extension("move");
     fs::write(gas_script_path.as_path(), update_gas_script).unwrap();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     assert!(Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
         .args(&vec![
@@ -67,6 +74,8 @@ async fn test_upgrade_flow() {
             "run-script",
             "--script-path",
             gas_script_path.to_str().unwrap(),
+            "--framework-local-dir",
+            framework_path.as_os_str().to_str().unwrap(),
             "--sender-account",
             "0xA550C18",
             "--url",
@@ -105,6 +114,13 @@ async fn test_upgrade_flow() {
 
     scripts.sort();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     for path in scripts.iter() {
         assert!(Command::new(aptos_cli.as_path())
             .current_dir(workspace_root())
@@ -113,6 +129,8 @@ async fn test_upgrade_flow() {
                 "run-script",
                 "--script-path",
                 path.to_str().unwrap(),
+                "--framework-local-dir",
+                framework_path.as_os_str().to_str().unwrap(),
                 "--sender-account",
                 "0xA550C18",
                 "--url",

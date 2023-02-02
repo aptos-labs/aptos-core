@@ -144,6 +144,22 @@ pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> Accou
     AccountAddress::new(array)
 }
 
+pub fn create_token_id(creator: AccountAddress, collection: &str, name: &str) -> AccountAddress {
+    let mut seed = vec![];
+    seed.extend(collection.as_bytes());
+    seed.extend(b"::");
+    seed.extend(name.as_bytes());
+    create_object_id(creator, &seed)
+}
+
+pub fn create_object_id(creator: AccountAddress, seed: &[u8]) -> AccountAddress {
+    let mut input = bcs::to_bytes(&creator).unwrap();
+    input.extend(seed);
+    input.push(Scheme::DeriveObjectId as u8);
+    let hash = HashValue::sha3_256_of(&input);
+    AccountAddress::from_bytes(hash.as_ref()).unwrap()
+}
+
 pub fn default_owner_stake_pool_address(owner: AccountAddress) -> AccountAddress {
     default_stake_pool_address(owner, owner)
 }

@@ -1,12 +1,12 @@
 ---
-title: "Prepare Aptos Dev Environment"
+title: "Prepare Your Environment"
 slug: "getting-started"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Prepare Aptos Dev Environment
+# Prepare your Aptos Dev Environment
 
 To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-Aptos-core-repo).
 

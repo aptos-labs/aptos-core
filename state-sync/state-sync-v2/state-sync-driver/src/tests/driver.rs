@@ -34,11 +34,11 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use claims::{assert_err, assert_none};
 use futures::{FutureExt, StreamExt};
+use ntest::timeout;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-// TODO(joshlind): extend these tests to cover more functionality!
-
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_auto_bootstrapping() {
     // Create a driver for a validator with a waypoint at version 0
     let (validator_driver, consensus_notifier, _, _, _, time_service) =
@@ -69,6 +69,7 @@ async fn test_auto_bootstrapping() {
 }
 
 #[tokio::test]
+#[timeout(120_000)]
 async fn test_consensus_commit_notification() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
@@ -90,6 +91,7 @@ async fn test_consensus_commit_notification() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_mempool_commit_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let subscription_event_key = EventKey::random();
@@ -145,6 +147,7 @@ async fn test_mempool_commit_notifications() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[timeout(120_000)]
 async fn test_reconfiguration_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let (
@@ -209,6 +212,7 @@ async fn test_reconfiguration_notifications() {
 }
 
 #[tokio::test]
+#[timeout(120_000)]
 async fn test_consensus_sync_request() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _, _) = create_full_node_driver(None).await;
@@ -280,6 +284,9 @@ async fn create_driver_for_tests(
     EventNotificationListener,
     TimeService,
 ) {
+    // Initialize the logger for tests
+    aptos_logger::Logger::init_for_testing();
+
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();

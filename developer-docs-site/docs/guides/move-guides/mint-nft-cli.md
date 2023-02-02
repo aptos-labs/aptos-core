@@ -1,9 +1,9 @@
 ---
-title: "Mint NFTs with Aptos CLI"
+title: "Mint NFTs with the Aptos CLI"
 slug: "mint-nft-cli"
 ---
 
-# Mint NFTs with Aptos CLI
+# Mint NFTs with the Aptos CLI
 
 This code lab lets you use the Aptos CLI to mint non-fungible tokens (NFTs) in Aptos so you can see how the process works and employ related functions in your code. Although this code lab assumes use of the devnet network, you could follow the same steps in devnet or even mainnet, assuming you have the necessary funds in your account.
 
