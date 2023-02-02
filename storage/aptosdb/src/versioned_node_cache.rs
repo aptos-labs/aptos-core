@@ -13,7 +13,6 @@ use std::{
 
 type NodeCache = HashMap<NodeKey, Node>;
 
-#[derive(Debug)]
 pub(crate) struct VersionedNodeCache {
     inner: RwLock<VecDeque<(Version, Arc<NodeCache>)>>,
 }

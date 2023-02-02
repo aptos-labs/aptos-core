@@ -116,6 +116,7 @@ use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
+    fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
     sync::{mpsc, Arc},
@@ -246,7 +247,6 @@ impl Drop for RocksdbPropertyReporter {
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
-#[derive(Debug)]
 pub struct AptosDB {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
@@ -1992,4 +1992,10 @@ where
         .observe(timer.elapsed().as_secs_f64());
 
     res
+}
+
+impl Debug for AptosDB {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("{AptosDB}")
+    }
 }
