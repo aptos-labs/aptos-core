@@ -35,7 +35,7 @@ There are four well-supported networks for integrating with the Aptos blockchain
 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 
-See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment.
+See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment. See [Check out release branch](./getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
 
 ### Run a local testnet
 
