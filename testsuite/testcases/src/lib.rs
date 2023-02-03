@@ -218,7 +218,7 @@ impl dyn NetworkLoadTest {
             stats_tracking_phases = 3;
         }
 
-        let job = rt
+        let mut job = rt
             .block_on(emitter.start_job(
                 ctx.swarm().chain_info().root_account,
                 emit_job_request,
@@ -295,17 +295,13 @@ impl dyn NetworkLoadTest {
         let stats_by_phase = rt.block_on(emitter.stop_job(job));
 
         info!("Stopped job");
-        info!("Warmup stats: {}", stats_by_phase[0].rate(warmup_duration));
+        info!("Warmup stats: {}", stats_by_phase[0].rate());
 
         let mut stats: Option<TxnStats> = None;
         let mut stats_and_duration_by_phase_filtered = Vec::new();
         for i in 0..stats_tracking_phases - 2 {
             let cur = &stats_by_phase[1 + i];
-            info!(
-                "Test stats [test phase {}]: {}",
-                i,
-                cur.rate(actual_phase_durations[i])
-            );
+            info!("Test stats [test phase {}]: {}", i, cur.rate());
             stats = if let Some(previous) = stats {
                 Some(&previous + cur)
             } else {
@@ -313,10 +309,7 @@ impl dyn NetworkLoadTest {
             };
             stats_and_duration_by_phase_filtered.push((cur.clone(), actual_phase_durations[i]));
         }
-        info!(
-            "Cooldown stats: {}",
-            stats_by_phase.last().unwrap().rate(cooldown_duration)
-        );
+        info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
             if let Some(start_t) = max_start_ledger_transactions {

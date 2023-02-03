@@ -85,7 +85,12 @@ impl SuccessCriteriaChecker {
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
-        let stats_rate = stats.rate(window);
+        println!(
+            "End to end duration: {}s, while txn emitter lasted: {}s",
+            window.as_secs(),
+            stats.lasted.as_secs()
+        );
+        let stats_rate = stats.rate();
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
         let avg_tps = stats_rate.committed;
         if avg_tps < success_criteria.avg_tps as u64 {

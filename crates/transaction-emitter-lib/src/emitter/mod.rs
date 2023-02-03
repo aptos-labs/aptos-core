@@ -419,15 +419,35 @@ pub struct EmitJob {
     workers: Vec<Worker>,
     stop: Arc<AtomicBool>,
     stats: Arc<DynamicStatsTracking>,
+    phase_starts: Vec<Instant>,
 }
 
 impl EmitJob {
-    pub fn start_next_phase(&self) {
-        self.stats.start_next_phase();
+    pub fn start_next_phase(&mut self) {
+        let cur_phase = self.stats.start_next_phase();
+
+        assert!(self.phase_starts.len() == cur_phase);
+        self.phase_starts.push(Instant::now());
     }
 
     pub fn get_cur_phase(&self) -> usize {
         self.stats.get_cur_phase()
+    }
+
+    pub async fn stop_and_accumulate(self) -> Vec<TxnStats> {
+        self.stop.store(true, Ordering::Relaxed);
+        for worker in self.workers {
+            let _accounts = worker
+                .join_handle
+                .await
+                .expect("TxnEmitter worker thread failed");
+        }
+
+        self.stats.accumulate(&self.phase_starts)
+    }
+
+    pub fn accumulate(&self) -> Vec<TxnStats> {
+        self.stats.accumulate(&self.phase_starts)
     }
 }
 
@@ -562,27 +582,21 @@ impl TxnEmitter {
             }
         }
         info!("Tx emitter workers started");
+
         Ok(EmitJob {
             workers,
             stop,
             stats,
+            phase_starts: vec![Instant::now()],
         })
     }
 
     pub async fn stop_job(self, job: EmitJob) -> Vec<TxnStats> {
-        job.stop.store(true, Ordering::Relaxed);
-        for worker in job.workers {
-            let _accounts = worker
-                .join_handle
-                .await
-                .expect("TxnEmitter worker thread failed");
-        }
-
-        job.stats.accumulate()
+        job.stop_and_accumulate().await
     }
 
     pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
-        job.stats.accumulate()
+        job.accumulate()
     }
 
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
@@ -600,7 +614,7 @@ impl TxnEmitter {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate(window));
+            info!("phase {}: {}", cur_phase, delta.rate());
         }
     }
 
@@ -613,7 +627,7 @@ impl TxnEmitter {
     ) -> Result<TxnStats> {
         let phases = emit_job_request.transaction_mix_per_phase.len();
 
-        let job = self
+        let mut job = self
             .start_job(source_account, emit_job_request, phases)
             .await?;
         info!(
