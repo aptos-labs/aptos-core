@@ -40,6 +40,7 @@ pub struct TransactionBatchInfo {
 }
 
 impl IndexerStreamCoordinator {
+    /// Coordinates the fetching, processing, and streaming of transactions
     pub fn new(
         context: Arc<Context>,
         request_start_version: u64,
@@ -59,6 +60,14 @@ impl IndexerStreamCoordinator {
         }
     }
 
+    /// Fans out a bunch of threads and processes transactions in parallel.
+    /// Pushes results in parallel to the stream, but only return that the batch is
+    /// fully completed if every job in the batch is successful
+    /// Processing transactions in 4 stages:
+    /// 1. Fetch transactions from storage
+    /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
+    /// 3. Convert into protobuf objects
+    /// 4. Encode protobuf objects (base64)
     pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
@@ -103,6 +112,24 @@ impl IndexerStreamCoordinator {
             Ok(res) => res,
             Err(err) => panic!("Error processing transaction batches: {:?}", err),
         }
+    }
+
+    /// Gets the last version of the batch if the entire batch is successful, otherwise return error
+    pub fn get_max_batch_version(
+        results: Vec<Result<EndVersion, Status>>,
+    ) -> Result<EndVersion, Status> {
+        let mut max_version = 0;
+        for result in results {
+            match result {
+                Ok(version) => {
+                    max_version = std::cmp::max(max_version, version);
+                },
+                Err(err) => {
+                    return Err(err);
+                },
+            }
+        }
+        Ok(max_version)
     }
 
     /// This will create batches based on the configuration of the request

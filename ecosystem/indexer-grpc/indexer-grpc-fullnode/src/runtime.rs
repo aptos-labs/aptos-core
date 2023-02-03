@@ -52,10 +52,12 @@ pub fn bootstrap(
     let runtime = aptos_runtimes::spawn_named_runtime("indexer-grpc".to_string(), None);
 
     let node_config = config.clone();
-    let processor_task_count = node_config.indexer_grpc.processor_task_count;
-    let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
-    let output_batch_size = node_config.indexer_grpc.output_batch_size;
-    let address = node_config.indexer_grpc.address.clone();
+
+    // We have defaults for these so they should all return something nonnull so unwrap is safe here
+    let processor_task_count = node_config.indexer_grpc.processor_task_count.unwrap();
+    let processor_batch_size = node_config.indexer_grpc.processor_batch_size.unwrap();
+    let output_batch_size = node_config.indexer_grpc.output_batch_size.unwrap();
+    let address = node_config.indexer_grpc.address.clone().unwrap();
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
@@ -81,22 +83,37 @@ pub fn bootstrap(
 impl IndexerStream for IndexerStreamService {
     type RawDatastreamStream = ResponseStream;
 
+    /// This function is required by the GRPC tonic server. It basically handles the request.
+    /// Given we want to persist the stream for better performance, our approach is that when
+    /// we receive a request, we will return a stream. Then as we process transactions, we
+    /// wrap those into a RawDatastreamResponse that we then push into the stream.
+    /// There are 2 types of RawDatastreamResponse:
+    /// Status - sends events back to the client, such as init stream and batch end
+    /// Transaction - sends encoded transactions lightly wrapped
     async fn raw_datastream(
         &self,
         req: Request<RawDatastreamRequest>,
     ) -> Result<Response<Self::RawDatastreamStream>, Status> {
+        // Gets configs for the stream, partly from the request and partly from the node config
         let r = req.into_inner();
         let starting_version = r.starting_version;
         let processor_task_count = self.processor_task_count;
         let processor_batch_size = self.processor_batch_size;
         let output_batch_size = self.output_batch_size;
 
-        let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+        // Some node metadata
         let context = self.context.clone();
+        let ledger_chain_id = context.chain_id().id();
+
+        // Creates a channel to send the stream to the client
+        let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+
+        // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
 
-        let ledger_chain_id = context.chain_id().id();
+        // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
+            // Initialize the coordinator that tracks starting version and processes transactions
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
                 starting_version,
@@ -105,6 +122,7 @@ impl IndexerStream for IndexerStreamService {
                 output_batch_size,
                 tx.clone(),
             );
+            // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status =
                 Self::get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -118,24 +136,18 @@ impl IndexerStream for IndexerStreamService {
             }
             let mut base: u64 = 0;
             loop {
+                // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
-                let mut is_error = false;
-                let mut max_version = 0;
-                for result in results {
-                    match result {
-                        Ok(end_version) => {
-                            max_version = std::cmp::max(max_version, end_version);
-                        },
-                        Err(e) => {
-                            error!("[indexer-grpc] Error sending to stream: {}", e);
-                            is_error = true;
-                            break;
-                        },
-                    }
-                }
-                if is_error {
-                    break;
-                }
+                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
+                    Ok(max_version) => max_version,
+                    Err(e) => {
+                        error!("[indexer-grpc] Error sending to stream: {}", e);
+                        break;
+                    },
+                };
+                // send end batch message (each batch) upon success of the entire batch
+                // client can use the start and end version to ensure that there are no gaps
+                // end loop if this message fails to send because otherwise the client can't validate
                 let batch_end_status = Self::get_status(
                     StatusType::BatchEnd,
                     coordinator.current_version,
@@ -144,6 +156,7 @@ impl IndexerStream for IndexerStreamService {
                 );
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
+                        // tps logging
                         let new_base: u64 = ma.sum() / (DEFAULT_EMIT_SIZE as u64);
                         ma.tick_now(max_version - coordinator.current_version + 1);
                         if base != new_base {
@@ -159,7 +172,7 @@ impl IndexerStream for IndexerStreamService {
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[indexer-grpc] Unable to initialize stream");
+                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status");
                         break;
                     },
                 }

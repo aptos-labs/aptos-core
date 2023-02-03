@@ -12,7 +12,7 @@ import "aptos/util/timestamp/timestamp.proto";
 //  StreamStatus: INIT with version x
 //  loop k:
 //    TransactionOutput data(size n)
-//    StreamStatus: BATCH_END with version x + k * n
+//    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
 
 message TransactionsOutput {
   repeated TransactionOutput transactions  = 1;
@@ -35,7 +35,7 @@ message StreamStatus {
   StatusType type = 1;
   // Required. Start version of current batch/stream, inclusive.
   uint64 start_version = 2;
-  // End version of current *batch*, exclusive.
+  // End version of current *batch*, inclusive.
   optional uint64 end_version = 3;
 }
 
