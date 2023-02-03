@@ -394,7 +394,7 @@ impl NodeConfig {
         self.indexer_grpc.address = self
             .indexer_grpc
             .address
-            .or(Some("0.0.0.0:50051".to_string()));
+            .or_else(|| Some("0.0.0.0:50051".to_string()));
 
         self.indexer_grpc.processor_task_count =
             self.indexer_grpc.processor_task_count.or(Some(20));
