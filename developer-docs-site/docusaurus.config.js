@@ -37,6 +37,7 @@ const config = {
           remarkPlugins: [codeInjector, math],
           path: "docs",
           rehypePlugins: [katex],
+          showLastUpdateTime: true,
         },
         sitemap: {
           changefreq: "daily",
