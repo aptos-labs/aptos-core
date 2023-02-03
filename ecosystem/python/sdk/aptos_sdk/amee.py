@@ -8,17 +8,29 @@ import secrets
 
 from pathlib import Path
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 from aptos_sdk.account import Account
+from aptos_sdk.ed25519 import PublicKey, MultiEd25519PublicKey
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+from nacl.signing import VerifyKey
+
+MAX_SIGNATORIES = 32
+"""Maximum number of signatories on a multisig account."""
+
 MIN_PASSWORD_LENGTH = 4
 """The minimum password length."""
+
+MIN_SIGNATORIES = 2
+"""Minimum number of signatories on a multisig account."""
+
+MIN_THRESHOLD = 1
+"""Minimum number of signatures required to for multisig transaction."""
 
 def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], bytes]:
     """Check keyfile password, returning JSON data/private key bytes"""
@@ -38,16 +50,24 @@ def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], bytes]:
         raise ValueError('Invalid password.') from None
     return data, private_key
 
-def check_password_length(password: str):
-    """Verify password meets minimum length threshold."""
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise ValueError(
-            f'Password should be at least {MIN_PASSWORD_LENGTH} characters.')
+def check_name(tokens: List[str]) -> str:
+    """Check list of tokens for valid name, return concatenated str."""
+    name = ' '.join(tokens) # Get name.
+    # Assert that name is not blank space.
+    if len(name) == 0 or name.isspace():
+        raise ValueError('Name may not be blank.')
+    return name # Return name.
 
 def check_outfile_exists(path: Path):
     """Verify desired outfile does not already exist."""
     if path.exists(): # Assert not overwriting file.
         raise ValueError(f'{path} already exists.')
+
+def check_password_length(password: str):
+    """Verify password meets minimum length threshold."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(
+            f'Password should be at least {MIN_PASSWORD_LENGTH} characters.')
 
 def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
     """Derive Fernet encryption key assistant from password and salt.
@@ -86,6 +106,48 @@ def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     encrypted_private_key = fernet.encrypt(private_key_bytes)
     return encrypted_private_key, salt
 
+def incorporate(args):
+    """Incorporate single-signer keyfiles to multisig metadata file."""
+    n_signers = len(args.keyfiles) # Get number of signers.
+    # Assert valid number of signatories.
+    assert MIN_SIGNATORIES <= n_signers <= MAX_SIGNATORIES, \
+        f'Number of signatories must be between {MIN_SIGNATORIES} and ' \
+        f'{MAX_SIGNATORIES} (inclusive).'
+    # Assert valid signature threshold.
+    assert MIN_THRESHOLD <= args.threshold <= n_signers, \
+        f'Signature threshold must be greater than {MIN_THRESHOLD} and less ' \
+        f'than the number of signatories.'
+    multisig_name = check_name(args.name) # Check name.
+    signatories = [] # Initialize empty signatories list.
+    public_keys = [] # Initialize empty public keys list.
+    for keyfile in args.keyfiles: # Loop over keyfiles.
+        signatory = json.load(keyfile) # Load signatory data.
+        public_key = PublicKey( # Get public key bytes.
+            VerifyKey(bytes.fromhex(signatory['public_key'][2:])))
+        # Extract relevant fields for list of signatories.
+        signatories.append(dict((field, signatory[field]) for field in \
+            ['signatory', 'public_key', 'authentication_key']))
+        public_keys.append(public_key) # Append public key to list.
+    # Initialize multisig public key.
+    multi_key = MultiEd25519PublicKey(public_keys, args.threshold)
+    data = { # Generate JSON data for multisig metadata file.
+        'multisig_name': multisig_name,
+        'threshold': args.threshold,
+        'n_signatories': n_signers,
+        'authentication_key': f'0x{multi_key.auth_key().hex()}',
+        'signatories': signatories}
+    if args.metafile is None: # If no custom filepath specified:
+        # Create filepath from multisig name.
+        args.metafile = Path('_'.join(args.name).casefold() +'.multisig')
+    check_outfile_exists(args.metafile) # Check if path exists.
+    # Dump JSON data to metafile.
+    with open(args.metafile, 'w', encoding='utf-8') as metafile:
+        json.dump(data, metafile, indent=4)
+    with open(args.metafile, 'r', encoding='utf-8') as metafile:
+        # Print contents of new metafile.
+        print(f'New multisig metadata file at {args.metafile}: '
+              f'{metafile.read()}')
+
 def keyfile_change_password(args):
     """Change password for a single-signer keyfile."""
     # Check password, get keyfile data and private key bytes.
@@ -112,10 +174,7 @@ def keyfile_extract(args):
 
 def keyfile_generate(args):
     """Generate a keyfile for a single signer."""
-    signatory = ' '.join(args.signatory) # Get signatory name.
-    # Assert that signatory name is not blank space.
-    if len(signatory) == 0 or signatory.isspace():
-        raise ValueError('Signatory name may not be blank space.')
+    signatory = check_name(args.signatory)
     if args.account_store is None: # If no account store supplied:
         account = Account.generate() # Generate new account.
     else: # If account store path supplied:
@@ -125,14 +184,13 @@ def keyfile_generate(args):
     private_key_bytes = account.private_key.key.encode()
     # Encrypt private key.
     encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
-    # Generate JSON data for keyfile.
-    data = {'signatory': signatory,
+    data = {'signatory': signatory, # Generate JSON data for keyfile.
             'public_key': f'{account.public_key()}',
             'authentication_key': f'{account.auth_key()}',
             'encrypted_private_key': f'0x{encrypted_private_key_bytes.hex()}',
             'salt': f'0x{salt.hex()}'}
     if args.keyfile is None: # If no custom filepath specified:
-        # Create filepath base from signatory name.
+        # Create filepath from signatory name.
         args.keyfile = Path('_'.join(args.signatory).casefold() +'.keyfile')
     check_outfile_exists(args.keyfile) # Check if path exists.
     keyfile_write_json(args.keyfile, data) # Write JSON to keyfile.
@@ -160,6 +218,40 @@ parser = argparse.ArgumentParser(
     description='''Aptos Multisig Execution Expeditor (AMEE): A collection of
         tools designed to expedite multisig account execution.''')
 subparsers = parser.add_subparsers(required=True)
+
+# Incorporate subcommand parser.
+parser_incorporate = subparsers.add_parser(
+    name='incorporate',
+    aliases=['i'],
+    description='''Incorporate multiple single-signer keyfiles into a multisig
+        metadata file.''',
+    help='Incorporate multiple signer singers into a multisig.')
+parser_incorporate.set_defaults(func=incorporate)
+parser_incorporate.add_argument(
+    'name',
+    type=str,
+    nargs='+',
+    help='''The name of the multisig entity. For example "Aptos" or "The Aptos
+        Foundation".''')
+parser_incorporate.add_argument(
+    '-t',
+    '--threshold',
+    type=int,
+    help='''The number of single signers required to approve a transaction.''',
+    required=True)
+parser_incorporate.add_argument(
+    '-k',
+    '--keyfiles',
+    action='extend',
+    nargs='+',
+    type=argparse.FileType('r', encoding='utf-8'),
+    help='''Relative paths to single-signer keyfiles in the multisig.''',
+    required=True)
+parser_incorporate.add_argument(
+    '-m',
+    '--metafile',
+    type=Path,
+    help='''Custom relative path to desired multisig metadata file.''')
 
 # Keyfile subcommand parser.
 parser_keyfile = subparsers.add_parser(
@@ -209,7 +301,7 @@ parser_keyfile_generate.set_defaults(func=keyfile_generate)
 parser_keyfile_generate.add_argument(
     'signatory',
     type=str,
-    nargs='*',
+    nargs='+',
     help='''The name of the entity acting as a signatory. For example "Aptos"
         or "The Aptos Foundation".''')
 parser_keyfile_generate.add_argument(
