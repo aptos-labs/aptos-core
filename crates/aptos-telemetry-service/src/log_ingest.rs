@@ -3,7 +3,10 @@
 
 use crate::{
     auth::with_auth,
-    clients::humio::{CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME},
+    clients::humio::{
+        CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME,
+        RUN_UUID_TAG_NAME,
+    },
     constants::MAX_CONTENT_LENGTH,
     context::Context,
     debug, error,
@@ -72,6 +75,7 @@ pub async fn handle_log_ingest(
     };
     tags.insert(CHAIN_ID_TAG_NAME.into(), chain_name);
     tags.insert(PEER_ROLE_TAG_NAME.into(), claims.node_type.to_string());
+    tags.insert(RUN_UUID_TAG_NAME.into(), claims.run_uuid.to_string());
 
     let unstructured_log = UnstructuredLog {
         fields,
