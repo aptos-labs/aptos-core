@@ -4,7 +4,7 @@
 use super::common::NodeType;
 use aptos_config::config::RoleType;
 use aptos_crypto::x25519;
-use aptos_types::{chain_id::ChainId, PeerId};
+use aptos_types::{chain_id::ChainId, hostname::Hostname, PeerId};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -14,6 +14,8 @@ pub struct AuthRequest {
     pub peer_id: PeerId,
     #[serde(default = "default_role_type")]
     pub role_type: RoleType,
+    #[serde(default)]
+    pub hostname: Option<Hostname>,
     pub server_public_key: x25519::PublicKey,
     pub handshake_msg: Vec<u8>,
     #[serde(default = "default_uuid")]
@@ -30,6 +32,7 @@ pub struct Claims {
     pub chain_id: ChainId,
     pub peer_id: PeerId,
     pub node_type: NodeType,
+    pub hostname: Option<Hostname>,
     pub epoch: u64,
     pub exp: usize,
     pub iat: usize,
@@ -53,6 +56,7 @@ impl Claims {
             chain_id: ChainId::test(),
             peer_id: PeerId::random(),
             node_type: NodeType::Validator,
+            hostname: Some("test".into()),
             epoch: 10,
             exp: Utc::now().timestamp() as usize,
             iat: Utc::now()

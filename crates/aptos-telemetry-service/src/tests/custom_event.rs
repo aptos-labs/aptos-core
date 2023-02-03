@@ -39,6 +39,7 @@ async fn test_custom_event() {
         node_type,
         epoch,
         uuid,
+        None,
     )
     .unwrap();
 

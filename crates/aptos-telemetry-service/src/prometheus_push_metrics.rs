@@ -117,28 +117,24 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
     } else {
         format!("chain_name={}", claims.chain_id)
     };
-    let pod_name = if let Some(common_name) = common_name {
-        format!(
-            "kubernetes_pod_name=peer_id:{}//{}",
-            common_name,
-            claims.peer_id.to_hex_literal()
-        )
-    } else {
-        // for community nodes we cannot determine which pod name they run in (or whether they run in k8s at all),
-        // so we use the peer id as an approximation/replacement for pod_name
-        // This works well with our existing grafana dashboards
-        format!(
-            "kubernetes_pod_name=peer_id:{}",
-            claims.peer_id.to_hex_literal()
-        )
-    };
+
+    let mut pod_name_parts = Vec::new();
+    if let Some(common_name) = common_name {
+        pod_name_parts.push(format!("name:{}", common_name,));
+    }
+    if let Some(hostname) = &claims.hostname {
+        pod_name_parts.push(format!("hostname:{}", hostname));
+    }
+    pod_name_parts.push(format!("peer_id:{}", claims.peer_id.to_hex_literal()));
+    let pod_name = pod_name_parts.join(";");
+
     vec![
         format!("role={}", claims.node_type),
         format!("metrics_source={}", "telemetry-service"),
         chain_name,
         format!("namespace={}", "telemetry-service"),
-        pod_name,
         format!("run_uuid={}", claims.run_uuid),
+        format!("kubernetes_pod_name={}", pod_name),
     ]
 }
 
@@ -159,6 +155,7 @@ mod test {
                 chain_id: ChainId::new(25),
                 peer_id: PeerId::from_str("0x1").unwrap(),
                 node_type: NodeType::Validator,
+                hostname: None,
                 epoch: 3,
                 exp: 123,
                 iat: 123,
@@ -171,8 +168,8 @@ mod test {
             "metrics_source=telemetry-service",
             "chain_name=25",
             "namespace=telemetry-service",
-            "kubernetes_pod_name=peer_id:test_name//0x1",
             &format!("run_uuid={}", Uuid::default()),
+            "kubernetes_pod_name=name:test_name;peer_id:0x1",
         ]);
 
         let test_uuid = Uuid::new_v4();
@@ -182,6 +179,7 @@ mod test {
                 chain_id: ChainId::new(25),
                 peer_id: PeerId::from_str("0x1").unwrap(),
                 node_type: NodeType::Validator,
+                hostname: Some("test".into()),
                 epoch: 3,
                 exp: 123,
                 iat: 123,
@@ -194,8 +192,8 @@ mod test {
             "metrics_source=telemetry-service",
             "chain_name=25",
             "namespace=telemetry-service",
-            "kubernetes_pod_name=peer_id:0x1",
             &format!("run_uuid={}", test_uuid),
+            "kubernetes_pod_name=hostname:test;peer_id:0x1",
         ]);
     }
 

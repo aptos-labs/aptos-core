@@ -7,7 +7,7 @@ use crate::{
     errors::{JwtAuthError, ServiceError},
     types::{auth::Claims, common::NodeType},
 };
-use aptos_types::{chain_id::ChainId, PeerId};
+use aptos_types::{chain_id::ChainId, hostname::Hostname, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{errors::Error, TokenData};
 use uuid::Uuid;
@@ -22,6 +22,7 @@ pub fn create_jwt_token(
     node_type: NodeType,
     epoch: u64,
     uuid: Uuid,
+    hostname: Option<Hostname>,
 ) -> Result<String, Error> {
     let issued = Utc::now().timestamp();
     let expiration = Utc::now()
@@ -34,6 +35,7 @@ pub fn create_jwt_token(
         peer_id,
         node_type,
         epoch,
+        hostname,
         exp: expiration as usize,
         iat: issued as usize,
         run_uuid: uuid,
@@ -164,6 +166,7 @@ mod tests {
             NodeType::Validator,
             10,
             Uuid::default(),
+            None,
         )
         .unwrap();
         let result =
@@ -177,6 +180,7 @@ mod tests {
             NodeType::ValidatorFullNode,
             10,
             Uuid::default(),
+            None,
         )
         .unwrap();
         let result = authorize_jwt(token, test_context.inner, vec![NodeType::Validator]).await;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use aptos_types::{chain_id::ChainId, PeerId};
+use aptos_types::{chain_id::ChainId, hostname::Hostname, PeerId};
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
@@ -15,6 +15,7 @@ pub struct AptosNodeIdentity {
     pub peer_id: Option<PeerId>,
     // Holds Peer ID as String to reduce overhead for frequent lookups.
     pub peer_id_str: Option<String>,
+    pub hostname: Option<Hostname>,
 }
 
 /// Initializes the [AptosNodeIdentity] using the provided [PeerId] and
@@ -24,6 +25,10 @@ pub fn init(peer_id: Option<PeerId>) -> Result<()> {
         chain_id: OnceCell::new(),
         peer_id,
         peer_id_str: peer_id.map(|id| id.to_string()),
+        hostname: hostname::get()
+            .ok()
+            .and_then(|name| name.into_string().ok())
+            .map(Hostname::new),
     };
 
     APTOS_NODE_IDENTITY
@@ -62,6 +67,13 @@ pub fn chain_id() -> Option<ChainId> {
     APTOS_NODE_IDENTITY
         .get()
         .and_then(|identity| identity.chain_id.get().cloned())
+}
+
+/// Returns the hostname from the global [APTOS_NODE_IDENTITY]
+pub fn hostname() -> Option<Hostname> {
+    APTOS_NODE_IDENTITY
+        .get()
+        .and_then(|identity| identity.hostname.clone())
 }
 
 #[cfg(test)]

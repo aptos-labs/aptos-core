@@ -15,7 +15,7 @@ use aptos_telemetry_service::types::{
     response::IndexResponse,
     telemetry::TelemetryDump,
 };
-use aptos_types::{chain_id::ChainId, PeerId};
+use aptos_types::{chain_id::ChainId, hostname::Hostname, PeerId};
 use flate2::{write::GzEncoder, Compression};
 use prometheus::{default_registry, Registry};
 use reqwest::{header::CONTENT_ENCODING, Response, StatusCode, Url};
@@ -49,6 +49,7 @@ pub(crate) struct TelemetrySender {
     chain_id: ChainId,
     peer_id: PeerId,
     role_type: RoleType,
+    hostname: Option<Hostname>,
     client: ClientWithMiddleware,
     auth_context: Arc<AuthContext>,
     uuid: Uuid,
@@ -80,6 +81,7 @@ impl TelemetrySender {
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             role_type: node_config.base.role,
+            hostname: aptos_node_identity::hostname(),
             client,
             auth_context: Arc::new(AuthContext::new(node_config)),
             uuid: uuid::Uuid::new_v4(),
@@ -314,6 +316,7 @@ impl TelemetrySender {
             chain_id: self.chain_id,
             peer_id: self.peer_id,
             role_type: self.role_type,
+            hostname: self.hostname.clone(),
             server_public_key,
             handshake_msg: client_noise_msg,
             run_uuid: self.uuid,

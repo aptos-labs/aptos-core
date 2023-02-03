@@ -69,6 +69,7 @@ mod tests {
             node_type,
             epoch,
             Uuid::default(),
+            None,
         )
         .unwrap();
 

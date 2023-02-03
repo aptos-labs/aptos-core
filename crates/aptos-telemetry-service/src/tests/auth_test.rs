@@ -18,6 +18,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address,
     chain_id::ChainId,
+    hostname::Hostname,
     network_address::{
         DnsName, NetworkAddress,
         Protocol::{Dns, Handshake, NoiseIK, Tcp},
@@ -147,6 +148,7 @@ async fn test_auth_validator_backwards_compat_uuid() {
         peer_id,
         node_type: NodeType::Validator,
         epoch: 1,
+        hostname: None,
         exp: decoded.claims.exp,
         iat: decoded.claims.iat,
         run_uuid: Uuid::default(),
@@ -192,6 +194,7 @@ async fn test_auth_validator() {
         peer_id,
         node_type: NodeType::Validator,
         epoch: 1,
+        hostname: None,
         exp: decoded.claims.exp,
         iat: decoded.claims.iat,
         run_uuid,
@@ -223,6 +226,7 @@ async fn test_auth_validatorfullnode() {
         "server_public_key": server_public_key,
         "handshake_msg": &client_noise_msg,
         "run_uuid": run_uuid,
+        "hostname": Hostname::new("test_host".into()),
     });
     let resp = context.post("/api/v1/auth", req).await;
 
@@ -238,6 +242,7 @@ async fn test_auth_validatorfullnode() {
         peer_id,
         node_type: NodeType::ValidatorFullNode,
         epoch: 1,
+        hostname: Some("test_host".into()),
         exp: decoded.claims.exp,
         iat: decoded.claims.iat,
         run_uuid

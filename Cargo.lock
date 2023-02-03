@@ -2430,6 +2430,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-node-identity",
  "aptos-node-resource-metrics",
  "aptos-runtimes",
  "aptos-state-sync-driver",
