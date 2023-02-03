@@ -59,7 +59,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
