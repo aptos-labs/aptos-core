@@ -792,6 +792,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
         .with_network_tests(vec![&TwoTrafficsTest {
             inner_tps: 15000,
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            inner_init_gas_price_multiplier: 20,
             // Additionally - we are not really gracefully handling overlaods,
             // setting limits based on current reality, to make sure they
             // don't regress, but something to investigate

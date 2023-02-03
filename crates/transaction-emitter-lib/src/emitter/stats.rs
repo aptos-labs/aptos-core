@@ -8,7 +8,7 @@ use std::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -20,6 +20,7 @@ pub struct TxnStats {
     pub latency: u64,
     pub latency_samples: u64,
     pub latency_buckets: AtomicHistogramSnapshot,
+    pub lasted: Duration,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -46,8 +47,8 @@ impl fmt::Display for TxnStatsRate {
 }
 
 impl TxnStats {
-    pub fn rate(&self, window: Duration) -> TxnStatsRate {
-        let mut window_secs = window.as_secs();
+    pub fn rate(&self) -> TxnStatsRate {
+        let mut window_secs = self.lasted.as_secs();
         if window_secs < 1 {
             window_secs = 1;
         }
@@ -91,6 +92,7 @@ impl Sub for &TxnStats {
             latency: self.latency - other.latency,
             latency_samples: self.latency_samples - other.latency_samples,
             latency_buckets: &self.latency_buckets - &other.latency_buckets,
+            lasted: self.lasted - other.lasted,
         }
     }
 }
@@ -107,6 +109,7 @@ impl Add for &TxnStats {
             latency: self.latency + other.latency,
             latency_samples: self.latency_samples + other.latency_samples,
             latency_buckets: &self.latency_buckets + &other.latency_buckets,
+            lasted: self.lasted + other.lasted,
         }
     }
 }
@@ -123,7 +126,7 @@ pub struct StatsAccumulator {
 }
 
 impl StatsAccumulator {
-    pub fn accumulate(&self) -> TxnStats {
+    pub fn accumulate(&self, lasted: Duration) -> TxnStats {
         TxnStats {
             submitted: self.submitted.load(Ordering::Relaxed),
             committed: self.committed.load(Ordering::Relaxed),
@@ -132,6 +135,7 @@ impl StatsAccumulator {
             latency: self.latency.load(Ordering::Relaxed),
             latency_samples: self.latency_samples.load(Ordering::Relaxed),
             latency_buckets: self.latencies.snapshot(),
+            lasted,
         }
     }
 }
@@ -286,8 +290,10 @@ impl DynamicStatsTracking {
         }
     }
 
-    pub fn start_next_phase(&self) {
-        assert!(self.cur_phase.fetch_add(1, Ordering::Relaxed) + 1 < self.num_phases);
+    pub fn start_next_phase(&self) -> usize {
+        let cur_phase = self.cur_phase.fetch_add(1, Ordering::Relaxed) + 1;
+        assert!(cur_phase < self.num_phases);
+        cur_phase
     }
 
     pub fn get_cur_phase(&self) -> usize {
@@ -298,8 +304,23 @@ impl DynamicStatsTracking {
         self.stats.get(self.get_cur_phase()).unwrap()
     }
 
-    pub fn accumulate(&self) -> Vec<TxnStats> {
-        self.stats.iter().map(|s| s.accumulate()).collect()
+    pub fn accumulate(&self, phase_starts: &[Instant]) -> Vec<TxnStats> {
+        let now = Instant::now();
+        self.stats
+            .iter()
+            .take(self.get_cur_phase() + 1)
+            .enumerate()
+            .map(|(i, s)| {
+                s.accumulate(
+                    (if i >= self.get_cur_phase() {
+                        now
+                    } else {
+                        phase_starts[i + 1]
+                    })
+                    .duration_since(phase_starts[i]),
+                )
+            })
+            .collect()
     }
 }
 
@@ -309,6 +330,7 @@ mod test {
         AtomicHistogramAccumulator, AtomicHistogramSnapshot, TxnStats, DEFAULT_HISTOGRAM_CAPACITY,
         DEFAULT_HISTOGRAM_STEP_WIDTH,
     };
+    use std::time::Duration;
 
     #[test]
     pub fn test_default_atomic_histogram() {
@@ -375,6 +397,7 @@ mod test {
             latency: 0,
             latency_samples: 0,
             latency_buckets: histogram.snapshot(),
+            lasted: Duration::from_secs(10),
         };
         let res = stat.latency_buckets.percentile(9, 10);
         assert_eq!(res, 900);
