@@ -80,7 +80,7 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @markuze @joshlind
+/network/ @joshlind
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind
