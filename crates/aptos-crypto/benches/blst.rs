@@ -6,7 +6,7 @@ extern crate criterion;
 
 use std::cmp::min;
 use std::ops::MulAssign;
-use blst::{blst_p1, blst_p1_affine, blst_p2, blst_p2_affine};
+use blst::{blst_p1, blst_p1_add, blst_p1_affine, blst_p1_mult, blst_p2, blst_p2_affine};
 use aptos_crypto::{
     bls12381,
     bls12381::ProofOfPossession,
@@ -265,6 +265,30 @@ fn bench_group(c: &mut Criterion) {
             )
         });
     }
+
+    group.bench_function("g1_proj_add", move|b| {
+        b.iter_with_setup(
+            || {
+                (random_p1(), random_p1())
+            },
+            |(p1, p2)|{
+                let mut res = blst_p1::default();
+                unsafe { blst_p1_add(&mut res, &p1, &p2); }
+            }
+        )
+    });
+
+    group.bench_function("g1_proj_scalar_mul", move|b| {
+        b.iter_with_setup(
+            || {
+                (random_p1(), random_bytes(256))
+            },
+            |(p, k)|{
+                let mut res = blst_p1::default();
+                unsafe { blst_p1_mult(&mut res, &p, k.as_ptr(), 256); }
+            }
+        )
+    });
 
     for scalar_count in (2..2049).step_by(22) {
         let bench_id = format!("g2_affine_msm_size_{scalar_count}");
