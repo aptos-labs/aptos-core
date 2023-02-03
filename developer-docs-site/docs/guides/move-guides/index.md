@@ -64,6 +64,7 @@ Install the [IDE plugins for the Move language](../../guides/getting-started.md#
 
 Use these external resources to learn about the core Move programming language.
 
+* [Teach yourself Move on Aptos](https://github.com/econia-labs/teach-yourself-move).
 * [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
 * [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
 * [Pontem Move Playground](https://playground.pontem.network/)
