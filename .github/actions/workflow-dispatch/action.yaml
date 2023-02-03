@@ -1,0 +1,13 @@
+inputs:
+  COMMAND:
+    description: "gh workflow run CLI command to run"
+    required: true
+
+runs:
+  using: composite
+  steps:
+
+    - name: Run workflow with commands
+      shell: bash
+      run: |
+        ./run.py ${{ inputs.COMMAND }}
