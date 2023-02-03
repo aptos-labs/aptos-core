@@ -28,9 +28,6 @@
 # Owner for aptos node (just to prevent things from becoming out of hand, again :D)
 /aptos-node/ @joshlind
 
-# Owner for logger config
-/config/src/config/logger_config.rs @markuze
-
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
 
@@ -48,9 +45,6 @@
 /crates/aptos-faucet @banool @gregnazario
 /crates/aptos-faucet-cli @gregnazario
 /crates/aptos-genesis @gregnazario
-
-# Owners for the aptos-logger crate
-/crates/aptos-logger @markuze
 
 /crates/aptos-open-api @banool @gregnazario
 /crates/aptos-rest-client @banool @gregnazario
