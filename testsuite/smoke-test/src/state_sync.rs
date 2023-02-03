@@ -3,7 +3,10 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::{create_and_fund_account, transfer_and_maybe_reconfig, transfer_coins},
+    test_utils::{
+        create_and_fund_account, transfer_and_maybe_reconfig, transfer_coins,
+        MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+    },
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
@@ -14,8 +17,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-
-const MAX_CATCH_UP_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 
 #[tokio::test]
 async fn test_full_node_bootstrap_state_snapshot() {
@@ -38,7 +39,7 @@ async fn test_full_node_bootstrap_state_snapshot() {
     config.save(validator.config_path()).unwrap();
     validator.restart().await.unwrap();
     validator
-        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -253,7 +254,7 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
             .unwrap();
     }
@@ -792,7 +793,7 @@ async fn execute_transactions_and_wait(
 /// Waits for all nodes to catch up
 async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 }

@@ -5,7 +5,7 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
-        transfer_and_maybe_reconfig, transfer_coins,
+        transfer_and_maybe_reconfig, transfer_coins, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
     workspace_builder,
     workspace_builder::workspace_root,
@@ -22,8 +22,6 @@ use std::{
     process::Command,
     time::{Duration, Instant},
 };
-
-const MAX_WAIT_SECS: u64 = 180;
 
 #[tokio::test]
 async fn test_db_restore() {
@@ -53,7 +51,7 @@ async fn test_db_restore() {
     // we need to wait for all nodes to see it, as client_1 is different node from the
     // one creating accounts above
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
     info!("---------- 1.3 caught up.");
@@ -160,13 +158,13 @@ async fn test_db_restore() {
     swarm
         .validator_mut(node_to_restart)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
     info!("---------- 5. Node 0 is healthy, verify it's caught up.");
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
