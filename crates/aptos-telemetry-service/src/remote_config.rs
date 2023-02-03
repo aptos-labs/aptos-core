@@ -39,6 +39,7 @@ mod tests {
     use aptos_config::config::PeerSet;
     use aptos_types::{chain_id::ChainId, PeerId};
     use std::collections::HashMap;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_handle_telemetry_log_env() {
@@ -67,6 +68,7 @@ mod tests {
             peer_id,
             node_type,
             epoch,
+            Uuid::default(),
         )
         .unwrap();
 

@@ -12,6 +12,7 @@ pub const PEER_ID_FIELD_NAME: &str = "peer_id";
 pub const EPOCH_FIELD_NAME: &str = "epoch";
 pub const PEER_ROLE_TAG_NAME: &str = "peer_role";
 pub const CHAIN_ID_TAG_NAME: &str = "chain_id";
+pub const RUN_UUID_TAG_NAME: &str = "run_uuid";
 
 #[derive(Clone)]
 pub struct IngestClient {
