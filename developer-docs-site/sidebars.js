@@ -417,6 +417,7 @@ const sidebars = {
     },
     "contribute/index",
     "contribute/highlights",
+    "contribute/faq",
   ],
 };
 

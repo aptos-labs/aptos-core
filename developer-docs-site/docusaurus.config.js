@@ -347,6 +347,11 @@ const config = {
                 type: "doc",
                 docId: "contribute/highlights",
               },
+              {
+                label: "Frequently Asked Questions",
+                type: "doc",
+                docId: "contribute/faq",
+              },
             ],
           },
         ],
