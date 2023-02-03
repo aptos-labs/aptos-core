@@ -124,7 +124,7 @@ impl DiscoveryChangeListener {
     }
 
     pub fn start(self, executor: &Handle) {
-        spawn_named!("DiscoveryChangeListener", executor, Box::pin(self).run()).unwrap();
+        spawn_named!("DiscoveryChangeListener", executor, Box::pin(self).run());
     }
 
     async fn run(mut self: Pin<Box<Self>>) {

@@ -166,8 +166,7 @@ impl BufferManager {
                 .send(request)
                 .await
                 .expect("Failed to send retry request");
-        })
-        .unwrap();
+        });
     }
 
     /// process incoming ordered blocks

@@ -98,7 +98,7 @@ impl DirectMempoolInnerBuilder {
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
         );
-        spawn_named!("DirectMempoolQuorumStore", quorum_store.start()).unwrap();
+        spawn_named!("DirectMempoolQuorumStore", quorum_store.start());
     }
 }
 
@@ -272,8 +272,7 @@ impl InnerBuilder {
         spawn_named!(
             "batch_store",
             batch_store.start(batch_store_cmd_rx, self.proof_coordinator_cmd_tx.clone())
-        )
-        .unwrap();
+        );
 
         batch_reader
     }
@@ -303,8 +302,7 @@ impl InnerBuilder {
         spawn_named!(
             "quorum_store_coordinator",
             quorum_store_coordinator.start(coordinator_rx)
-        )
-        .unwrap();
+        );
 
         let batch_generator_cmd_rx = self.batch_generator_cmd_rx.take().unwrap();
         let back_pressure_rx = self.back_pressure_rx.take().unwrap();
@@ -325,8 +323,7 @@ impl InnerBuilder {
         spawn_named!(
             "batch_generator",
             batch_generator.start(batch_generator_cmd_rx, back_pressure_rx, interval)
-        )
-        .unwrap();
+        );
 
         let batch_coordinator_cmd_rx = self.batch_coordinator_cmd_rx.take().unwrap();
         let batch_coordinator = BatchCoordinator::new(
@@ -338,7 +335,7 @@ impl InnerBuilder {
             self.proof_coordinator_cmd_tx.clone(),
             self.config.max_batch_bytes,
         );
-        spawn_named!("batch_coordinator", batch_coordinator.start()).unwrap();
+        spawn_named!("batch_coordinator", batch_coordinator.start());
 
         for (i, remote_batch_coordinator_cmd_rx) in
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
@@ -355,8 +352,7 @@ impl InnerBuilder {
             spawn_named!(
                 format!("batch_coordinator-{}", i).as_str(),
                 batch_coordinator.start()
-            )
-            .unwrap();
+            );
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
@@ -368,8 +364,7 @@ impl InnerBuilder {
                 self.proof_manager_cmd_tx.clone(),
                 self.verifier.clone(),
             )
-        )
-        .unwrap();
+        );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager =
@@ -382,8 +377,7 @@ impl InnerBuilder {
                 self.consensus_to_quorum_store_receiver,
                 proof_manager_cmd_rx,
             )
-        )
-        .unwrap();
+        );
 
         let network_msg_rx = self.quorum_store_msg_rx.take().unwrap();
         let net = NetworkListener::new(
@@ -393,7 +387,7 @@ impl InnerBuilder {
             self.remote_batch_coordinator_cmd_tx.clone(),
             self.proof_manager_cmd_tx.clone(),
         );
-        spawn_named!("network_listener", net.start()).unwrap();
+        spawn_named!("network_listener", net.start());
 
         self.coordinator_tx
     }

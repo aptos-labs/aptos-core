@@ -129,8 +129,7 @@ async fn test_batch_store_recovery() {
             test_batch_store
                 .batch_store
                 .start(test_batch_store.batch_store_cmd_rx, proof_coordinator_tx)
-        )
-        .unwrap();
+        );
 
         // Persist batch and wait
         let cmd = BatchStoreCommand::Persist(PersistRequest::new(
@@ -174,8 +173,7 @@ async fn test_batch_store_recovery() {
             test_batch_store
                 .batch_store
                 .start(test_batch_store.batch_store_cmd_rx, proof_coordinator_tx)
-        )
-        .unwrap();
+        );
 
         let mut network_rx = test_batch_store.network_rx;
         get_batch_for_peer_and_check(
