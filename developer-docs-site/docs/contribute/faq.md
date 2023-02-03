@@ -9,7 +9,7 @@ This page answers common questions by subject. To add your own answers, create p
 
 ## Aptos Labs
 
-### **What is Aptos Labs?**
+### What is Aptos Labs?
 
 Aptos Labs is a startup that is building the safest and most production-ready blockchain. Our goal is to create universal and fair access to decentralized assets. The founding team at Aptos consists of an impressive group of PhDs, researchers, engineers, designers and strategists.
 
@@ -19,26 +19,26 @@ Read this blog post, “[The Genesis of Aptos](https://medium.com/aptoslabs/the-
 
 Aptos is Ohlone for “The People” and encompasses our mission and ethos for why we build.
 
-### **What is your website and blog?**
+### What is your website and blog?
 
-- **Aptos Labs Website**: [https://aptoslabs.com](https://aptoslabs.com/)
-- **Aptos Labs Blog:** [https://medium.com/aptoslabs](https://medium.com/aptoslabs)
+- Aptos Labs Website: [https://aptoslabs.com](https://aptoslabs.com/)
+- Aptos Labs Blog: [https://medium.com/aptoslabs](https://medium.com/aptoslabs)
 
-### **Where can I find information about the Aptos Labs team?**
+### Where can I find information about the Aptos Labs team?
 
 See [https://www.linkedin.com/company/aptoslabs](https://www.linkedin.com/company/aptoslabs)
 
-### Where is the Aptos Labs **white paper?**
+### Where is the Aptos Labs white paper?
 
 https://aptos.dev/aptos-white-paper/aptos-white-paper-index
 
-### Where is your **developer documentation?**
+### Where is your developer documentation?
 
 See: https://aptos.dev/
 
 (This site. :-))
 
-### **What makes Aptos unique compared to alternative blockchains?**
+### What makes Aptos unique compared to alternative blockchains?
 
 We have a specific focus on building a safe, scalable and upgradable blockchain with credible neutrality.  [](https://aptos.dev/transactions/interacting-with-the-aptos-blockchain)
 
@@ -48,11 +48,11 @@ Join the Discord channel [Aptos Move language channel](https://discord.com/chann
 
 Also see [Interacting with Aptos Blockchain](https://aptos.dev/guides/interacting-with-the-aptos-blockchain) document. 
 
-**What types of projects would be interesting and uniquely suited for Aptos blockchain platform?**
+What types of projects would be interesting and uniquely suited for Aptos blockchain platform?
 
 We are building a general purpose blockchain development platform, so the many use cases range from decentralized finance to gaming, NFTs, DAOs, and beyond!
 
-### ***What changed from Diem to Aptos?***
+### *What changed from Diem to Aptos?*
 
 We have focused upon:
 
@@ -63,14 +63,14 @@ We have focused upon:
 
 ## Aptos Community
 
-### **How can I find you on Telegram, Discord, Twitter and other communities?**
+### How can I find you on Telegram, Discord, Twitter and other communities?
 
-- **Telegram**
-    - **Aptos Labs**: [https://t.me/AptosLabs](https://t.me/AptosLabs)
-    - **Aptos Official (announcements):** [https://t.me/Aptos_official](https://t.me/Aptos_official)
-- **Discord**: [https://discord.gg/tuDs9TmWwv](https://discord.gg/tuDs9TmWwv)
-- **Twitter**: [https://twitter.com/aptoslabs](https://twitter.com/aptoslabs)
-- **Twitch**: [https://www.twitch.tv/aptoslabs](https://www.twitch.tv/aptoslabs)
+- Telegram
+    - Aptos Labs: [https://t.me/AptosLabs](https://t.me/AptosLabs)
+    - Aptos Official (announcements): [https://t.me/Aptos_official](https://t.me/Aptos_official)
+- Discord: [https://discord.gg/tuDs9TmWwv](https://discord.gg/tuDs9TmWwv)
+- Twitter: [https://twitter.com/aptoslabs](https://twitter.com/aptoslabs)
+- Twitch: [https://www.twitch.tv/aptoslabs](https://www.twitch.tv/aptoslabs)
 
 ### How do I keep up with news from Aptos Labs?
 
@@ -84,23 +84,23 @@ A role gives a specific level of permission. As more and more contributors join 
 
 Check out the [Aptos Discord channel](https://discord.com/channels/945856774056083548/957486688710561872) `#roles` to get the role for yourself. 
 
-### **What do these roles mean?**
+### What do these roles mean?
 
-- **Node Operator**: Any Aptos community member running Aptos nodes.
-- **Developer**: Any Aptos community member developing on Aptos Blockchain.
-- **Aptonaut**: Anyone who is exploring opportunities to contribute in the [Aptos Discord channel](https://discord.com/channels/945856774056083548/963777510473084988).
+- Node Operator: Any Aptos community member running Aptos nodes.
+- Developer: Any Aptos community member developing on Aptos Blockchain.
+- Aptonaut: Anyone who is exploring opportunities to contribute in the [Aptos Discord channel](https://discord.com/channels/945856774056083548/963777510473084988).
 
-### **How do I get roles?**
+### How do I get roles?
 
 Head over to the [Aptos Discord channel](https://discord.com/channels/945856774056083548/957486688710561872) `#roles` to get the role for yourself by reacting with the designated emoji. 
 
 ## Aptos Token
 
-### Does **Aptos have a token?**
+### Does Aptos have a token?
 
 There is no Aptos token. 
 
-### **Is there an Aptos token for sale, presale or airdrop?**
+### Is there an Aptos token for sale, presale or airdrop?
 
 There is no current token sale. Anyone claiming otherwise is running a scam and please make sure to report them in the [Aptos Discord channel](https://discord.com/channels/945856774056083548/951160191716585542) `#report-scams`. 
 
@@ -108,26 +108,26 @@ Aptos Labs will post any updates and announcements in the [Aptos Discord channel
 
 ## Working with Aptos Labs
 
-### **I want to be a translator, what are my choices?**
+### I want to be a translator, what are my choices?
 
 Currently, any translation of Aptos Labs documentation from English to a non-English language is a community effort. Check the [Aptos Discord](https://discord.gg/zTDYBEud7U) channel.
 
-### Do you have an **ambassador program?**
+### Do you have an ambassador program?
 
 Yes. The Aptos community program will be announced next week. See Aptos Discord channel `#announcements`.
 TODO: Update with link to program.
 
-### **Is Aptos is hiring?**
+### Is Aptos is hiring?
 
 Yes! Check out this careers page on the Aptos Labs website: [aptoslabs.com/careers](https://aptoslabs.com/careers).
 
-### **I have a commercial proposal, whom I should contact?**
+### I have a commercial proposal, whom I should contact?
 
 Please contact `info@aptoslabs.com`. Note that Aptos Labs is not looking for investment. We would love to collaborate as a community!
 
 ## Aptos devnet
 
-### **What is the purpose of Aptos devnet?**
+### What is the purpose of Aptos devnet?
 
 The Aptos devnet is a publicly deployed instance of the Aptos network, built for experimenting with new ideas. The Aptos devnet runs a set of validator test nodes. 
 
@@ -139,7 +139,7 @@ Yes. Click here: [https://explorer.devnet.aptos.dev](https://explorer.devnet.apt
 
 ## Validators and Nodes
 
-### **Can only developers run full nodes?**
+### Can only developers run full nodes?
 
 Anyone with the proper hardware can run a node and get involved! We welcome everyone from the community to join in and participate. 
 
@@ -151,39 +151,39 @@ See the [Troubleshooting FullNode Setup](https://aptos.dev/tutorials/full-node/t
 
 ### What are the hardware and storage requirements to run an Aptos node?
 
-**What are the minimum hardware requirements for compiling the source?**
+What are the minimum hardware requirements for compiling the source?
 
 We recommend 16GB of memory or more.
 
-**What are the hardware requirements for a full node?**
+What are the hardware requirements for a full node?
 
 See [Hardware requirements](https://aptos.dev/tutorials/full-node/run-a-fullnode#hardware-requirements) section of Aptos developer docs for running a FullNode.
 
-**Can I run a node using PC with Win10 or macOS?**
+Can I run a node using PC with Win10 or macOS?
 
 Yes! 
 
-- For **macOS or Linux**: See the Aptos developer documents: [Running a local testnet](https://aptos.dev/tutorials/run-a-local-testnet) and [Run a FullNode](https://aptos.dev/tutorials/full-node/run-a-fullnode).
-- For **Windows**: See the guide created by Mahamadou Camara: [https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing](https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing)
-    - Here is the **Chinese language version** of the above document, courtesy of @aptos_cn: [https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows](https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows)
+- For macOS or Linux: See the Aptos developer documents: [Running a local testnet](https://aptos.dev/tutorials/run-a-local-testnet) and [Run a FullNode](https://aptos.dev/tutorials/full-node/run-a-fullnode).
+- For Windows: See the guide created by Mahamadou Camara: [https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing](https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing)
+    - Here is the Chinese language version of the above document, courtesy of @aptos_cn: [https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows](https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows)
 
-### **How do I run a full node?**
+### How do I run a full node?
 
 See a step-by-step tutorial showing how to [Run a FullNode](https://aptos.dev/tutorials/full-node/run-a-fullnode). 
 
-### **How to run a full node on Google Cloud Platform?**
+### How to run a full node on Google Cloud Platform?
 
 See a step-by-step tutorial showing how to [Run a FullNode on GCP](https://aptos.dev/tutorials/run-a-fullnode-on-gcp). 
 
-### **Can I run a validator node?**
+### Can I run a validator node?
 
 Yes. See this step-by-step tutorial describing how to [Run a Local Testnet](https://aptos.dev/tutorials/run-a-local-testnet) with a single validator node on your computer. 
 
-### **How to know if my node is synced?**
+### How to know if my node is synced?
 
 See the document [Verify initial synchronization](https://aptos.dev/tutorials/full-node/run-a-fullnode#verify-initial-synchronization).
 
-### **How do I know if my node should be updated?**
+### How do I know if my node should be updated?
 
 When Aptos devnet is wiped and updated with newer versions, you should update your FullNode. See [Update FullNode With New Releases](https://aptos.dev/tutorials/full-node/update-fullnode-with-new-releases) documentation. 
 
@@ -201,7 +201,7 @@ The Aptos Incentivized Testnet (AIT) is a series of incentivized programs offere
 
 See the latest update on AIT in this [Aptos blog post](https://medium.com/aptoslabs/launch-of-aptos-incentivized-testnet-registration-2e85696a62d0). 
 
-### **When can I participate in the incentivized testnet?**
+### When can I participate in the incentivized testnet?
 
 Registration for AIT1 has begun on 13 May 2022. See the latest schedule update on this [Aptos Community](https://community.aptoslabs.com/) page and [in this Aptos blog post](https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c). 
 
@@ -209,19 +209,19 @@ Registration for AIT1 has begun on 13 May 2022. See the latest schedule update o
 
 The identity of all the participants will be verified prior to the AIT1 lottery event. You may not be qualified to participate, and some participants may not be eligible for token-based rewards. See below for a quick summary. See the latest update in this [Aptos blog post](https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c). 
 
-**Participation**
+Participation
 
-- If you are on a sanctions or other screening list from the US, EU, UN and certain other countries, then **you cannot participate**.
-- If you are a citizen or resident of Cuba, Democratic People’s Republic of Korea, the Crimea, Donetsk, and Luhansk regions, Iran, or Syria, then **you cannot participate**.
+- If you are on a sanctions or other screening list from the US, EU, UN and certain other countries, then you cannot participate.
+- If you are a citizen or resident of Cuba, Democratic People’s Republic of Korea, the Crimea, Donetsk, and Luhansk regions, Iran, or Syria, then you cannot participate.
 
-**Rewards**
+Rewards
 
-- **U.S. participants**: Because of regulatory considerations, participants who are either citizens of the U.S., or who are residents in the United States are **not eligible** for the token-based rewards. We are looking into non-token awards but there is no guarantee that any such rewards will be available to US participants.
+- U.S. participants: Because of regulatory considerations, participants who are either citizens of the U.S., or who are residents in the United States are not eligible for the token-based rewards. We are looking into non-token awards but there is no guarantee that any such rewards will be available to US participants.
 
 ## App and Move development
 
-## How do you generate FT and NFT tokens without issuing modules using “token.move” with Aptos Framework?
-## How do you ensure data security and token control. What are the pros on the Aptos side of publishing a token without a module (smart contract) that it is designed differently from languages such as Solidity, Cairo, Sway?
+### How do you generate FT and NFT tokens without issuing modules using “token.move” with Aptos Framework?
+### How do you ensure data security and token control. What are the pros on the Aptos side of publishing a token without a module (smart contract) that it is designed differently from languages such as Solidity, Cairo, Sway?
 
 * You can call the entry functions of token.move (such as [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L338-L395](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L338-L395) ) directly via the fullnode API by signing+submitting a transaction using any of our supported SDKs (more to come) or via the `aptos cli`. This allows you to create tokens without writing any Move code.
 * There are several benefits to issuing tokens using `token.move` instead of redeploying your own contract code every time, for example:
