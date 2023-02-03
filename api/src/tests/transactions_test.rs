@@ -477,6 +477,7 @@ async fn test_signing_message_with_entry_function_payload() {
         ]
     });
     test_signing_message_with_payload(context, txn, payload).await;
+}
 
 async fn test_signing_message_with_payload(
     mut context: TestContext,
