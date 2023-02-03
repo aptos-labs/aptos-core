@@ -3,7 +3,7 @@
 
 use crate::{
     context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
-    index, CustomEventConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
+    index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
@@ -31,11 +31,11 @@ pub async fn new_test_context() -> TestContext {
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
-        humio_url: "".into(),
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
         peer_identities: HashMap::new(),
         metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
+        humio_ingest_config: LogIngestConfig::default_for_test(),
     };
 
     let peers = PeerStoreTuple::default();

@@ -28,6 +28,8 @@ pub fn log_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
             NodeType::Validator,
             NodeType::ValidatorFullNode,
             NodeType::PublicFullNode,
+            NodeType::UnknownFullNode,
+            NodeType::UnknownValidator,
         ]))
         .and(warp::header::optional(CONTENT_ENCODING.as_str()))
         .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
@@ -43,6 +45,21 @@ pub async fn handle_log_ingest(
     body: impl Buf,
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling log ingest");
+
+    if let Some(blacklist) = &context.log_ingest_clients().blacklist {
+        if blacklist.contains(&claims.peer_id) {
+            return Err(reject::custom(ServiceError::forbidden(
+                LogIngestError::Forbidden(claims.peer_id).into(),
+            )));
+        }
+    }
+
+    let client = match claims.node_type {
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
+            &context.log_ingest_clients().unknown_logs_ingest_client
+        },
+        _ => &context.log_ingest_clients().known_logs_ingest_client,
+    };
 
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
@@ -87,10 +104,7 @@ pub async fn handle_log_ingest(
 
     let start_timer = Instant::now();
 
-    let res = context
-        .humio_client()
-        .ingest_unstructured_log(unstructured_log)
-        .await;
+    let res = client.ingest_unstructured_log(unstructured_log).await;
 
     match res {
         Ok(res) => {

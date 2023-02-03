@@ -321,7 +321,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(format!("{}/api/v1/auth", self.base_url))
+            .post(self.build_path("auth")?)
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;
