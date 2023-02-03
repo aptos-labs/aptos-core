@@ -242,3 +242,4 @@ This section contains links to frequently referred Aptos developer resources.
 - [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
 - [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
+- [Remix IDE Plugin for Move](https://docs.welldonestudio.io/code/getting-started): Web-based DevEnvironment. It is a no-setup tool with a GUI for developing Move modules.
