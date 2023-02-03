@@ -122,10 +122,6 @@ You can check the returned compiled binary file in `aptos/<YOUR_PROJECT_NAME>/o
 If you need to revise the contract and compile again, delete the `out` directory and click the compile button.
 :::
 
-:::info
-There is a bug that prevents you from signing transactions if your current account does not have enough APT (approximately 0.3APT). We are analyzing the cause and will fix it soon. Please refer to it for development.
-:::
-
 4. If you have a compiled contract code, then `Deploy` button will be activated. 
 
 ## Step 6: Interact with a Move module.
