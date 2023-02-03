@@ -5,11 +5,15 @@ slug: "aptos-api"
 
 # Use the Aptos REST Read API
 
-If you provide blockchain services to your customers and wish to employ the Aptos API, then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
+If you provide blockchain services to your customers and wish to employ the [Aptos API](https://aptos.dev/nodes/aptos-api-spec/#/), then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
 
 :::tip
 Also see the [System Integrators Guide](./system-integrators-guide.md) for a thorough walkthrough of Aptos integration.
 :::
+
+## Understanding rate limits
+
+As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a rate limit of 1000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
 
 ## Viewing current and historical state
 
