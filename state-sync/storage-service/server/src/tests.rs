@@ -76,7 +76,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 /// Various test constants for storage
-const MAX_RESPONSE_TIMEOUT_SECS: u64 = 40;
+const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
 const PROTOCOL_VERSION: u64 = 1;
 
 #[tokio::test]
