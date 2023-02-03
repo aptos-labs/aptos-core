@@ -4,7 +4,9 @@
 mod aptos_debug_natives;
 mod manifest;
 pub mod package_hooks;
+
 pub use package_hooks::*;
+
 pub mod stored_package;
 mod transactional_tests_runner;
 
@@ -30,7 +32,7 @@ use aptos_framework::{
     BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -84,6 +86,7 @@ pub enum MoveTool {
     Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    View(ViewFunction),
 }
 
 impl MoveTool {
@@ -106,6 +109,7 @@ impl MoveTool {
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::View(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -1101,6 +1105,58 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 }
 
+/// Run a Move function
+#[derive(Parser)]
+pub struct ViewFunction {
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
+    #[clap(long)]
+    pub(crate) function_id: MemberId,
+
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
+    fn command_name(&self) -> &'static str {
+        "RunViewFunction"
+    }
+
+    async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
+        let mut args: Vec<serde_json::Value> = vec![];
+        for arg in self.args {
+            args.push(arg.to_json()?);
+        }
+
+        let view_request = ViewRequest {
+            function: EntryFunctionId {
+                module: self.function_id.module_id.into(),
+                name: self.function_id.member_id.into(),
+            },
+            type_arguments: self.type_args,
+            arguments: args,
+        };
+
+        self.txn_options.view(view_request).await
+    }
+}
+
 /// Run a Move script
 #[derive(Parser)]
 pub struct RunScript {
@@ -1395,6 +1451,71 @@ impl ArgWithType {
             _ty: FunctionArgType::Raw,
             arg,
         }
+    }
+
+    pub fn to_json(&self) -> CliTypedResult<serde_json::Value> {
+        match self._ty.clone() {
+            FunctionArgType::Address => {
+                serde_json::to_value(bcs::from_bytes::<AccountAddress>(&self.arg)?)
+            },
+            FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
+            FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+            FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U64 => {
+                serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U128 => {
+                serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U256 => {
+                serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+            },
+            FunctionArgType::Raw => serde_json::to_value(&self.arg),
+            FunctionArgType::HexArray => {
+                serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+            },
+            FunctionArgType::Vector(inner) => match inner.deref() {
+                FunctionArgType::Address => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<AccountAddress>>(&self.arg)?)
+                },
+                FunctionArgType::Bool => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<bool>>(&self.arg)?)
+                },
+                FunctionArgType::Hex => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+                },
+                FunctionArgType::String => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<String>>(&self.arg)?)
+                },
+                FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+                FunctionArgType::U16 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u16>>(&self.arg)?)
+                },
+                FunctionArgType::U32 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u32>>(&self.arg)?)
+                },
+                FunctionArgType::U64 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u64>>(&self.arg)?)
+                },
+                FunctionArgType::U128 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u128>>(&self.arg)?)
+                },
+                FunctionArgType::U256 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<U256>>(&self.arg)?)
+                },
+                FunctionArgType::Raw | FunctionArgType::HexArray | FunctionArgType::Vector(_) => {
+                    return Err(CliError::UnexpectedError(
+                        "Nested vectors not supported".to_string(),
+                    ));
+                },
+            },
+        }
+        .map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
+        })
     }
 }
 
