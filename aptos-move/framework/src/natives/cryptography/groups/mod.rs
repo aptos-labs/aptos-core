@@ -49,20 +49,6 @@ impl Structure {
     }
 }
 
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum HashAlg {
-    SHA256,
-}
-
-impl HashAlg {
-    pub fn from_type_tag(type_tag: &TypeTag) -> Option<HashAlg> {
-        match type_tag.to_string().as_str() {
-            "0x1::groups::SHA256" => Some(HashAlg::SHA256),
-            _ => None
-        }
-    }
-}
-
 pub mod abort_codes {
     pub const NOT_IMPLEMENTED: u64 = 0x0c0000;
     pub const NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS: u64 = 4;
@@ -75,10 +61,6 @@ pub struct GasParameters {
     pub blst_g1_msm_per_pair: InternalGasPerArg,
     pub blst_g2_msm_base: InternalGasPerArg,
     pub blst_g2_msm_per_pair: InternalGasPerArg,
-    pub blst_hash_to_g1_proj_base: InternalGasPerArg,
-    pub blst_hash_to_g1_proj_per_byte: InternalGasPerByte,
-    pub blst_hash_to_g2_proj_base: InternalGasPerArg,
-    pub blst_hash_to_g2_proj_per_byte: InternalGasPerByte,
     pub blst_g1_proj_to_affine: InternalGasPerArg,
     pub blst_g1_affine_ser: InternalGasPerArg,
     pub blst_g2_proj_to_affine: InternalGasPerArg,
@@ -100,7 +82,7 @@ pub struct GasParameters {
     pub ark_bls12_381_fq12_inv: InternalGasPerArg,
     pub ark_bls12_381_fq12_mul: InternalGasPerArg,
     pub ark_bls12_381_fq12_one: InternalGasPerArg,
-    pub ark_bls12_381_fq12_pow_fr: InternalGasPerArg,
+    pub ark_bls12_381_fq12_pow_u256: InternalGasPerArg,
     pub ark_bls12_381_fq12_serialize: InternalGasPerArg,
     pub ark_bls12_381_fq12_square: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_add: InternalGasPerArg,
@@ -149,21 +131,6 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
     pub ark_bls12_381_pairing_product_base: InternalGasPerArg,
     pub ark_bls12_381_pairing_product_per_pair: InternalGasPerArg,
-}
-
-impl GasParameters {
-    fn blst_hash_to_g1_proj(&self, num_input_bytes: usize) -> InternalGas {
-        self.blst_hash_to_g1_proj_per_byte * NumBytes::from(num_input_bytes as u64) + self.blst_hash_to_g1_proj_base * NumArgs::one()
-    }
-
-    fn blst_hash_to_g2_proj(&self, num_input_bytes: usize) -> InternalGas {
-        self.blst_hash_to_g2_proj_per_byte * NumBytes::from(num_input_bytes as u64) + self.blst_hash_to_g2_proj_base * NumArgs::one()
-    }
-
-    fn sha256(&self, num_input_bytes: usize) -> InternalGas {
-        //TODO
-        InternalGas::zero()
-    }
 }
 
 #[derive(Tid)]
@@ -215,13 +182,6 @@ macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
         Structure::from_type_tag(&type_tag)
-    }}
-}
-
-macro_rules! hash_alg_from_ty_arg {
-    ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
-        HashAlg::from_type_tag(&type_tag)
     }}
 }
 
@@ -418,7 +378,7 @@ fn element_deserialize_uncompressed_internal(
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             match Fq12::deserialize(bytes.as_slice()) {
                 Ok(element) => {
-                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_fr + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
+                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
                     if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
                         let handle = store_bls12_381_gt!(context, element);
                         Ok(NativeResult::ok(
@@ -496,7 +456,7 @@ fn element_deserialize_compressed_internal(
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
             match ark_bls12_381::Fq12::deserialize(bytes.as_slice()) {
                 Ok(element) => {
-                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_fr + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
+                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
                     if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
                         let handle = store_bls12_381_gt!(context, element);
                         Ok(NativeResult::ok(
@@ -1110,7 +1070,7 @@ fn element_scalar_mul_internal(
             let new_element = element.pow(scalar.into_repr().as_ref());
             let new_handle = store_bls12_381_gt!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_fr_to_repr + gas_params.ark_bls12_381_fq12_pow_fr) * NumArgs::one(),
+                (gas_params.ark_bls12_381_fr_to_repr + gas_params.ark_bls12_381_fq12_pow_u256) * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1544,73 +1504,6 @@ fn blst_g2_proj_to_affine(point: &blst::blst_p2) -> blst::blst_p2_affine {
     ret
 }
 
-fn hash_to_blst_g1(bytes: &[u8]) -> blst::blst_p1 {
-    let mut ret = blst::blst_p1::default();
-    unsafe { blst::blst_hash_to_g1(&mut ret, bytes.as_ptr(), bytes.len(), DST.as_ptr(), DST.len(), AUG.as_ptr(), AUG.len()); }
-    ret
-}
-
-fn hash_to_blst_g2(bytes: &[u8]) -> blst::blst_p2 {
-    let mut ret = blst::blst_p2::default();
-    unsafe { blst::blst_hash_to_g2(&mut ret, bytes.as_ptr(), bytes.len(), DST.as_ptr(), DST.len(), AUG.as_ptr(), AUG.len()); }
-    ret
-}
-
-fn hash_to_element_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
-    assert_eq!(2, ty_args.len());
-    let hash_alg = hash_alg_from_ty_arg!(context, &ty_args[0]);
-    let target_group = structure_from_ty_arg!(context, &ty_args[1]);
-    let bytes = pop_arg!(args, Vec<u8>);
-    match (hash_alg, target_group) {
-        (Some(HashAlg::SHA256), Some(Structure::BLS12_381_G1)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::SHA256_TO_GROUP);
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let blst_g1_proj = hash_to_blst_g1(bytes.as_slice());
-            let blst_g1_affine = blst_g1_proj_to_affine(&blst_g1_proj);
-            let ark_g1_affine = blst_g1_affine_to_ark_g1_affine(&blst_g1_affine);
-            let ark_g1_proj = ark_g1_affine.into_projective();
-            let new_handle = store_bls12_381_g1!(context, ark_g1_proj);
-            Ok(NativeResult::ok(
-                gas_params.blst_hash_to_g1_proj(bytes.len())
-                    + (
-                    gas_params.blst_g1_proj_to_affine
-                        + gas_params.blst_g1_affine_ser
-                        + gas_params.ark_bls12_381_g1_affine_deser_uncomp
-                        + gas_params.ark_bls12_381_g1_affine_to_proj
-                ) * NumArgs::one(),
-                smallvec![Value::u64(new_handle as u64)]
-            ))
-        }
-        (Some(HashAlg::SHA256), Some(Structure::BLS12_381_G2)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::SHA256_TO_GROUP);
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let blst_g2_proj = hash_to_blst_g2(bytes.as_slice());
-            let blst_g2_affine = blst_g2_proj_to_affine(&blst_g2_proj);
-            let ark_g2_affine = blst_g2_affine_to_ark_g2_affine(&blst_g2_affine);
-            let ark_g2_proj = ark_g2_affine.into_projective();
-            let new_handle = store_bls12_381_g2!(context, ark_g2_proj);
-            Ok(NativeResult::ok(
-                gas_params.blst_hash_to_g2_proj(bytes.len())
-                    + (gas_params.blst_g2_proj_to_affine
-                    + gas_params.blst_g2_affine_ser
-                    + gas_params.ark_bls12_381_g2_affine_deser_uncomp
-                    + gas_params.ark_bls12_381_g2_affine_to_proj
-                ) * NumArgs::one(),
-                smallvec![Value::u64(new_handle as u64)]
-            ))
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
-
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
 
@@ -1707,10 +1600,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "group_order_internal",
             make_native_from_func(gas_params.clone(), group_order_internal),
-        ),
-        (
-            "hash_to_element_internal",
-            make_native_from_func(gas_params.clone(), hash_to_element_internal),
         ),
     ]);
 

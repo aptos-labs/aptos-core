@@ -2,9 +2,6 @@ module aptos_std::groups {
     use std::option::Option;
     use aptos_std::type_info::type_of;
 
-    // Error codes
-    const E_NOT_IMPLEMENTED: u64 = 2;
-
     /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
     /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
     /// `E(Fq)` is an elliptic curve `y^2=x^3+4` defined over `Fq`.
@@ -254,16 +251,6 @@ module aptos_std::groups {
         }
     }
 
-    /// Hash bytes to a group element.
-    public fun hash_to_element<H, G>(bytes: vector<u8>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
-        abort_unless_hash_alg_enabled<H>();
-        abort_unless_structure_enabled<G>();
-        Element<G> {
-            handle: hash_to_element_internal<H, G>(bytes)
-        }
-    }
-
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` for a list of scalars `k[]` and a list of group elements `P[]`, both of size `n`.
     /// This function is much faster and cheaper than calling `element_scalar_mul` and adding up the results using `scalar_add`.
     public fun element_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Scalar<S>>): Element<G> {
@@ -403,15 +390,6 @@ module aptos_std::groups {
         }
     }
 
-    fun abort_unless_hash_alg_enabled<S>() {
-        let type = type_of<S>();
-        if (type == type_of<SHA256>() && std::features::sha256_to_group_enabled()) {
-            // Let go.
-        } else {
-            abort(std::error::not_implemented(0))
-        }
-    }
-
     // Native functions.
     native fun element_deserialize_uncompressed_internal<G>(bytes: vector<u8>): (bool, u64);
     native fun element_deserialize_compressed_internal<G>(bytes: vector<u8>): (bool, u64);
@@ -436,7 +414,6 @@ module aptos_std::groups {
     native fun element_serialize_compressed_internal<G>(handle: u64): vector<u8>;
     native fun element_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
-    native fun hash_to_element_internal<H, G>(bytes: vector<u8>): u64;
     #[test_only]
     native fun random_element_internal<G>(): u64;
     #[test_only]
@@ -537,9 +514,6 @@ module aptos_std::groups {
         naive = element_add(&naive, &element_scalar_mul(&point_r, &scalar_c));
         let fast = element_multi_scalar_mul(&vector[point_p, point_q, point_r], &vector[scalar_a, scalar_b, scalar_c]);
         assert!(element_eq(&naive, &fast), 1);
-
-        // Hash to group.
-        let _point = hash_to_element<SHA256, BLS12_381_G1>(x"1234");
     }
 
     #[test(fx = @std)]
@@ -605,9 +579,6 @@ module aptos_std::groups {
         naive = element_add(&naive, &element_scalar_mul(&point_r, &scalar_c));
         let fast = element_multi_scalar_mul(&vector[point_p, point_q, point_r], &vector[scalar_a, scalar_b, scalar_c]);
         assert!(element_eq(&naive, &fast), 1);
-
-        // Hash to group.
-        let _point = hash_to_element<SHA256, BLS12_381_G2>(x"1234");
     }
 
     #[test(fx = @std)]

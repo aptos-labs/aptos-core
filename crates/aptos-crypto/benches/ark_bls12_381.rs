@@ -280,7 +280,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fq12_pow_fr", move |b| {
+    group.bench_function("fq12_pow_u256", move |b| {
         b.iter_with_setup(
             || {
                 let e = Fq12::rand(&mut test_rng());
@@ -813,9 +813,9 @@ fn bench_group(c: &mut Criterion) {
     });
 
 
-    for num_pairs in [1,2,4,8] {
+    for num_pairs in [1,2,3,4,8] {
         group.bench_function(
-            format!("{num_pairs}_pairing_product").as_str(),
+            format!("pairing_product_of_{num_pairs}").as_str(),
             |b| {
                 b.iter_with_setup(
                     ||{
