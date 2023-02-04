@@ -55,6 +55,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move"]).await;
     assert_cmd_not_panic(&["aptos", "move", "clean", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "compile", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "compile-script", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "download", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "init", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "list", "--help"]).await;
@@ -64,6 +65,7 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move", "run-script", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "test", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "transactional-test", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "view", "--help"]).await;
 
     assert_cmd_not_panic(&["aptos", "node"]).await;
     assert_cmd_not_panic(&["aptos", "node", "get-stake-pool", "--help"]).await;
