@@ -324,7 +324,7 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
       }
     }
 
-    if (!(argVal instanceof Array)) {
+    if (!Array.isArray(argVal)) {
       throw new Error("Invalid vector args.");
     }
 
