@@ -479,28 +479,6 @@ async fn test_signing_message_with_entry_function_payload() {
     test_signing_message_with_payload(context, txn, payload).await;
 }
 
-// need a correct module payload
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_module_payload() {
-    let context = new_test_context(current_function_name!());
-    let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut root_account = context.root_account();
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .module(hex::decode(code).unwrap()),
-    );
-    let payload = json!({
-        "type": "module_bundle_payload",
-        "modules" : [
-            {"bytecode": format!("0x{}", code)},
-        ],
-    });
-
-    test_signing_message_with_payload(context, txn, payload).await;
-}
-
 async fn test_signing_message_with_payload(
     mut context: TestContext,
     txn: SignedTransaction,
@@ -657,21 +635,6 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
         )
         .await;
     assert_eq!(txns.as_array().unwrap().len(), 2);
-}
-
-#[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
-    let context = new_test_context(current_function_name!());
-    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
-    let mut root_account = context.root_account();
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .module(invalid_bytecode)
-            .expiration_timestamp_secs(u64::MAX),
-    );
-    test_transaction_vm_status(context, txn, false).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
