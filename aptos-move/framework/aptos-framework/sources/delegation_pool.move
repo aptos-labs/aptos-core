@@ -436,7 +436,7 @@ module aptos_framework::delegation_pool {
         // short-circuit if amount to add is 0 so no event is emitted
         if (amount == 0) { return };
         // should add at least the symbolic minimum stake
-        // assert!(amount >= MIN_ADD_STAKE_AMOUNT, error::invalid_argument(EINVALID_ADD_STAKE_AMOUNT));
+        assert!(amount >= MIN_ADD_STAKE_AMOUNT, error::invalid_argument(EINVALID_ADD_STAKE_AMOUNT));
 
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
@@ -833,7 +833,7 @@ module aptos_framework::delegation_pool {
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000 * ONE_APT);
+        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
     }
 
     #[test_only]
@@ -977,7 +977,7 @@ module aptos_framework::delegation_pool {
         delegator1: &signer,
         delegator2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000000 * ONE_APT);
+        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
 
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
@@ -1069,6 +1069,16 @@ module aptos_framework::delegation_pool {
         // stakes should remain the same - `Self::get_stake` correctly calculates them
         synchronize_delegation_pool(pool_address);
         assert_delegation(delegator1_address, pool_address, 11201699216002, 0, 2000000000000);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10008, location = Self)]
+    public entry fun test_add_stake_min_amount(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, MIN_ADD_STAKE_AMOUNT - 1, false, false);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
