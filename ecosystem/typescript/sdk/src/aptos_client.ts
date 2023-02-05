@@ -282,6 +282,18 @@ export class AptosClient {
       config.expSecFromNow = timestamp - Math.floor(Date.now() / 1000);
     }
 
+    if (!payload.type_arguments) {
+      throw new Error("type_arguments missing from transaction payload");
+    }
+
+    if (!payload.function) {
+      throw new Error("function missing from transaction payload");
+    }
+
+    if (!payload.arguments) {
+      throw new Error("arguments missing from transaction payload");
+    }
+
     const builder = new TransactionBuilderRemoteABI(this, config);
     return builder.build(payload.function, payload.type_arguments, payload.arguments);
   }

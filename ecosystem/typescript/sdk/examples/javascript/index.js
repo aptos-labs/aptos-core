@@ -37,4 +37,38 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   resources = await client.getAccountResources(account2.address());
   accountResource = resources.find((r) => r.type === aptosCoin);
   console.log(`account2 coins: ${accountResource.data.coin.value}. Should be 717!`);
+
+  const tokenClient = new aptos.TokenClient(client);
+  const collectionName = "AliceCollection";
+  const tokenName = "Alice Token";
+
+  // Create collection and token on Alice's account
+  await client.waitForTransaction(
+    await tokenClient.createCollection(account1, collectionName, "Alice's new collection", "https://aptos.dev"),
+    { checkSuccess: true },
+  );
+
+  await client.waitForTransaction(
+    await tokenClient.createTokenWithMutabilityConfig(
+      account1,
+      collectionName,
+      tokenName,
+      "Alice's new token",
+      1,
+      "https://aptos.dev/img/nyan.jpeg",
+      1000,
+      account1.address(),
+      1,
+      0,
+      ["TOKEN_BURNABLE_BY_OWNER"],
+      [aptos.BCS.bcsSerializeBool(true)],
+      ["bool"],
+      [false, false, false, false, true],
+    ),
+    { checkSuccess: true },
+  );
+
+  let connection = new aptos.IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  const response = await connection.getAccountNFTs(account1.address().hex(), { limit: 20, offset: 0 });
+  console.log(`account1 current token name: ${response[0].name}. Should be Alice Token!`);
 })();

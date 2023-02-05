@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
-import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
+import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TokenClient, IndexerClient } from "aptos";
 import assert from "assert";
 
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
+const FAUCET_URL = "https://faucet.devnet.aptoslabs.com";
 
 export const aptosCoinStore = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -92,4 +92,47 @@ const {
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);
+
+  const tokenClient = new TokenClient(client);
+  const collectionName = "AliceCollection";
+  const tokenName = "Alice Token";
+
+  // Create collection and token on Alice's account
+  await client.waitForTransaction(
+    await tokenClient.createCollection(account1, collectionName, "Alice's new collection", "https://aptos.dev"),
+    { checkSuccess: true },
+  );
+
+  await client.waitForTransaction(
+    await tokenClient.createTokenWithMutabilityConfig(
+      account1,
+      collectionName,
+      tokenName,
+      "Alice's new token",
+      1,
+      "https://aptos.dev/img/nyan.jpeg",
+      1000,
+      account1.address(),
+      1,
+      0,
+      ["TOKEN_BURNABLE_BY_OWNER"],
+      [BCS.bcsSerializeBool(true)],
+      ["bool"],
+      [false, false, false, false, true],
+    ),
+    { checkSuccess: true },
+  );
+
+  let connection = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  const response = await connection.getAccountNFTs(account1.address().hex(), { limit: 20, offset: 0 });
+  console.log(`account1 current token name: ${response[0].name}. Should be Alice Token!`);
+
+  // using notStrictEqual because we also get token_data_id_hash in the response
+  assert.notStrictEqual(response[0], {
+    name: "Alice Token",
+    collection_name: "AliceCollection",
+    table_type: "0x3::token::TokenStore",
+    property_version: 0,
+    amount: 1,
+  });
 })();

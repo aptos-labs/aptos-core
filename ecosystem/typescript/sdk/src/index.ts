@@ -3,6 +3,7 @@
 
 export * from "./aptos_account";
 export * from "./aptos_client";
+export * from "./indexer_client";
 export * as BCS from "./bcs";
 export * from "./coin_client";
 export * from "./faucet_client";
