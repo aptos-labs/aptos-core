@@ -67,7 +67,7 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     build_information.insert(BUILD_CARGO_VERSION.into(), build::CARGO_VERSION.into());
     build_information.insert(BUILD_COMMIT_HASH.into(), build::COMMIT_HASH.into());
     build_information.insert(BUILD_TAG.into(), build::TAG.into());
-    build_information.insert(BUILD_TIME.into(), build::BUILD_TIME.into());
+    // build_information.insert(BUILD_TIME.into(), build::BUILD_TIME.into());
     build_information.insert(BUILD_OS.into(), build::BUILD_OS.into());
     build_information.insert(BUILD_RUST_CHANNEL.into(), build::RUST_CHANNEL.into());
     build_information.insert(BUILD_RUST_VERSION.into(), build::RUST_VERSION.into());
