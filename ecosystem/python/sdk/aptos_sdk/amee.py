@@ -41,6 +41,16 @@ def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
     return bytes.fromhex(prefixed_hex[2:])
 
 
+def get_file_path(
+    optional_path: Option[Path], tokens: List[str], extension: str
+) -> Path:
+    """If no path provided, generate one from tokens and extension."""
+    if optional_path is not None:  # If optional path provided:
+        return optional_path  # Use it as the path.
+    # Otherwise return a new path from tokens and extension.
+    return Path("_".join(tokens).casefold() + "." + extension)
+
+
 def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
     """Check keyfile password, returning JSON data/private key bytes."""
     with open(path, "r", encoding="utf-8") as keyfile:  # Open keyfile:
@@ -147,28 +157,23 @@ def incorporate(args):
             )
         )  # Extract relevant fields for list of signatories.
     # Initialize multisig public key.
-    multi_key = MultiEd25519PublicKey(public_keys, args.threshold)
+    multisig_public_key = MultiEd25519PublicKey(public_keys, args.threshold)
     # Get authentication key as prefixed hex.
-    auth_key = bytes_to_prefixed_hex(multi_key.auth_key().hex())
+    auth_key = bytes_to_prefixed_hex(multisig_public_key.auth_key().hex())
     data = {  # Generate JSON data for multisig metadata file.
         "multisig_name": multisig_name,
         "threshold": args.threshold,
         "n_signatories": n_signers,
-        "public_key": bytes_to_prefixed_hex(multi_key.to_bytes()),
+        "public_key": bytes_to_prefixed_hex(multisig_public_key.to_bytes()),
         "authentication_key": auth_key,
         "signatories": signatories,
     }
-    if args.metafile is None:  # If no custom filepath specified:
-        # Create filepath from multisig name.
-        args.metafile = Path("_".join(args.name).casefold() + ".multisig")
-    check_outfile_exists(args.metafile)  # Check if path exists.
-    # Dump JSON data to metafile.
-    with open(args.metafile, "w", encoding="utf-8") as metafile:
-        json.dump(data, metafile, indent=4)
-    with open(args.metafile, "r", encoding="utf-8") as metafile:
-        header = "New multisig metadata file at"  # Message header.
-        # Print contents of new metafile.
-        print(f"{header} {args.metafile}: {metafile.read()}")
+    write_json_file(  # Write JSON to multisig metadata file.
+        path=get_file_path(args.metafile, args.name, "multisig"),
+        data=data,
+        descriptor="multisig metadata file",
+        check_if_exists=True,
+    )
 
 
 def keyfile_change_password(args):
@@ -177,14 +182,16 @@ def keyfile_change_password(args):
     data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is not None:  # If able to decrypt private key:
         # Encrypt private key.
-        encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
+        encrypted_bytes, salt = encrypt_private_key(private_key_bytes)
         # Get encrypted private key hex.
-        key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
+        encrypted_private_key_hex = bytes_to_prefixed_hex(encrypted_bytes)
         # Update JSON with encrypted private key.
-        data["encrypted_private_key"] = key_hex
+        data["encrypted_private_key"] = encrypted_private_key_hex
         # Update JSON with new salt.
         data["salt"] = bytes_to_prefixed_hex(salt.hex())
-        keyfile_write_json(args.keyfile, data)  # Write JSON to keyfile.
+        write_json_file(  # Write JSON to keyfile.
+            path=args.keyfile, data=data, descriptor="keyfile", check_if_exists=False
+        )
 
 
 def keyfile_extract(args):
@@ -202,7 +209,8 @@ def keyfile_extract(args):
         # Open new Aptos account store:
         with open(args.account_store, "r", encoding="utf-8") as outfile:
             # Print contents of new account store.
-            print(f"New account store at {args.account_store}: \n{outfile.read()}")
+            print(f"New account store at {args.account_store}:")
+            print(f"{outfile.read()}")
 
 
 def keyfile_generate(args):
@@ -226,11 +234,12 @@ def keyfile_generate(args):
         "encrypted_private_key": key_hex,
         "salt": bytes_to_prefixed_hex(salt),
     }
-    if args.keyfile is None:  # If no custom filepath specified:
-        # Create filepath from signatory name.
-        args.keyfile = Path("_".join(args.signatory).casefold() + ".keyfile")
-    check_outfile_exists(args.keyfile)  # Check if path exists.
-    keyfile_write_json(args.keyfile, data)  # Write JSON to keyfile.
+    write_json_file(  # Write JSON to keyfile.
+        path=get_file_path(args.keyfile, args.signatory, "keyfile"),
+        data=data,
+        descriptor="keyfile",
+        check_if_exists=True,
+    )
 
 
 def keyfile_verify(args):
@@ -245,14 +254,21 @@ def keyfile_verify(args):
         print(f'Authentication key: {data["authentication_key"]}')
 
 
-def keyfile_write_json(path: Path, data: Dict[str, str]):
-    """Write JSON data to keyfile path."""
-    # Dump JSON data to keyfile.
-    with open(path, "w", encoding="utf-8") as keyfile:
-        json.dump(data, keyfile, indent=4)
-    with open(path, "r", encoding="utf-8") as keyfile:
-        # Print contents of new keyfile.
-        print(f"New keyfile at {path}: \n{keyfile.read()}")
+def write_json_file(
+    path: Path, data: Dict[str, str], descriptor: str, check_if_exists: bool
+):
+    """Write JSON data to path, printing contents of new file and
+    optionally checking if the file already exists."""
+    if check_if_exists:
+        check_outfile_exists(path)  # Check if file exists.
+    # With file open for writing:
+    with open(path, "w", encoding="utf-8") as file:
+        # Dump JSON data to file.
+        json.dump(data, file, indent=4)
+    # With file open for reading:
+    with open(path, "r", encoding="utf-8") as file:
+        # Print contents of file.
+        print(f"New {descriptor} at {path}: \n{file.read()}")
 
 
 # AMEE parser.
