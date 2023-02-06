@@ -15,6 +15,7 @@ use aptos_types::{
     on_chain_config::Features,
     transaction::{ChangeSet, Script, Version},
 };
+use aptos_vm::aptos_vm::LATEST_FEATURE_ACTIVATION_TIME;
 use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
@@ -117,6 +118,7 @@ where
         LATEST_GAS_FEATURE_VERSION,
         chain_id,
         Features::default(),
+        LATEST_FEATURE_ACTIVATION_TIME,
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

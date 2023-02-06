@@ -26,6 +26,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::StateSnapshotReceiver;
+use aptos_types::chain_id::ChainId;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
@@ -36,6 +37,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use aptos_vm::aptos_vm::LATEST_FEATURE_ACTIVATION_TIME;
 use aptos_vm::move_vm_ext::verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
@@ -222,7 +224,12 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        let config = verifier_config(false);
+        let config = verifier_config(
+            false,
+            // FIXME: fead chain id & timestamp from the state.
+            ChainId::test().id(),
+            LATEST_FEATURE_ACTIVATION_TIME,
+        );
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {

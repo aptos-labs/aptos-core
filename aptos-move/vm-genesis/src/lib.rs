@@ -27,7 +27,9 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
+    aptos_vm::LATEST_FEATURE_ACTIVATION_TIME,
     data_cache::AsMoveResolver,
+    data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
@@ -109,6 +111,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        LATEST_FEATURE_ACTIVATION_TIME,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -220,6 +223,7 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        LATEST_FEATURE_ACTIVATION_TIME,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -600,13 +604,19 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
         });
 
     // Call the initialize function with the metadata.
-    exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS)
-            .simple_serialize()
-            .unwrap(),
-        MoveValue::Signer(addr).simple_serialize().unwrap(),
-        bcs::to_bytes(pack.package_metadata()).unwrap(),
-    ]);
+    exec_function(
+        session,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(pack.package_metadata()).unwrap(),
+        ],
+    );
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -887,6 +897,7 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        LATEST_FEATURE_ACTIVATION_TIME,
     )
     .unwrap();
     let id1 = HashValue::zero();
