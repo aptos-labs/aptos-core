@@ -25,6 +25,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
 -  [Function `get_resource_groups_feature`](#0x1_features_get_resource_groups_feature)
 -  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
+-  [Function `get_storage_slot_metadata_feature`](#0x1_features_get_storage_slot_metadata_feature)
+-  [Function `storage_slot_metadata_enabled`](#0x1_features_storage_slot_metadata_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -164,6 +166,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_features_STORAGE_SLOT_METADATA"></a>
+
+Whether metadata is tracked for newly allocated storage slots.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STORAGE_SLOT_METADATA">STORAGE_SLOT_METADATA</a>: u64 = 10;
 </code></pre>
 
 
@@ -554,6 +566,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_resource_groups_enabled">resource_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_storage_slot_metadata_feature"></a>
+
+## Function `get_storage_slot_metadata_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_storage_slot_metadata_feature">get_storage_slot_metadata_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_storage_slot_metadata_feature">get_storage_slot_metadata_feature</a>(): u64 { <a href="features.md#0x1_features_STORAGE_SLOT_METADATA">STORAGE_SLOT_METADATA</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_storage_slot_metadata_enabled"></a>
+
+## Function `storage_slot_metadata_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_storage_slot_metadata_enabled">storage_slot_metadata_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_storage_slot_metadata_enabled">storage_slot_metadata_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_STORAGE_SLOT_METADATA">STORAGE_SLOT_METADATA</a>)
 }
 </code></pre>
 
