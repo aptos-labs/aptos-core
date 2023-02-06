@@ -16,6 +16,8 @@ use aptos_config::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
+use aptos_cached_packages::aptos_stdlib;
+use aptos_framework::BuiltPackage;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_mempool::mocks::MockSharedMempool;
@@ -36,15 +38,16 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{Transaction, TransactionStatus},
+    transaction::{Transaction, TransactionStatus, TransactionPayload},
 };
+
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::VMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
+use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -380,6 +383,65 @@ impl TestContext {
         let mut ret = self.clone();
         ret.expect_status_code = status_code;
         ret
+    }
+
+    pub async fn maybe_read_resource(
+        &self,
+        account_address: &AccountAddress,
+        resource: &str,
+    ) -> Option<Value> {
+        let response = self.read_resources(account_address).await;
+        response
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["type"] == resource)
+            .cloned()
+    }
+
+    pub async fn read_resources(&self, account_address: &AccountAddress) -> Value {
+        let request = format!("/accounts/{}/resources", account_address);
+        self.get(&request).await
+    }
+
+    pub async fn read_resource(
+        &self,
+        account_address: &AccountAddress,
+        resource: &str,
+    ) -> Value {
+        let request = format!("/accounts/{}/resource/{}", account_address, resource);
+        self.get(&request).await
+    }
+
+    fn build_package(
+        path: PathBuf,
+        named_addresses: Vec<(String, AccountAddress)>,
+    ) -> TransactionPayload {
+        let mut build_options = aptos_framework::BuildOptions::default();
+        let _ = named_addresses
+            .into_iter()
+            .map(|(name, address)| build_options.named_addresses.insert(name, address))
+            .collect::<Vec<_>>();
+
+        let package = BuiltPackage::build(path, build_options).unwrap();
+        let code = package.extract_code();
+        let metadata = package.extract_metadata().unwrap();
+
+        aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
+    }
+
+    pub async fn publish_package(
+        &mut self,
+        publisher: &mut LocalAccount,
+        payload: TransactionPayload,
+    ) {
+        let txn =
+            publisher.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+        let bcs_txn = bcs::to_bytes(&txn).unwrap();
+        self.expect_status_code(202)
+            .post_bcs_txn("/transactions", bcs_txn)
+            .await;
+        context.commit_mempool_txns(1).await;
     }
 
     pub async fn commit_mempool_txns(&mut self, size: u64) {

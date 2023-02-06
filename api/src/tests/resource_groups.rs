@@ -3,26 +3,24 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::BuiltPackage;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::path::PathBuf;
 
 // This test verifies that both READ APIs can seamlessly translate from resource group to resource
 // 1. Create accounts
 // 2. Publish a resource group package
 // 3. Verify default data exists
-// 4. Read the resources from that resource group anad verify they don't exist
+// 4. Read the resources from that resource group and verify they don't exist
 // 5. Init data for that resource group / member
 // 6. Read and ensure data is present
 // 7. Publish another resource group member
-// 8. Read the resources from the new resource group anad verify they don't exist
+// 8. Read the resources from the new resource group and verify they don't exist
 // 9. Init data for that resource group / member
 // 10. Read and ensure data is present
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_read_resoure_group() {
+async fn test_read_resource_group() {
     let mut context = new_test_context(current_function_name!());
 
     // Prepare accounts
@@ -41,72 +39,72 @@ async fn test_read_resoure_group() {
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/resource_groups/primary");
-        build_package(path, named_addresses_clone)
+        context.build_package(path, named_addresses_clone)
     });
-    publish_package(&mut context, &mut admin0, txn).await;
+    context.publish_package(&mut admin0, txn).await;
 
     let named_addresses_clone = named_addresses.clone();
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/resource_groups/secondary");
-        build_package(path, named_addresses_clone)
+        context.build_package(path, named_addresses_clone)
     });
-    publish_package(&mut context, &mut admin1, txn).await;
+    context.publish_package(&mut admin1, txn).await;
 
     // Read default data
     let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
     let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
 
-    let response = read_resource(&context, &admin0.address(), &primary).await;
+    let response = context.read_resource(&admin0.address(), &primary).await;
     assert_eq!(response["data"]["value"], "3");
 
-    let response = maybe_read_resource(&context, &admin0.address(), &primary).await;
+    let response = context.maybe_read_resource(&admin0.address(), &primary).await;
     assert_eq!(response.unwrap()["data"]["value"], "3");
 
     // Verify account is empty
-    let response = maybe_read_resource(&context, &user.address(), &primary).await;
+    let response = context.maybe_read_resource(&user.address(), &primary).await;
     assert!(response.is_none());
-    let response = maybe_read_resource(&context, &user.address(), &secondary).await;
-    assert!(response.is_none());
-
-    // Init secondary
-    execute_entry_function(
-        &mut context,
-        &mut user,
-        &format!("0x{}::secondary::init", admin1.address()),
-        json!([]),
-        json!([55]),
-    )
-    .await;
-    let response = read_resource(&context, &user.address(), &secondary).await;
-    assert_eq!(response["data"]["value"], 55);
-
-    let response = maybe_read_resource(&context, &user.address(), &secondary).await;
-    assert_eq!(response.unwrap()["data"]["value"], 55);
-
-    let response = maybe_read_resource(&context, &user.address(), &primary).await;
+    let response = context.maybe_read_resource(&user.address(), &secondary).await;
     assert!(response.is_none());
 
-    // Init primary
-    execute_entry_function(
-        &mut context,
-        &mut user,
-        &format!("0x{}::primary::init", admin0.address()),
-        json!([]),
-        json!(["35"]),
-    )
-    .await;
-    let response = read_resource(&context, &user.address(), &primary).await;
-    assert_eq!(response["data"]["value"], "35");
+   // Init secondary
+   execute_entry_function(
+       &mut context,
+       &mut user,
+       &format!("0x{}::secondary::init", admin1.address()),
+       json!([]),
+       json!([55]),
+   )
+   .await;
+   let response = context.read_resource(&user.address(), &secondary).await;
+   assert_eq!(response["data"]["value"], 55);
 
-    let response = maybe_read_resource(&context, &user.address(), &primary).await;
-    assert_eq!(response.unwrap()["data"]["value"], "35");
+   let response = context.maybe_read_resource(&user.address(), &secondary).await;
+   assert_eq!(response.unwrap()["data"]["value"], 55);
 
-    let response = read_resource(&context, &user.address(), &secondary).await;
-    assert_eq!(response["data"]["value"], 55);
+   let response = context.maybe_read_resource(&user.address(), &primary).await;
+   assert!(response.is_none());
 
-    let response = maybe_read_resource(&context, &user.address(), &secondary).await;
-    assert_eq!(response.unwrap()["data"]["value"], 55);
+   // Init primary
+   execute_entry_function(
+       &mut context,
+       &mut user,
+       &format!("0x{}::primary::init", admin0.address()),
+       json!([]),
+       json!(["35"]),
+   )
+   .await;
+   let response = context.read_resource(&user.address(), &primary).await;
+   assert_eq!(response["data"]["value"], "35");
+
+   let response = context.maybe_read_resource(&user.address(), &primary).await;
+   assert_eq!(response.unwrap()["data"]["value"], "35");
+
+   let response = context.read_resource(&user.address(), &secondary).await;
+   assert_eq!(response["data"]["value"], 55);
+
+   let response = context.maybe_read_resource(&user.address(), &secondary).await;
+   assert_eq!(response.unwrap()["data"]["value"], 55);
 }
 
 // TODO: The TestContext code is a bit of a mess, the following likely should be added and that
@@ -130,6 +128,7 @@ async fn create_account(context: &mut TestContext, root: &mut LocalAccount) -> L
     account
 }
 
+<<<<<<< HEAD
 async fn maybe_read_resource(
     context: &TestContext,
     account_address: &AccountAddress,

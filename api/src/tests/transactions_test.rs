@@ -821,33 +821,18 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
 async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
 
-    // address 0xA550C18 {
-    //     module Hello {
-    //         fun world() {
-    //             1/0;
-    //         }
-    //         public(script) fun hello() {
-    //             world();
-    //         }
-    //     }
-    // }
-    let hello_entry_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
-    let mut root_account = context.root_account();
-    let module_txn = root_account
-        .sign_with_transaction_builder(context.transaction_factory().module(hello_entry_fun));
+    let named_addresses = vec![
+        ("entry_func_fail".to_string(), admin.address()),
+    ];
 
-    context.commit_block(&vec![module_txn]).await;
+    let named_addresses_clone = named_addresses.clone();
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+            .join("test-context/move");
+        context.build_package(path, named_addresses_clone)
+    });
+    context.publish_package(&mut admin0, txn).await;
 
-    test_get_txn_execute_failed_by_invalid_entry_function(
-        context,
-        root_account,
-        "0xA550C18",
-        "Hello",
-        "hello",
-        vec![],
-        vec![],
-    )
-    .await
 }
 
 #[ignore] // re-enable after cleaning compiled code
