@@ -7,7 +7,7 @@ use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as 
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
     pub enabled: Vec<FeatureFlag>,
     pub disabled: Vec<FeatureFlag>,

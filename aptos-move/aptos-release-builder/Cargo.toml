@@ -15,9 +15,11 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true }
+aptos-api-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
+aptos-genesis = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
@@ -32,10 +34,12 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+walkdir = { workspace = true }
 
 [[bin]]
 name = "aptos-release-builder"
