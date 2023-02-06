@@ -289,9 +289,10 @@ impl FakeExecutor {
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
-        let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::access_path(ap))
-            .expect("account must exist in data store")
-            .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
+        let data_blob =
+            TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
+                .expect("account must exist in data store")
+                .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
@@ -465,7 +466,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath

@@ -106,7 +106,7 @@ impl FakeDataStore {
 impl TStateView for FakeDataStore {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(self.state_data.get(state_key).cloned())
     }
 

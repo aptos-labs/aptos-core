@@ -394,7 +394,7 @@ mod test {
     impl TStateView for FakeTestStorage {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+        fn get_state_value_bytes(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }
 
@@ -414,7 +414,7 @@ mod test {
             key: &[u8],
         ) -> Result<Option<Vec<u8>>, anyhow::Error> {
             let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
-            self.get_state_value(&state_key)
+            self.get_state_value_bytes(&state_key)
         }
     }
 

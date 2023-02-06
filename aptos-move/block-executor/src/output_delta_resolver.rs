@@ -29,7 +29,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
         // TODO: with more deltas, re-use executor threads and process in parallel.
         for key in self.versioned_outputs.aggregator_keys() {
             let mut latest_value: Option<u128> = base_view
-                .get_state_value(&key)
+                .get_state_value_bytes(&key)
                 .ok() // Was anything found in storage
                 .and_then(|value| value.map(|bytes| deserialize(&bytes)));
 

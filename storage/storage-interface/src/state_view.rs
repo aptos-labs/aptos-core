@@ -30,7 +30,7 @@ impl DbStateView {
 impl TStateView for DbStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get(state_key)
     }
 

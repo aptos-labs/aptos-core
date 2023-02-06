@@ -186,7 +186,7 @@ impl DebuggerStateView {
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get_state_value_internal(state_key, self.version)
     }
 

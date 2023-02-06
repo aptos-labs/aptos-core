@@ -170,7 +170,7 @@ impl DeltaOp {
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         state_view
-            .get_state_value(state_key)
+            .get_state_value_bytes(state_key)
             .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))
             .and_then(|maybe_bytes| {
                 match maybe_bytes {
@@ -540,7 +540,7 @@ mod tests {
     impl TStateView for FakeView {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+        fn get_state_value_bytes(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
             Ok(self.data.get(state_key).cloned())
         }
 

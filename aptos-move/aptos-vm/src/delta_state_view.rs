@@ -29,11 +29,11 @@ where
         self.base.id()
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         match self.write_set.get(state_key) {
             Some(WriteOp::Creation(data) | WriteOp::Modification(data)) => Ok(Some(data.clone())),
             Some(WriteOp::Deletion) => Ok(None),
-            None => self.base.get_state_value(state_key),
+            None => self.base.get_state_value_bytes(state_key),
         }
     }
 

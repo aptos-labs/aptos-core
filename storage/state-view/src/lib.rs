@@ -30,7 +30,7 @@ pub trait TStateView {
     }
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>>;
+    fn get_state_value_bytes(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>>;
 
     /// VM needs this method to know whether the current state view is for genesis state creation.
     /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.
@@ -67,8 +67,8 @@ where
         self.deref().id()
     }
 
-    fn get_state_value(&self, state_key: &K) -> Result<Option<Vec<u8>>> {
-        self.deref().get_state_value(state_key)
+    fn get_state_value_bytes(&self, state_key: &K) -> Result<Option<Vec<u8>>> {
+        self.deref().get_state_value_bytes(state_key)
     }
 
     fn is_genesis(&self) -> bool {
