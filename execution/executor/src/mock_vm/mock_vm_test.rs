@@ -6,7 +6,9 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
@@ -21,7 +23,7 @@ struct MockStateView;
 impl TStateView for MockStateView {
     type Key = StateKey;
 
-    fn get_state_value_bytes(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<StateValue>> {
         Ok(None)
     }
 
