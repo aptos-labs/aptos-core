@@ -29,13 +29,24 @@ MIN_THRESHOLD = 1
 """Minimum number of signatures required to for multisig transaction."""
 
 
+def bytes_to_prefixed_hex(input_bytes: bytes) -> str:
+    """Convert bytes to hex string with 0x prefix."""
+    return f"0x{input_bytes.hex()}"
+
+
+def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
+    """Convert hex string with 0x prefix to bytes."""
+    return bytes.fromhex(prefixed_hex[2:])
+
+
 def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], bytes]:
     """Check keyfile password, returning JSON data/private key bytes"""
     with open(path, "r", encoding="utf-8") as keyfile:  # Open keyfile:
         data = json.load(keyfile)  # Load JSON data from keyfile.
-    salt = bytes.fromhex(data["salt"][2:])  # Get salt bytes.
-    # Get encrypted private key.
-    encrypted_private_key = bytes.fromhex(data["encrypted_private_key"][2:])
+    salt = prefixed_hex_to_bytes(data["salt"])  # Get salt bytes.
+    encrypted_hex = data["encrypted_private_key"]  # Get encrypted key.
+    # Convert encrypted private key hex to bytes.
+    encrypted_private_key = prefixed_hex_to_bytes(encrypted_hex)
     # Define password input prompt.
     prompt = "Enter password for encrypted private key: "
     password = getpass.getpass(prompt)  # Get keyfile password.
@@ -126,23 +137,26 @@ def incorporate(args):
     public_keys = []  # Initialize empty public keys list.
     for keyfile in args.keyfiles:  # Loop over keyfiles.
         signatory = json.load(keyfile)  # Load signatory data.
-        public_key = PublicKey(  # Get public key bytes.
-            VerifyKey(bytes.fromhex(signatory["public_key"][2:]))
-        )
+        # Get signatory's public key as bytes.
+        public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
+        # Append public key to list of public keys.
+        public_keys.append(PublicKey(VerifyKey(public_key_bytes)))
         signatories.append(
             dict(
                 (field, signatory[field])
                 for field in ["signatory", "public_key", "authentication_key"]
             )
         )  # Extract relevant fields for list of signatories.
-        public_keys.append(public_key)  # Append public key to list.
     # Initialize multisig public key.
     multi_key = MultiEd25519PublicKey(public_keys, args.threshold)
+    # Get authentication key as prefixed hex.
+    auth_key = bytes_to_prefixed_hex(multi_key.auth_key().hex())
     data = {  # Generate JSON data for multisig metadata file.
         "multisig_name": multisig_name,
         "threshold": args.threshold,
         "n_signatories": n_signers,
-        "authentication_key": f"0x{multi_key.auth_key().hex()}",
+        "public_key": bytes_to_prefixed_hex(multi_key.to_bytes()),
+        "authentication_key": auth_key,
         "signatories": signatories,
     }
     if args.metafile is None:  # If no custom filepath specified:
@@ -164,9 +178,12 @@ def keyfile_change_password(args):
     data, private_key_bytes = check_keyfile_password(args.keyfile)
     # Encrypt private key.
     encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
+    # Get encrypted private key hex.
+    key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
     # Update JSON with encrypted private key.
-    data["encrypted_private_key"] = f"0x{encrypted_private_key_bytes.hex()}"
-    data["salt"] = f"0x{salt.hex()}"  # Update JSON with new salt.
+    data["encrypted_private_key"] = key_hex
+    # Update JSON with new salt.
+    data["salt"] = bytes_to_prefixed_hex(salt.hex())
     keyfile_write_json(args.keyfile, data)  # Write JSON to keyfile.
 
 
@@ -195,12 +212,14 @@ def keyfile_generate(args):
     private_key_bytes = account.private_key.key.encode()
     # Encrypt private key.
     encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
-    data = {
-        "signatory": signatory,  # Generate JSON data for keyfile.
+    # Get encrypted private key hex.
+    key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
+    data = {  # Generate JSON data for keyfile.
+        "signatory": signatory,
         "public_key": f"{account.public_key()}",
-        "authentication_key": f"{account.auth_key()}",
-        "encrypted_private_key": f"0x{encrypted_private_key_bytes.hex()}",
-        "salt": f"0x{salt.hex()}",
+        "authentication_key": account.auth_key(),
+        "encrypted_private_key": key_hex,
+        "salt": bytes_to_prefixed_hex(salt.hex()),
     }
     if args.keyfile is None:  # If no custom filepath specified:
         # Create filepath from signatory name.
