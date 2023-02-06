@@ -1,13 +1,14 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9 AS debian-base
+FROM --platform=$TARGETPLATFORM debian:bullseye-20220912 AS debian-base
 
+ARG TARGETARCH
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
-ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-${TARGETARCH} /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
+FROM --platform=$BUILDPLATFORM rust:1.64.0-bullseye AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
@@ -22,6 +23,23 @@ ARG BUILT_VIA_BUILDKIT
 ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
 
 RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
+RUN dpkg --add-architecture ${TARGETARCH} \
+    && apt-get update \
+    && ARCHITECTURE=$(echo ${TARGETARCH} | sed -e 's/arm64/aarch64/g' -e 's/amd64/x86-64/g') \
+    && apt-get install -y --no-install-recommends \
+        build-essential clang \
+        $(if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then echo gcc g++ ; else echo gcc-$ARCHITECTURE-linux-gnu g++-$ARCHITECTURE-linux-gnu ; fi) \
+        libc6-dev:$TARGETARCH libssl-dev:$TARGETARCH
+
+RUN ARCHITECTURE=$(echo ${TARGETARCH} | sed -e 's/arm64/aarch64/g' -e 's/amd64/x86_64/g') \
+    && rustup component add rustfmt clippy \
+    && rustup target add $ARCHITECTURE-unknown-linux-gnu \
+    && rustup toolchain install --force-non-host stable-$ARCHITECTURE-unknown-linux-gnu
+    
 
 COPY --link . /aptos/
 
@@ -41,7 +59,9 @@ ARG GIT_CREDENTIALS
 ENV GIT_CREDENTIALS ${GIT_CREDENTIALS}
 
 RUN GIT_CREDENTIALS="$GIT_CREDENTIALS" git config --global credential.helper store && echo "${GIT_CREDENTIALS}" > ~/.git-credentials
-RUN PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh && rm -rf $CARGO_HOME && rm -rf target
+RUN ARCHITECTURE=$(echo ${TARGETARCH} | sed -e 's/arm64/aarch64/g' -e 's/amd64/x86_64/g') \
+    && TARGET=$ARCHITECTURE-unknown-linux-gnu PKG_CONFIG_SYSROOT_DIR="/usr/$ARCHITECTURE-linux-gnu/" RUSTFLAGS="-C linker=$ARCHITECTURE-linux-gnu-gcc --cfg tokio_unstable" CARGO_NET_GIT_FETCH_WITH_CLI=true PROFILE=$PROFILE FEATURES=$FEATURES docker/build-rust-all.sh \
+    && rm -rf $CARGO_HOME && rm -rf target
 RUN rm -rf ~/.git-credentials
 
 ### Validator Image ###
