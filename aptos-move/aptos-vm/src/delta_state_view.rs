@@ -7,7 +7,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::{WriteOp, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 
 pub struct DeltaStateView<'a, 'b, S> {
@@ -33,10 +33,7 @@ where
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         match self.write_set.get(state_key) {
-            Some(WriteOp::Creation(data) | WriteOp::Modification(data)) => {
-                Ok(Some(StateValue::new(data.clone())))
-            },
-            Some(WriteOp::Deletion) => Ok(None),
+            Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base.get_state_value(state_key),
         }
     }

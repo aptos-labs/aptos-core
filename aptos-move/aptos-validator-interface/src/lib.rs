@@ -180,7 +180,7 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let bytes_opt = rx.recv()?;
-        Ok(bytes_opt.map(StateValue::new))
+        Ok(bytes_opt.map(StateValue::new_legacy))
     }
 }
 

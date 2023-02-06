@@ -159,8 +159,8 @@ impl<'a> TableInfoParser<'a> {
     }
 
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
-        match write_op {
-            WriteOp::Modification(bytes) | WriteOp::Creation(bytes) => match state_key.inner() {
+        if let Some(bytes) = write_op.bytes() {
+            match state_key.inner() {
                 StateKeyInner::AccessPath(access_path) => {
                     let path: Path = (&access_path.path).try_into()?;
                     match path {
@@ -171,8 +171,7 @@ impl<'a> TableInfoParser<'a> {
                 },
                 StateKeyInner::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
                 StateKeyInner::Raw(_) => (),
-            },
-            WriteOp::Deletion => (),
+            }
         }
         Ok(())
     }

@@ -185,8 +185,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
-                ReadResult::Value(v) => Ok(v.extract_raw_bytes().map(StateValue::new)),
-                ReadResult::U128(v) => Ok(Some(StateValue::new(serialize(&v)))),
+                ReadResult::Value(v) => Ok(v.as_state_value()),
+                ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
                 ReadResult::Unresolved(delta) => {
                     let from_storage = self
                         .base_view
@@ -197,7 +197,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     let result = delta
                         .apply_to(from_storage)
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                    Ok(Some(StateValue::new(serialize(&result))))
+                    Ok(Some(StateValue::new_legacy(serialize(&result))))
                 },
                 ReadResult::None => self.base_view.get_state_value(state_key),
             },
@@ -218,7 +218,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     // log_context.alert();
                     // ret
                 },
-                |v| Ok(v.extract_raw_bytes().map(StateValue::new)),
+                |v| Ok(v.as_state_value()),
             ),
         }
     }
