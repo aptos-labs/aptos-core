@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    clients::{
-        big_query::TableWriteClient, humio::IngestClient as HumioClient,
-        victoria_metrics_api::Client as MetricsClient,
-    },
+    clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
     types::common::EpochedPeerStore,
-    MetricsEndpointsConfig,
+    LogIngestConfig, MetricsEndpointsConfig,
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
@@ -54,6 +51,23 @@ impl From<MetricsEndpointsConfig> for GroupedMetricsClients {
     }
 }
 
+#[derive(Clone)]
+pub struct LogIngestClients {
+    pub known_logs_ingest_client: humio::IngestClient,
+    pub unknown_logs_ingest_client: humio::IngestClient,
+    pub blacklist: Option<HashSet<PeerId>>,
+}
+
+impl From<LogIngestConfig> for LogIngestClients {
+    fn from(config: LogIngestConfig) -> Self {
+        Self {
+            known_logs_ingest_client: config.known_logs_endpoint.make_client(),
+            unknown_logs_ingest_client: config.unknown_logs_endpoint.make_client(),
+            blacklist: config.blacklist_peers,
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct PeerStoreTuple {
     validators: Arc<RwLock<EpochedPeerStore>>,
@@ -91,19 +105,19 @@ impl PeerStoreTuple {
 pub struct ClientTuple {
     bigquery_client: Option<TableWriteClient>,
     victoria_metrics_clients: Option<GroupedMetricsClients>,
-    humio_client: Option<HumioClient>,
+    log_ingest_clients: Option<LogIngestClients>,
 }
 
 impl ClientTuple {
     pub(crate) fn new(
         bigquery_client: Option<TableWriteClient>,
         victoria_metrics_clients: Option<GroupedMetricsClients>,
-        humio_client: Option<HumioClient>,
+        log_ingest_clients: Option<LogIngestClients>,
     ) -> ClientTuple {
         Self {
             bigquery_client,
             victoria_metrics_clients,
-            humio_client,
+            log_ingest_clients,
         }
     }
 }
@@ -197,8 +211,8 @@ impl Context {
         self.clients.victoria_metrics_clients.as_mut().unwrap()
     }
 
-    pub fn humio_client(&self) -> &HumioClient {
-        self.clients.humio_client.as_ref().unwrap()
+    pub fn log_ingest_clients(&self) -> &LogIngestClients {
+        self.clients.log_ingest_clients.as_ref().unwrap()
     }
 
     pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
