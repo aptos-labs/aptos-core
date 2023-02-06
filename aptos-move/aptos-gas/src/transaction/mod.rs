@@ -191,6 +191,8 @@ impl TransactionGasParameters {
         &self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> Fee {
+        use WriteOp::*;
+
         let excess_fee = |size: NumBytes| -> Fee {
             match size.checked_sub(self.free_write_bytes_quota) {
                 Some(excess) => excess * self.storage_fee_per_excess_state_byte,
@@ -204,16 +206,16 @@ impl TransactionGasParameters {
         for (key, op) in ops {
             let key_size = NumBytes::new(key.size() as u64);
             match op {
-                WriteOp::Creation(data) => {
+                Creation(data) | CreationWithMetadata { data, .. } => {
                     new_slots += 1.into();
                     let val_size = NumBytes::new(data.len() as u64);
                     fee += excess_fee(key_size + val_size);
                 },
-                WriteOp::Modification(data) => {
+                Modification(data) | ModificationWithMetadata { data, .. } => {
                     let val_size = NumBytes::new(data.len() as u64);
                     fee += excess_fee(key_size + val_size);
                 },
-                WriteOp::Deletion => (),
+                Deletion | DeletionWithMetadata { .. } => (),
             }
         }
 

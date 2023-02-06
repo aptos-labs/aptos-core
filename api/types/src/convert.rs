@@ -304,8 +304,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let ret = match op {
-            WriteOp::Deletion => match access_path.get_path() {
+        let ret = match op.into_bytes() {
+            None => match access_path.get_path() {
                 Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
@@ -322,21 +322,21 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     resource: typ.into(),
                 }),
             },
-            WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
+            Some(bytes) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: MoveModuleBytecode::new(val).try_parse_abi()?,
+                    data: MoveModuleBytecode::new(bytes).try_parse_abi()?,
                 }),
                 Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &val)?,
+                    data: self.try_into_resource(&typ, &bytes)?,
                 }),
                 Path::ResourceGroup(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &val)?,
+                    data: self.try_into_resource(&typ, &bytes)?,
                 }),
             },
         };
@@ -352,8 +352,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
-        let ret = match op {
-            WriteOp::Deletion => {
+        let ret = match op.into_bytes() {
+            None => {
                 let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
 
                 WriteSetChange::DeleteTableItem(DeleteTableItem {
@@ -363,15 +363,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             },
-            WriteOp::Modification(value) | WriteOp::Creation(value) => {
+            Some(bytes) => {
                 let data =
-                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &bytes)?;
 
                 WriteSetChange::WriteTableItem(WriteTableItem {
                     state_key_hash,
                     handle: hex_handle,
                     key,
-                    value: value.into(),
+                    value: bytes.into(),
                     data,
                 })
             },
