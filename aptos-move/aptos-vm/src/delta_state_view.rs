@@ -4,7 +4,9 @@
 use anyhow::Result;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     write_set::{WriteOp, WriteSet},
 };
 
@@ -29,11 +31,13 @@ where
         self.base.id()
     }
 
-    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         match self.write_set.get(state_key) {
-            Some(WriteOp::Creation(data) | WriteOp::Modification(data)) => Ok(Some(data.clone())),
+            Some(WriteOp::Creation(data) | WriteOp::Modification(data)) => {
+                Ok(Some(StateValue::new(data.clone())))
+            },
             Some(WriteOp::Deletion) => Ok(None),
-            None => self.base.get_state_value_bytes(state_key),
+            None => self.base.get_state_value(state_key),
         }
     }
 
