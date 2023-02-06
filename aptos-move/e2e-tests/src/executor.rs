@@ -47,6 +47,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    aptos_vm::LATEST_FEATURE_ACTIVATION_TIME,
     block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
@@ -564,6 +565,8 @@ impl FakeExecutor {
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                 self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
+                // FIXME: should probably read the timestamp from storage.
+                LATEST_FEATURE_ACTIVATION_TIME,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -615,6 +618,8 @@ impl FakeExecutor {
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
+            // FIXME: should probably read the timestamp from storage.
+            LATEST_FEATURE_ACTIVATION_TIME,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

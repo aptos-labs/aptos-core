@@ -18,8 +18,6 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
@@ -30,10 +28,15 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
+use aptos_types::{chain_id::ChainId, timestamp::Timestamp};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    timestamp::TimestampResource,
+};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
-    language_storage::ModuleId,
+    language_storage::{ModuleId, StructTag},
     move_resource::MoveStructType,
     resolver::ResourceResolver,
     value::{serialize_values, MoveValue},
@@ -54,6 +57,29 @@ pub struct AptosVMImpl {
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     features: Features,
+}
+
+fn fetch_timestamp(storage: &impl ResourceResolver) -> TimestampResource {
+    // 01/01/1970
+    const DEFAULT_TIMESTAMP: TimestampResource = TimestampResource {
+        timestamp: Timestamp { microseconds: 0 },
+    };
+
+    match storage.get_resource(
+        &CORE_CODE_ADDRESS,
+        &StructTag {
+            address: TimestampResource::ADDRESS,
+            module: TimestampResource::MODULE_NAME.to_owned(),
+            name: TimestampResource::STRUCT_NAME.to_owned(),
+            type_params: vec![],
+        },
+    ) {
+        Ok(Some(bytes)) => match bcs::from_bytes::<TimestampResource>(&bytes) {
+            Ok(timestamp) => timestamp,
+            Err(_) => DEFAULT_TIMESTAMP,
+        },
+        Ok(None) | Err(_) => DEFAULT_TIMESTAMP,
+    }
 }
 
 impl AptosVMImpl {
@@ -119,6 +145,8 @@ impl AptosVMImpl {
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
 
+        let timestamp = fetch_timestamp(&storage);
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
@@ -126,6 +154,7 @@ impl AptosVMImpl {
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
+            timestamp.timestamp.microseconds,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

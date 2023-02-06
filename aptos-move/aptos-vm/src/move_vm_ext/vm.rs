@@ -11,6 +11,7 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_types::chain_id::ChainId;
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
@@ -31,6 +32,7 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
         allow_binary_format_v6: bool,
         chain_id: u8,
+        timestamp_microseconds: u64,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
@@ -49,7 +51,11 @@ impl MoveVmExt {
                     gas_feature_version,
                 ),
                 VMConfig {
-                    verifier: verifier_config(treat_friend_as_private),
+                    verifier: verifier_config(
+                        treat_friend_as_private,
+                        chain_id,
+                        timestamp_microseconds,
+                    ),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
@@ -103,7 +109,24 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
+pub fn verifier_config(
+    _treat_friend_as_private: bool,
+    chain_id: u8,
+    time_microseconds: u64,
+) -> VerifierConfig {
+    let mut max_back_edges_per_function = None;
+    let mut max_back_edges_per_module = None;
+    let mut max_basic_blocks_in_script = None;
+
+    if (chain_id == ChainId::testnet().id() && time_microseconds >= 1675792800000/* Tuesday, February 7, 2023 10:00:00 AM GMT-08:00 */)
+        || (chain_id == ChainId::mainnet().id() && time_microseconds >= 1676052000000/* Friday, February 10, 2023 10:00:00 AM GMT-08:00 */)
+        || (chain_id == ChainId::test().id())
+    {
+        max_back_edges_per_function = Some(20);
+        max_back_edges_per_module = Some(400);
+        max_basic_blocks_in_script = Some(1024);
+    }
+
     VerifierConfig {
         max_loop_depth: Some(5),
         max_generic_instantiation_length: Some(32),
@@ -116,5 +139,8 @@ pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
         max_struct_definitions: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
+        max_back_edges_per_function,
+        max_back_edges_per_module,
+        max_basic_blocks_in_script,
     }
 }
