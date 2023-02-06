@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import typing
-from typing import List, Tuple
+from typing import List
 
 from . import ed25519
 from .account_address import AccountAddress
@@ -155,9 +155,6 @@ class MultiEd25519Authenticator:
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
-
-    def to_bytes(self):
-        self.public_key.to_bytes() + self.signature.to_bytes()
 
     def serialize(self, serializer: Serializer):
         serializer.struct(self.public_key)

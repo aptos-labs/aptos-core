@@ -5,7 +5,7 @@ slug: "your-first-multisig"
 
 # Your First Multisig
 
-This tutorial introduces assorted [K-of-N multisigner authentication](../concepts/accounts.md#multisigner-authentication) operations, and supplements content from the following tutorials:
+This tutorial introduces assorted [K-of-N multi-signer authentication](../concepts/accounts.md#multisigner-authentication) operations, and supplements content from the following tutorials:
 
 * [Your First Transaction](./first-transaction.md)
 * [Your First Coin](./first-coin.md)
@@ -47,26 +47,26 @@ Fresh accounts are generated for each example run, but the output should resembl
 
 ```zsh
 === Account addresses ===
-Alice: 0xb6a60cf0af64152a0c305dc4dc93a0298c2b373782cd4880e10091acdcc7f315
-Bob:   0x41ac06b3faceef0d018b8e9be59b3e5cfee5a858e420f25b703b37a9af6ef718
-Chad:  0xf4f6c6949a903e3055ab05d220eea75d29ba56abb5a744476fd37214b3d11000
+Alice: 0x9635724a9e3f7997c9975c76398e434504544d4044a6c34d5125f7825574e861
+Bob:   0x4509faa7d24179368cc340548345acb7fde777191f1a69bda0fad619f0df67fd
+Chad:  0x20454430a49bb2c7e4b768bfe586a543f4b2b25386e35a40aab18c1fa3413fd2
 
 === Authentication keys ===
-Alice: 0xb6a60cf0af64152a0c305dc4dc93a0298c2b373782cd4880e10091acdcc7f315
-Bob:   0x41ac06b3faceef0d018b8e9be59b3e5cfee5a858e420f25b703b37a9af6ef718
-Chad:  0xf4f6c6949a903e3055ab05d220eea75d29ba56abb5a744476fd37214b3d11000
+Alice: 0x9635724a9e3f7997c9975c76398e434504544d4044a6c34d5125f7825574e861
+Bob:   0x4509faa7d24179368cc340548345acb7fde777191f1a69bda0fad619f0df67fd
+Chad:  0x20454430a49bb2c7e4b768bfe586a543f4b2b25386e35a40aab18c1fa3413fd2
 
 === Public keys ===
-Alice: 0xe44af056dc3eea75d2c750ace58a8d5f5164a7f5fd52eda18c16d1c7cc355c59
-Bob:   0x554868a66a50a220f1b1065572406ec5ecb587b4bcab2e6434b022303b3094bc
-Chad:  0x2f414aecc6a7dd204ae81fd2e4f33934cdb00b80d1abe2a7568c85c43870373f
+Alice: 0x850a1cb34a627ddca5f392c8039621dbfa737068fa08b179484cbe3d0edc31f8
+Bob:   0x30f1d8c34526625998ca7edd8a5fae6d9930588c12158510fe9ad54b9e9b3a0f
+Chad:  0x710790fa9cc2cb2540889b3c487d3417147dd6fbfa9f9dccf8da057cf34ca3cd
 ```
 
 For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
 
 ## Step 4: Generate a multisig account
 
-Next generate a [K-of-N multisigner](../concepts/accounts.md#multisigner-authentication) public key and account address for a multisig account requiring two of the three signatures:
+Next generate a [K-of-N multi-signer](../concepts/accounts.md#multisigner-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
 ```python
 :!: static/sdks/python/examples/multisig.py section_2
@@ -77,7 +77,7 @@ The multisig account address depends on the public keys of the single signers. (
 ```zsh
 === 2-of-3 Multisig account ===
 Account public key: 2-of-3 Multi-Ed25519 public key
-Account address:    0x12133ea3b7d710216881a01f9f9cd59693f6a9c81c88a200b90123fc11a2b984
+Account address:    0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
 ```
 
 ## Step 5: Fund all accounts
@@ -113,8 +113,8 @@ Again, signatures vary for each example run:
 
 ```zsh
 === Individual signatures ===
-Alice: 0x8ccfbab4eb72fda7d10c4b9e4dfc4c2f34bcef78cccef4bb7e3d6666b778de70b9368429dcbd04e677c0e283a27cdfe72622aaf6e99d7dd7a002c9d8adac440c
-Bob:   0xfa9bec52c7d1c8b8a68691a1a08c7e41cb6f66037e717cc99c533c5e7059c527077749403968c2b673e5460dc23f34af34f88158535f26fd796f8b4d1f6ad104
+Alice: 0x370c9bdd467bb7de36ade1bffe66f29de153b0f4807a2a964d4c63f3e2c4dc0f7032e42db1f3c45ae55c6ea0cde0802ba1ccd4bfa655dcbd0040e507a7eea800
+Bob:   0xf8bf5676affd2a8f5d594844c5fed63c3b02c599b9f9e8067b941169366dc72257ae31313332d4fa52f877b709cddcb80719c44a0ca9870f9c886f90286f9000
 ```
 
 ### Step 6.2: Submit the multisig transaction
@@ -128,7 +128,7 @@ Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisi
 
 ```zsh
 === Submitting transaction ===
-Transaction hash: 0xa0d59cb79b4a6ea5392381d2de1140adf9a779d3541d25d3a6d39ebf5ac4c2f5
+Transaction hash: 0x4da4bb16ff481e22f22cf049cda3faa2df60a4dbd2c40aabee441d890b23c1dd
 ```
 
 ### Step 6.3: Check balances
@@ -164,8 +164,8 @@ A fourth user, Deedee, wants her account address to start with `0xdd..`, so she 
 
 ```zsh
 === Funding vanity address ===
-Deedee's address:    0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
-Deedee's public key: 0x54daba7e8c6e54217ff54cd2af3735099f5fb89dcbb22f5c0f670203b449b6c4
+Deedee's address:    0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
+Deedee's public key: 0x90b17d64843ca7ece0f96498bca49c269f585eda24105b0b9894ab7976c52c73
 Deedee's balance: 50000000
 ```
 
@@ -182,8 +182,8 @@ Here, Bob and Chad provide individual signatures for the multisig:
 
 ```zsh
 === Signing rotation proof challenge ===
-cap_rotate_key:   0x6d4bdafa2eed35a32314730e8d892d94fc9318c25b0f3527fefd8d2b0f29853cdfdcd9560f469ddbba7b1107c661036155f10e340abdca15c97c7129bd0cc603
-cap_update_table: 0x0702a4754c7653fe8e56e82af631a21db4a2672f01a5443bb86638aea0351b79a074be81d48745387433dcf9b4e22b8dd0f7d35c592e510673a3d17dd0ea040ec0a531af37259332902a9140822a4f7af5e40186da512343d7e503228797272130729118bdee53383c17c7ad0a549f0283f78c2da8a958c38e5c528caa7de00360000000
+cap_rotate_key:   0x71e3b8357051409881de4286046b477612d59ee9826d03f017ade18b0b5025801eef302a113dc687bceec9618fe43f684f53d6eea48309ef7a146ac606180b0d
+cap_update_table: 0xa3c0f67cbe4a98cc3956373a62e15ca03f1d8b2cc61c5650e85157a84806fa9e8834197b75fd7cfc9d2b15230ef96ceed7f8e35e4ec0775c4fef2ebdf4ef15048cea52b850bc688ff658c643aa6974bd4b734d2d700f45c977a69bf7491fdb888b18f9ed28c317b91e37153920339534278bcacb985f1fbd500457628311590c60000000
 ```
 
 ### Step 7.3 Rotate the authentication key
@@ -197,12 +197,12 @@ After it executes, the rotated authentication key matches the address of the fir
 
 ```zsh
 === Submitting authentication key rotation transaction ===
-Auth key pre-rotation: 0xddb819d72eca401eb4d5d894a3d72540fd1ee47fef2daa0867c9c05fc469925f
+Auth key pre-rotation: 0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
-Waiting for client to update...
+Waiting for API server to update...
 
-Auth key post-rotation: 0xeec99e7567cceebcbdffdffd5248d5c6dde6e332ca7c1fa04d5cc42f228fb3c2
-First multisig address: 0xeec99e7567cceebcbdffdffd5248d5c6dde6e332ca7c1fa04d5cc42f228fb3c2
+New auth key:         0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
+1st multisig address: 0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
 ```
 
 In other words, Deedee generated an account with a vanity address so that Alice, Bob, and Chad could use it as a multisig account.
@@ -280,7 +280,7 @@ All compilation and publication operations are handled via the ongoing Python sc
 
 ```zsh
 === Publishing v1.0.0 ===
-Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
 Compiling, may take a little while to download git dependencies...
 INCLUDING DEPENDENCY AptosFramework
@@ -288,7 +288,7 @@ INCLUDING DEPENDENCY AptosStdlib
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING UpgradeAndGovern
 
-Transaction hash: 0xa71189804cf90ecbe8ec011a3e89feddc8910529a390ce6bdd311c3224ad9d48
+Transaction hash: 0x3b7b974b3d4e525f21c1da2f083e01648476dd416c3c3ce7b2c44a4600692a38
 
 Waiting for API server to update...
 
@@ -371,7 +371,7 @@ This process is almost identical to that of the `v1.0.0` publication:
 
 ```zsh
 === Publishing v1.1.0 ===
-Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xdd41eb16f1ec28fdaa816a95c47c611e7ff24bb5e864daa8bb42cc8c2e723689
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
 Compiling, may take a little while to download git dependencies...
 INCLUDING DEPENDENCY AptosFramework
@@ -379,7 +379,7 @@ INCLUDING DEPENDENCY AptosStdlib
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING UpgradeAndGovern
 
-Transaction hash: 0x874fdb388b64dfaccd27a8a12a85cab59237bf172ddca3f1c16e1f09db466a9f
+Transaction hash: 0xcfbb3207169a0058fb43467df4964b4d52855259bd183c648e8b358c1899190e
 
 Waiting for API server to update...
 
@@ -433,7 +433,7 @@ Here, the amounts sent to each account are specified in the hard-coded values fr
 
 ```zsh
 === Invoking Move script ===
-Transaction hash: 0x98f8e74a505f5905b0336d97df60f3dd8972214a154d4f5fa945c1335814a74b
+Transaction hash: 0x05903b30e3a88829d5ba802a671ba5b692c53bb870e2fb393a2b9cbdf153b120
 
 Waiting for API server to update...
 
@@ -442,4 +442,4 @@ Bob's balance:   20000200
 Chad's balance:  30000100
 ```
 
-Congratulations on completing the tutorial on K-of-N multisigner authentication operations!
+Congratulations on completing the tutorial on K-of-N multi-signer authentication operations!

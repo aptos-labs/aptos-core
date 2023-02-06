@@ -79,20 +79,23 @@ class Account:
 
         return self.private_key.public_key()
 
+
 class RotationProofChallenge:
-    type_info_account_address: AccountAddress = AccountAddress.from_hex('0x1')
-    type_info_module_name: str = 'account'
-    type_info_struct_name: str = 'RotationProofChallenge'
+    type_info_account_address: AccountAddress = AccountAddress.from_hex("0x1")
+    type_info_module_name: str = "account"
+    type_info_struct_name: str = "RotationProofChallenge"
     sequence_number: int
     originator: AccountAddress
     current_auth_key: AccountAddress
     new_public_key: bytes
 
-    def __init__(self,
-                 sequence_number: int,
-                 originator: AccountAddress,
-                 current_auth_key: AccountAddress,
-                 new_public_key: bytes):
+    def __init__(
+        self,
+        sequence_number: int,
+        originator: AccountAddress,
+        current_auth_key: AccountAddress,
+        new_public_key: bytes,
+    ):
         self.sequence_number = sequence_number
         self.originator = originator
         self.current_auth_key = current_auth_key

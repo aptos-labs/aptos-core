@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import hashlib
-
 import unittest
+from typing import List, Tuple
 
 from nacl.signing import SigningKey, VerifyKey
-from typing import List, Tuple
 
 from .bcs import Deserializer, Serializer
 
@@ -156,18 +155,20 @@ class MultiEd25519Signature:
     signatures: List[Signature]
     bitmap: bytes
 
-    def __init__(self,
-                 public_key: MultiEd25519PublicKey,
-                 signatures_map: List[Tuple[PublicKey, Signature]]):
+    def __init__(
+        self,
+        public_key: MultiEd25519PublicKey,
+        signatures_map: List[Tuple[PublicKey, Signature]],
+    ):
         self.signatures = list()
         bitmap = 0
         for entry in signatures_map:
             self.signatures.append(entry[1])
             index = public_key.keys.index(entry[0])
-            shift = 31 - index # 32 bit positions, left to right.
+            shift = 31 - index  # 32 bit positions, left to right.
             bitmap = bitmap | (1 << shift)
         # 4-byte big endian bitmap.
-        self.bitmap = bitmap.to_bytes(4, 'big')
+        self.bitmap = bitmap.to_bytes(4, "big")
 
     def to_bytes(self) -> bytes:
         concatenated_signatures = bytes()

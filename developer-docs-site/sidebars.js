@@ -122,7 +122,7 @@ const sidebars = {
         "tutorials/first-transaction",
         "tutorials/first-dapp",
         "tutorials/first-coin",
-        "tutorials/first-multisig"
+        "tutorials/first-multisig",
       ],
     },
     {
