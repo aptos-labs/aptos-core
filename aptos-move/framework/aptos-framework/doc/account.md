@@ -342,6 +342,10 @@ Second, this struct is signed by the new public key that the account owner wants
 knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
 context because they include the TXN's unique sequence number.
 
+Note that the challenge message to sign includes the <code><a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a></code> type info prepended to the
+relevant bytes, such that serializing then signing only the below four struct fields will lead to rotation
+failure. For the verification implementation, see <code>aptos_stdlib::ed25519::signature_verify_strict_t()</code>.
+
 
 <pre><code><b>struct</b> <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> <b>has</b> <b>copy</b>, drop
 </code></pre>

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import hashlib
-
 from typing import List
 
 from . import ed25519
@@ -53,7 +52,8 @@ class AccountAddress:
 
     @staticmethod
     def from_multisig_schema(
-            keys: List[ed25519.PublicKey], threshold: int) -> AccountAddress:
+        keys: List[ed25519.PublicKey], threshold: int
+    ) -> AccountAddress:
         multisig_public_key = ed25519.MultiEd25519PublicKey(keys, threshold)
         return AccountAddress(multisig_public_key.auth_key())
 
