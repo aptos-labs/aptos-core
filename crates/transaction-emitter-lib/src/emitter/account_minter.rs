@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    emitter::MAX_RETRIES,
     transaction_generator::{TransactionExecutor, SEND_AMOUNT},
     EmitJobRequest, EmitModeParams,
 };
@@ -25,7 +26,7 @@ use core::{
 };
 use futures::StreamExt;
 use rand::{rngs::StdRng, SeedableRng};
-use std::{path::Path, sync::atomic::AtomicUsize};
+use std::{path::Path, sync::atomic::AtomicUsize, time::Instant};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -65,8 +66,8 @@ impl<'t> AccountMinter<'t> {
         total_requested_accounts: usize,
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
-        let expected_num_seed_accounts =
-            (total_requested_accounts / 50).clamp(1, CREATION_PARALLELISM);
+        let expected_num_seed_accounts = (total_requested_accounts / 50)
+            .clamp(1, (total_requested_accounts as f32).sqrt() as usize + 1);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
             .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
@@ -144,7 +145,12 @@ impl<'t> AccountMinter<'t> {
             }
         }
 
-        let failed_requests = AtomicUsize::new(0);
+        let start = Instant::now();
+
+        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
+            .take(MAX_RETRIES * 2)
+            .collect::<Vec<_>>();
+
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
         let seed_accounts = self
@@ -160,18 +166,23 @@ impl<'t> AccountMinter<'t> {
         let num_new_child_accounts =
             (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
         info!(
-            "Completed creating {} seed accounts, each with {} coins, had to retry {} transactions",
+            "Completed creating {} seed accounts in {}s, each with {} coins, had to retry {:?} transactions",
             seed_accounts.len(),
+            start.elapsed().as_secs(),
             coins_per_seed_account,
-            failed_requests.into_inner(),
+            failed_requests_to_trimmed_vec(failed_requests),
         );
         info!(
-            "Minting additional {} accounts with {} coins each",
+            "Creating additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
-        let failed_requests = AtomicUsize::new(0);
+        let start = Instant::now();
+        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
+            .take(MAX_RETRIES * 2)
+            .collect::<Vec<_>>();
+
         // For each seed account, create a future and transfer coins from that seed account to new accounts
         let account_futures = seed_accounts
             .into_iter()
@@ -195,29 +206,31 @@ impl<'t> AccountMinter<'t> {
                 )
             });
 
-        // Each future creates 10 accounts, limit concurrency to 100.
+        // Each future creates 10 accounts, limit concurrency to 1000.
         let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);
         // wait for all futures to complete
-        let mut minted_accounts = stream
+        let mut created_accounts = stream
             .collect::<Vec<_>>()
             .await
             .into_iter()
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("Failed to mint accounts: {:?}", e))?
+            .map_err(|e| format_err!("Failed to create accounts: {:?}", e))?
             .into_iter()
             .flatten()
             .collect();
 
-        accounts.append(&mut minted_accounts);
+        accounts.append(&mut created_accounts);
         assert!(
             accounts.len() >= num_accounts,
-            "Something wrong in mint_account, wanted to mint {}, only have {}",
+            "Something wrong in create_accounts, wanted to create {}, only have {}",
             total_requested_accounts,
             accounts.len()
         );
         info!(
-            "Successfully completed creating accounts, had to retry {} transactions",
-            failed_requests.into_inner()
+            "Successfully completed creating {} accounts in {}s, had to retry {:?} transactions",
+            actual_num_seed_accounts * num_new_child_accounts,
+            start.elapsed().as_secs(),
+            failed_requests_to_trimmed_vec(failed_requests),
         );
         Ok(accounts)
     }
@@ -244,9 +257,9 @@ impl<'t> AccountMinter<'t> {
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
-        failed_requests: &AtomicUsize,
+        failed_requests: &[AtomicUsize],
     ) -> Result<Vec<LocalAccount>> {
-        info!("Creating and minting seeds accounts");
+        info!("Creating and funding seeds accounts");
         let mut i = 0;
         let mut seed_accounts = vec![];
         while i < seed_account_num {
@@ -306,6 +319,17 @@ impl<'t> AccountMinter<'t> {
     }
 }
 
+fn failed_requests_to_trimmed_vec(failed_requests: Vec<AtomicUsize>) -> Vec<usize> {
+    let mut result = failed_requests
+        .into_iter()
+        .map(|c| c.into_inner())
+        .collect::<Vec<_>>();
+    while result.len() > 1 && *result.last().unwrap() == 0 {
+        result.pop();
+    }
+    result
+}
+
 fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
     // use same seed for reuse account creation and reuse
     // TODO: Investigate why we use the same seed and then consider changing
@@ -334,7 +358,7 @@ async fn create_and_fund_new_accounts<R>(
     txn_factory: &TransactionFactory,
     reuse_account: bool,
     mut rng: R,
-    failed_requests: &AtomicUsize,
+    failed_requests: &[AtomicUsize],
 ) -> Result<Vec<LocalAccount>>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
@@ -428,4 +452,4 @@ pub fn create_and_fund_account_request(
     ))
 }
 
-const CREATION_PARALLELISM: usize = 100;
+const CREATION_PARALLELISM: usize = 500;

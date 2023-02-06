@@ -58,7 +58,7 @@ pub trait TransactionExecutor: Sync + Send {
     async fn execute_transactions_with_counter(
         &self,
         txns: &[SignedTransaction],
-        failure_counter: &AtomicUsize,
+        failure_counter: &[AtomicUsize],
     ) -> Result<()>;
 }
 
