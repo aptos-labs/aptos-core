@@ -368,7 +368,7 @@ impl<'a> AptosTestAdapter<'a> {
             AccessPath::resource_access_path(*signer_addr, AccountResource::struct_tag());
         let account_blob = self
             .storage
-            .get_state_value(&StateKey::access_path(account_access_path))
+            .get_state_value_bytes(&StateKey::access_path(account_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -388,7 +388,7 @@ impl<'a> AptosTestAdapter<'a> {
 
         let balance_blob = self
             .storage
-            .get_state_value(&StateKey::access_path(coin_access_path))
+            .get_state_value_bytes(&StateKey::access_path(coin_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -895,7 +895,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
                 let bytes = self
                     .storage
-                    .get_state_value(&state_key)
+                    .get_state_value_bytes(&state_key)
                     .unwrap()
                     .ok_or_else(|| format_err!("Failed to fetch table item.",))?;
 

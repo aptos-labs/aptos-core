@@ -182,7 +182,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
     type Key = T::Key;
 
-    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
                 ReadResult::Value(v) => Ok(v.extract_raw_bytes()),
@@ -190,7 +190,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                 ReadResult::Unresolved(delta) => {
                     let from_storage = self
                         .base_view
-                        .get_state_value(state_key)?
+                        .get_state_value_bytes(state_key)?
                         .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR)), |bytes| {
                             Ok(deserialize(&bytes))
                         })?;
@@ -199,12 +199,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                     Ok(Some(serialize(&result)))
                 },
-                ReadResult::None => self.base_view.get_state_value(state_key),
+                ReadResult::None => self.base_view.get_state_value_bytes(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
                 || {
                     // let ret =
-                    self.base_view.get_state_value(state_key)
+                    self.base_view.get_state_value_bytes(state_key)
 
                     // TODO: common treatment with the above case.
                     // TODO: enable below when logging isn't a circular dependency.

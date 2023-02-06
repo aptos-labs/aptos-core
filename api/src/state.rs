@@ -305,7 +305,7 @@ impl StateApi {
         let (ledger_info, ledger_version, state_view) =
             self.preprocess_request(ledger_version.map(|inner| inner.0))?;
         let bytes = state_view
-            .get_state_value(&state_key)
+            .get_state_value_bytes(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
@@ -392,7 +392,7 @@ impl StateApi {
         // Retrieve value from the state key
         let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
         let bytes = state_view
-            .get_state_value(&state_key)
+            .get_state_value_bytes(&state_key)
             .context(format!(
                 "Failed when trying to retrieve table item from the DB with key: {}",
                 key
@@ -446,7 +446,7 @@ impl StateApi {
             table_item_request.key.0.clone(),
         );
         let bytes = state_view
-            .get_state_value(&state_key)
+            .get_state_value_bytes(&state_key)
             .context(format!(
                 "Failed when trying to retrieve table item from the DB with key: {}",
                 table_item_request.key,

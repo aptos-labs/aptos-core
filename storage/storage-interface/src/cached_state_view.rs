@@ -126,7 +126,7 @@ impl CachedStateView {
                 .into_iter()
                 .for_each(|key| {
                     s.spawn(move |_| {
-                        self.get_state_value(key).expect("Must succeed.");
+                        self.get_state_value_bytes(key).expect("Must succeed.");
                     })
                 });
         });
@@ -194,7 +194,7 @@ impl TStateView for CachedStateView {
         self.id
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.get(state_key) {
@@ -240,13 +240,13 @@ impl TStateView for CachedDbStateView {
         self.db_state_view.id()
     }
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.clone());
         }
-        let state_value_option = self.db_state_view.get_state_value(state_key)?;
+        let state_value_option = self.db_state_view.get_state_value_bytes(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache
