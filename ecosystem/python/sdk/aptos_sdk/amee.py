@@ -6,7 +6,9 @@ import getpass
 import json
 import secrets
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
+from typing import Optional as Option
+from typing import Tuple
 
 from aptos_sdk.account import Account
 from aptos_sdk.ed25519 import MultiEd25519PublicKey, PublicKey
@@ -39,8 +41,8 @@ def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
     return bytes.fromhex(prefixed_hex[2:])
 
 
-def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], bytes]:
-    """Check keyfile password, returning JSON data/private key bytes"""
+def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
+    """Check keyfile password, returning JSON data/private key bytes."""
     with open(path, "r", encoding="utf-8") as keyfile:  # Open keyfile:
         data = json.load(keyfile)  # Load JSON data from keyfile.
     salt = prefixed_hex_to_bytes(data["salt"])  # Get salt bytes.
@@ -54,33 +56,31 @@ def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], bytes]:
     fernet = derive_password_protection_fernet(password, salt)
     try:  # Try decrypting private key.
         private_key = fernet.decrypt(encrypted_private_key)
-    # Assert encrypted private key can be decrypted.
+    # If exception from attempting to decrypt private key:
     except (InvalidSignature, InvalidToken):
-        raise ValueError("Invalid password.") from None
-    return data, private_key
+        print("Invalid password.")  # Inform user.
+        private_key = None  # Set private key to none.
+    return data, private_key  # Return JSON data, private key.
 
 
 def check_name(tokens: List[str]) -> str:
     """Check list of tokens for valid name, return concatenated str."""
     name = " ".join(tokens)  # Get name.
     # Assert that name is not blank space.
-    if len(name) == 0 or name.isspace():
-        raise ValueError("Name may not be blank.")
+    assert len(name) != 0 and not name.isspace(), "Name may not be blank."
     return name  # Return name.
 
 
 def check_outfile_exists(path: Path):
     """Verify desired outfile does not already exist."""
-    if path.exists():  # Assert not overwriting file.
-        raise ValueError(f"{path} already exists.")
+    assert not path.exists(), f"{path} already exists."
 
 
 def check_password_length(password: str):
     """Verify password meets minimum length threshold."""
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise ValueError(
-            f"Password should be at least {MIN_PASSWORD_LENGTH} characters."
-        )
+    assert (
+        len(password) >= MIN_PASSWORD_LENGTH
+    ), f"Password should be at least {MIN_PASSWORD_LENGTH} characters."
 
 
 def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
@@ -110,9 +110,8 @@ def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     check_password_length(password)  # Check password length.
     # Have user re-enter password.
     check = getpass.getpass("Re-enter password: ")
-    if password != check:  # Raise error if passwords do not match.
-        raise ValueError("Passwords do not match.")
-    # Raise error if password does not meet minimum length threshold.
+    # Assert passwords match.
+    assert password == check, "Passwords do not match."
     salt = secrets.token_bytes(16)  # Generate encryption salt.
     # Generate Fernet encryption assistant from password and salt.
     fernet = derive_password_protection_fernet(password, salt)
@@ -174,30 +173,36 @@ def incorporate(args):
 
 def keyfile_change_password(args):
     """Change password for a single-signer keyfile."""
-    # Check password, get keyfile data and private key bytes.
+    # Check password, get keyfile data and optional private key bytes.
     data, private_key_bytes = check_keyfile_password(args.keyfile)
-    # Encrypt private key.
-    encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
-    # Get encrypted private key hex.
-    key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
-    # Update JSON with encrypted private key.
-    data["encrypted_private_key"] = key_hex
-    # Update JSON with new salt.
-    data["salt"] = bytes_to_prefixed_hex(salt.hex())
-    keyfile_write_json(args.keyfile, data)  # Write JSON to keyfile.
+    if private_key_bytes is not None:  # If able to decrypt private key:
+        # Encrypt private key.
+        encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
+        # Get encrypted private key hex.
+        key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
+        # Update JSON with encrypted private key.
+        data["encrypted_private_key"] = key_hex
+        # Update JSON with new salt.
+        data["salt"] = bytes_to_prefixed_hex(salt.hex())
+        keyfile_write_json(args.keyfile, data)  # Write JSON to keyfile.
 
 
 def keyfile_extract(args):
     """Extract private key from keyfile, store via
     aptos_sdk.account.Account.store"""
     check_outfile_exists(args.account_store)  # Check if path exists.
-    # Load private key bytes.
+    # Try loading private key bytes.
     _, private_key_bytes = check_keyfile_password(args.keyfile)
-    account = Account.load_key(private_key_bytes.hex())  # Load account.
-    account.store(f"{args.account_store}")  # Store Aptos account file.
-    with open(args.account_store, "r", encoding="utf-8") as outfile:
-        # Print contents of new account store.
-        print(f"New account store at {args.account_store}: \n{outfile.read()}")
+    # If able to successfully decrypt:
+    if private_key_bytes is not None:
+        # Load account.
+        account = Account.load_key(private_key_bytes.hex())
+        # Store Aptos account file.
+        account.store(f"{args.account_store}")
+        # Open new Aptos account store:
+        with open(args.account_store, "r", encoding="utf-8") as outfile:
+            # Print contents of new account store.
+            print(f"New account store at {args.account_store}: \n{outfile.read()}")
 
 
 def keyfile_generate(args):
@@ -219,7 +224,7 @@ def keyfile_generate(args):
         "public_key": f"{account.public_key()}",
         "authentication_key": account.auth_key(),
         "encrypted_private_key": key_hex,
-        "salt": bytes_to_prefixed_hex(salt.hex()),
+        "salt": bytes_to_prefixed_hex(salt),
     }
     if args.keyfile is None:  # If no custom filepath specified:
         # Create filepath from signatory name.
@@ -231,11 +236,13 @@ def keyfile_generate(args):
 def keyfile_verify(args):
     """Verify password for single-signer keyfile generated via
     keyfile_generate(), show public key and authentication key."""
-    data, _ = check_keyfile_password(args.keyfile)  # Load JSON data.
-    # Print keyfile metadata.
-    print(f'Keyfile password verified for {data["signatory"]}')
-    print(f'Public key:         {data["public_key"]}')
-    print(f'Authentication key: {data["authentication_key"]}')
+    # Load JSON data and try getting private key bytes.
+    data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is not None:  # If able to decrypt private key:
+        # Print keyfile metadata.
+        print(f'Keyfile password verified for {data["signatory"]}')
+        print(f'Public key:         {data["public_key"]}')
+        print(f'Authentication key: {data["authentication_key"]}')
 
 
 def keyfile_write_json(path: Path, data: Dict[str, str]):
