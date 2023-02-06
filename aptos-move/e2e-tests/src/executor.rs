@@ -601,15 +601,13 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let session_out = session.finish().expect("Failed to generate txn effects");
-            // TODO: Support deltas in fake executor.
-            let (_, change_set) = session_out
-                .into_change_set(
+            let change_set_ext = session
+                .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
-                .expect("Failed to generate writeset")
-                .into_inner();
+                .expect("Failed to generate txn effects");
+            let (_delta_change_set, change_set) = change_set_ext.into_inner();
             let (write_set, _events) = change_set.into_inner();
             write_set
         };
@@ -643,15 +641,15 @@ impl FakeExecutor {
                 &mut UnmeteredGasMeter,
             )
             .map_err(|e| e.into_vm_status())?;
-        let session_out = session.finish().expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
-        let (_, change_set) = session_out
-            .into_change_set(
+
+        let change_set_ext = session
+            .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
-            .expect("Failed to generate writeset")
-            .into_inner();
+            .expect("Failed to generate txn effects");
+        // TODO: Support deltas in fake executor.
+        let (_delta_change_set, change_set) = change_set_ext.into_inner();
         let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }

@@ -289,9 +289,8 @@ impl AptosVM {
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
 
         let epilogue_change_set_ext = session
-            .finish()
-            .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -396,9 +395,9 @@ impl AptosVM {
                 new_published_modules_loaded,
             )?;
 
-            let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let change_set_ext =
-                session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
+            let change_set_ext = session
+                .finish(&mut (), gas_meter.change_set_configs())
+                .map_err(|e| e.into_vm_status())?;
 
             // Charge gas for write set
             gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -565,9 +564,9 @@ impl AptosVM {
             new_published_modules_loaded,
         )?;
 
-        let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-        let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
+        let change_set_ext = session
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
 
         // Charge gas for write set
         gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
@@ -836,24 +835,15 @@ impl AptosVM {
                     )
                     .map_err(Err)?;
 
-                let execution_result = tmp_session
+                tmp_session
                     .execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
                         args,
                         &mut gas_meter,
                     )
-                    .and_then(|_| tmp_session.finish())
-                    .map_err(|e| e.into_vm_status());
-
-                match execution_result {
-                    Ok(session_out) => session_out
-                        .into_change_set(&mut (), &change_set_configs)
-                        .map_err(Err)?,
-                    Err(e) => {
-                        return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
-                    },
-                }
+                    .and_then(|_| tmp_session.finish(&mut (), &change_set_configs))
+                    .map_err(|e| Err(e.into_vm_status()))?
             },
         })
     }

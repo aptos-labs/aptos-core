@@ -9,6 +9,6 @@ mod vm;
 
 pub use crate::move_vm_ext::{
     resolver::MoveResolverExt,
-    session::{SessionExt, SessionId, SessionOutput},
+    session::{SessionExt, SessionId},
     vm::{verifier_config, MoveVmExt},
 };
