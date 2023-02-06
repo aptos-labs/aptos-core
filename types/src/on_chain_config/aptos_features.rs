@@ -26,6 +26,7 @@ pub enum FeatureFlag {
     PERIODICAL_REWARD_RATE_DECREASE = 16,
     PARTIAL_GOVERNANCE_VOTING = 17,
     SIGNATURE_CHECKER_V2 = 18,
+    STORAGE_SLOT_METADATA = 19,
 }
 
 /// Representation of features on chain as a bitset.
