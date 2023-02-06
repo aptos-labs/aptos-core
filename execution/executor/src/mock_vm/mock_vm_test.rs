@@ -21,7 +21,7 @@ struct MockStateView;
 impl TStateView for MockStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 
