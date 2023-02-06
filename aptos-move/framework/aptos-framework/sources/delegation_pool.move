@@ -625,7 +625,11 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u64 {
-        if (coins_amount == 0) return 0;
+        // cannot buy inactive shares, only pending_inactive at current lockup cycle
+        let new_shares = pool_u64::buy_in(pending_inactive_shares_pool(pool), shareholder, coins_amount);
+        // never create a new pending withdrawal unless delegator owns some pending_inactive shares
+        if (new_shares == 0) { return 0 };
+
         // execute the pending withdrawal if exists and is inactive before creating a new one
         execute_pending_withdrawal(pool, shareholder);
 
@@ -639,8 +643,7 @@ module aptos_framework::delegation_pool {
             error::invalid_state(EPENDING_WITHDRAWAL_EXISTS)
         );
 
-        // cannot buy inactive shares, only pending_inactive at current lockup cycle
-        pool_u64::buy_in(pending_inactive_shares_pool(pool), shareholder, coins_amount)
+        new_shares
     }
 
     /// Convert `coins_amount` of coins to be redeemed from shares pool `shares_pool`
@@ -1069,6 +1072,55 @@ module aptos_framework::delegation_pool {
         // stakes should remain the same - `Self::get_stake` correctly calculates them
         synchronize_delegation_pool(pool_address);
         assert_delegation(delegator1_address, pool_address, 11201699216002, 0, 2000000000000);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator = @0x010)]
+    public entry fun test_never_create_pending_withdrawal_if_no_shares_bought(
+        aptos_framework: &signer,
+        validator: &signer,
+        delegator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, 1000 * ONE_APT, true, true);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let delegator_address = signer::address_of(delegator);
+        account::create_account_for_test(delegator_address);
+
+        stake::mint(delegator, ONE_APT);
+        add_stake(delegator, pool_address, ONE_APT);
+
+        unlock(validator, pool_address, 100 * ONE_APT);
+
+        stake::assert_stake_pool(pool_address, 90000000000, 0, 100000000, 10000000000);
+        end_aptos_epoch();
+        stake::assert_stake_pool(pool_address, 91000000000, 0, 0, 10100000000);
+
+        unlock(delegator, pool_address, 1);
+        // redeem 1 coins * 901 / 910 = 0 shares -> 0 coins to buy in pending_inactive pool
+        assert_delegation(delegator_address, pool_address, 100000000, 0, 0);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
+
+        unlock(delegator, pool_address, 2);
+        // redeem 2 coins * 901 / 910 = 1 shares -> 1 shares * 910 / 901 = 1 coins to buy in pending_inactive pool
+        // buy 1 coins * 100 / 101 = 0 shares in pending_inactive pool worth 0 coins
+        assert_delegation(delegator_address, pool_address, 99999999, 0, 0);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
+
+        unlock(delegator, pool_address, 3);
+        // redeem 3 coins * 901 / 910 = 2 shares -> 2 shares * 910 / 901 = 2 coins to buy in pending_inactive pool
+        // buy 2 coins * 100 / 101 = 1 shares in pending_inactive pool worth 1 * 101 / 100 = 1 coins
+        assert_delegation(delegator_address, pool_address, 99999996, 0, 1);
+        // the pending withdrawal has been created as > 0 pending_inactive shares have been bought
+        assert_pending_withdrawal(delegator_address, pool_address, true, 0, false, 1);
+
+        reactivate_stake(delegator, pool_address, 1);
+        // redeem 1 coins >= delegator balance -> 1 shares are redeemed
+        assert_delegation(delegator_address, pool_address, 99999996, 0, 0);
+        // the pending withdrawal has been deleted as delegator has 0 pending_inactive shares now
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
