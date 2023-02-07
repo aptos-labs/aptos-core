@@ -119,7 +119,14 @@ impl PayloadManager {
     }
 
     /// Extract transaction from a given block
+    ///
+    //
+    ///
+    /// /
+    ///
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
+    ///
+    ///
     pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
         let payload = match block.payload() {
             Some(p) => p,

@@ -8,6 +8,7 @@ use crate::{
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
@@ -44,6 +45,7 @@ pub struct ExecutionProxy {
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<()>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
+    transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
 }
 
 impl ExecutionProxy {
@@ -76,6 +78,7 @@ impl ExecutionProxy {
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(()),
             payload_manager: Mutex::new(None),
+            transaction_shuffler: Mutex::new(None),
         }
     }
 }
@@ -103,13 +106,16 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
+
+        let shuffled_txns = txn_shuffler.shuffle(txns);
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
 
         let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), txns.clone());
+            block.transactions_to_execute(&self.validators.lock(), shuffled_txns.clone());
 
         let compute_result = monitor!(
             "execute_block",
@@ -125,7 +131,7 @@ impl StateComputer for ExecutionProxy {
         // notify mempool about failed transaction
         if let Err(e) = self
             .txn_notifier
-            .notify_failed_txn(txns, &compute_result)
+            .notify_failed_txn(shuffled_txns, &compute_result)
             .await
         {
             error!(
@@ -153,6 +159,8 @@ impl StateComputer for ExecutionProxy {
         let mut payloads = Vec::new();
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
+
         for block in blocks {
             block_ids.push(block.id());
 
@@ -161,8 +169,9 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
+            let shuffled_txns = txn_shuffler.shuffle(signed_txns);
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
+            txns.extend(block.transactions_to_commit(&self.validators.lock(), shuffled_txns));
             reconfig_events.extend(block.reconfig_event());
 
             latest_epoch = max(latest_epoch, block.epoch());
@@ -247,11 +256,19 @@ impl StateComputer for ExecutionProxy {
         })
     }
 
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>) {
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        payload_manager: Arc<PayloadManager>,
+        transaction_shuffler: Arc<dyn TransactionShuffler>,
+    ) {
         *self.validators.lock() = epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
             .collect();
         self.payload_manager.lock().replace(payload_manager);
+        self.transaction_shuffler
+            .lock()
+            .replace(transaction_shuffler);
     }
 }

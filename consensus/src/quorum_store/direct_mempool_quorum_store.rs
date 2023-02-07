@@ -138,8 +138,14 @@ impl DirectMempoolQuorumStore {
                 payload_filter,
                 callback,
             ) => {
-                self.handle_block_request(max_txns, max_bytes, return_non_full, payload_filter, callback)
-                    .await;
+                self.handle_block_request(
+                    max_txns,
+                    max_bytes,
+                    return_non_full,
+                    payload_filter,
+                    callback,
+                )
+                .await;
             },
         }
     }

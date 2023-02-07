@@ -30,7 +30,14 @@ pub enum BlockProposalCommand {
 impl fmt::Display for BlockProposalCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, return_non_full, excluded, _) => {
+            BlockProposalCommand::GetBlockRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
                 write!(
                     f,
                     "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {}, return_non_full: {}, excluded: {}]",

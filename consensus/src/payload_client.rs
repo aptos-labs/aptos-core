@@ -45,7 +45,7 @@ impl QuorumStoreClient {
             consensus_to_quorum_store_sender,
             poll_count,
             pull_timeout_ms,
-            create_empty_blocks_for_pending_ordering, 
+            create_empty_blocks_for_pending_ordering,
             create_partial_blocks_before_poll_ends,
         }
     }

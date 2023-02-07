@@ -187,7 +187,13 @@ impl MempoolProxy {
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, return_non_full, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(
+            max_items,
+            max_bytes,
+            return_non_full,
+            exclude_txns,
+            callback,
+        );
         self.mempool_tx
             .clone()
             .try_send(msg)
