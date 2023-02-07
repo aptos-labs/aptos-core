@@ -109,7 +109,7 @@ The core of the object model that defines ownership, transferability, and events
 </dt>
 <dd>
  Object transferring is a common operation, this allows for disabling and enabling
- transfers. Bypassing the use of a the TransferRef.
+ transfers bypassing the use of a TransferRef.
 </dd>
 <dt>
 <code>transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="object.md#0x1_object_TransferEvent">object::TransferEvent</a>&gt;</code>
@@ -154,7 +154,7 @@ A shared resource group for storing object resources together in storage.
 
 ## Struct `ObjectId`
 
-Type safe way of designate an object as at this address.
+Type safe way of designating an object as at this address.
 
 
 <pre><code><b>struct</b> <a href="object.md#0x1_object_ObjectId">ObjectId</a> <b>has</b> <b>copy</b>, drop, store
@@ -336,7 +336,7 @@ the current owner.
 
 ## Struct `TransferEvent`
 
-Emitted whenever the objects owner field is changed.
+Emitted whenever the object's owner field is changed.
 
 
 <pre><code><b>struct</b> <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> <b>has</b> drop, store

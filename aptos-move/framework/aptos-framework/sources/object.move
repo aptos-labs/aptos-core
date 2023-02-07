@@ -70,7 +70,7 @@ module aptos_framework::object {
         /// The address (object or account) that owns this object
         owner: address,
         /// Object transferring is a common operation, this allows for disabling and enabling
-        /// transfers. Bypassing the use of a the TransferRef.
+        /// transfers bypassing the use of a TransferRef.
         allow_ungated_transfer: bool,
         /// Emitted events upon transferring of ownership.
         transfer_events: event::EventHandle<TransferEvent>,
@@ -80,7 +80,7 @@ module aptos_framework::object {
     /// A shared resource group for storing object resources together in storage.
     struct ObjectGroup { }
 
-    /// Type safe way of designate an object as at this address.
+    /// Type safe way of designating an object as at this address.
     struct ObjectId has copy, drop, store {
         inner: address,
     }
@@ -115,7 +115,7 @@ module aptos_framework::object {
         owner: address,
     }
 
-    /// Emitted whenever the objects owner field is changed.
+    /// Emitted whenever the object's owner field is changed.
     struct TransferEvent has drop, store {
         object_id: ObjectId,
         from: address,
@@ -476,7 +476,6 @@ module aptos_framework::object {
             HeroEquipEvent { weapon_id: option::none() },
         );
     }
-
 
     #[test(creator = @0x123)]
     fun test_object(creator: &signer) acquires Hero, Object {
