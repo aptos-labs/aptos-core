@@ -1,24 +1,10 @@
-name: "Prover Test"
+name: "Prover Daily Test"
 on:
-   pull_request:
-     types: [ labeled, opened, synchronize, reopened, auto_merge_enabled ]
-     paths:
-       - '**.move'
-       - 'Cargo.toml'
-   push:
-     branches:
-       - main
-       - devnet
-       - testnet
-       - auto
-       - canary
-       - mainnet
-       - aptos-node-v*
-     paths:
-       - '**.move'
-       - 'Cargo.toml'
   # Allow us to manually run this specific workflow without a PR
   workflow_dispatch:
+  # Until enabled on all PRs, run continuously at the beginning of each hour
+  schedule:
+    - cron: "14 14 * * *"
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -31,9 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  prover-test:
-    if: |
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-prover-test')
+  prover-inconsistency-test:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
@@ -54,5 +38,5 @@ jobs:
           echo "/home/runner/bin" | tee -a $GITHUB_PATH
           echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
           echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
-      - run: cargo test -p aptos-move-examples --release -- --include-ignored prover
-      - run: cargo test -p aptos-framework --release -- --include-ignored prover
+      - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover
