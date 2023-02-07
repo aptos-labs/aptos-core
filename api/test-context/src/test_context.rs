@@ -40,7 +40,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{Transaction, TransactionStatus, TransactionPayload},
 };
-
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::VMValidator;
 use bytes::Bytes;
