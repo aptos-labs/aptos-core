@@ -1,17 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::change_set::{DeltaChangeSet, WriteChangeSet};
+use crate::change_set::{ChangeSetContainer, DeltaChange, WriteChange};
 use aptos_types::{contract_event::ContractEvent, transaction::TransactionStatus};
 
 /// The output of executing a transaction.
 #[derive(Debug)]
 pub struct ExecutionOutput {
     /// The list of deltas this transaction intends to apply.
-    delta_changes: DeltaChangeSet,
+    delta_changes: ChangeSetContainer<DeltaChange>,
 
     /// The list of writes this transaction intends to do.
-    write_changes: WriteChangeSet,
+    write_changes: ChangeSetContainer<WriteChange>,
 
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,

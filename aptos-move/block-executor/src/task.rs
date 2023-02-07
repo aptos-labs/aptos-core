@@ -6,6 +6,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
 };
+use aptos_vm_types::data_cache::{Cache, DataCache};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -40,7 +41,7 @@ impl ModulePath for StateKey {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath;
-    type Value: Send + Sync + TransactionWrite;
+    type Value: Send + Sync + Cache;
 }
 
 /// Inference result of a transaction.
@@ -71,7 +72,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &impl DataCache<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: usize,
         materialize_deltas: bool,

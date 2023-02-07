@@ -112,7 +112,7 @@ mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
-mod delta_state_view;
+mod data_cache_with_changes;
 mod errors;
 pub mod logging;
 pub mod move_vm_ext;

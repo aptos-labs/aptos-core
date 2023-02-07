@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
-use aptos_types::write_set::TransactionWrite;
+use aptos_vm_types::change_set::AsCachedData;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -41,7 +41,7 @@ pub enum EntryCell<V> {
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Arc<V>),
+    Write(Incarnation, V),
     /// Recorded in the shared multi-version data-structure for each delta.
     Delta(DeltaOp),
 }
@@ -50,7 +50,7 @@ impl<V> Entry<V> {
     pub fn new_write_from(flag: usize, incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             flag: AtomicUsize::new(flag),
-            cell: EntryCell::Write(incarnation, Arc::new(data)),
+            cell: EntryCell::Write(incarnation, data),
         }
     }
 
@@ -77,7 +77,7 @@ pub(crate) struct VersionedValue<V> {
     pub(crate) contains_delta: bool,
 }
 
-impl<V: TransactionWrite> VersionedValue<V> {
+impl<V> VersionedValue<V> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -86,7 +86,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
     }
 }
 
-impl<V: TransactionWrite> Default for VersionedValue<V> {
+impl<V> Default for VersionedValue<V> {
     fn default() -> Self {
         VersionedValue::new()
     }
@@ -127,10 +127,10 @@ pub enum MVHashMapOutput<V> {
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid passing big values around.
-    Version(Version, Arc<V>),
+    Version(Version, Option<V>),
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: AsCachedData> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -236,7 +236,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                         (EntryCell::Write(incarnation, data), None) => {
                             // Resolve to the write if no deltas were applied in between.
                             let write_version = (*idx, *incarnation);
-                            return Ok(Version(write_version, data.clone()));
+                            return Ok(Version(write_version, data.as_cached_data()));
                         },
                         (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                             // Deltas were applied. We must deserialize the value
@@ -244,14 +244,15 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let maybe_value = AggregatorValue::from_write(data.as_ref());
+                            let cached_data = data.as_cached_data();
+                            let maybe_value = AggregatorValue::from_write(cached_data);
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
                                 // (MoveVM will observe 'deletion'). This takes precedence
                                 // over any speculative delta accumulation errors on top.
                                 let write_version = (*idx, *incarnation);
-                                return Ok(Version(write_version, data.clone()));
+                                return Ok(Version(write_version, None));
                             }
                             return accumulator.map_err(|_| DeltaApplicationFailure).and_then(
                                 |a| {
@@ -297,7 +298,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> Default for MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: AsCachedData> Default for MVHashMap<K, V> {
     fn default() -> Self {
         Self::new()
     }

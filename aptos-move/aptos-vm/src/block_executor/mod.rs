@@ -32,6 +32,7 @@ use rayon::prelude::*;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
+    // TODO: WriteChange
     type Value = WriteOp;
 }
 

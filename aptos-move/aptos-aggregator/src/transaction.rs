@@ -6,8 +6,10 @@ use anyhow::bail;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
-    write_set::{TransactionWrite, WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm_types::{data_cache::CachedData, change_set::AsCachedData};
+use move_core_types::value::{MoveTypeLayout, MoveValue};
 use std::{collections::btree_map, sync::Arc};
 
 /// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
@@ -15,11 +17,23 @@ use std::{collections::btree_map, sync::Arc};
 pub struct AggregatorValue(u128);
 
 impl AggregatorValue {
+    /// TODO: change message and revisit this later.
     /// Returns None if the write doesn't contain a value (i.e deletion), and panics if
     /// the value raw bytes can't be deserialized into an u128.
-    pub fn from_write(write: &dyn TransactionWrite) -> Option<Self> {
-        let v = write.extract_raw_bytes();
-        v.map(|bytes| Self(deserialize(&bytes)))
+    pub fn from_write(write: &dyn AsCachedData<CachedData>) -> Option<Self> {
+        let cd = write.as_cached_data();
+        cd.map(|data| {
+            match data {
+                CachedData::Serialized(blob) => Self(deserialize(&blob)),
+                CachedData::MoveValue(v) => {
+                    Self(match v.as_ref().as_move_value(&MoveTypeLayout::U128) {
+                        MoveValue::U128(v) => v,
+                        _ => unreachable!()
+                    })
+                },
+                CachedData::AggregatorValue(v) => Self(v),
+            }
+        })
     }
 
     pub fn into(self) -> u128 {

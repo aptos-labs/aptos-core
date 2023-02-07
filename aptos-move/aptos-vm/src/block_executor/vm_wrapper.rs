@@ -12,6 +12,7 @@ use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::Transactio
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_vm_types::data_cache::AptosDataCache;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -56,7 +57,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl StateView,
+        view: &impl AptosDataCache,
         txn: &PreprocessedTransaction,
         txn_idx: usize,
         materialize_deltas: bool,
