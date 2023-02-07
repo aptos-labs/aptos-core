@@ -10,7 +10,9 @@ from typing import Any, Dict, List
 from typing import Optional as Option
 from typing import Tuple
 
-from aptos_sdk.account import Account
+from aptos_sdk.account import Account, RotationProofChallenge
+from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.bcs import Serializer
 from aptos_sdk.ed25519 import MultiEd25519PublicKey, PublicKey
 from cryptography.exceptions import InvalidSignature
 from cryptography.fernet import Fernet, InvalidToken
@@ -130,6 +132,14 @@ def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     return encrypted_private_key, salt  # Return key, salt.
 
 
+def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract public fields from signatory keyfile JSON data."""
+    return dict(
+        (field, data[field])
+        for field in ["signatory", "public_key", "authentication_key"]
+    )
+
+
 def incorporate(args):
     """Incorporate single-signer keyfiles to multisig metadata file."""
     n_signers = len(args.keyfiles)  # Get number of signers.
@@ -150,28 +160,26 @@ def incorporate(args):
         public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
         # Append public key to list of public keys.
         public_keys.append(PublicKey(VerifyKey(public_key_bytes)))
-        signatories.append(
-            dict(
-                (field, signatory[field])
-                for field in ["signatory", "public_key", "authentication_key"]
-            )
-        )  # Extract relevant fields for list of signatories.
+        # Append signatory public data to list of signatories.
+        signatories.append(get_public_signatory_fields(signatory))
     # Initialize multisig public key.
     multisig_public_key = MultiEd25519PublicKey(public_keys, args.threshold)
     # Get authentication key as prefixed hex.
-    auth_key = bytes_to_prefixed_hex(multisig_public_key.auth_key().hex())
-    data = {  # Generate JSON data for multisig metadata file.
-        "multisig_name": multisig_name,
-        "threshold": args.threshold,
-        "n_signatories": n_signers,
-        "public_key": bytes_to_prefixed_hex(multisig_public_key.to_bytes()),
-        "authentication_key": auth_key,
-        "signatories": signatories,
-    }
+    auth_key = bytes_to_prefixed_hex(multisig_public_key.auth_key())
+    # Get public key as prefixed hex.
+    public_key = bytes_to_prefixed_hex(multisig_public_key.to_bytes())
     write_json_file(  # Write JSON to multisig metadata file.
         path=get_file_path(args.metafile, args.name, "multisig"),
-        data=data,
-        descriptor="multisig metadata file",
+        data={
+            "filetype": "Multisig metadata file",
+            "multisig_name": multisig_name,
+            "address": None,
+            "threshold": args.threshold,
+            "n_signatories": n_signers,
+            "public_key": public_key,
+            "authentication_key": auth_key,
+            "signatories": signatories,
+        },
         check_if_exists=True,
     )
 
@@ -189,9 +197,8 @@ def keyfile_change_password(args):
         data["encrypted_private_key"] = encrypted_private_key_hex
         # Update JSON with new salt.
         data["salt"] = bytes_to_prefixed_hex(salt.hex())
-        write_json_file(  # Write JSON to keyfile.
-            path=args.keyfile, data=data, descriptor="keyfile", check_if_exists=False
-        )
+        # Write JSON to keyfile, skipping check for if file exists.
+        write_json_file(args.keyfile, data, False)
 
 
 def keyfile_extract(args):
@@ -218,6 +225,15 @@ def keyfile_generate(args):
     signatory = check_name(args.signatory)
     if args.account_store is None:  # If no account store supplied:
         account = Account.generate()  # Generate new account.
+        # If vanity prefix supplied:
+        if args.vanity_prefix is not None:
+            # Get vanity address prefix bytes.
+            prefix = prefixed_hex_to_bytes(args.vanity_prefix)
+            print("Mining vanity address...")  # Print feedback message.
+            len_prefix = len(prefix)  # Get prefix length.
+            # While account address does not have prefix:
+            while account.account_address.address[0:len_prefix] != prefix:
+                account = Account.generate()  # Generate another.
     else:  # If account store path supplied:
         # Generate an account from it.
         account = Account.load(f"{args.account_store}")
@@ -227,17 +243,16 @@ def keyfile_generate(args):
     encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
     # Get encrypted private key hex.
     key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
-    data = {  # Generate JSON data for keyfile.
-        "signatory": signatory,
-        "public_key": f"{account.public_key()}",
-        "authentication_key": account.auth_key(),
-        "encrypted_private_key": key_hex,
-        "salt": bytes_to_prefixed_hex(salt),
-    }
     write_json_file(  # Write JSON to keyfile.
         path=get_file_path(args.keyfile, args.signatory, "keyfile"),
-        data=data,
-        descriptor="keyfile",
+        data={
+            "filetype": "Keyfile",
+            "signatory": signatory,
+            "public_key": f"{account.public_key()}",
+            "authentication_key": account.auth_key(),
+            "encrypted_private_key": key_hex,
+            "salt": bytes_to_prefixed_hex(salt),
+        },
         check_if_exists=True,
     )
 
@@ -254,9 +269,7 @@ def keyfile_verify(args):
         print(f'Authentication key: {data["authentication_key"]}')
 
 
-def write_json_file(
-    path: Path, data: Dict[str, str], descriptor: str, check_if_exists: bool
-):
+def write_json_file(path: Path, data: Dict[str, str], check_if_exists: bool):
     """Write JSON data to path, printing contents of new file and
     optionally checking if the file already exists."""
     if check_if_exists:
@@ -265,10 +278,82 @@ def write_json_file(
     with open(path, "w", encoding="utf-8") as file:
         # Dump JSON data to file.
         json.dump(data, file, indent=4)
+    filetype = data["filetype"]  # Get file type from data.
     # With file open for reading:
     with open(path, "r", encoding="utf-8") as file:
         # Print contents of file.
-        print(f"New {descriptor} at {path}: \n{file.read()}")
+        print(f"{filetype} now at {path}: \n{file.read()}")
+
+
+def rotate_challenge_propose(args):
+    """Propose a rotation proof challenge, storing an output file.
+
+    Accepts either a single-signer keyfile or multisig metadata file for
+    originating account. If single-signer, assumes authentication key is
+    account address."""
+    name = check_name(args.name)  # Get name for the rotation.
+    # Load originator data.
+    originator_data = json.load(args.originator)
+    target_data = json.load(args.target)  # Load target data.
+    if args.single_originator:  # If a single-signer originator:
+        # Address is authentication key.
+        originator_address = originator_data["authentication_key"]
+    else:  # If multisig originator:
+        # Address is that indicated in metadata file.
+        originator_address = originator_data["address"]
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "challenge_proposal"),
+        data={
+            "filetype": "Rotation proof challenge proposal",
+            "description": name,
+            "sequence_number": args.sequence_number,
+            "originator": originator_address,
+            "current_auth_key": originator_data["authentication_key"],
+            "new_public_key": target_data["public_key"],
+        },
+        check_if_exists=True,
+    )
+
+
+def rotate_challenge_sign(args):
+    """Sign a rotation proof challenge proposal, storing output file."""
+    name = check_name(args.name)  # Get name for the signature.
+    proposal_data = json.load(args.proposal)  # Load proposal data.
+    # Check password, get keyfile data and optional private key bytes.
+    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is None:  # If can't decrypt private key:
+        return  # Return
+    # Get proposal fields as bytes.
+    (originator_address_bytes, current_auth_key_bytes, new_pubkey_bytes) = (
+        prefixed_hex_to_bytes(proposal_data["originator"]),
+        prefixed_hex_to_bytes(proposal_data["current_auth_key"]),
+        prefixed_hex_to_bytes(proposal_data["new_public_key"]),
+    )
+    rotation_proof_challenge = RotationProofChallenge(
+        sequence_number=int(proposal_data["sequence_number"]),
+        originator=AccountAddress(originator_address_bytes),
+        current_auth_key=AccountAddress(current_auth_key_bytes),
+        new_public_key=new_pubkey_bytes,
+    )  # Declare a rotation proof challenge.
+    serializer = Serializer()  # Init BCS serializer.
+    # Serialize rotation proof challenge.
+    rotation_proof_challenge.serialize(serializer)
+    rotation_proof_challenge_bcs = serializer.output()  # Get BCS.
+    # Create Aptos-style account.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    # Sign the serialized rotation proof challnege.
+    signature = account.sign(rotation_proof_challenge_bcs).data()
+    write_json_file(  # Write JSON to signature file.
+        path=get_file_path(args.outfile, args.name, "challenge_signature"),
+        data={
+            "filetype": "Rotation proof challenge signature",
+            "description": name,
+            "challenge_proposal": proposal_data,
+            "signatory": get_public_signatory_fields(keyfile_data),
+            "signature": bytes_to_prefixed_hex(signature),
+        },
+        check_if_exists=True,
+    )
 
 
 # AMEE parser.
@@ -291,8 +376,8 @@ parser_incorporate.add_argument(
     "name",
     type=str,
     nargs="+",
-    help="""The name of the multisig entity. For example "Aptos" or "The Aptos
-        Foundation".""",
+    help="""The name of the multisig entity. For example 'Aptos' or 'The Aptos
+        Foundation'.""",
 )
 parser_incorporate.add_argument(
     "-t",
@@ -369,18 +454,25 @@ parser_keyfile_generate.add_argument(
     "signatory",
     type=str,
     nargs="+",
-    help="""The name of the entity acting as a signatory. For example "Aptos"
-        or "The Aptos Foundation".""",
+    help="""The name of the entity acting as a signatory. For example 'Aptos'
+        or 'The Aptos Foundation'.""",
 )
 parser_keyfile_generate.add_argument(
+    "-k", "--keyfile", type=Path, help="""Relative path to desired keyfile."""
+)
+exclusive_group = parser_keyfile_generate.add_mutually_exclusive_group()
+exclusive_group.add_argument(
     "-a",
     "--account-store",
     type=Path,
     help="""Relative path to Aptos account data generated via
         `aptos_sdk.account.Account.store()`.""",
 )
-parser_keyfile_generate.add_argument(
-    "-k", "--keyfile", type=Path, help="""Relative path to desired keyfile."""
+exclusive_group.add_argument(
+    "-v",
+    "--vanity-prefix",
+    type=str,
+    help="""Vanity address prefix, for example 0xf00.""",
 )
 
 # Keyfile verify subcommand parser.
@@ -393,6 +485,101 @@ parser_keyfile_verify = subparsers_keyfile.add_parser(
 parser_keyfile_verify.set_defaults(func=keyfile_verify)
 parser_keyfile_verify.add_argument(
     "keyfile", type=Path, help="""Relative path to keyfile."""
+)
+
+# Rotate subcommand parser.
+parser_rotate = subparsers.add_parser(
+    name="rotate",
+    aliases=["r"],
+    description="Assorted authentication key rotation operations.",
+    help="Authentication key rotation operations.",
+)
+subparsers_rotate = parser_rotate.add_subparsers(required=True)
+
+# Rotate challenge subcommand parser.
+parser_rotate_challenge = subparsers_rotate.add_parser(
+    name="challenge",
+    aliases=["c"],
+    description="Authentication key rotation proof challenge operations.",
+    help="Authentication key rotation proof challenges.",
+)
+tmp = parser_rotate_challenge.add_subparsers(required=True)
+subparsers_rotate_challenge = tmp  # Temp variable for line breaking.
+
+# Rotate challenge propose subcommand parser.
+parser_rotate_challenge_propose = subparsers_rotate_challenge.add_parser(
+    name="propose",
+    aliases=["p"],
+    description="Propose a rotation proof challenge.",
+    help="Rotation proof challenge proposal.",
+)
+parser_rotate_challenge_propose.set_defaults(func=rotate_challenge_propose)
+parser_rotate_challenge_propose.add_argument(
+    "sequence_number",
+    metavar="sequence-number",
+    type=int,
+    help="""Sequence number of originating account.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "originator",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Either single-signer keyfile or multisig metadata relative file
+        path for originating account. If a single-signer keyfile, assumes that
+        account has not yet had its authentication key rotated.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "target",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Multisig metadata relative file path for account to rotate to.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""Description for rotation. For example 'Setup' or 'Add signer'.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "-s",
+    "--single-originator",
+    action="store_true",
+    help="""If originator is a single signer.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="""Relative path to rotation proof challenge proposal outfile.""",
+)
+
+# Rotate challenge sign subcommand parser.
+parser_rotate_challenge_sign = subparsers_rotate_challenge.add_parser(
+    name="sign",
+    aliases=["s"],
+    description="Sign a rotation proof challenge proposal.",
+    help="Rotation proof challenge proposal signing.",
+)
+parser_rotate_challenge_sign.set_defaults(func=rotate_challenge_sign)
+parser_rotate_challenge_sign.add_argument(
+    "proposal",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Rotation proof challenge proposal file.""",
+)
+parser_rotate_challenge_sign.add_argument(
+    "keyfile",
+    type=Path,
+    help="""Single-signer keyfile for signing challenge proposal.""",
+)
+parser_rotate_challenge_sign.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="""Relative path to rotation proof challenge signature outfile.""",
+)
+parser_rotate_challenge_sign.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""Description for rotation signature.""",
 )
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
