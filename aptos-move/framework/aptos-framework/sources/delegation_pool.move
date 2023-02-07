@@ -33,6 +33,21 @@
  * at the newly started lockup.
  * Detecting a lockup expiration on the stake pool resumes to detecting new inactive stake.
  *
+ * Accounting main invariants:
+ *  - each stake-management operation (add/unlock/reactivate/withdraw) and operator change triggers
+ * the synchronization process before executing its own function.
+ *  - each OLC maps to one or more real lockups on the stake pool, but not the opposite. Actually, only a real
+ * lockup with 'activity' (existing unlocking stake) triggers the creation of a new OLC.
+ *  - unlocking and/or unlocked stake originating from different real lockups are never mixed together into
+ * the same pool_u64. This invalidates the accounting of which rewards belong to whom.
+ *  - no delegator can have unlocking and/or unlocked stake (pending withdrawals) in different OLCs. This ensures
+ * delegators do not have to keep track of the OLCs when they unlocked. When creating a new pending withdrawal,
+ * the existing one is executed (withdrawn) if is already inactive.
+ *  - `add_stake` fees are always refunded, but only after the epoch when they have been charged ends.
+ *  - withdrawing pending_inactive stake (when validator had gone inactive before its lockup expired)
+ * does not inactivate any stake additional to the requested one to ensure OLC cannot advance indefinitely.
+ *  - the pending withdrawal exists at an OLC iff delegator owns some shares within the shares pool of that OLC.
+ *
  * Example flow:
  * 1. A node operator creates a delegation pool by calling `initialize_delegation_pool` and sets
  * its commission fee to 0% (for simplicity). A stake pool is created with no initial stake and owned by
@@ -692,11 +707,14 @@ module aptos_framework::delegation_pool {
         let shares_to_redeem = amount_to_shares_to_redeem(inactive_shares, shareholder, coins_amount);
         // silently exit if not a shareholder otherwise redeem would fail with `ESHAREHOLDER_NOT_FOUND`
         if (shares_to_redeem == 0) return 0;
+        // 1. reaching here means delegator owns inactive/pending_inactive shares at OLC `lockup_cycle`
         let redeemed_coins = pool_u64::redeem_shares(inactive_shares, shareholder, shares_to_redeem);
 
         // if entirely reactivated pending_inactive stake or withdrawn inactive one,
         // re-enable unlocking for delegator by deleting this pending withdrawal
         if (pool_u64::shares(inactive_shares, shareholder) == 0) {
+            // 2. a delegator owns inactive/pending_inactive shares only at the OLC of its pending withdrawal
+            // 1 & 2: the pending withdrawal itself has been emptied of shares and can be safely deleted
             table::remove(&mut pool.pending_withdrawals, shareholder);
         };
         // destroy inactive shares pool of past OLC if all its stake has been withdrawn
