@@ -5,7 +5,7 @@ use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
-use aptos_framework::natives::cryptography::groups::GroupContext;
+use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 #[cfg(feature = "testing")]
@@ -95,8 +95,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     let mut features = Features::default();
-    features.enable(FeatureFlag::BLS12_381_GROUPS);
-    features.enable(FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
-    features.enable(FeatureFlag::SHA256_TO_GROUP);
-    exts.add(GroupContext::new(features));
+    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+    features.enable(FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
+    exts.add(AlgebraContext::new(features));
 }

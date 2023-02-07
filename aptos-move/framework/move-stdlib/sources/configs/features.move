@@ -133,12 +133,6 @@ module std::features {
         is_enabled(BLS12_381_GROUPS)
     }
 
-    const SHA256_TO_GROUP: u64 = 12;
-    public fun get_sha256_to_group_feature(): u64 { SHA256_TO_GROUP }
-    public fun sha256_to_group_enabled(): bool acquires Features {
-        is_enabled(SHA256_TO_GROUP)
-    }
-
     // ============================================================================================
     // Feature Flag Implementation
 

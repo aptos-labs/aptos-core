@@ -17,9 +17,8 @@ pub enum FeatureFlag {
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
     RESOURCE_GROUPS = 9,
-    GENERIC_GROUP_BASIC_OPERATIONS = 10,
-    BLS12_381_GROUPS = 11,
-    SHA256_TO_GROUP = 12,
+    GENERIC_ALGEBRAIC_BASIC_OPERATIONS = 10,
+    BLS12_381_STRUCTURES = 11,
 }
 
 /// Representation of features on chain as a bitset.

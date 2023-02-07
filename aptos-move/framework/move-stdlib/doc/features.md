@@ -29,8 +29,6 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `generic_group_basic_operations_enabled`](#0x1_features_generic_group_basic_operations_enabled)
 -  [Function `get_bls12_381_groups_feature`](#0x1_features_get_bls12_381_groups_feature)
 -  [Function `bls12_381_groups_enabled`](#0x1_features_bls12_381_groups_enabled)
--  [Function `get_sha256_to_group_feature`](#0x1_features_get_sha256_to_group_feature)
--  [Function `sha256_to_group_enabled`](#0x1_features_sha256_to_group_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -176,15 +174,6 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="0x1_features_SHA256_TO_GROUP"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SHA256_TO_GROUP">SHA256_TO_GROUP</a>: u64 = 12;
 </code></pre>
 
 
@@ -679,52 +668,6 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_groups_enabled">bls12_381_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_GROUPS">BLS12_381_GROUPS</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_get_sha256_to_group_feature"></a>
-
-## Function `get_sha256_to_group_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sha256_to_group_feature">get_sha256_to_group_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sha256_to_group_feature">get_sha256_to_group_feature</a>(): u64 { <a href="features.md#0x1_features_SHA256_TO_GROUP">SHA256_TO_GROUP</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_sha256_to_group_enabled"></a>
-
-## Function `sha256_to_group_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_sha256_to_group_enabled">sha256_to_group_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_sha256_to_group_enabled">sha256_to_group_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SHA256_TO_GROUP">SHA256_TO_GROUP</a>)
 }
 </code></pre>
 

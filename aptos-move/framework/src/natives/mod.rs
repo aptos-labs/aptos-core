@@ -15,7 +15,6 @@ pub mod transaction_context;
 pub mod type_info;
 pub mod util;
 
-use crate::natives::cryptography::groups;
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
@@ -35,7 +34,7 @@ pub mod status {
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
-    pub groups: groups::GasParameters,
+    pub groups: cryptography::algebra::gas::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
@@ -72,7 +71,7 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            groups: groups::GasParameters {
+            groups: cryptography::algebra::gas::GasParameters {
                 blst_g1_msm_base: 0.into(),
                 blst_g1_msm_per_pair: 0.into(),
                 blst_g2_msm_base: 0.into(),
@@ -80,10 +79,12 @@ impl GasParameters {
                 blst_g1_proj_to_affine: 0.into(),
                 blst_g1_affine_ser: 0.into(),
                 blst_g2_proj_to_affine: 0.into(),
-                ark_bls12_381_fr_serialize: 0.into(),
-                ark_bls12_381_fr_deser: 0.into(),
+                ark_bls12_381_fr_ser: 0.into(),
+                ark_bls12_381_fr_deser_base: 0.into(),
+                ark_bls12_381_fr_deser_per_byte: 0.into(),
                 ark_bls12_381_fr_from_u128: 0.into(),
                 ark_bls12_381_fr_neg: 0.into(),
+                ark_bls12_381_fr_pow_base: 0.into(),
                 ark_bls12_381_fr_add: 0.into(),
                 ark_bls12_381_fr_sub: 0.into(),
                 ark_bls12_381_fr_mul: 0.into(),
@@ -96,9 +97,11 @@ impl GasParameters {
                 ark_bls12_381_g1_proj_generator: 0.into(),
                 ark_bls12_381_g1_affine_scalar_mul_to_proj: 0.into(),
                 ark_bls12_381_g1_affine_ser_uncomp: 0.into(),
-                ark_bls12_381_g1_affine_deser_uncomp: 0.into(),
+                ark_bls12_381_g1_affine_deser_uncomp_base: 0.into(),
+                ark_bls12_381_g1_affine_deser_uncomp_per_byte: 0.into(),
                 ark_bls12_381_g1_affine_ser_comp: 0.into(),
-                ark_bls12_381_g1_affine_deser_comp: 0.into(),
+                ark_bls12_381_g1_affine_deser_comp_base: 0.into(),
+                ark_bls12_381_g1_affine_deser_comp_per_byte: 0.into(),
                 ark_bls12_381_g1_affine_neg: 0.into(),
                 ark_bls12_381_g1_affine_add: 0.into(),
                 ark_bls12_381_g1_affine_to_proj: 0.into(),
@@ -133,11 +136,12 @@ impl GasParameters {
                 ark_bls12_381_g2_proj_to_prepared: 0.into(),
                 ark_bls12_381_fq12_serialize: 0.into(),
                 ark_bls12_381_fq12_deserialize: 0.into(),
-                ark_bls12_381_fq12_pow_u256: 0.into(),
                 ark_bls12_381_fq12_eq: 0.into(),
                 ark_bls12_381_fq12_one: 0.into(),
+                ark_bls12_381_fq12_pow_base: 0.into(),
                 ark_bls12_381_fq12_clone: 0.into(),
                 ark_bls12_381_fq12_mul: 0.into(),
+                ark_bls12_381_fq12_sub: 0.into(),
                 ark_bls12_381_fr_to_repr: 0.into(),
                 ark_bls12_381_pairing_product_base: 0.into(),
                 ark_bls12_381_pairing_product_per_pair: 0.into(),
@@ -147,6 +151,10 @@ impl GasParameters {
                 ark_bls12_381_g2_proj_double: 0.into(),
                 blst_g2_affine_ser: 0.into(),
                 ark_bls12_381_g2_affine_eq: 0.into(),
+                ark_bls12_381_fr_pow_per_exponent_u64: 0.into(),
+                ark_bls12_381_fq12_div: 0.into(),
+                ark_bls12_381_fq12_pow_per_exponent_u64: 0.into(),
+                ark_bls12_381_fq12_add: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),
@@ -284,7 +292,7 @@ pub fn all_natives(
         "create_signer",
         create_signer::make_all(gas_params.account.create_signer.clone())
     );
-    add_natives_from_module!("groups", groups::make_all(gas_params.groups.clone()));
+    add_natives_from_module!("algebra", cryptography::algebra::make_all(gas_params.groups.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!(
         "genesis",

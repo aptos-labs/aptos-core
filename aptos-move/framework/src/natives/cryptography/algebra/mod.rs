@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-use std::collections::VecDeque;
-use std::ops::{Add, Mul, Neg};
+use std::any::{Any, TypeId};
+use std::collections::{HashMap, VecDeque};
+use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::rc::Rc;
 use ark_bls12_381::{Fq12, Fr, FrParameters, G1Projective, G2Projective, Parameters};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{Field, PrimeField};
+use ark_ff::{BigInteger256, Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes};
+use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
 use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -21,17 +23,21 @@ use move_vm_types::pop_arg;
 use move_vm_types::values::Value;
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
-use sha2::Digest;
+use serde::de::Unexpected::Str;
 use smallvec::smallvec;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use crate::natives::cryptography::groups::abort_codes::NOT_IMPLEMENTED;
+use crate::natives::cryptography::algebra::abort_codes::NOT_IMPLEMENTED;
+use crate::natives::cryptography::algebra::gas::GasParameters;
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 
+pub mod gas;
+
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12_381_Fr,
+    BLS12_381_Fq12,
     BLS12_381_G1,
     BLS12_381_G2,
     BLS12_381_Gt,
@@ -40,10 +46,11 @@ pub enum Structure {
 impl Structure {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
         match type_tag.to_string().as_str() {
-            "0x1::groups::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
-            "0x1::groups::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
-            "0x1::groups::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
-            "0x1::groups::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
+            "0x1::algebra::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
+            "0x1::algebra::BLS12_381_Fq12" => Some(Structure::BLS12_381_Fq12),
+            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
+            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
+            "0x1::algebra::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
             _ => None
         }
     }
@@ -55,100 +62,24 @@ pub mod abort_codes {
     pub const NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS: u64 = 5;
 }
 
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub blst_g1_msm_base: InternalGasPerArg,
-    pub blst_g1_msm_per_pair: InternalGasPerArg,
-    pub blst_g2_msm_base: InternalGasPerArg,
-    pub blst_g2_msm_per_pair: InternalGasPerArg,
-    pub blst_g1_proj_to_affine: InternalGasPerArg,
-    pub blst_g1_affine_ser: InternalGasPerArg,
-    pub blst_g2_proj_to_affine: InternalGasPerArg,
-    pub blst_g2_affine_ser: InternalGasPerArg,
-    pub ark_bls12_381_fr_add: InternalGasPerArg,
-    pub ark_bls12_381_fr_deser: InternalGasPerArg,
-    pub ark_bls12_381_fr_div: InternalGasPerArg,
-    pub ark_bls12_381_fr_eq: InternalGasPerArg,
-    pub ark_bls12_381_fr_from_u128: InternalGasPerArg,
-    pub ark_bls12_381_fr_inv: InternalGasPerArg,
-    pub ark_bls12_381_fr_mul: InternalGasPerArg,
-    pub ark_bls12_381_fr_neg: InternalGasPerArg,
-    pub ark_bls12_381_fr_serialize: InternalGasPerArg,
-    pub ark_bls12_381_fr_sub: InternalGasPerArg,
-    pub ark_bls12_381_fr_to_repr: InternalGasPerArg,
-    pub ark_bls12_381_fq12_clone: InternalGasPerArg,
-    pub ark_bls12_381_fq12_deserialize: InternalGasPerArg,
-    pub ark_bls12_381_fq12_eq: InternalGasPerArg,
-    pub ark_bls12_381_fq12_inv: InternalGasPerArg,
-    pub ark_bls12_381_fq12_mul: InternalGasPerArg,
-    pub ark_bls12_381_fq12_one: InternalGasPerArg,
-    pub ark_bls12_381_fq12_pow_u256: InternalGasPerArg,
-    pub ark_bls12_381_fq12_serialize: InternalGasPerArg,
-    pub ark_bls12_381_fq12_square: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_add: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_deser_comp: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_deser_uncomp: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_eq_proj: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_generator: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_scalar_mul_to_proj: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_neg: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_ser_comp: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_ser_uncomp: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_to_prepared: InternalGasPerArg,
-    pub ark_bls12_381_g1_affine_to_proj: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_add: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_double: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_eq: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_generator: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_neg: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_scalar_mul: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_sub: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_to_affine: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_to_prepared: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_add: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_deser_comp: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_deser_uncomp: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_eq: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_generator: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_neg: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_ser_comp: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_ser_uncomp: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_to_prepared: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_to_proj: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_add: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_double: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_eq: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_generator: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_neg: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_scalar_mul: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_sub: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_to_affine: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
-    pub ark_bls12_381_pairing_product_base: InternalGasPerArg,
-    pub ark_bls12_381_pairing_product_per_pair: InternalGasPerArg,
-}
-
 #[derive(Tid)]
-pub struct GroupContext {
+pub struct AlgebraContext {
     features: Features,
     bls12_381_fr_elements: Vec<Fr>,
     bls12_381_g1_elements: Vec<G1Projective>,
     bls12_381_g2_elements: Vec<G2Projective>,
-    bls12_381_gt_elements: Vec<Fq12>,
+    bls12_381_fq12_elements: Vec<Fq12>,
+    objs: HashMap<Structure, Vec<Rc<dyn Any>>>,
 }
 
-impl GroupContext {
+impl AlgebraContext {
     pub fn new(features: Features) -> Self {
         Self {
             bls12_381_fr_elements: vec![],
             bls12_381_g1_elements: vec![],
             bls12_381_g2_elements: vec![],
-            bls12_381_gt_elements: vec![],
+            bls12_381_fq12_elements: vec![],
+            objs: HashMap::new(),
             features,
         }
     }
@@ -156,7 +87,7 @@ impl GroupContext {
 
 macro_rules! abort_if_feature_disabled {
     ($context:expr, $feature:expr) => {
-        if !$context.extensions().get::<GroupContext>().features.is_enabled($feature) {
+        if !$context.extensions().get::<AlgebraContext>().features.is_enabled($feature) {
             return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
         }
     };
@@ -187,13 +118,13 @@ macro_rules! structure_from_ty_arg {
 
 macro_rules! borrow_bls12_381_g1 {
     ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_g1_elements.get($handle).unwrap()
+        $context.extensions().get::<AlgebraContext>().bls12_381_g1_elements.get($handle).unwrap()
     }}
 }
 
 macro_rules! store_bls12_381_g1 {
     ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
         let ret = inner_ctxt.bls12_381_g1_elements.len();
         inner_ctxt.bls12_381_g1_elements.push($element);
         ret
@@ -202,13 +133,13 @@ macro_rules! store_bls12_381_g1 {
 
 macro_rules! borrow_bls12_381_fr {
     ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_fr_elements.get($handle).unwrap()
+        $context.extensions().get::<AlgebraContext>().bls12_381_fr_elements.get($handle).unwrap()
     }}
 }
 
 macro_rules! store_bls12_381_fr {
     ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
         let ret = inner_ctxt.bls12_381_fr_elements.len();
         inner_ctxt.bls12_381_fr_elements.push($element);
         ret
@@ -217,71 +148,97 @@ macro_rules! store_bls12_381_fr {
 
 macro_rules! borrow_bls12_381_g2 {
     ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_g2_elements.get($handle).unwrap()
+        $context.extensions().get::<AlgebraContext>().bls12_381_g2_elements.get($handle).unwrap()
     }}
 }
 
 macro_rules! store_bls12_381_g2 {
     ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
+        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
         let ret = inner_ctxt.bls12_381_g2_elements.len();
         inner_ctxt.bls12_381_g2_elements.push($element);
         ret
     }}
 }
 
-macro_rules! borrow_bls12_381_gt {
+macro_rules! borrow_bls12_381_fq12 {
     ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<GroupContext>().bls12_381_gt_elements.get($handle).unwrap()
+        $context.extensions().get::<AlgebraContext>().bls12_381_fq12_elements.get($handle).unwrap()
     }}
 }
 
-macro_rules! store_bls12_381_gt {
+
+macro_rules! store_bls12_381_fq12 {
     ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<GroupContext>();
-        let ret = inner_ctxt.bls12_381_gt_elements.len();
-        inner_ctxt.bls12_381_gt_elements.push($element);
+        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
+        let ret = inner_ctxt.bls12_381_fq12_elements.len();
+        inner_ctxt.bls12_381_fq12_elements.push($element);
         ret
     }}
 }
 
-fn element_serialize_uncompressed_internal(
+macro_rules! borrow_bls12_381_stuff {
+    ($context:expr, $struct_name:expr, $handle:expr, $assign_to:ident) => {
+        let pointer: Rc<dyn Any> = $context.extensions().get::<AlgebraContext>().objs.get(&$struct_name).unwrap().get($handle).unwrap();
+        let mut $assign_to = pointer.downcast_ref<ark_bls12_381::Fr>().unwrap();
+
+    }
+}
+
+macro_rules! store_obj {
+    ($context:expr, $structure:expr, $obj:expr) => {{
+        let target_vec = $context.extensions_mut().get_mut::<AlgebraContext>().objs.entry($structure).or_insert_with(Vec::new);
+        let ret = target_vec.len();
+        target_vec.push(Rc::new($obj));
+        ret
+    }}
+}
+
+macro_rules! get_obj_pointer {
+    ($context:expr, $structure:expr, $handle:expr) => {{
+        let target_vec = $context.extensions_mut().get_mut::<AlgebraContext>().objs.entry($structure).or_insert_with(Vec::new);
+        target_vec[$handle].clone()
+    }}
+}
+
+fn serialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_g1!(context, handle);
+    let scheme = pop_arg!(args, Vec<u8>);
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    match (structure_opt, scheme) {
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_LENDIAN.as_slice() => {
+            let element_ptr = get_obj_pointer!(context, structure, handle);
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_ser_uncomp) * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_ser * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_g2!(context, handle);
-            let buf = ark_serialize_uncompressed!(element);
-            Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_uncomp) * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
-            ))
-        }
-        Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_gt!(context, handle);
-            let buf = ark_serialize_uncompressed!(element);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
-            ))
-        }
+        // Some(Structure::BLS12_381_G2) => {
+        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+        //     let element = borrow_bls12_381_g2!(context, handle);
+        //     let buf = ark_serialize_uncompressed!(element);
+        //     Ok(NativeResult::ok(
+        //         (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_uncomp) * NumArgs::one(),
+        //         smallvec![Value::vector_u8(buf)],
+        //     ))
+        // }
+        // Some(Structure::BLS12_381_Gt) => {
+        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+        //     let element = borrow_bls12_381_fq12!(context, handle);
+        //     let buf = ark_serialize_uncompressed!(element);
+        //     Ok(NativeResult::ok(
+        //         gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
+        //         smallvec![Value::vector_u8(buf)],
+        //     ))
+        // }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
@@ -294,7 +251,7 @@ fn element_serialize_compressed_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
@@ -315,7 +272,7 @@ fn element_serialize_compressed_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            let element = borrow_bls12_381_gt!(context, handle);
+            let element = borrow_bls12_381_fq12!(context, handle);
             let buf = ark_serialize_compressed!(element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
@@ -328,189 +285,137 @@ fn element_serialize_compressed_internal(
     }
 }
 
-fn element_deserialize_uncompressed_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    let bytes = pop_arg!(args, Vec<u8>);
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice()) {
-                Ok(element) => {
-                    let handle = store_bls12_381_g1!(context, element.into_projective());
-                    Ok(NativeResult::ok(
-                        (gas_params.ark_bls12_381_g1_affine_deser_uncomp + gas_params.ark_bls12_381_g1_affine_to_proj) * NumArgs::one(),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice()) {
-                Ok(element) => {
-                    let handle = store_bls12_381_g2!(context, element.into_projective());
-                    Ok(NativeResult::ok(
-                        (gas_params.ark_bls12_381_g2_affine_deser_uncomp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match Fq12::deserialize(bytes.as_slice()) {
-                Ok(element) => {
-                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
-                    if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
-                        let handle = store_bls12_381_gt!(context, element);
-                        Ok(NativeResult::ok(
-                            cost,
-                            smallvec![Value::bool(true), Value::u64(handle as u64)],
-                        ))
-                    } else {
-                        Ok(NativeResult::ok(
-                            cost,
-                            smallvec![Value::bool(false), Value::u64(0)],
-                        ))
-                    }
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fq12_deserialize * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
+static BLS12_381_FP_SERIALIZATION: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
+static BLS12_381_FR_SERIALIZATION_LENDIAN: Lazy<Vec<u8>> = Lazy::new(||vec![0x00]);
+static BLS12_381_FR_SERIALIZATION_BENDIAN: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
+static BLS12_381_FQ12_SERIALIZATION: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
+static BLS12_381_G1_UNCOMPRESSED: Lazy<Vec<u8>> = Lazy::new(||vec![0x02]);
+static BLS12_381_G1_COMPRESSED: Lazy<Vec<u8>> = Lazy::new(||vec![0x03]);
 
-fn element_deserialize_compressed_internal(
+fn deserialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
-    let bytes = pop_arg!(args, Vec<u8>);
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
+    let structure = structure_from_ty_arg!(context, &ty_args[0]);
+    let mut bytes = pop_arg!(args, Vec<u8>);
+    let scheme = pop_arg!(args, Vec<u8>);
+    match (structure,scheme) {
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_LENDIAN.as_slice() => {
+            match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
                 Ok(element) => {
-                    let handle = store_bls12_381_g1!(context, element.into_projective());
+                    let handle = store_obj!(context, structure, element);
                     Ok(NativeResult::ok(
-                        (gas_params.ark_bls12_381_g1_affine_deser_comp + gas_params.ark_bls12_381_g1_affine_to_proj) * NumArgs::one(),
+                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
                         smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_g1_affine_deser_comp * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match ark_bls12_381::G2Affine::deserialize(bytes.as_slice()) {
-                Ok(element) => {
-                    let handle = store_bls12_381_g2!(context, element.into_projective());
-                    Ok(NativeResult::ok(
-                        (gas_params.ark_bls12_381_g2_affine_deser_comp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_g2_affine_deser_comp * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match ark_bls12_381::Fq12::deserialize(bytes.as_slice()) {
-                Ok(element) => {
-                    let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
-                    if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
-                        let handle = store_bls12_381_gt!(context, element);
-                        Ok(NativeResult::ok(
-                            cost,
-                            smallvec![Value::bool(true), Value::u64(handle as u64)],
-                        ))
-                    } else {
-                        Ok(NativeResult::ok(
-                            cost,
-                            smallvec![Value::bool(false), Value::u64(0)],
-                        ))
-                    }
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fq12_deserialize * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
-
-fn scalar_deserialize_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
-    let bytes = pop_arg!(args, Vec<u8>);
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            match Fr::deserialize_uncompressed(bytes.as_slice()) {
-                Ok(scalar) => {
-                    let handle = store_bls12_381_fr!(context, scalar);
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser * NumArgs::one(),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                }
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 },
+                _ => {
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
+                        smallvec![Value::bool(false), Value::u64(0)],
+                    ))
+                }
             }
         }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_BENDIAN.as_slice() => {
+            bytes.reverse();
+            match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
+                Ok(element) => {
+                    let handle = store_obj!(context, structure, element);
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
+                        smallvec![Value::bool(true), Value::u64(handle as u64)],
+                    ))
+                },
+                _ => {
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
+                        smallvec![Value::bool(false), Value::u64(0)],
+                    ))
+                }
+            }
+        }
+        (Some(structure), scheme) if structure== Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED.as_slice() => {
+            match ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice()) {
+                Ok(element) => {
+                    let handle = store_obj!(context, structure, element.into_projective());
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_g1_affine_deser_uncomp_base * NumArgs::one() + gas_params.ark_bls12_381_g1_affine_deser_uncomp_per_byte * NumArgs::from(bytes.len() as u64) + gas_params.ark_bls12_381_g1_affine_to_proj * NumArgs::one(),
+                        smallvec![Value::bool(true), Value::u64(handle as u64)],
+                    ))
+                }
+                _ => {
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_g1_affine_deser_uncomp_base * NumArgs::one() + gas_params.ark_bls12_381_g1_affine_deser_uncomp_per_byte * NumArgs::from(bytes.len() as u64),
+                        smallvec![Value::bool(false), Value::u64(0)],
+                    ))
+                }
+            }
+        }
+        (Some(structure), scheme) if structure== Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_COMPRESSED.as_slice() => {
+            match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
+                Ok(element) => {
+                    let handle = store_obj!(context, structure, element.into_projective());
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_g1_affine_deser_comp_base * NumArgs::one() + gas_params.ark_bls12_381_g1_affine_deser_comp_per_byte * NumArgs::from(bytes.len() as u64) + gas_params.ark_bls12_381_g1_affine_to_proj * NumArgs::one(),
+                        smallvec![Value::bool(true), Value::u64(handle as u64)],
+                    ))
+                }
+                _ => {
+                    Ok(NativeResult::ok(
+                        gas_params.ark_bls12_381_g1_affine_deser_comp_base * NumArgs::one() + gas_params.ark_bls12_381_g1_affine_deser_comp_per_byte * NumArgs::from(bytes.len() as u64),
+                        smallvec![Value::bool(false), Value::u64(0)],
+                    ))
+                }
+            }
+        }
+        // Some(Structure::BLS12_381_G2) => {
+        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+        //     match ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice()) {
+        //         Ok(element) => {
+        //             let handle = store_bls12_381_g2!(context, element.into_projective());
+        //             Ok(NativeResult::ok(
+        //                 (gas_params.ark_bls12_381_g2_affine_deser_uncomp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
+        //                 smallvec![Value::bool(true), Value::u64(handle as u64)],
+        //             ))
+        //         }
+        //         _ => {
+        //             Ok(NativeResult::ok(
+        //                 gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one(),
+        //                 smallvec![Value::bool(false), Value::u64(0)],
+        //             ))
+        //         }
+        //     }
+        // }
+        // Some(Structure::BLS12_381_Gt) => {
+        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+        //     match Fq12::deserialize(bytes.as_slice()) {
+        //         Ok(element) => {
+        //             let cost = (gas_params.ark_bls12_381_fq12_deserialize + gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one();
+        //             if Fq12::one() == element.pow(BLS12381_R_SCALAR.clone()) {
+        //                 let handle = store_bls12_381_fq12!(context, element);
+        //                 Ok(NativeResult::ok(
+        //                     cost,
+        //                     smallvec![Value::bool(true), Value::u64(handle as u64)],
+        //                 ))
+        //             } else {
+        //                 Ok(NativeResult::ok(
+        //                     cost,
+        //                     smallvec![Value::bool(false), Value::u64(0)],
+        //                 ))
+        //             }
+        //         }
+        //         _ => {
+        //             Ok(NativeResult::ok(
+        //                 gas_params.ark_bls12_381_fq12_deserialize * NumArgs::one(),
+        //                 smallvec![Value::bool(false), Value::u64(0)],
+        //             ))
+        //         }
+        //     }
+        // }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
@@ -523,16 +428,16 @@ fn scalar_serialize_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_fr!(context, handle);
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_serialize * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_ser * NumArgs::one(),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -542,20 +447,18 @@ fn scalar_serialize_internal(
     }
 }
 
-fn scalar_from_u64_internal(
+fn from_u64_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let value = pop_arg!(args, u64);
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
             let element = ark_bls12_381::Fr::from(value as u128);
-            let handle = store_bls12_381_fr!(context, element);
+            let handle = store_obj!(context, structure, element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fr_from_u128 * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
@@ -567,53 +470,25 @@ fn scalar_from_u64_internal(
     }
 }
 
-fn scalar_add_internal(
+fn field_add_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let scalar_1 = borrow_bls12_381_fr!(context, handle_1);
-            let scalar_2 = borrow_bls12_381_fr!(context, handle_2);
-            let result = scalar_1.add(scalar_2);
-            let result_handle = store_bls12_381_fr!(context, result);
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let handle_2 = pop_arg!(args, u64) as usize;
+            let handle_1 = pop_arg!(args, u64) as usize;
+            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let new_element = element_1.add(element_2);
+            let new_handle = store_obj!(context, structure, new_element);
             Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_add * NumArgs::one(),
-                smallvec![Value::u64(result_handle as u64)],
-            ))
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
-
-fn scalar_mul_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let scalar_1 = borrow_bls12_381_fr!(context, handle_1);
-            let scalar_2 = borrow_bls12_381_fr!(context, handle_2);
-            let new_scalar = scalar_1.mul(scalar_2);
-            let new_handle = store_bls12_381_fr!(context, new_scalar);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_mul * NumArgs::one(),
+                gas_params.field_add(structure),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -623,23 +498,36 @@ fn scalar_mul_internal(
     }
 }
 
-fn scalar_neg_internal(
+fn field_sub_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let scalar = borrow_bls12_381_fr!(context, handle);
-            let result = scalar.neg();
-            let result_handle = store_bls12_381_fr!(context, result);
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let new_element = element_1.sub(element_2);
+            let new_handle = store_obj!(context, structure, new_element);
             Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_neg * NumArgs::one(),
+                gas_params.field_sub(structure),
+                smallvec![Value::u64(new_handle as u64)],
+            ))
+        }
+        Some(Structure::BLS12_381_Fq12) => {
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let scalar_1 = borrow_bls12_381_fq12!(context, handle_1);
+            let scalar_2 = borrow_bls12_381_fq12!(context, handle_2);
+            let result = scalar_1.add(scalar_2);
+            let result_handle = store_bls12_381_fq12!(context, result);
+            Ok(NativeResult::ok(
+                gas_params.ark_bls12_381_fq12_sub * NumArgs::one(),
                 smallvec![Value::u64(result_handle as u64)],
             ))
         }
@@ -649,24 +537,164 @@ fn scalar_neg_internal(
     }
 }
 
-fn scalar_inv_internal(
+fn field_mul_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
+    assert_eq!(1, ty_args.len());
+    let handle_2 = pop_arg!(args, u64) as usize;
+    let handle_1 = pop_arg!(args, u64) as usize;
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let new_element = element_1.mul(element_2);
+            let new_handle = store_obj!(context, structure, new_element);
+            Ok(NativeResult::ok(
+                gas_params.field_mul(structure),
+                smallvec![Value::u64(new_handle as u64)],
+            ))
+        }
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+fn vu8_to_vu64(v: &[u8]) -> Vec<u64> {
+    let mut ret = Vec::new();
+    for (i,&e) in v.iter().enumerate() {
+        if i%8==0 {
+            ret.push(e as u64);
+        } else {
+            ret[i/8] += (e as u64) << (8 * (i%8))
+        }
+    }
+    ret
+}
+
+#[test]
+fn test_vu8_to_vu64() {
+    assert_eq!(vec![0x03020100_u64, 0x0504], vu8_to_vu64(vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05].as_slice()));
+}
+
+macro_rules! field_pow_internal {
+    ($gas_params:ident, $context:ident, $args:ident, $structure:ident, $typ:ty) => {{
+        let exponent = vu8_to_vu64(pop_arg!($args, Vec<u8>).as_slice());
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let new_scalar = element.pow(exponent.as_slice());
+        let new_handle = store_obj!($context, $structure, new_scalar);
+        Ok(NativeResult::ok(
+            $gas_params.field_pow($structure, exponent.len()),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
+fn field_pow_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_fr!(context, handle);
+        Some(structure) if structure == Structure::BLS12_381_Fr => field_pow_internal!(gas_params, context, args, structure, ark_bls12_381::Fr),
+        Some(structure) if structure == Structure::BLS12_381_Fq12 => field_pow_internal!(gas_params, context, args, structure, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+macro_rules! ark_field_div_internal {
+    ($gas_params:ident, $context:ident, $args:ident, $structure:ident, $typ:ty) => {{
+            let handle_2 = pop_arg!($args, u64) as usize;
+            let handle_1 = pop_arg!($args, u64) as usize;
+            let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+            let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+            if element_2.is_zero() {
+                return Ok(NativeResult::ok(
+                    InternalGas::zero(),
+                    smallvec![Value::bool(false), Value::u64(0_u64)],
+                ));
+            }
+            let new_element = element_1.div(element_2);
+            let new_handle = store_obj!($context, $structure, new_element);
+            Ok(NativeResult::ok(
+                $gas_params.field_div($structure),
+                smallvec![Value::bool(true), Value::u64(new_handle as u64)],
+            ))
+
+    }}
+}
+fn field_div_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(s) if s == Structure::BLS12_381_Fr => ark_field_div_internal!(gas_params, context, args, s, ark_bls12_381::Fr),
+        Some(s) if s == Structure::BLS12_381_Fq12 => ark_field_div_internal!(gas_params, context, args, s, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+fn field_neg_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let handle = pop_arg!(args, u64) as usize;
+            let element_ptr = get_obj_pointer!(context, structure, handle);
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let new_element = element.neg();
+            let new_handle = store_obj!(context, structure, new_element);
+            Ok(NativeResult::ok(
+                gas_params.ark_bls12_381_fr_neg * NumArgs::one(),
+                smallvec![Value::u64(new_handle as u64)],
+            ))
+        }
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+fn field_inv_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let handle = pop_arg!(args, u64) as usize;
+            let element_ptr = get_obj_pointer!(context, structure, handle);
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
             match element.inverse() {
-                Some(scalar) => {
-                    let result_handle = store_bls12_381_fr!(context, scalar);
+                Some(new_element) => {
+                    let new_handle = store_obj!(context, structure, new_element);
                     Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_inv * NumArgs::one(),
-                        smallvec![Value::bool(true), Value::u64(result_handle as u64)],
+                        gas_params.field_inv(structure),
+                        smallvec![Value::bool(true), Value::u64(new_handle as u64)],
                     ))
                 }
                 None => {
@@ -683,24 +711,24 @@ fn scalar_inv_internal(
     }
 }
 
-fn scalar_eq_internal(
+fn eq_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let scalar_1 = borrow_bls12_381_fr!(context, handle_1);
-            let scalar_2 = borrow_bls12_381_fr!(context, handle_2);
+        Some(structure) if structure == Structure::BLS12_381_Fr => {
+            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
-                smallvec![Value::bool(scalar_1 == scalar_2)],
+                smallvec![Value::bool(element_1 == element_2)],
             ))
         }
         _ => {
@@ -718,11 +746,11 @@ fn group_identity_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G1Projective::zero();
             let handle = store_bls12_381_g1!(context, element);
             Ok(NativeResult::ok(
@@ -731,7 +759,7 @@ fn group_identity_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G2Projective::zero();
             let handle = store_bls12_381_g2!(context, element);
             Ok(NativeResult::ok(
@@ -740,9 +768,9 @@ fn group_identity_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = Fq12::one();
-            let handle = store_bls12_381_gt!(context, element);
+            let handle = store_bls12_381_fq12!(context, element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_one * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
@@ -776,11 +804,11 @@ fn group_generator_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g1!(context, element);
             Ok(NativeResult::ok(
@@ -789,7 +817,7 @@ fn group_generator_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g2!(context, element);
             Ok(NativeResult::ok(
@@ -798,9 +826,9 @@ fn group_generator_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = BLS12381_GT_GENERATOR.clone();
-            let handle = store_bls12_381_gt!(context, element);
+            let handle = store_bls12_381_fq12!(context, element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_clone * NumArgs::one(),
                 smallvec![Value::u64(handle as u64)],
@@ -821,11 +849,11 @@ fn group_order_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) | Some(Structure::BLS12_381_G2) | Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::vector_u8(BLS12381_R_BYTES_LENDIAN.clone())],
@@ -846,11 +874,11 @@ fn is_prime_order_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) | Some(Structure::BLS12_381_G2) | Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::bool(true)],
@@ -868,11 +896,11 @@ fn random_scalar_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let scalar = Fr::rand(&mut test_rng());
             let handle = store_bls12_381_fr!(context, scalar);
             Ok(NativeResult::ok(
@@ -895,11 +923,11 @@ fn random_element_internal(
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G1Projective::rand(&mut test_rng());
             let handle = store_bls12_381_g1!(context, element);
             Ok(NativeResult::ok(
@@ -908,7 +936,7 @@ fn random_element_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G2Projective::rand(&mut test_rng());
             let handle = store_bls12_381_g2!(context, element);
             Ok(NativeResult::ok(
@@ -917,10 +945,10 @@ fn random_element_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let k = Fr::rand(&mut test_rng());
             let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
-            let handle = store_bls12_381_gt!(context, element);
+            let handle = store_bls12_381_fq12!(context, element);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::u64(handle as u64)],
@@ -941,13 +969,13 @@ fn element_eq_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g1!(context, handle_1);
             let element_2 = borrow_bls12_381_g1!(context, handle_2);
             Ok(NativeResult::ok(
@@ -956,7 +984,7 @@ fn element_eq_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g2!(context, handle_1);
             let element_2 = borrow_bls12_381_g2!(context, handle_2);
             Ok(NativeResult::ok(
@@ -965,9 +993,9 @@ fn element_eq_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element_1 = borrow_bls12_381_gt!(context, handle_1);
-            let element_2 = borrow_bls12_381_gt!(context, handle_2);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let element_1 = borrow_bls12_381_fq12!(context, handle_1);
+            let element_2 = borrow_bls12_381_fq12!(context, handle_2);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_eq * NumArgs::one(),
                 smallvec![Value::bool(element_1.eq(element_2))],
@@ -979,19 +1007,19 @@ fn element_eq_internal(
     }
 }
 
-fn element_add_internal(
+fn group_add_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g1!(context, handle_1);
             let element_2 = borrow_bls12_381_g1!(context, handle_2);
             let new_element = element_1.add(element_2);
@@ -1002,7 +1030,7 @@ fn element_add_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g2!(context, handle_1);
             let element_2 = borrow_bls12_381_g2!(context, handle_2);
             let new_element = element_1.add(element_2);
@@ -1013,11 +1041,11 @@ fn element_add_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element_1 = borrow_bls12_381_gt!(context, handle_1);
-            let element_2 = borrow_bls12_381_gt!(context, handle_2);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let element_1 = borrow_bls12_381_fq12!(context, handle_1);
+            let element_2 = borrow_bls12_381_fq12!(context, handle_2);
             let new_element = element_1.mul(element_2);
-            let new_handle = store_bls12_381_gt!(context, new_element);
+            let new_handle = store_bls12_381_fq12!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_mul * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
@@ -1029,7 +1057,7 @@ fn element_add_internal(
     }
 }
 
-fn element_scalar_mul_internal(
+fn group_scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1042,7 +1070,7 @@ fn element_scalar_mul_internal(
     let element_handle = pop_arg!(args, u64) as usize;
     match (group_structure, scalar_structure) {
         (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, element_handle);
             let scalar = borrow_bls12_381_fr!(context, scalar_handle);
             let new_element = element.mul(scalar.into_repr());
@@ -1053,7 +1081,7 @@ fn element_scalar_mul_internal(
             ))
         }
         (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, element_handle);
             let scalar = borrow_bls12_381_fr!(context, scalar_handle);
             let new_element = element.mul(scalar.into_repr());
@@ -1064,13 +1092,13 @@ fn element_scalar_mul_internal(
             ))
         }
         (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fr)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_gt!(context, element_handle);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let element = borrow_bls12_381_fq12!(context, element_handle);
             let scalar = borrow_bls12_381_fr!(context, scalar_handle);
             let new_element = element.pow(scalar.into_repr().as_ref());
-            let new_handle = store_bls12_381_gt!(context, new_element);
+            let new_handle = store_bls12_381_fq12!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_fr_to_repr + gas_params.ark_bls12_381_fq12_pow_u256) * NumArgs::one(),
+                gas_params.ark_bls12_381_fr_to_repr * NumArgs::one() + gas_params.field_pow(Structure::BLS12_381_Fq12, 32),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1256,13 +1284,13 @@ fn test_blst_g2_affine_to_ark_g2_affine() {
 
 
 
-fn element_multi_scalar_mul_internal(
+fn group_multi_scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(2, ty_args.len());
     let group_structure = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_structure = structure_from_ty_arg!(context, &ty_args[1]);
@@ -1275,7 +1303,7 @@ fn element_multi_scalar_mul_internal(
     }
     match (group_structure, scalar_structure) {
         (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             // Using blst multi-scalar multiplication API for better performance.
             let blst_g1_proj_points: Vec<blst::blst_p1> = element_handles.iter().map(|&handle|{
                 let ark_point = borrow_bls12_381_g1!(context, handle as usize).into_affine();
@@ -1302,7 +1330,7 @@ fn element_multi_scalar_mul_internal(
             ))
         }
         (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             // Using blst multi-scalar multiplication API for better performance.
             let blst_points: Vec<blst::blst_p2> = element_handles.iter().map(|&handle|{
                 let ark_point = borrow_bls12_381_g2!(context, handle as usize).into_affine();
@@ -1346,18 +1374,18 @@ fn blst_g2_affine_to_proj(point: &blst::blst_p2_affine) -> blst::blst_p2 {
     ret
 }
 
-fn element_double_internal(
+fn group_double_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, handle);
             let new_element = element.double();
             let new_handle = store_bls12_381_g1!(context, new_element);
@@ -1367,7 +1395,7 @@ fn element_double_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, handle);
             let new_element = element.double();
             let new_handle = store_bls12_381_g2!(context, new_element);
@@ -1377,10 +1405,10 @@ fn element_double_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_gt!(context, handle);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let element = borrow_bls12_381_fq12!(context, handle);
             let new_element = element.square();
-            let new_handle = store_bls12_381_gt!(context, new_element);
+            let new_handle = store_bls12_381_fq12!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_square * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
@@ -1392,18 +1420,18 @@ fn element_double_internal(
     }
 }
 
-fn element_neg_internal(
+fn group_neg_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, handle);
             let new_element = element.neg();
             let new_handle = store_bls12_381_g1!(context, new_element);
@@ -1413,7 +1441,7 @@ fn element_neg_internal(
             ))
         }
         Some(Structure::BLS12_381_G2) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, handle);
             let new_element = element.neg();
             let new_handle = store_bls12_381_g2!(context, new_element);
@@ -1423,10 +1451,10 @@ fn element_neg_internal(
             ))
         }
         Some(Structure::BLS12_381_Gt) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
-            let element = borrow_bls12_381_gt!(context, handle);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+            let element = borrow_bls12_381_fq12!(context, handle);
             let new_element = element.inverse().unwrap();
-            let new_handle = store_bls12_381_gt!(context, new_element);
+            let new_handle = store_bls12_381_fq12!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.ark_bls12_381_fq12_inv * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
@@ -1444,7 +1472,7 @@ fn pairing_product_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_GROUP_BASIC_OPERATIONS);
+    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(3, ty_args.len());
     let g1 = structure_from_ty_arg!(context, &ty_args[0]);
     let g2 = structure_from_ty_arg!(context, &ty_args[1]);
@@ -1453,7 +1481,7 @@ fn pairing_product_internal(
     let g1_handles = pop_arg!(args, Vec<u64>);
     match (g1, g2, gt) {
         (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Gt)) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_GROUPS);
+            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()
                 .map(|&handle| {
@@ -1477,7 +1505,7 @@ fn pairing_product_internal(
                 .zip(g2_prepared.into_iter())
                 .collect();
             let new_element = ark_bls12_381::Bls12_381::product_of_pairings(input_pairs.as_slice());
-            let new_handle = store_bls12_381_gt!(context, new_element);
+            let new_handle = store_bls12_381_fq12!(context, new_element);
             Ok(NativeResult::ok(
                 (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_to_prepared + gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_to_prepared + gas_params.ark_bls12_381_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.ark_bls12_381_pairing_product_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
@@ -1488,9 +1516,6 @@ fn pairing_product_internal(
         }
     }
 }
-
-const DST: &str = "";
-const AUG: &str = "";
 
 fn blst_g1_proj_to_affine(point: &blst::blst_p1) -> blst::blst_p1_affine {
     let mut ret = blst::blst_p1_affine::default();
@@ -1510,52 +1535,48 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     // Always-on natives.
     natives.append(&mut vec![
         (
-            "element_serialize_uncompressed_internal",
-            make_native_from_func(gas_params.clone(), element_serialize_uncompressed_internal),
+            "serialize_internal",
+            make_native_from_func(gas_params.clone(), serialize_internal),
         ),
         (
-            "element_serialize_compressed_internal",
-            make_native_from_func(gas_params.clone(), element_serialize_compressed_internal),
+            "deserialize_internal",
+            make_native_from_func(gas_params.clone(), deserialize_internal),
         ),
         (
-            "element_deserialize_uncompressed_internal",
-            make_native_from_func(gas_params.clone(), element_deserialize_uncompressed_internal),
+            "eq_internal",
+            make_native_from_func(gas_params.clone(), eq_internal),
         ),
         (
-            "element_deserialize_compressed_internal",
-            make_native_from_func(gas_params.clone(), element_deserialize_compressed_internal),
+            "field_neg_internal",
+            make_native_from_func(gas_params.clone(), field_neg_internal),
         ),
         (
-            "scalar_deserialize_internal",
-            make_native_from_func(gas_params.clone(), scalar_deserialize_internal),
+            "field_inv_internal",
+            make_native_from_func(gas_params.clone(), field_inv_internal),
         ),
         (
-            "scalar_serialize_internal",
-            make_native_from_func(gas_params.clone(), scalar_serialize_internal),
+            "from_u64_internal",
+            make_native_from_func(gas_params.clone(), from_u64_internal),
         ),
         (
-            "scalar_eq_internal",
-            make_native_from_func(gas_params.clone(), scalar_eq_internal),
+            "field_add_internal",
+            make_native_from_func(gas_params.clone(), field_add_internal),
         ),
         (
-            "scalar_neg_internal",
-            make_native_from_func(gas_params.clone(), scalar_neg_internal),
+            "field_sub_internal",
+            make_native_from_func(gas_params.clone(), field_sub_internal),
         ),
         (
-            "scalar_inv_internal",
-            make_native_from_func(gas_params.clone(), scalar_inv_internal),
+            "field_mul_internal",
+            make_native_from_func(gas_params.clone(), field_mul_internal),
         ),
         (
-            "scalar_from_u64_internal",
-            make_native_from_func(gas_params.clone(), scalar_from_u64_internal),
+            "field_div_internal",
+            make_native_from_func(gas_params.clone(), field_div_internal),
         ),
         (
-            "scalar_add_internal",
-            make_native_from_func(gas_params.clone(), scalar_add_internal),
-        ),
-        (
-            "scalar_mul_internal",
-            make_native_from_func(gas_params.clone(), scalar_mul_internal),
+            "field_pow_internal",
+            make_native_from_func(gas_params.clone(), field_pow_internal),
         ),
         (
             "group_identity_internal",
@@ -1566,32 +1587,24 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_generator_internal),
         ),
         (
-            "element_add_internal",
-            make_native_from_func(gas_params.clone(), element_add_internal),
+            "group_add_internal",
+            make_native_from_func(gas_params.clone(), group_add_internal),
         ),
         (
-            "element_mul_internal",
-            make_native_from_func(gas_params.clone(), element_scalar_mul_internal),
+            "group_mul_internal",
+            make_native_from_func(gas_params.clone(), group_scalar_mul_internal),
         ),
         (
-            "element_multi_scalar_mul_internal",
-            make_native_from_func(gas_params.clone(), element_multi_scalar_mul_internal),
+            "group_multi_scalar_mul_internal",
+            make_native_from_func(gas_params.clone(), group_multi_scalar_mul_internal),
         ),
         (
-            "element_double_internal",
-            make_native_from_func(gas_params.clone(), element_double_internal),
+            "group_double_internal",
+            make_native_from_func(gas_params.clone(), group_double_internal),
         ),
         (
-            "element_neg_internal",
-            make_native_from_func(gas_params.clone(), element_neg_internal),
-        ),
-        (
-            "element_eq_internal",
-            make_native_from_func(gas_params.clone(), element_eq_internal),
-        ),
-        (
-            "is_prime_order_internal",
-            make_native_from_func(gas_params.clone(), is_prime_order_internal),
+            "group_neg_internal",
+            make_native_from_func(gas_params.clone(), group_neg_internal),
         ),
         (
             "pairing_product_internal",
