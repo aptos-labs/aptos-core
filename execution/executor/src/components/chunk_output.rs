@@ -187,7 +187,10 @@ pub fn update_counters_for_processed_chunk(
             TransactionStatus::Discard(discard_status_code) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(15)),
-                    warn!("Txn being discarded is {:?}", txn)
+                    warn!(
+                        "Txn being discarded is {:?} with status code {:?}",
+                        txn, discard_status_code
+                    )
                 );
                 (
                     "discard",

@@ -48,6 +48,8 @@ pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
+mod sender_aware_shuffler;
+mod transaction_shuffler;
 
 pub use consensusdb::create_checkpoint;
 /// Required by the smoke tests
