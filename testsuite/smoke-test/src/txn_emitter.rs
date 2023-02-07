@@ -27,7 +27,8 @@ pub async fn generate_traffic(
         .collect::<Vec<_>>();
     let mut emit_job_request = EmitJobRequest::default();
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
+    let transaction_factory =
+        TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(gas_price);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
@@ -51,7 +52,7 @@ async fn test_txn_emmitter() {
         &mut swarm,
         &all_validators,
         Duration::from_secs(20),
-        1,
+        100,
         vec![
             vec![(
                 TransactionType::AccountGeneration {

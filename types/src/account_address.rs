@@ -155,7 +155,7 @@ pub fn create_token_id(creator: AccountAddress, collection: &str, name: &str) ->
 pub fn create_object_id(creator: AccountAddress, seed: &[u8]) -> AccountAddress {
     let mut input = bcs::to_bytes(&creator).unwrap();
     input.extend(seed);
-    input.push(Scheme::DeriveObjectId as u8);
+    input.push(Scheme::DeriveObjectIdFromSeed as u8);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(hash.as_ref()).unwrap()
 }

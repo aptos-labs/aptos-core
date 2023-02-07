@@ -3,6 +3,7 @@ testnet: true
 remote_endpoint: ~
 framework_release:
   bytecode_version: 6
+  git_hash: ~
 gas_schedule:
   feature_version: 6
   entries:
@@ -503,4 +504,8 @@ consensus_config:
           weight_by_voting_power: true
           use_history_from_previous_epoch_max_count: 5
     max_failed_authors_to_store: 10
+feature_flags:
+  enabled:
+    - code_dependency_check
+  disabled: []
 is_multi_step: false

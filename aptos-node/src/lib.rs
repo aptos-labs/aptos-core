@@ -154,6 +154,9 @@ pub fn start(
     // Create global rayon thread pool
     utils::create_global_rayon_pool(create_global_rayon_pool);
 
+    // Initialize the global aptos-node-identity
+    aptos_node_identity::init(config.peer_id())?;
+
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
 
@@ -355,8 +358,13 @@ pub fn setup_environment_and_start_node(
     // Set the Aptos VM configurations
     utils::set_aptos_vm_configurations(&node_config);
 
-    // Start the telemetry service (as early as possible and before any blocking calls)
+    // Obtain the chain_id from the DB
     let chain_id = utils::fetch_chain_id(&db_rw)?;
+
+    // Set the chain_id in global AptosNodeIdentity
+    aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
         &node_config,
         remote_log_rx,

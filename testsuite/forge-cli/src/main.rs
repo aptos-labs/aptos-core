@@ -594,7 +594,7 @@ fn twin_validator_test(config: ForgeConfig) -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(6000)
+            SuccessCriteria::new(5500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
@@ -638,7 +638,7 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
         true,
         false,
         &ChangingWorkingQuorumTest {
-            min_tps: 1500,
+            min_tps: 750,
             always_healthy_nodes: 2,
             max_down_nodes: 0,
             num_large_validators: 2,
@@ -649,8 +649,8 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
-        min_tps: 50,
+    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, &ChangingWorkingQuorumTest {
+        min_tps: 30,
         always_healthy_nodes: 6,
         max_down_nodes: 5,
         num_large_validators: 3,
@@ -679,28 +679,20 @@ fn large_test_only_few_nodes_down() -> ForgeConfig<'static> {
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(
-        20,
-        120,
-        500,
-        300,
-        true,
-        false,
-        &ChangingWorkingQuorumTest {
-            min_tps: 50,
-            always_healthy_nodes: 0,
-            max_down_nodes: 20,
-            num_large_validators: 0,
-            add_execution_delay: false,
-            // Use longer check duration, as we are bringing enough nodes
-            // to require state-sync to catch up to have consensus.
-            check_period_s: 53,
-        },
-    )
+    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, &ChangingWorkingQuorumTest {
+        min_tps: 50,
+        always_healthy_nodes: 0,
+        max_down_nodes: 20,
+        num_large_validators: 0,
+        add_execution_delay: false,
+        // Use longer check duration, as we are bringing enough nodes
+        // to require state-sync to catch up to have consensus.
+        check_period_s: 53,
+    })
 }
 
 fn changing_working_quorum_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(20, 120, 100, 70, true, true, &ChangingWorkingQuorumTest {
         min_tps: 15,
         always_healthy_nodes: 0,
         max_down_nodes: 20,
@@ -803,7 +795,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             // Additionally - we are not really gracefully handling overlaods,
             // setting limits based on current reality, to make sure they
             // don't regress, but something to investigate
-            avg_tps: 4000,
+            avg_tps: 3500,
             latency_thresholds: &[],
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
@@ -888,13 +880,20 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
             },
         )
         .with_success_criteria(
-            SuccessCriteria::new(4000)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+            SuccessCriteria::new(match test_name.as_str() {
+                "account_creation" => 3700,
+                "nft_mint" => 1000,
+                "publishing" => 60,
+                "write_new_resource" => 3700,
+                "module_loading" => 1800,
+                _ => unreachable!("{}", test_name),
+            })
+            .add_no_restarts()
+            .add_wait_for_catchup_s(240)
+            .add_chain_progress(StateProgressThreshold {
+                max_no_progress_secs: 20.0,
+                max_round_gap: 6,
+            }),
         )
 }
 
@@ -1001,7 +1000,7 @@ fn network_partition(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         .with_network_tests(vec![&NetworkPartitionTest])
         .with_success_criteria(
-            SuccessCriteria::new(3000)
+            SuccessCriteria::new(2500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )

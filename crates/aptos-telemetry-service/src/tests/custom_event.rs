@@ -14,6 +14,7 @@ use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use serde_json::json;
 use std::collections::BTreeMap;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_custom_event() {
@@ -21,6 +22,7 @@ async fn test_custom_event() {
     let chain_id = ChainId::new(28);
     let peer_id = PeerId::random();
     let node_type = NodeType::Validator;
+    let uuid = Uuid::new_v4();
     let epoch = 10;
 
     test_context
@@ -36,6 +38,7 @@ async fn test_custom_event() {
         peer_id,
         node_type,
         epoch,
+        uuid,
     )
     .unwrap();
 

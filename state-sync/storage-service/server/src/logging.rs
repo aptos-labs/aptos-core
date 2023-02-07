@@ -35,4 +35,5 @@ pub enum LogEntry {
     StorageServiceError,
     StorageSummaryRefresh,
     SubscriptionRefresh,
+    SubscriptionResponse,
 }

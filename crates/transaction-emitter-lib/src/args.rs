@@ -82,6 +82,7 @@ pub enum TransactionTypeArg {
     PublishPackage,
     CustomFunctionLargeModuleWorkingSet,
     CreateNewResource,
+    NoOp,
 }
 
 impl Default for TransactionTypeArg {
@@ -132,6 +133,15 @@ pub struct EmitArgs {
 
     #[clap(long, min_values = 0)]
     pub transaction_phases: Vec<usize>,
+
+    #[clap(long)]
+    pub gas_price: Option<u64>,
+
+    #[clap(long)]
+    pub max_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
+    pub init_gas_price_multiplier: Option<u64>,
 
     #[clap(long)]
     pub expected_max_txns: Option<u64>,

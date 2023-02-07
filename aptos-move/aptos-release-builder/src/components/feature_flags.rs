@@ -13,7 +13,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
@@ -68,6 +68,11 @@ pub fn generate_feature_upgrade_proposal(
     assert!(disabled.len() < u16::MAX as usize);
 
     let writer = CodeWriter::new(Loc::default());
+
+    emitln!(writer, "// Modifying on-chain feature flags: ");
+    emitln!(writer, "// Enabled Features: {:?}", features.enabled);
+    emitln!(writer, "// Disabled Features: {:?}", features.disabled);
+    emitln!(writer, "//");
 
     let proposal = generate_governance_proposal(
         &writer,

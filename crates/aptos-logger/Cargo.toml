@@ -17,6 +17,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-infallible = { workspace = true }
 aptos-log-derive = { workspace = true }
+aptos-node-identity = { workspace = true }
 backtrace = { workspace = true }
 chrono = { workspace = true }
 console-subscriber = { workspace = true, optional = true }

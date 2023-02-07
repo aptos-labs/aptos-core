@@ -10,14 +10,18 @@ import yaml
 # This script runs the fullnode-sync from the root of aptos-core.
 
 # Useful file constants
+FAST_SYNC_BOOTSTRAPPING_MODE = "DownloadLatestStates" # The bootstrapping string for fast sync
 FULLNODE_CONFIG_NAME = "public_full_node.yaml" # Relative to the aptos-core repo
 FULLNODE_CONFIG_TEMPLATE_PATH = "config/src/config/test_data/public_full_node.yaml" # Relative to the aptos-core repo
 GENESIS_BLOB_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/genesis.blob" # Location inside the aptos-networks repo
+LOCAL_METRICS_ENDPOINT = "http://127.0.0.1:9101/json_metrics" # The json metrics endpoint running on the local host
 LOCAL_REST_ENDPOINT = "http://127.0.0.1:8080/v1" # The rest endpoint running on the local host
 LEDGER_VERSION_API_STRING = "ledger_version" # The string to fetch the ledger version from the REST API
-MAX_TIME_BETWEEN_VERSION_INCREASES_SECS = 1800 # The number of seconds after which to fail if the node isn't syncing
+LEDGER_VERSION_METRICS_STRING = "aptos_state_sync_version.synced" # The string to fetch the ledger version from the metrics API
+MAX_TIME_BETWEEN_SYNC_INCREASES_SECS = 1800 # The number of seconds after which to fail if the node isn't syncing
 REMOTE_REST_ENDPOINTS = "https://fullnode.{network}.aptoslabs.com/v1" # The remote rest endpoint
 SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highest known at the job start
+SYNCED_STATES_METRICS_STRING = "aptos_state_sync_version.synced_states" # The string to fetch the synced states from the metrics API
 WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/waypoint.txt" # Location inside the aptos-networks repo
 
 def print_error_and_exit(error):
@@ -52,6 +56,30 @@ def get_synced_version_from_index_response(api_index_response, exit_if_none):
   return int(synced_version)
 
 
+def get_metric_from_metrics_port(metric_name):
+  """Gets and returns the metric from the metrics port. If no metric exists, returns 0."""
+  # Ping the metrics port
+  process = subprocess.Popen(["curl", "-s", LOCAL_METRICS_ENDPOINT], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  metrics_response, errors = process.communicate()
+  if metrics_response is None:
+    print_error_and_exit("Exiting! Unable to get the metrics from the localhost. Response is empty.")
+  if errors is not None and errors != b'':
+    print("Found output on stderr for get_synced_version_from_metrics_port: {errors}".format(errors=errors))
+
+  # Parse the metric value
+  try:
+    metrics_response = json.loads(metrics_response)
+    metric_value = metrics_response[metric_name]
+  except Exception as exception:
+    print("Exception caught when getting the metric value: {metric_name}. Exception: {exception}".format(metric_name=metric_name, exception=exception))
+    metric_value = 0 # We default to 0 if no metric is found. This is okay given the larger timeouts.
+  if metric_value is None:
+    print_error_and_exit("Exiting! Unable to get the metric from the metrics port. Metric is empty: {metric_name}".format(metric_name=metric_name))
+
+  # Return the metric value
+  return int(metric_value)
+
+
 def check_fullnode_is_still_running(fullnode_process_handle):
   """Verifies the fullnode is still running and exits if not"""
   return_code = fullnode_process_handle.poll()
@@ -63,6 +91,7 @@ def monitor_fullnode_syncing(fullnode_process_handle, bootstrapping_mode, node_l
   """Monitors the ability of the fullnode to sync"""
   print("Waiting for the node to synchronize!")
   last_synced_version = 0 # The most recent synced version
+  last_synced_states = 0 # The most recent synced key-value state
   last_sync_update_time = time.time() # The latest timestamp of when we were able to sync to a higher version
   start_sync_time = time.time() # The time at which we started syncing the node
   synced_to_public_version = False # If we've synced to the public version
@@ -72,9 +101,8 @@ def monitor_fullnode_syncing(fullnode_process_handle, bootstrapping_mode, node_l
     # Ensure the fullnode is still running
     check_fullnode_is_still_running(fullnode_process_handle)
 
-    # Fetch the latest synced version
-    api_index_response = ping_rest_api_index_page(LOCAL_REST_ENDPOINT, True)
-    synced_version = get_synced_version_from_index_response(api_index_response, True)
+    # Fetch the latest synced version from the node metrics
+    synced_version = get_metric_from_metrics_port(LEDGER_VERSION_METRICS_STRING)
 
     # Check if we've synced to the public version
     if not synced_to_public_version:
@@ -90,18 +118,27 @@ def monitor_fullnode_syncing(fullnode_process_handle, bootstrapping_mode, node_l
       print("Successfully synced to the target! Target version: {target_version}, Synced version: {synced_version}".format(target_version=target_version, synced_version=synced_version))
       sys.exit(0)
 
-    # Ensure we're actually making syncing progress (depending on the sync mode)
-    if synced_version <= last_synced_version:
-      time_since_last_version_increase = time.time() - last_sync_update_time
-      if time_since_last_version_increase > MAX_TIME_BETWEEN_VERSION_INCREASES_SECS:
-        if bootstrapping_mode == "DownloadLatestStates":
-          if synced_version != 0: # Fast sync will take long to initialize the synced_version
-            print_error_and_exit("Exiting! The fullnode is not making any syncing progress, despite using fast sync!")
-        else:
-          print_error_and_exit("Exiting! The fullnode is not making any syncing progress!")
-    else:
-      last_synced_version = synced_version
-      last_sync_update_time = time.time()
+    # If we're fast syncing, ensure we're making progress
+    if bootstrapping_mode == FAST_SYNC_BOOTSTRAPPING_MODE and synced_version == 0:
+      synced_states = get_metric_from_metrics_port(SYNCED_STATES_METRICS_STRING)
+      if synced_states <= last_synced_states:
+        time_since_last_states_increase = time.time() - last_sync_update_time
+        if time_since_last_states_increase > MAX_TIME_BETWEEN_SYNC_INCREASES_SECS:
+          print_error_and_exit("Exiting! The fullnode is not making any fast sync progress! Last synced state: {last_synced_states}".format(last_synced_states=last_synced_states))
+      else:
+        print("Latest synced states: {last_synced_states}".format(last_synced_states=last_synced_states))
+        last_synced_states = synced_states
+        last_sync_update_time = time.time()
+
+    # If we're regular syncing, ensure we're making progress
+    if bootstrapping_mode != FAST_SYNC_BOOTSTRAPPING_MODE or synced_version != 0:
+      if synced_version <= last_synced_version:
+        time_since_last_version_increase = time.time() - last_sync_update_time
+        if time_since_last_version_increase > MAX_TIME_BETWEEN_SYNC_INCREASES_SECS:
+            print_error_and_exit("Exiting! The fullnode is not making any syncing progress! Last synced version: {last_synced_version}".format(last_synced_version=last_synced_version))
+      else:
+        last_synced_version = synced_version
+        last_sync_update_time = time.time()
 
     # We're still syncing. Display the last 10 lines of the node log.
     print("Still syncing. Target version: {target_version}, Synced version: {synced_version}".format(target_version=target_version, synced_version=synced_version))
