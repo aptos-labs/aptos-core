@@ -283,7 +283,7 @@ impl ChangeSetConfigs {
     fn for_feature_version_3() -> Self {
         const MB: u64 = 1 << 20;
 
-        Self::new_impl(3, MB, u64::MAX, MB, MB << 10)
+        Self::new_impl(3, MB, u64::MAX, MB, 10 * MB)
     }
 
     fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
