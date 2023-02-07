@@ -43,6 +43,8 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 10_000_000_000;
 
+const MAX_RETRIES: usize = 6;
+
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
 // account sequence numbers). If these fail, the whole test fails. We do not use
@@ -50,7 +52,7 @@ const MAX_TXNS: u64 = 10_000_000_000;
 // This retry policy means an operation will take 8 seconds at most.
 pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
     RetryPolicy::exponential(Duration::from_millis(125))
-        .with_max_retries(6)
+        .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
 
@@ -511,6 +513,7 @@ impl TxnEmitter {
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
+            max_retries: MAX_RETRIES,
         };
         let mut all_accounts = account_minter
             .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
