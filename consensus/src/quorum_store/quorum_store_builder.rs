@@ -349,10 +349,9 @@ impl InnerBuilder {
                 self.proof_coordinator_cmd_tx.clone(),
                 self.config.max_batch_bytes,
             );
-            spawn_named!(
-                format!("batch_coordinator-{}", i).as_str(),
-                batch_coordinator.start()
-            );
+            #[allow(unused_variables)]
+            let name = format!("batch_coordinator-{}", i).as_str();
+            spawn_named!(name, batch_coordinator.start());
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
