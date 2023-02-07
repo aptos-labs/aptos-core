@@ -12,13 +12,14 @@ use aptos_types::{
     on_chain_config::ConfigStorage,
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
 };
-use aptos_vm_types::data_cache::{DataCache, AptosDataCache, CachedData};
+use aptos_vm_types::data_cache::{AptosDataCache, CachedData, DataCache};
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
-    vm_status::StatusCode, value::MoveTypeLayout,
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
@@ -108,7 +109,11 @@ impl<'a, S: DataCache> StorageAdapter<'a, S> {
         Self(data_cache)
     }
 
-    pub fn get(&self, access_path: AccessPath, layout: &MoveTypeLayout) -> PartialVMResult<Option<CachedData>> {
+    pub fn get(
+        &self,
+        access_path: AccessPath,
+        layout: &MoveTypeLayout,
+    ) -> PartialVMResult<Option<CachedData>> {
         self.0
             .get_value(&StateKey::AccessPath(access_path), Some(layout))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
@@ -130,7 +135,8 @@ impl<'a, S: DataCache> MoveResolverExt for StorageAdapter<'a, S> {
         resource_group: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
         let ap = AccessPath::resource_group_access_path(*address, resource_group.clone());
-        self.get(ap, None).map_err(|e| e.finish(Location::Undefined))
+        self.get(ap, None)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// TODO: change API.
@@ -140,7 +146,8 @@ impl<'a, S: DataCache> MoveResolverExt for StorageAdapter<'a, S> {
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
         let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
-        self.get(ap, None).map_err(|e| e.finish(Location::Undefined))
+        self.get(ap, None)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -150,7 +157,8 @@ impl<'a, S: DataCache> ModuleResolver for StorageAdapter<'a, S> {
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
-        self.get(ap, None).map_err(|e| e.finish(Location::Undefined))
+        self.get(ap, None)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -168,7 +176,6 @@ impl<'a, S: DataCache> ResourceResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: DataCache> TableResolver for StorageAdapter<'a, S> {
-
     /// TODO: change API.
     fn resolve_table_entry(
         &self,
@@ -180,7 +187,6 @@ impl<'a, S: DataCache> TableResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: DataCache> ConfigStorage for StorageAdapter<'a, S> {
-
     /// TODO: change API.
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(access_path, None).ok()?

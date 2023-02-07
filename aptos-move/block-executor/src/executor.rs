@@ -15,6 +15,7 @@ use aptos_logger::debug;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use aptos_types::write_set::WriteOp;
+use aptos_vm_types::data_cache::Cache;
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
@@ -63,7 +64,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_data_cache: &MVHashMap<T::Key, T::ReadValue>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -92,7 +93,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_data_cache.add_write(&k, write_version, v);
+                versioned_data_cache.add_write(&k, write_version, v.cache());
             }
 
             // Then, apply deltas.
@@ -139,7 +140,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_data_cache: &MVHashMap<T::Key, T::ReadValue>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVHashMapError::*;
@@ -190,7 +191,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_data_cache: &MVHashMap<T::Key, T::ReadValue>,
         scheduler: &Scheduler,
         base_view: &S,
         committing: bool,
@@ -355,7 +356,7 @@ where
                     );
                     // Apply the writes.
                     for (ap, write_op) in output.get_writes().into_iter() {
-                        data_map.insert(ap, write_op);
+                        data_map.insert(ap, write_op.cache());
                     }
                     ret.push(output);
                 },

@@ -6,13 +6,16 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
-use aptos_types::write_set::TransactionWrite;
+use aptos_vm_types::data_cache::{CachedData, Readable};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -35,10 +38,11 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
+#[derive(Clone)]
 struct Value<V>(Option<V>);
 
-impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+impl<V: Into<Vec<u8>> + Clone> Readable for Value<V> {
+    fn read(&self) -> Option<CachedData> {
         if self.0.is_none() {
             None
         } else {
@@ -48,7 +52,7 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
             };
 
             bytes.resize(16, 0);
-            Some(bytes)
+            Some(CachedData::Serialized(Arc::new(bytes)))
         }
     }
 }
@@ -219,7 +223,7 @@ where
                         loop {
                             match map.read(key, idx) {
                                 Ok(Version(_, v)) => {
-                                    match &*v {
+                                    match &v.clone() {
                                         Value(Some(w)) => {
                                             assert_eq!(
                                                 baseline,

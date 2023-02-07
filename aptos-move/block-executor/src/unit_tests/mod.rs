@@ -8,7 +8,7 @@ use crate::{
     task::ModulePath,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
-use aptos_types::write_set::TransactionWrite;
+use aptos_vm_types::data_cache::Readable;
 use rand::random;
 use std::{
     fmt::Debug,
@@ -20,7 +20,7 @@ use std::{
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
+    V: Send + Sync + Debug + Clone + Eq + Readable + 'static,
 {
     let data_view = DeltaDataView::<K, V> {
         phantom: PhantomData,

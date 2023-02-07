@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::state_store::state_key::StateKey;
-use aptos_vm_types::{change_set::{ChangeSetContainer, WriteChange}, data_cache::{DataCache, CachedData}};
+use aptos_vm_types::{
+    change_set::{ChangeSetContainer, WriteChange},
+    data_cache::{CachedData, DataCache},
+};
 use move_core_types::value::MoveTypeLayout;
 
 /// Data cache which additionally stores a change set.

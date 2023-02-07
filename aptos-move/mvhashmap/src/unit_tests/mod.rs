@@ -6,34 +6,40 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
     transaction::AggregatorValue,
 };
+use aptos_vm_types::data_cache::CachedData;
 
 mod proptest_types;
 
-#[derive(Debug, PartialEq, Eq)]
-struct Value(Vec<usize>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+struct Value(Arc<Vec<usize>>);
 
-impl TransactionWrite for Value {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+impl Readable for Value {
+    fn read(&self) -> Option<CachedData> {
         let mut v: Vec<u8> = self
             .0
+            .as_ref()
             .clone()
             .into_iter()
             .flat_map(|element| element.to_be_bytes())
             .collect();
         v.resize(16, 0);
-        Some(v)
+        Some(CachedData::Serialized(Arc::new(v)))
     }
 }
 
 // Generate a Vec deterministically based on txn_idx and incarnation.
 fn value_for(txn_idx: usize, incarnation: usize) -> Value {
-    Value(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
+    Value(Arc::new(vec![
+        txn_idx * 5,
+        txn_idx + incarnation,
+        incarnation * 5,
+    ]))
 }
 
 // Generate the value_for txn_idx and incarnation in arc.
-fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
+fn arc_value_for(txn_idx: usize, incarnation: usize) -> Value {
     // Generate a Vec deterministically based on txn_idx and incarnation.
-    Arc::new(value_for(txn_idx, incarnation))
+    value_for(txn_idx, incarnation)
 }
 
 // Convert value for txn_idx and incarnation into u128.

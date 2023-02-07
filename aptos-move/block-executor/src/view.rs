@@ -14,9 +14,8 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     state_store::state_storage_usage::StateStorageUsage,
     vm_status::{StatusCode, VMStatus},
-    write_set::TransactionWrite,
 };
-use aptos_vm_types::data_cache::{Cache, CachedData, DataCache};
+use aptos_vm_types::data_cache::{Cache, CachedData, DataCache, Readable};
 use move_binary_format::errors::Location;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::values::Value;
@@ -32,7 +31,7 @@ pub type ResolvedData = Option<Vec<u8>>;
 /// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
 /// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
 /// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub(crate) struct MVHashMapView<'a, K, V> {
+pub(crate) struct MVHashMapView<'a, K, V: Readable> {
     versioned_map: &'a MVHashMap<K, V>,
     scheduler: &'a Scheduler,
     captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
@@ -55,7 +54,7 @@ pub enum ReadResult<V> {
 impl<
         'a,
         K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
-        V: Send + Sync + Cache + Clone,
+        V: Send + Sync + Clone + Readable,
     > MVHashMapView<'a, K, V>
 {
     pub(crate) fn new(versioned_map: &'a MVHashMap<K, V>, scheduler: &'a Scheduler) -> Self {
@@ -146,8 +145,8 @@ impl<
 }
 
 enum ViewMapKind<'a, T: Transaction> {
-    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value>),
-    BTree(&'a BTreeMap<T::Key, T::Value>),
+    MultiVersion(&'a MVHashMapView<'a, T::Key, T::ReadValue>),
+    BTree(&'a BTreeMap<T::Key, T::ReadValue>),
 }
 
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
@@ -159,7 +158,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
-        map: &'a MVHashMapView<'a, T::Key, T::Value>,
+        map: &'a MVHashMapView<'a, T::Key, T::ReadValue>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -171,7 +170,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     pub(crate) fn new_btree_view(
         base_view: &'a S,
-        map: &'a BTreeMap<T::Key, T::Value>,
+        map: &'a BTreeMap<T::Key, T::ReadValue>,
         txn_idx: TxnIndex,
     ) -> LatestView<'a, T, S> {
         LatestView {
@@ -183,16 +182,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> DataCache for LatestView<'a, T, S> {
-    type Key = T::Key;
     type DeserializerHint = MoveTypeLayout;
+    type Key = T::Key;
 
-    fn get_value(&self, key: &T::Key, hint: Option<&MoveTypeLayout>) -> anyhow::Result<Option<CachedData>> {
+    fn get_value(
+        &self,
+        key: &T::Key,
+        hint: Option<&MoveTypeLayout>,
+    ) -> anyhow::Result<Option<CachedData>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(key, self.txn_idx) {
-                // TODO: cache must bew Arc::new, clone must be arc::clone!
-                // TODO: this is not nice and not correct, but it compiles.
-                ReadResult::Value(v) => Ok(v.clone()),
-
+                ReadResult::Value(v) => Ok(v.read()),
                 // TODO: This seems very unnecessary, can we pass u128 instead?
                 ReadResult::U128(v) => Ok(Some(CachedData::MoveValue(Arc::new(Value::u128(v))))),
                 ReadResult::Unresolved(delta) => {
@@ -210,19 +210,39 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> DataCache for LatestView<'
                     Ok(Some(CachedData::MoveValue(Arc::new(Value::u128(result)))))
                 },
                 ReadResult::None => {
-                    // TODO: Instead, we want to serialise the type here. Note this is not possible without MoveTypeLayout.
-                    // At least we can cache bytes into MVHashMap? ANd then give out arc?
                     self.base_view.get_state_value(key).map(|maybe_blob| {
-                        maybe_blob.map(|blob| CachedData::Serialized(Arc::new(blob)))
+                        maybe_blob.map(|blob| {
+                            match hint {
+                                Some(layout) => {
+                                    // TODO: Propagate error?
+                                    let value = Value::simple_deserialize(&blob, layout)
+                                        .expect("should deserialize");
+                                    CachedData::MoveValue(Arc::new(value))
+                                },
+                                None => CachedData::Serialized(Arc::new(blob)),
+                            }
+                        })
                     })
                 },
             },
             ViewMapKind::BTree(map) => map.get(key).map_or_else(
                 || {
                     let blob = self.base_view.get_state_value(key);
-                    // TODO: Call Value::simple_deserialize and cache here?
-                    blob.map(|b| b.map(CachedData::from_blob))
-                    
+                    // TODO: Cache value here?
+                    blob.map(|maybe_blob| {
+                        maybe_blob.map(|blob| {
+                            match hint {
+                                Some(layout) => {
+                                    // TODO: Propagate error?
+                                    let value = Value::simple_deserialize(&blob, layout)
+                                        .expect("should deserialize");
+                                    CachedData::MoveValue(Arc::new(value))
+                                },
+                                None => CachedData::Serialized(Arc::new(blob)),
+                            }
+                        })
+                    })
+
                     // TODO: common treatment with the above case.
                     // TODO: enable below when logging isn't a circular dependency.
                     // Even speculatively, reading from base view should not return an error.
@@ -235,10 +255,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> DataCache for LatestView<'
                     // log_context.alert();
                     // ret
                 },
-                |v| {
-                    Ok(v.extract_raw_bytes()
-                        .map(|blob| CachedData::Serialized(Arc::new(blob))))
-                },
+                |v| Ok(v.read_ref()),
             ),
         }
     }

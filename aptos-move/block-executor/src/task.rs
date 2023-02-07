@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_state_view::TStateView;
-use aptos_types::{
-    access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
-};
-use aptos_vm_types::data_cache::{Cache, DataCache};
+use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
+use aptos_vm_types::data_cache::{Cache, DataCache, Readable};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -41,7 +38,8 @@ impl ModulePath for StateKey {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath;
-    type Value: Send + Sync + Cache;
+    type Value: Send + Sync + Cache<Target = Self::ReadValue>;
+    type ReadValue: Send + Sync + Clone + Readable;
 }
 
 /// Inference result of a transaction.

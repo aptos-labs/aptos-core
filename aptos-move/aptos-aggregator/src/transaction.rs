@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::{ChangeSet, CheckChangeSet, TransactionOutput},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm_types::{data_cache::CachedData, change_set::AsCachedData};
+use aptos_vm_types::data_cache::{CachedData, Readable};
 use move_core_types::value::{MoveTypeLayout, MoveValue};
 use std::{collections::btree_map, sync::Arc};
 
@@ -17,22 +17,18 @@ use std::{collections::btree_map, sync::Arc};
 pub struct AggregatorValue(u128);
 
 impl AggregatorValue {
-    /// TODO: change message and revisit this later.
     /// Returns None if the write doesn't contain a value (i.e deletion), and panics if
     /// the value raw bytes can't be deserialized into an u128.
-    pub fn from_write(write: &dyn AsCachedData<CachedData>) -> Option<Self> {
-        let cd = write.as_cached_data();
-        cd.map(|data| {
-            match data {
-                CachedData::Serialized(blob) => Self(deserialize(&blob)),
-                CachedData::MoveValue(v) => {
-                    Self(match v.as_ref().as_move_value(&MoveTypeLayout::U128) {
-                        MoveValue::U128(v) => v,
-                        _ => unreachable!()
-                    })
-                },
-                CachedData::AggregatorValue(v) => Self(v),
-            }
+    pub fn from_write(write: &impl Readable) -> Option<Self> {
+        let v = write.read_ref();
+        v.map(|data| match data {
+            CachedData::Serialized(blob) => Self(deserialize(&blob)),
+            CachedData::MoveValue(v) => {
+                Self(match v.as_ref().as_move_value(&MoveTypeLayout::U128) {
+                    MoveValue::U128(v) => v,
+                    _ => unreachable!(),
+                })
+            },
         })
     }
 

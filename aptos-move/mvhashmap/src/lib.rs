@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
-use aptos_vm_types::change_set::AsCachedData;
+use aptos_vm_types::data_cache::{Cache, Readable};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -28,7 +28,7 @@ const FLAG_ESTIMATE: usize = 1;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-pub struct Entry<V> {
+pub struct Entry<V: Readable> {
     /// Used to mark the entry as a "write estimate".
     flag: AtomicUsize,
     /// Actual content.
@@ -36,7 +36,7 @@ pub struct Entry<V> {
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-pub enum EntryCell<V> {
+pub enum EntryCell<V: Readable> {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
@@ -46,7 +46,7 @@ pub enum EntryCell<V> {
     Delta(DeltaOp),
 }
 
-impl<V> Entry<V> {
+impl<V: Readable> Entry<V> {
     pub fn new_write_from(flag: usize, incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             flag: AtomicUsize::new(flag),
@@ -70,14 +70,14 @@ impl<V> Entry<V> {
     }
 }
 
-pub(crate) struct VersionedValue<V> {
+pub(crate) struct VersionedValue<V: Readable> {
     pub(crate) versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
     // Note: this can cache base (storage) value in Option<u128> to facilitate
     // aggregator validation & reading in the future, if needed.
     pub(crate) contains_delta: bool,
 }
 
-impl<V> VersionedValue<V> {
+impl<V: Readable> VersionedValue<V> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -86,7 +86,7 @@ impl<V> VersionedValue<V> {
     }
 }
 
-impl<V> Default for VersionedValue<V> {
+impl<V: Readable> Default for VersionedValue<V> {
     fn default() -> Self {
         VersionedValue::new()
     }
@@ -100,7 +100,7 @@ impl<V> Default for VersionedValue<V> {
 /// Concurrency is managed by DashMap, i.e. when a method accesses a BTreeMap at a
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
-pub struct MVHashMap<K, V> {
+pub struct MVHashMap<K, V: Readable> {
     data: DashMap<K, VersionedValue<V>>,
     delta_keys: Mutex<Vec<K>>,
 }
@@ -120,17 +120,17 @@ pub enum MVHashMapError {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVHashMapOutput<V> {
+pub enum MVHashMapOutput<V: Readable> {
     /// Result of resolved delta op, always u128. Unlike with `Version`, we return
     /// actual data because u128 is cheap to copy amd validation can be done correctly
     /// on values as well (ABA is not a problem).
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid passing big values around.
-    Version(Version, Option<V>),
+    Version(Version, V),
 }
 
-impl<K: Hash + Clone + Eq, V: AsCachedData> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: Clone + Readable> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -236,7 +236,7 @@ impl<K: Hash + Clone + Eq, V: AsCachedData> MVHashMap<K, V> {
                         (EntryCell::Write(incarnation, data), None) => {
                             // Resolve to the write if no deltas were applied in between.
                             let write_version = (*idx, *incarnation);
-                            return Ok(Version(write_version, data.as_cached_data()));
+                            return Ok(Version(write_version, data.clone()));
                         },
                         (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                             // Deltas were applied. We must deserialize the value
@@ -244,15 +244,14 @@ impl<K: Hash + Clone + Eq, V: AsCachedData> MVHashMap<K, V> {
 
                             // None if data represents deletion. Otherwise, panics if the
                             // data can't be resolved to an aggregator value.
-                            let cached_data = data.as_cached_data();
-                            let maybe_value = AggregatorValue::from_write(cached_data);
+                            let maybe_value = AggregatorValue::from_write(data);
 
                             if maybe_value.is_none() {
                                 // Resolve to the write if the WriteOp was deletion
                                 // (MoveVM will observe 'deletion'). This takes precedence
                                 // over any speculative delta accumulation errors on top.
                                 let write_version = (*idx, *incarnation);
-                                return Ok(Version(write_version, None));
+                                return Ok(Version(write_version, data.clone()));
                             }
                             return accumulator.map_err(|_| DeltaApplicationFailure).and_then(
                                 |a| {
@@ -298,7 +297,7 @@ impl<K: Hash + Clone + Eq, V: AsCachedData> MVHashMap<K, V> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V: AsCachedData> Default for MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: Clone + Readable> Default for MVHashMap<K, V> {
     fn default() -> Self {
         Self::new()
     }

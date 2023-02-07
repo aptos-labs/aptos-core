@@ -15,11 +15,10 @@ use aptos_aggregator::{
 };
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    access_path::AccessPath,
-    account_address::AccountAddress,
-    state_store::state_storage_usage::StateStorageUsage,
-    write_set::{TransactionWrite, WriteOp},
+    access_path::AccessPath, account_address::AccountAddress,
+    state_store::state_storage_usage::StateStorageUsage, write_set::WriteOp,
 };
+use aptos_vm_types::data_cache::{Cache, CachedData, DataCache, Readable};
 use claims::assert_none;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -46,7 +45,7 @@ pub(crate) struct DeltaDataView<K, V> {
 impl<K, V> TStateView for DeltaDataView<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Debug + Send + Sync + Debug + Clone + Readable + 'static,
 {
     type Key = K;
 
@@ -76,7 +75,7 @@ pub(crate) struct EmptyDataView<K, V> {
 impl<K, V> TStateView for EmptyDataView<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Debug + Send + Sync + Debug + Clone + Readable + 'static,
 {
     type Key = K;
 
@@ -142,14 +141,22 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
     pub bool,
 );
 
-impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
-    for ValueType<V>
-{
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Readable for ValueType<V> {
+    fn read_ref(&self) -> Option<CachedData> {
         if self.1 {
-            let mut v = self.0.clone().into();
+            let mut v: Vec<u8> = self.0.clone().into();
             v.resize(16, 1);
-            Some(v)
+            Some(CachedData::Serialized(Arc::new(v)))
+        } else {
+            None
+        }
+    }
+
+    fn read(self) -> Option<CachedData> {
+        if self.1 {
+            let mut v: Vec<u8> = self.0.clone().into();
+            v.resize(16, 1);
+            Some(CachedData::Serialized(Arc::new(v)))
         } else {
             None
         }
@@ -383,7 +390,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Debug + Send + Sync + Debug + Clone + Readable + 'static,
 {
     type Key = K;
     type Value = V;
@@ -405,7 +412,7 @@ impl<K, V> Task<K, V> {
 impl<K, V> ExecutorTask for Task<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Send + Sync + Debug + Clone + Readable + 'static,
 {
     type Argument = ();
     type Error = usize;
@@ -418,7 +425,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &impl DataCache<Key = K>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -441,7 +448,7 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    reads_result.push(view.get_state_value(k).unwrap());
+                    reads_result.push(view.get_value(k, None).unwrap());
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
@@ -461,7 +468,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
 impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Send + Sync + Debug + Clone + Readable + 'static,
 {
     type Txn = Transaction<K, V>;
 
@@ -490,7 +497,7 @@ pub enum ExpectedOutput<V> {
     DeltaFailure(usize, Vec<Vec<(Option<V>, Option<u128>)>>),
 }
 
-impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
+impl<V: Debug + Clone + PartialEq + Eq + Readable> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
     pub fn generate_baseline<K: Hash + Clone + Eq>(
         txns: &[Transaction<K, V>],

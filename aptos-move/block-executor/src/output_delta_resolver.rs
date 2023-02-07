@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::{
+    delta_change_set::{deserialize, serialize},
+    transaction::AggregatorValue,
+};
 use aptos_mvhashmap::{EntryCell, MVHashMap};
 use aptos_state_view::TStateView;
-use aptos_types::write_set::{TransactionWrite, WriteOp};
+use aptos_types::write_set::WriteOp;
 
 pub(crate) struct OutputDeltaResolver<T: Transaction> {
-    versioned_outputs: MVHashMap<T::Key, T::Value>,
+    versioned_outputs: MVHashMap<T::Key, T::ReadValue>,
 }
 
 impl<T: Transaction> OutputDeltaResolver<T> {
-    pub fn new(versioned_outputs: MVHashMap<T::Key, T::Value>) -> Self {
+    pub fn new(versioned_outputs: MVHashMap<T::Key, T::ReadValue>) -> Self {
         Self { versioned_outputs }
     }
 
@@ -40,7 +43,7 @@ impl<T: Transaction> OutputDeltaResolver<T> {
             for (idx, entry) in indexed_entries.iter() {
                 match &entry.cell {
                     EntryCell::Write(_, data) => {
-                        latest_value = data.extract_raw_bytes().map(|bytes| deserialize(&bytes))
+                        latest_value = AggregatorValue::from_write(data).map(AggregatorValue::into);
                     },
                     EntryCell::Delta(delta) => {
                         // Apply to the latest value and store in outputs.
