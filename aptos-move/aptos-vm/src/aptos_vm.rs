@@ -1072,7 +1072,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl StateView + Sync + Clone),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(

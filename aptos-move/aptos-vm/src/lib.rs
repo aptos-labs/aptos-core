@@ -150,6 +150,6 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl StateView + Sync + Clone),
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }

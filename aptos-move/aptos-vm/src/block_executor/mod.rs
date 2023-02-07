@@ -82,7 +82,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    pub fn execute_block<S: StateView + Sync>(
+    pub fn execute_block<S: StateView + Sync + Clone>(
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,

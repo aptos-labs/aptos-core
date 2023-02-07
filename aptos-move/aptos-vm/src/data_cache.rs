@@ -202,6 +202,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
+#[derive(Clone)]
 pub struct StorageAdapterOwned<S> {
     state_view: S,
 }

@@ -42,7 +42,7 @@ use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
-#[derive(Clone)]
+// #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
@@ -52,6 +52,20 @@ pub struct AptosVMImpl {
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     features: Features,
+}
+
+impl Clone for AptosVMImpl {
+    fn clone(&self) -> Self {
+        Self {
+            move_vm: Arc::new(self.move_vm.as_ref().clone()),
+            gas_feature_version: self.gas_feature_version,
+            gas_params: self.gas_params.clone(),
+            storage_gas_params: self.storage_gas_params.clone(),
+            version: self.version.clone(),
+            transaction_validation: self.transaction_validation.clone(),
+            features: self.features.clone(),
+        }
+    }
 }
 
 impl AptosVMImpl {

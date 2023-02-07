@@ -187,7 +187,7 @@ where
 
     fn work_task_with_scope(
         &self,
-        executor_arguments: &E::Argument,
+        executor: E,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         versioned_data_cache: &MVHashMap<T::Key, T::Value>,
@@ -197,7 +197,7 @@ where
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        // let executor = E::init(*executor_arguments);
         drop(init_timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
@@ -263,12 +263,13 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
+        let executor = E::init(executor_initial_arguments);
 
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
                     self.work_task_with_scope(
-                        &executor_initial_arguments,
+                        executor.clone(),
                         signature_verified_block,
                         &last_input_output,
                         &versioned_data_cache,

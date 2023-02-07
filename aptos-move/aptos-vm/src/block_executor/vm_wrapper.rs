@@ -18,12 +18,13 @@ use move_core_types::{
     vm_status::VMStatus,
 };
 
+#[derive(Clone)]
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
     base_view: &'a S,
 }
 
-impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
+impl<'a, S: 'a + StateView + Sync + Clone> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
