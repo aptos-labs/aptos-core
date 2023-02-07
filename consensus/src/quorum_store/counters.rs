@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec, HistogramVec,
+    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
+    register_int_counter, HistogramVec, IntCounter,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -41,4 +42,22 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
+});
+
+/// Count of the expired batch fragments at the receiver side.
+pub static EXPIRED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_expired_batch_fragments_count",
+        "Count of the expired batch fragments at the receiver side."
+    )
+    .unwrap()
+});
+
+/// Count of the missed batch fragments at the receiver side.
+pub static MISSED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_missed_batch_fragments_count",
+        "Count of the missed batch fragments at the receiver side."
+    )
+    .unwrap()
 });

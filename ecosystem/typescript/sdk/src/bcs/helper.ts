@@ -20,7 +20,7 @@ export function serializeVector<T extends Serializable>(value: Seq<T>, serialize
 }
 
 /**
- * Serializes a vector with specified item serializaiton function.
+ * Serializes a vector with specified item serialization function.
  * Very dynamic function and bypasses static typechecking.
  */
 export function serializeVectorWithFunc(value: any[], func: string): Bytes {

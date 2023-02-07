@@ -560,7 +560,7 @@ mod tests {
         let state_view = FakeView::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            delta_op.try_into_write_op(&state_view, &*KEY),
+            delta_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::Error(StatusCode::STORAGE_ERROR))
         );
     }
@@ -574,10 +574,10 @@ mod tests {
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result = add_op.try_into_write_op(&state_view, &*KEY);
+        let add_result = add_op.try_into_write_op(&state_view, &KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
 
-        let sub_result = sub_op.try_into_write_op(&state_view, &*KEY);
+        let sub_result = sub_op.try_into_write_op(&state_view, &KEY);
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
     }
 
@@ -591,11 +591,11 @@ mod tests {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            add_op.try_into_write_op(&state_view, &*KEY),
+            add_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
-            sub_op.try_into_write_op(&state_view, &*KEY),
+            sub_op.try_into_write_op(&state_view, &KEY),
             Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }

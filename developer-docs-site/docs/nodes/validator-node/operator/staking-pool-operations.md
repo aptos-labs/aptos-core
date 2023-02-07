@@ -11,6 +11,10 @@ This document describes how to perform staking pool operations. Note that you ca
 The current required minimum for staking is 1M APT tokens.
 :::
 
+## Connect to Aptos network
+
+[Connect to the Aptos](./connect-to-aptos-network.md) and start your node has with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
+
 ## Initializing the stake pool
 
 Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.
@@ -208,6 +212,18 @@ aptos stake request-commission \
   --owner-address 0xe7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb \
   --profile mainnet-operator
 ```
+
+If you run the `aptos stake request-commission` command before the end of the the lockup expiration, the command will initiate unlock for any locked commission earned up until that moment in time.
+
+See example below:
+
+Month 1 Day 29, you call the command, it would initiate unlock for 29 days worth of commission.
+
+Month 2, Day 29, if you call the command again, it would disburse the fully unlocked commission from previous month (29 days worth), and initiate commission unlock for Month 1 Day 30 + Month 2 Day 1-29 (30 days worth).
+
+Month 3, Day 29, if you call the commission again, 30 days of commission would be disbursed, and the a new batch of commission would initiate unlock.
+
+You can call the command multiple times, and the amount you receive depends on the day when you requested commission unlock previously.
 
 ## Frequently used staking operations commands
 

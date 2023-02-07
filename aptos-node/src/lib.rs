@@ -14,7 +14,6 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use crate::network::ApplicationNetworkHandle;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_config::config::{NodeConfig, PersistableConfig};
@@ -134,7 +133,7 @@ impl AptosNodeArgs {
 /// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
-    _backup_runtime: Runtime,
+    _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
@@ -154,6 +153,9 @@ pub fn start(
 
     // Create global rayon thread pool
     utils::create_global_rayon_pool(create_global_rayon_pool);
+
+    // Initialize the global aptos-node-identity
+    aptos_node_identity::init(config.peer_id())?;
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
@@ -198,7 +200,7 @@ pub fn setup_test_environment_and_start_node<R>(
     rng: R,
 ) -> anyhow::Result<()>
 where
-    R: ::rand::RngCore + ::rand::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     // If there wasn't a test directory specified, create a temporary one
     let test_dir =
@@ -235,13 +237,13 @@ where
 
         // Write the mint key to disk
         let serialized_keys = bcs::to_bytes(&root_key)?;
-        let mut key_file = std::fs::File::create(&aptos_root_key_path)?;
+        let mut key_file = fs::File::create(&aptos_root_key_path)?;
         key_file.write_all(&serialized_keys)?;
 
         // Build a waypoint file so that clients / docker can grab it easily
         let waypoint_file_path = test_dir.join("waypoint.txt");
         Write::write_all(
-            &mut fs::File::create(&waypoint_file_path)?,
+            &mut fs::File::create(waypoint_file_path)?,
             genesis_waypoint.to_string().as_bytes(),
         )?;
 
@@ -356,8 +358,13 @@ pub fn setup_environment_and_start_node(
     // Set the Aptos VM configurations
     utils::set_aptos_vm_configurations(&node_config);
 
-    // Start the telemetry service (as early as possible and before any blocking calls)
+    // Obtain the chain_id from the DB
     let chain_id = utils::fetch_chain_id(&db_rw)?;
+
+    // Set the chain_id in global AptosNodeIdentity
+    aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
         &node_config,
         remote_log_rx,
@@ -375,12 +382,10 @@ pub fn setup_environment_and_start_node(
     // Set up the networks and gather the application network handles
     let (
         network_runtimes,
-        peer_metadata_storage,
-        mempool_network_handles,
-        consensus_network_handle,
-        storage_service_server_network_handles,
-        storage_client_network_senders,
-    ) = network::setup_networks_and_get_handles(
+        consensus_network_interfaces,
+        mempool_network_interfaces,
+        storage_service_network_interfaces,
+    ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
         &mut event_subscription_service,
@@ -390,9 +395,7 @@ pub fn setup_environment_and_start_node(
     let (state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
-            storage_service_server_network_handles,
-            storage_client_network_senders,
-            peer_metadata_storage.clone(),
+            storage_service_network_interfaces,
             genesis_waypoint,
             event_subscription_service,
             db_rw.clone(),
@@ -408,14 +411,13 @@ pub fn setup_environment_and_start_node(
             &mut node_config,
             &db_rw,
             mempool_reconfig_subscription,
-            &peer_metadata_storage,
-            mempool_network_handles,
+            mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
         );
 
     // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_handle.map(|application_network_handle| {
+    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
         debug!("Waiting until state sync is initialized!");
         state_sync_runtimes.block_until_initialized();
@@ -426,8 +428,7 @@ pub fn setup_environment_and_start_node(
             &mut node_config,
             db_rw,
             consensus_reconfig_subscription,
-            peer_metadata_storage,
-            application_network_handle,
+            consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
         )

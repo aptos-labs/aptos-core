@@ -1,12 +1,12 @@
 ---
-title: "Prepare Aptos Dev Environment"
+title: "Prepare Your Environment"
 slug: "getting-started"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Prepare Aptos Dev Environment
+# Prepare your Aptos Dev Environment
 
 To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-Aptos-core-repo).
 
@@ -79,7 +79,7 @@ As described in [Workflows](#workflows), you may interact with Aptos using only 
     cd aptos-core
     ```
    
-1. Set up build dependencies -
+## Set up build dependencies
 
    Prepare your developer environment by installing the dependencies needed to build, test and inspect Aptos Core.
    No matter your selected mechanism for installing these dependencies, **it is imperative you keep your entire toolchain up-to-date**. If you encounter issues later, update all packages and try again.
@@ -150,9 +150,11 @@ Windows.  All dependencies must be manually installed.
 
 </details>
 
-5. Optionally, check out a release branch to install an Aptos node:
+## Check out release branch
 
-    We suggest you checkout `devnet` for your first development.
+Optionally, check out a release branch to install an Aptos node:
+
+    We suggest you check out `devnet` for your first development.
 
     <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
@@ -182,6 +184,10 @@ Windows.  All dependencies must be manually installed.
     </Tabs>
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
+
+## Create and fund test accounts
+
+Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`).
 
 ## Understand the Aptos Token Standard
 

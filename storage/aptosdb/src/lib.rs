@@ -9,6 +9,8 @@
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 // Used in this and other crates for testing.
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
@@ -35,11 +37,15 @@ mod aptosdb_test;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::buffered_state::BufferedState;
+
+#[cfg(feature = "db-debugger")]
+pub mod db_debugger;
+
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_options::{
-        gen_ledger_cfds, gen_state_merkle_cfds, ledger_db_column_families,
-        state_merkle_db_column_families,
+        gen_kv_cfds, gen_ledger_cfds, gen_state_merkle_cfds, kv_db_column_families,
+        ledger_db_column_families, state_merkle_db_column_families,
     },
     errors::AptosDbError,
     event_store::EventStore,
@@ -79,14 +85,15 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
-    contract_event::EventWithVersion,
+    contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
-        TransactionAccumulatorSummary, TransactionInfoListWithProof,
+        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
+        TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
@@ -101,6 +108,7 @@ use aptos_types::{
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
         TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use itertools::zip_eq;
@@ -108,6 +116,7 @@ use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
+    fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
     sync::{mpsc, Arc},
@@ -118,6 +127,7 @@ use std::{
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
+pub const KV_DB_NAME: &str = "kv_db";
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -237,10 +247,10 @@ impl Drop for RocksdbPropertyReporter {
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
-#[derive(Debug)]
 pub struct AptosDB {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
+    _kv_db: Arc<Option<DB>>,
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
@@ -255,6 +265,7 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
+        kv_rocksdb: Option<DB>,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
@@ -262,6 +273,7 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
+        let arc_kv_rocksdb = Arc::new(kv_rocksdb);
         let state_pruner = StatePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
@@ -288,6 +300,7 @@ impl AptosDB {
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
+            _kv_db: Arc::clone(&arc_kv_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_store,
@@ -318,9 +331,10 @@ impl AptosDB {
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let kv_db_path = db_root_path.as_ref().join(KV_DB_NAME);
         let instant = Instant::now();
 
-        let (ledger_db, state_merkle_db) = if readonly {
+        let (ledger_db, state_merkle_db, kv_db) = if readonly {
             (
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
@@ -334,6 +348,16 @@ impl AptosDB {
                     STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
                 )?,
+                if rocksdb_configs.use_kv_db {
+                    Some(DB::open_cf_readonly(
+                        &gen_rocksdb_options(&rocksdb_configs.kv_db_config, true),
+                        kv_db_path.clone(),
+                        KV_DB_NAME,
+                        kv_db_column_families(),
+                    )?)
+                } else {
+                    None
+                },
             )
         } else {
             (
@@ -349,12 +373,23 @@ impl AptosDB {
                     STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
+                if rocksdb_configs.use_kv_db {
+                    Some(DB::open_cf(
+                        &gen_rocksdb_options(&rocksdb_configs.kv_db_config, false),
+                        kv_db_path.clone(),
+                        KV_DB_NAME,
+                        gen_kv_cfds(&rocksdb_configs.kv_db_config),
+                    )?)
+                } else {
+                    None
+                },
             )
         };
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
             state_merkle_db,
+            kv_db,
             pruner_config,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
@@ -365,6 +400,9 @@ impl AptosDB {
             myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
         }
 
+        if rocksdb_configs.use_kv_db {
+            info!(kv_db_path = kv_db_path, "Opened K/V DB.",);
+        }
         info!(
             ledger_db_path = ledger_db_path,
             state_merkle_db_path = state_merkle_db_path,
@@ -427,6 +465,8 @@ impl AptosDB {
         let state_merkle_db_primary_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let kv_db_primary_path = db_root_path.as_ref().join(KV_DB_NAME);
+        let kv_db_secondary_path = secondary_db_root_path.as_ref().join(KV_DB_NAME);
 
         // Secondary needs `max_open_files = -1` per
         // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
@@ -448,6 +488,17 @@ impl AptosDB {
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
             )?,
+            if rocksdb_configs.use_kv_db {
+                Some(DB::open_cf_as_secondary(
+                    &gen_rocksdb_options(&rocksdb_configs.kv_db_config, false),
+                    kv_db_primary_path,
+                    kv_db_secondary_path,
+                    "kv_db_sec",
+                    kv_db_column_families(),
+                )?)
+            } else {
+                None
+            },
             NO_OP_STORAGE_PRUNER_CONFIG,
             BUFFERED_STATE_TARGET_ITEMS,
             0,
@@ -648,17 +699,40 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
         let start = Instant::now();
-        let ledger_db_path = path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = path.as_ref().join(STATE_MERKLE_DB_NAME);
-        std::fs::remove_dir_all(&ledger_db_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_merkle_db_path).unwrap_or(());
-        self.ledger_db.create_checkpoint(&ledger_db_path)?;
-        self.state_merkle_db
-            .create_checkpoint(&state_merkle_db_path)?;
+        let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
+        let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
+        let state_merkle_db_path = db_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_merkle_cp_path = cp_path.as_ref().join(STATE_MERKLE_DB_NAME);
+
+        std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
+        std::fs::remove_dir_all(&state_merkle_cp_path).unwrap_or(());
+
+        // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
+        // https://github.com/facebook/rocksdb/issues/11167
+        {
+            let ledger_db = aptos_schemadb::DB::open(
+                ledger_db_path,
+                LEDGER_DB_NAME,
+                ledger_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            ledger_db.create_checkpoint(ledger_cp_path)?;
+        }
+        {
+            let state_merkle_db = aptos_schemadb::DB::open(
+                state_merkle_db_path,
+                STATE_MERKLE_DB_NAME,
+                state_merkle_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            state_merkle_db.create_checkpoint(state_merkle_cp_path)?;
+        }
+
         info!(
-            path = path.as_ref(),
+            db_path = db_path.as_ref(),
+            cp_path = cp_path.as_ref(),
             time_ms = %start.elapsed().as_millis(),
             "Made AptosDB checkpoint."
         );
@@ -1156,6 +1230,90 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_transaction_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Transaction>> + '_>> {
+        gauged_api("get_transaction_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .transaction_store
+                .get_transaction_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
+        })
+    }
+
+    fn get_transaction_info_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>> {
+        gauged_api("get_transaction_info_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .ledger_store
+                .get_transaction_info_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>)
+        })
+    }
+
+    fn get_events_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_>> {
+        gauged_api("get_events_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .event_store
+                .get_events_by_version_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter)
+                as Box<
+                    dyn Iterator<Item = Result<Vec<ContractEvent>>> + '_,
+                >)
+        })
+    }
+
+    fn get_write_set_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>> {
+        gauged_api("get_write_set_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .transaction_store
+                .get_write_set_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<WriteSet>> + '_>)
+        })
+    }
+
+    fn get_transaction_accumulator_range_proof(
+        &self,
+        first_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<TransactionAccumulatorRangeProof> {
+        gauged_api("get_transaction_accumulator_range_proof", || {
+            self.error_if_ledger_pruned("Transaction", first_version)?;
+
+            self.ledger_store.get_transaction_range_proof(
+                Some(first_version),
+                limit,
+                ledger_version,
+            )
+        })
+    }
+
     /// Gets ledger info at specified version and ensures it's an epoch ending.
     fn get_epoch_ending_ledger_info(&self, version: u64) -> Result<LedgerInfoWithSignatures> {
         gauged_api("get_epoch_ending_ledger_info", || {
@@ -1546,6 +1704,16 @@ impl DbWriter for AptosDB {
                     new_root_hash,
                     expected_root_hash,
                 );
+                let current_epoch = self
+                    .ledger_store
+                    .get_latest_ledger_info_option()
+                    .map_or(0, |li| li.ledger_info().next_block_epoch());
+                ensure!(
+                    x.ledger_info().epoch() == current_epoch,
+                    "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                    x.ledger_info().epoch(),
+                    current_epoch,
+                );
 
                 self.ledger_store.put_ledger_info(x, &batch)?;
             }
@@ -1800,7 +1968,7 @@ impl GetRestoreHandler for Arc<AptosDB> {
     }
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub(crate) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
@@ -1824,4 +1992,10 @@ where
         .observe(timer.elapsed().as_secs_f64());
 
     res
+}
+
+impl Debug for AptosDB {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("{AptosDB}")
+    }
 }

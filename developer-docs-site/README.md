@@ -9,6 +9,9 @@
 
 This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally to test your contribution.
 
+[![Check GitHub Links](https://github.com/aptos-labs/aptos-core/actions/workflows/links.yml/badge.svg)](https://github.com/org/repo/actions/workflows/links.yml)
+
+
 ## Installation
 
 **IMPORTANT**: These installation steps apply to macOS environment.
@@ -88,3 +91,13 @@ Fix formatting issues by running:
 ```
 pnpm fmt
 ```
+
+## Re-generate contributors
+
+The src/contributors.json file (which powers the list of Authors at the bottom of doc pages) needs to be manually generated. Run the following command:
+
+```
+pnpm contributors
+```
+
+And then create a PR with the updated src/contributors.json.

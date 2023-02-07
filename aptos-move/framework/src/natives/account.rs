@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::natives::create_signer;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -51,45 +52,13 @@ pub fn make_native_create_address(gas_params: CreateAddressGasParameters) -> Nat
 }
 
 /***************************************************************************************************
- * native fun create_signer
- *
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct CreateSignerGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_create_signer(
-    gas_params: &CreateSignerGasParameters,
-    _context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.is_empty());
-    debug_assert!(arguments.len() == 1);
-
-    let address = pop_arg!(arguments, AccountAddress);
-    Ok(NativeResult::ok(gas_params.base, smallvec![Value::signer(
-        address
-    )]))
-}
-
-pub fn make_native_create_signer(gas_params: CreateSignerGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| {
-        native_create_signer(&gas_params, context, ty_args, args)
-    })
-}
-
-/***************************************************************************************************
  * module
  *
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub create_address: CreateAddressGasParameters,
-    pub create_signer: CreateSignerGasParameters,
+    pub create_signer: create_signer::CreateSignerGasParameters,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -98,9 +67,11 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             "create_address",
             make_native_create_address(gas_params.create_address),
         ),
+        // Despite that this is no longer present in account.move, we must keep this around for
+        // replays.
         (
             "create_signer",
-            make_native_create_signer(gas_params.create_signer),
+            create_signer::make_native_create_signer(gas_params.create_signer),
         ),
     ];
 

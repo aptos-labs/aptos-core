@@ -16,6 +16,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/aptos-vm-profiling",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -50,6 +51,7 @@ members = [
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
     "crates/aptos-network-checker",
+    "crates/aptos-node-identity",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
     "crates/aptos-rate-limiter",
@@ -57,6 +59,7 @@ members = [
     "crates/aptos-retrier",
     "crates/aptos-rosetta",
     "crates/aptos-rosetta-cli",
+    "crates/aptos-runtimes",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
@@ -123,6 +126,7 @@ members = [
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",
+    "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
     "types",
@@ -228,6 +232,7 @@ aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
+aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
@@ -244,6 +249,7 @@ aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
 aptos-rosetta = { path = "crates/aptos-rosetta" }
+aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
@@ -334,6 +340,9 @@ futures-channel = "= 0.3.24"
 futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
+git2 = "0.16.1"
+git-version = "0.3.5"
+glob = "0.3.0"
 goldenfile = "1.1.0"
 handlebars = "4.2.2"
 heck = "0.3.2"
@@ -365,10 +374,12 @@ mirai-annotations = "1.12.0"
 mockall = "0.11.0"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
+ntest = "0.9.0"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+owo-colors = "3.5.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
 pbjson = "0.4.0"
@@ -395,8 +406,8 @@ rand_core = "0.5.1"
 rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
-reqwest-middleware = "0.1.6"
-reqwest-retry = "0.1.5"
+reqwest-middleware = "0.2.0"
+reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.19.0", features = ["lz4"] }
@@ -451,34 +462,34 @@ x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-cli = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-compiler ={ git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["address32"] }
-move-docgen = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-model = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-package = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-prover = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-symbol-pool = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["table-extension"] }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-read-write-set = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
-read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "81d19fce20d73675b7ac129abe6b6797513cc8d0" }
+move-abigen = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-cli = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-compiler ={ git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62", features = ["address32"] }
+move-docgen = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-model = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-package = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-prover = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-symbol-pool = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62", features = ["table-extension"] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62", features = ["table-extension"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+read-write-set = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
+read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "b860816481ab5e7be077c531f0d57fae3567fc62" }
 # END MOVE DEPENDENCIES
 
 [profile.release]

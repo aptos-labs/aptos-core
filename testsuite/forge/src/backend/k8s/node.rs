@@ -187,7 +187,7 @@ impl Node for K8sNode {
         info!("{:?}", delete_storage_paths);
         let cleanup_output = Command::new(KUBECTL_BIN)
             .stdout(Stdio::inherit())
-            .args(&delete_storage_paths)
+            .args(delete_storage_paths)
             .output()
             .expect("failed to clear node storage");
         assert!(

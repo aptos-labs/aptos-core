@@ -19,11 +19,12 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, GasScheduleV2},
     state_store::state_key::StateKey,
     transaction::{
-        EntryFunction, SignedTransaction, TransactionOutput, TransactionPayload, TransactionStatus,
+        EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
+        TransactionPayload, TransactionStatus,
     },
 };
 use move_core_types::{
-    language_storage::{ResourceKey, StructTag, TypeTag},
+    language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
     value::MoveValue,
 };
@@ -120,9 +121,9 @@ impl MoveHarness {
         let privkey = Ed25519PrivateKey::generate(&mut rng);
         let pubkey = privkey.public_key();
         let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 10);
+        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 0);
         self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), 10);
+        self.txn_seq_no.insert(*acc.address(), 0);
         data.account().clone()
     }
 
@@ -247,6 +248,19 @@ impl MoveHarness {
         )
     }
 
+    pub fn create_script(
+        &mut self,
+        account: &Account,
+        code: Vec<u8>,
+        ty_args: Vec<TypeTag>,
+        args: Vec<TransactionArgument>,
+    ) -> SignedTransaction {
+        self.create_transaction_payload(
+            account,
+            TransactionPayload::Script(Script::new(code, ty_args, args)),
+        )
+    }
+
     /// Run the specified entry point `fun`. Arguments need to be provided in bcs-serialized form.
     pub fn run_entry_function(
         &mut self,
@@ -342,6 +356,19 @@ impl MoveHarness {
             .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
+    // Executes the block of transactions inserting metadata at the start of the
+    // block. Returns a vector of transaction statuses and the gas they used.
+    pub fn run_block_with_metadata(
+        &mut self,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<(TransactionStatus, u64)> {
+        self.fast_forward(1);
+        self.executor
+            .run_block_with_metadata(proposer, failed_proposer_indices, txns)
+    }
+
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
         self.executor.read_state_value(state_key).and_then(|bytes| {
             if bytes.is_empty() {
@@ -358,7 +385,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path = AccessPath::resource_access_path(ResourceKey::new(*addr, struct_tag));
+        let path = AccessPath::resource_access_path(*addr, struct_tag);
         self.read_state_value(&StateKey::AccessPath(path))
     }
 
@@ -375,6 +402,30 @@ impl MoveHarness {
         )
     }
 
+    pub fn read_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
+        self.read_state_value(&StateKey::AccessPath(path))
+            .map(|data| bcs::from_bytes(&data).unwrap())
+    }
+
+    pub fn read_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        if let Some(group) = self.read_resource_group(addr, resource_group) {
+            if let Some(data) = group.get(&struct_tag) {
+                return Some(bcs::from_bytes::<T>(data).unwrap());
+            }
+        }
+        None
+    }
+
     /// Checks whether resource exists.
     pub fn exists_resource(&self, addr: &AccountAddress, struct_tag: StructTag) -> bool {
         self.read_resource_raw(addr, struct_tag).is_some()
@@ -387,7 +438,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag));
+        let path = AccessPath::resource_access_path(addr, struct_tag);
         let state_key = StateKey::AccessPath(path);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
@@ -445,6 +496,12 @@ impl MoveHarness {
         self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
             .unwrap()
             .sequence_number()
+    }
+}
+
+impl Default for MoveHarness {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

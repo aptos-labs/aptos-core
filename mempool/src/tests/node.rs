@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::{MempoolNetworkEvents, MempoolSyncMsg},
+    network::MempoolSyncMsg,
     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
@@ -17,12 +17,18 @@ use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListen
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::storage::PeerMetadataStorage,
+    application::{
+        interface::{NetworkClient, NetworkServiceEvents},
+        storage::PeersAndMetadata,
+    },
     peer_manager::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+    protocols::{
+        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::ProtocolId::MempoolDirectSend,
+    },
     transport::ConnectionMetadata,
     ProtocolId,
 };
@@ -41,7 +47,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 type MempoolNetworkHandle = (
     NetworkId,
@@ -320,7 +326,7 @@ pub struct Node {
     /// Subscriber for mempool events
     subscriber: UnboundedReceiver<SharedMempoolNotification>,
     /// Global peer connection data
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 /// Reimplement `NodeInfoTrait` for simplicity
@@ -345,10 +351,10 @@ impl NodeInfoTrait for Node {
 impl Node {
     /// Sets up a single node by starting up mempool and any network handles
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
-        let (network_interfaces, network_handles, peer_metadata_storage) =
+        let (network_interfaces, network_client, network_service_events, peers_and_metadata) =
             setup_node_network_interfaces(&node);
         let (mempool, runtime, subscriber) =
-            start_node_mempool(config, network_handles, peer_metadata_storage.clone());
+            start_node_mempool(config, network_client, network_service_events);
 
         Node {
             node_info: node,
@@ -356,7 +362,7 @@ impl Node {
             network_interfaces,
             runtime: Arc::new(runtime),
             subscriber,
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -382,19 +388,23 @@ impl Node {
     /// Notifies the `Node` of a `new_peer`
     pub fn send_new_peer_event(
         &mut self,
-        new_peer: PeerNetworkId,
+        peer_network_id: PeerNetworkId,
         peer_role: PeerRole,
         origin: ConnectionOrigin,
     ) {
-        let mut metadata =
-            ConnectionMetadata::mock_with_role_and_origin(new_peer.peer_id(), peer_role, origin);
+        let mut metadata = ConnectionMetadata::mock_with_role_and_origin(
+            peer_network_id.peer_id(),
+            peer_role,
+            origin,
+        );
         metadata
             .application_protocols
             .insert(ProtocolId::MempoolDirectSend);
         let notif = ConnectionNotification::NewPeer(metadata.clone(), NetworkContext::mock());
-        self.peer_metadata_storage
-            .insert_connection(new_peer.network_id(), metadata);
-        self.send_connection_event(new_peer.network_id(), notif);
+        self.peers_and_metadata
+            .insert_connection_metadata(peer_network_id, metadata)
+            .unwrap();
+        self.send_connection_event(peer_network_id.network_id(), notif);
     }
 
     /// Sends a connection event, and waits for the notification to arrive
@@ -507,25 +517,42 @@ fn setup_node_network_interfaces(
     node: &NodeInfo,
 ) -> (
     HashMap<NetworkId, NodeNetworkInterface>,
-    Vec<MempoolNetworkHandle>,
-    Arc<PeerMetadataStorage>,
+    NetworkClient<MempoolSyncMsg>,
+    NetworkServiceEvents<MempoolSyncMsg>,
+    Arc<PeersAndMetadata>,
 ) {
-    let mut network_handles = vec![];
-    let mut network_interfaces = HashMap::new();
-    for network in node.supported_networks() {
-        let (network_interface, network_handle) =
-            setup_node_network_interface(PeerNetworkId::new(network, node.peer_id(network)));
+    // Create the peers and metadata
+    let network_ids = node.supported_networks();
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
-        network_handles.push(network_handle);
-        network_interfaces.insert(network, network_interface);
+    // Create the network interfaces
+    let mut network_senders = HashMap::new();
+    let mut network_and_events = HashMap::new();
+    let mut network_interfaces = HashMap::new();
+    for network_id in network_ids {
+        let (network_interface, network_handle) =
+            setup_node_network_interface(PeerNetworkId::new(network_id, node.peer_id(network_id)));
+
+        network_senders.insert(network_id, network_handle.1);
+        network_and_events.insert(network_id, network_handle.2);
+        network_interfaces.insert(network_id, network_interface);
     }
 
-    let network_ids: Vec<_> = network_handles
-        .iter()
-        .map(|(network_id, _, _)| *network_id)
-        .collect();
-    let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
-    (network_interfaces, network_handles, peer_metadata_storage)
+    // Create the client and service events
+    let network_client = NetworkClient::new(
+        vec![MempoolDirectSend],
+        vec![],
+        network_senders,
+        peers_and_metadata.clone(),
+    );
+    let network_service_events = NetworkServiceEvents::new(network_and_events);
+
+    (
+        network_interfaces,
+        network_client,
+        network_service_events,
+        peers_and_metadata,
+    )
 }
 
 /// Builds a single network interface with associated queues, and attaches it to the top level network
@@ -543,7 +570,7 @@ fn setup_node_network_interface(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = MempoolNetworkEvents::new(network_notifs_rx, conn_status_rx);
+    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx);
 
     (
         NodeNetworkInterface {
@@ -558,8 +585,8 @@ fn setup_node_network_interface(
 /// Starts up the mempool resources for a single node
 fn start_node_mempool(
     config: NodeConfig,
-    network_handles: Vec<MempoolNetworkHandle>,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    network_client: NetworkClient<MempoolSyncMsg>,
+    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
 ) -> (
     Arc<Mutex<CoreMempool>>,
     Runtime,
@@ -581,17 +608,14 @@ fn start_node_mempool(
             on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
         })
         .unwrap();
-    let runtime = Builder::new_multi_thread()
-        .thread_name("shared-mem")
-        .disable_lifo_slot()
-        .enable_all()
-        .build()
-        .expect("[shared mempool] failed to create runtime");
+
+    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
         &config,
         Arc::clone(&mempool),
-        network_handles,
+        network_client,
+        network_service_events,
         ac_endpoint_receiver,
         quorum_store_receiver,
         mempool_listener,
@@ -599,7 +623,6 @@ fn start_node_mempool(
         Arc::new(MockDbReaderWriter),
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
-        peer_metadata_storage,
     );
 
     (mempool, runtime, subscriber)

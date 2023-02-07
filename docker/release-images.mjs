@@ -31,9 +31,18 @@ const Features = {
   Default: "default",
   Indexer: "indexer",
 };
-
+const TESTING_IMAGES = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
   validator: {
+    performance: [
+      Features.Default,
+    ],
+    release: [
+      Features.Default,
+      Features.Indexer,
+    ],
+  },
+  "validator-testing": {
     performance: [
       Features.Default,
     ],
@@ -113,11 +122,21 @@ if (process.env.CI === "true") {
   crane = "crane";
 }
 
+const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
+const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
+const DOCKERHUB = "docker.io/aptoslabs";
+
 const TARGET_REGISTRIES = [
-  parsedArgs.GCP_DOCKER_ARTIFACT_REPO,
-  "docker.io/aptoslabs",
-  `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`,
+  GCP_ARTIFACT_REPO,
+  DOCKERHUB,
+  AWS_ECR,
 ];
+
+const INTERNAL_TARGET_REGISTRIES = [
+  GCP_ARTIFACT_REPO,
+  AWS_ECR,
+];
+
 
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
@@ -128,8 +147,9 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
     const profilePrefix = profile === "release" ? "" : profile;
     for (const feature of features) {
       const featureSuffix = feature === Features.Default ? "" : feature;
+      const targetRegistries = TESTING_IMAGES.includes(image) ? INTERNAL_TARGET_REGISTRIES : TARGET_REGISTRIES;
 
-      for (const targetRegistry of TARGET_REGISTRIES) {
+      for (const targetRegistry of targetRegistries) {
         const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
           profilePrefix,
           featureSuffix,

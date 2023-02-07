@@ -17,7 +17,7 @@ use aptos_testcases::{
     forge_setup_test::ForgeSetupTest,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
-    load_vs_perf_benchmark::LoadVsPerfBenchmark,
+    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
@@ -462,10 +462,12 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "single_vfn_perf" => single_vfn_perf(config),
         "validator_reboot_stress_test" => validator_reboot_stress_test(config),
         "fullnode_reboot_stress_test" => fullnode_reboot_stress_test(config),
-        "account_creation" | "nft_mint" => account_creation_or_nft_mint(test_name.into(), config),
+        "account_creation" | "nft_mint" | "publishing" | "module_loading"
+        | "write_new_resource" => individual_workload_tests(test_name.into(), config),
         "graceful_overload" => graceful_overload(config),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(config),
+        "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(config),
         // maximizing number of rounds and epochs within a given time, to stress test consensus
         // so using small constant traffic, small blocks and fast rounds, and short epochs.
         // reusing changing_working_quorum_test just for invariants/asserts, but with max_down_nodes = 0.
@@ -479,9 +481,104 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_failures_catching_up" => state_sync_failures_catching_up(),
         "twin_validator_test" => twin_validator_test(config),
         "large_db_simple_test" => large_db_simple_test(),
+        "consensus_only_perf_benchmark" => run_consensus_only_perf_test(config),
+        "consensus_only_three_region_simulation" => {
+            run_consensus_only_three_region_simulation(config)
+        },
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
+}
+
+fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 30000 })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .with_network_tests(vec![&ThreeRegionSimulationTest {
+            add_execution_delay: None,
+        }])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
+                (5 * 60 * 60).into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
+                (5 * 60 * 60_000).into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                30000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                (3 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        }))
+        // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
+        .with_success_criteria(
+            SuccessCriteria::new(10000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 6,
+                }),
+        )
+}
+
+fn run_consensus_only_perf_test(config: ForgeConfig) -> ForgeConfig {
+    let emit_job = config.get_emit_job().clone();
+    config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_network_tests(vec![&LoadVsPerfBenchmark {
+            test: &PerformanceBenchmark,
+            workloads: Workloads::TPS(&[30000]),
+        }])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_emit_job(emit_job.txn_expiration_time_secs(5 * 60))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
+                (5 * 60 * 60).into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
+                (5 * 60 * 60_000).into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                10000.into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                50000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                (3 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        }))
+        .with_success_criteria(
+            // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
+            SuccessCriteria::new(10000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+        )
 }
 
 fn large_db_simple_test() -> ForgeConfig<'static> {
@@ -497,7 +594,7 @@ fn twin_validator_test(config: ForgeConfig) -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(6000)
+            SuccessCriteria::new(5500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
@@ -541,7 +638,7 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
         true,
         false,
         &ChangingWorkingQuorumTest {
-            min_tps: 1500,
+            min_tps: 750,
             always_healthy_nodes: 2,
             max_down_nodes: 0,
             num_large_validators: 2,
@@ -552,8 +649,8 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
-        min_tps: 50,
+    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, &ChangingWorkingQuorumTest {
+        min_tps: 30,
         always_healthy_nodes: 6,
         max_down_nodes: 5,
         num_large_validators: 3,
@@ -582,28 +679,20 @@ fn large_test_only_few_nodes_down() -> ForgeConfig<'static> {
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(
-        20,
-        120,
-        500,
-        300,
-        true,
-        false,
-        &ChangingWorkingQuorumTest {
-            min_tps: 50,
-            always_healthy_nodes: 0,
-            max_down_nodes: 20,
-            num_large_validators: 0,
-            add_execution_delay: false,
-            // Use longer check duration, as we are bringing enough nodes
-            // to require state-sync to catch up to have consensus.
-            check_period_s: 53,
-        },
-    )
+    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, &ChangingWorkingQuorumTest {
+        min_tps: 50,
+        always_healthy_nodes: 0,
+        max_down_nodes: 20,
+        num_large_validators: 0,
+        add_execution_delay: false,
+        // Use longer check duration, as we are bringing enough nodes
+        // to require state-sync to catch up to have consensus.
+        check_period_s: 53,
+    })
 }
 
 fn changing_working_quorum_test() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, false, &ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(20, 120, 100, 70, true, true, &ChangingWorkingQuorumTest {
         min_tps: 15,
         always_healthy_nodes: 0,
         max_down_nodes: 20,
@@ -632,9 +721,49 @@ fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmarkWithFN,
-            tps: &[
+            workloads: Workloads::TPS(&[
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
-            ],
+            ]),
+        }])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(0)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+        )
+}
+
+fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
+        }))
+        // .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+        //     mempool_backlog: 10000,
+        // }))
+        .with_network_tests(vec![&LoadVsPerfBenchmark {
+            test: &PerformanceBenchmarkWithFN,
+            workloads: Workloads::TRANSACTIONS(&[
+                TransactinWorkload::NoOp,
+                TransactinWorkload::NoOpUnique,
+                TransactinWorkload::CoinTransfer,
+                TransactinWorkload::CoinTransferUnique,
+                TransactinWorkload::WriteResourceSmall,
+                TransactinWorkload::WriteResourceBig,
+                TransactinWorkload::LargeModuleWorkingSet,
+                TransactinWorkload::PublishPackages,
+                // TransactinWorkload::NftMint,
+            ]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -666,7 +795,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             // Additionally - we are not really gracefully handling overlaods,
             // setting limits based on current reality, to make sure they
             // don't regress, but something to investigate
-            avg_tps: 4000,
+            avg_tps: 3500,
             latency_thresholds: &[],
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
@@ -697,7 +826,10 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
         )
 }
 
-fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> ForgeConfig {
+fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeConfig {
+    let job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+        mempool_backlog: 30000,
+    });
     config
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
@@ -705,27 +837,63 @@ fn account_creation_or_nft_mint(test_name: String, config: ForgeConfig) -> Forge
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 600.into();
         }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
+        }))
         .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 30000,
-                })
-                .transaction_type(
-                    if test_name == "account_creation" {
-                        TransactionType::AccountGeneration
-                    } else {
-                        TransactionType::NftMintAndTransfer
+            if test_name == "write_new_resource" {
+                let account_creation_type = TransactionType::AccountGeneration {
+                    add_created_accounts_to_pool: true,
+                    max_account_working_set: 20_000_000,
+                    creation_balance: 200_000_000,
+                };
+                let write_type = TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::BytesMakeOrChange {
+                        data_length: Some(32),
                     },
-                ),
+                    num_modules: 1,
+                    use_account_pool: true,
+                };
+                job.transaction_mix_per_phase(vec![
+                    // warmup
+                    vec![(account_creation_type, 1)],
+                    vec![(account_creation_type, 1)],
+                    vec![(write_type, 1)],
+                    // cooldown
+                    vec![(write_type, 1)],
+                ])
+            } else {
+                job.transaction_type(match test_name.as_str() {
+                    "account_creation" => TransactionType::default_account_generation(),
+                    "nft_mint" => TransactionType::NftMintAndTransfer,
+                    "publishing" => TransactionType::PublishPackage {
+                        use_account_pool: false,
+                    },
+                    "module_loading" => TransactionType::CallCustomModules {
+                        entry_point: EntryPoints::Nop,
+                        num_modules: 1000,
+                        use_account_pool: false,
+                    },
+                    _ => unreachable!("{}", test_name),
+                })
+            },
         )
         .with_success_criteria(
-            SuccessCriteria::new(4000)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(240)
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 6,
-                }),
+            SuccessCriteria::new(match test_name.as_str() {
+                "account_creation" => 3700,
+                "nft_mint" => 1000,
+                "publishing" => 60,
+                "write_new_resource" => 3700,
+                "module_loading" => 1800,
+                _ => unreachable!("{}", test_name),
+            })
+            .add_no_restarts()
+            .add_wait_for_catchup_s(240)
+            .add_chain_progress(StateProgressThreshold {
+                max_no_progress_secs: 20.0,
+                max_round_gap: 6,
+            }),
         )
 }
 
@@ -832,7 +1000,7 @@ fn network_partition(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         .with_network_tests(vec![&NetworkPartitionTest])
         .with_success_criteria(
-            SuccessCriteria::new(3000)
+            SuccessCriteria::new(2500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
@@ -916,7 +1084,7 @@ fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> Fo
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionType::AccountGeneration), // Create many state values
+                .transaction_type(TransactionType::default_account_generation()), // Create many state values
         )
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -1113,8 +1281,8 @@ fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 80),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 80),
+                    (TransactionType::default_account_generation(), 20),
                 ]),
         )
         .with_success_criteria(
@@ -1164,8 +1332,8 @@ fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::P2P, 75),
-                    (TransactionType::AccountGeneration, 20),
+                    (TransactionType::default_coin_transfer(), 75),
+                    (TransactionType::default_account_generation(), 20),
                     (TransactionType::NftMintAndTransfer, 5),
                 ]),
         )

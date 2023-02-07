@@ -18,6 +18,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
 use proptest::{collection::vec, prelude::*, sample::Index};
+use std::fmt::Debug;
 
 prop_compose! {
     pub fn arb_state_kv_sets(
@@ -652,6 +653,64 @@ fn group_txns_by_account(
     account_to_txns
 }
 
+fn assert_items_equal<'a, T: 'a + Debug + Eq>(
+    iter: impl Iterator<Item = &'a T>,
+    db_iter_res: Result<impl Iterator<Item = Result<T>>>,
+) {
+    for (item, db_item) in itertools::zip_eq(iter, db_iter_res.unwrap()) {
+        assert_eq!(item, &db_item.unwrap());
+    }
+}
+
+fn verify_ledger_iterators(
+    db: &AptosDB,
+    txns_to_commit: &[TransactionToCommit],
+    first_version: Version,
+    ledger_info_with_sigs: &LedgerInfoWithSignatures,
+) {
+    let num_txns = txns_to_commit.len() as u64;
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction()),
+        db.get_transaction_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.transaction_info()),
+        db.get_transaction_info_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit
+            .iter()
+            .map(|t| t.events().to_vec())
+            .collect::<Vec<_>>()
+            .iter(),
+        db.get_events_iterator(first_version, num_txns),
+    );
+    assert_items_equal(
+        txns_to_commit.iter().map(|t| t.write_set()),
+        db.get_write_set_iterator(first_version, num_txns),
+    );
+    let range_proof = db
+        .get_transaction_accumulator_range_proof(
+            first_version,
+            num_txns,
+            ledger_info_with_sigs.ledger_info().version(),
+        )
+        .unwrap();
+    range_proof
+        .verify(
+            ledger_info_with_sigs
+                .ledger_info()
+                .transaction_accumulator_hash(),
+            Some(first_version),
+            &db.get_transaction_info_iterator(first_version, num_txns)
+                .unwrap()
+                .map(|txn_info_res| Ok(txn_info_res?.hash()))
+                .collect::<Result<Vec<_>>>()
+                .unwrap(),
+        )
+        .unwrap()
+}
+
 pub fn verify_committed_transactions(
     db: &AptosDB,
     txns_to_commit: &[TransactionToCommit],
@@ -659,6 +718,7 @@ pub fn verify_committed_transactions(
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
     is_latest: bool,
 ) {
+    verify_ledger_iterators(db, txns_to_commit, first_version, ledger_info_with_sigs);
     let ledger_info = ledger_info_with_sigs.ledger_info();
     let ledger_version = ledger_info.version();
     assert_eq!(

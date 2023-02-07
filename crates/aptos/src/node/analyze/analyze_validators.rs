@@ -276,9 +276,8 @@ impl AnalyzeValidators {
             if is_nil {
                 nil_blocks += 1;
             }
-            let expected_round = previous_round
-                + (if is_nil { 0 } else { 1 })
-                + event.failed_proposer_indices().len() as u64;
+            let expected_round =
+                previous_round + u64::from(!is_nil) + event.failed_proposer_indices().len() as u64;
             if event.round() != expected_round {
                 println!(
                     "Missing failed AccountAddresss : {} {:?}",

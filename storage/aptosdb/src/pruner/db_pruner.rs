@@ -46,7 +46,7 @@ pub trait DBPruner: Send + Sync {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         min(
-            self.min_readable_version() + max_versions as u64,
+            self.min_readable_version() + max_versions,
             self.target_version(),
         )
     }

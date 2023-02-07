@@ -1475,6 +1475,71 @@ module aptos_token::token {
         token_data.royalty
     }
 
+    /// return the token_data_id from the token_id
+    public fun get_tokendata_id(token_id: TokenId): TokenDataId {
+        token_id.token_data_id
+    }
+
+    /// return the mutation setting of the token
+    public fun get_tokendata_mutability_config(token_data_id: TokenDataId): TokenMutabilityConfig acquires Collections {
+        let creator_addr = token_data_id.creator;
+        assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
+        assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+        table::borrow(all_token_data, token_data_id).mutability_config
+    }
+
+    /// return if the token's maximum is mutable
+    public fun get_token_mutability_maximum(config: &TokenMutabilityConfig): bool {
+        config.maximum
+    }
+
+    /// return if the token royalty is mutable with a token mutability config
+    public fun get_token_mutability_royalty(config: &TokenMutabilityConfig): bool {
+        config.royalty
+    }
+
+    /// return if the token uri is mutable with a token mutability config
+    public fun get_token_mutability_uri(config: &TokenMutabilityConfig): bool {
+        config.uri
+    }
+
+    /// return if the token description is mutable with a token mutability config
+    public fun get_token_mutability_description(config: &TokenMutabilityConfig): bool {
+        config.description
+    }
+
+    /// return if the tokendata's default properties is mutable with a token mutability config
+    public fun get_token_mutability_default_properties(config: &TokenMutabilityConfig): bool {
+        config.properties
+    }
+
+    #[view]
+    /// return the collection mutation setting
+    public fun get_collection_mutability_config(
+        creator: address,
+        collection_name: String
+    ): CollectionMutabilityConfig acquires Collections {
+        assert!(exists<Collections>(creator), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
+        let all_collection_data = &borrow_global<Collections>(creator).collection_data;
+        assert!(table::contains(all_collection_data, collection_name), error::not_found(ECOLLECTION_NOT_PUBLISHED));
+        table::borrow(all_collection_data, collection_name).mutability_config
+    }
+
+    /// return if the collection description is mutable with a collection mutability config
+    public fun get_collection_mutability_description(config: &CollectionMutabilityConfig): bool {
+        config.description
+    }
+
+    /// return if the collection uri is mutable with a collection mutability config
+    public fun get_collection_mutability_uri(config: &CollectionMutabilityConfig): bool {
+        config.uri
+    }
+    /// return if the collection maximum is mutable with collection mutability config
+    public fun get_collection_mutability_maximum(config: &CollectionMutabilityConfig): bool {
+        config.maximum
+    }
+
     //
     // Private functions
     //
@@ -2527,6 +2592,46 @@ module aptos_token::token {
         assert!(option::is_none(&cap), 1);
         merge(&mut token, token_1);
         token
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_get_collection_mutability_config(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+
+        get_collection_mutability_config(@0xcafe, get_collection_name());
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_get_tokendata_mutability_config(creator: &signer) acquires Collections, TokenStore {
+        account::create_account_for_test(signer::address_of(creator));
+
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[],
+            vector<vector<u8>>[],
+            vector<String>[],
+            vector<bool>[false, false, false],
+            vector<bool>[false, false, false, false, true],
+        );
+
+        get_tokendata_mutability_config(token_id.token_data_id);
     }
 
     //

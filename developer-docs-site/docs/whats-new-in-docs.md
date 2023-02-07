@@ -5,11 +5,105 @@ slug: "whats-new-in-docs"
 
 # See What's New in Aptos
 
-This page shows the key updates to the developer documentation on this site.
+This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
+
+## 31 January 2023
+
+- Improved the new script for installing the Aptos CLI to [always fetch the latest version and seamlessly apply updates](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md#update).
+
+## 30 January 2023
+
+- Released [Aptos Node v1.2.4](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.4) to testnet with enhancements to state synchronization and features added for use of the Move programming language, including:
+  * New integer types (u16, u32, u256)
+  * [View functions](guides/aptos-apis.md#reading-state-with-the-view-function) to evaluate transactions before execution
+  * Compile-time checks for transaction arguments
+  * Various updates to smart contracts
+  * Several Aptos Improvement Proposals (AIPs)
+
+  See the [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for many more details. This release will be available on mainnet soon.
+
+- Created an entirely new tutorial that covers [building an end-to-end todo list dapp](tutorials/build-e2e-dapp/index.md), starting from the smart contract side through the front-end side and use of a wallet to interact with the two.
+
+## 26 January 2023
+
+- Developed and now recommend use of a script to [automate installation of the Aptos command line interface (CLI)](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) that works on Linux, macOS, Windows Subsystem for Linux (WSL), and Windows NT.
+
+## 25 January 2023
+
+- Split up the sidebars of Aptos.dev into one left navigation menu per topic to ease use. As part of this:
+
+  * Added top-level menu for *Create NFTs* section
+  * Renamed *Measure Nodes* section to *Monitor Nodes*
+  * Moved [Node Liveness Criteria](nodes/validator-node/operator/node-liveness-criteria.md) to the *Monitor Nodes* section
+
+- Added a new section [Reading state with the View function](guides/aptos-apis.md#reading-state-with-the-view-function) explaining how to use the [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function now available in devnet to test transactions without modifying blockchain state.
+
+## 24 January 2023
+
+- Added [Mint NFT with Aptos CLI](guides/move-guides/mint-nft-cli.md) Move code lab describing the completely revised [Mint NFT](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move examples.
+
+## 23 January 2023
+
+- Introduced a *Create NFTs* section in navigation that includes:
+
+  * a [comparison of Aptos tokens](concepts/coin-and-token/aptos-token-overview.md) with other blockchains
+  * instructions for [minting fungible tokens with on-chain data](concepts/coin-and-token/mint-onchain-data.md)
+  * installation instructions for a new web-based [Aptos NFT Minting Tool](concepts/coin-and-token/nft-minting-tool.md)
+
+## 18 January 2023
+
+- Added a section explaining the nuances of [batch signing](guides/sign-a-transaction.md#batch-signing) to Create a Signed Transaction.
+
+- Enhanced [validator node setup documentation](nodes/validator-node/operator/index.md) to ensure operators first [deploy the nodes](nodes/validator-node/operator/running-validator-node/index.md), then [connect to the Aptos network](nodes/validator-node/operator/connect-to-aptos-network.md), and finally [establish staking pool operations](nodes/validator-node/operator/staking-pool-operations.md).
+
+## 16 January 2023
+
+- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos CLI.
+
+## 12 January 2023
+
+- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and WSL package manager.
+
+## 11 January 2023
+
+- Greatly expanded the [First Dapp tutorial](tutorials/first-dapp.md) to include a section on publishing the Move module using the TypeScript SDK, adds labels to output, improve the initialization for Petra wallet and the Aptos CLI, and more.
+
+- Noted in the [Aptos Token Standard](concepts/coin-and-token/aptos-token.md) that limits exist to storing customized token properties on-chain, namely 1000 properties per token with field names limited to 128 characters.
+
+- Added examples for requesting staking commission to [Staking Pool Operations](nodes/validator-node/operator/staking-pool-operations.md).
+
+
+## 10 January 2023
+
+- Explained in Validator cloud setup docs ([AWS](nodes/validator-node/operator/running-validator-node/using-aws.md), [Azure](nodes/validator-node/operator/running-validator-node/using-azure.md) and [GCP](nodes/validator-node/operator/running-validator-node/using-gcp.md)) how to check for and remove remaining Kubernetes volumes after changing the `era` to reset a deployment's state.
+
+- Expanded support for other networks in [Start Public Fullnode with Aptos Source or Docker](nodes/full-node/fullnode-source-code-or-docker.md) by adding files and instructions for fullnodes in `devnet` and `testnet`, as well as the default `mainnet`.
+
+- Enhanced [Run a Public Fullnode on GCP](nodes/full-node/run-a-fullnode-on-gcp.md) with details on fixing Terraform version mismatches, a link to the Docker image, and example output from `kubectl` commands.
+
+- Added a [Node types](concepts/node-networks-sync.md#node-types) section to Node Networks and Synchronization describing the various forms of nodes supported by Aptos: validator nodes, public fullnodes, validator fullnodes, and archival nodes.
+
+## 06 January 2023
+
+- Added an *Authors* list to the bottom of every page on Aptos.dev giving credit to all contributors to the document, both within Aptos Labs and externally.
+
+## 30 December 2022
+
+- Added [Node Inspection Service](nodes/measure/node-inspection-service.md) document that explains how to access node metrics for validators and fullnodes and highlights key metrics for monitoring.
+
+- Added instructions for [running archival nodes](guides/state-sync.md#running-archival-nodes), specifically avoiding fast syncing and ledger pruning. 
+
+## 29 December 2022
+
+- Improved [Update Aptos Validator Node](nodes/validator-node/operator/update-validator-node.md) with a section on securely running multiple validator fullnodes (VFNs) plus links to [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) and [state synchronization](guides/state-sync.md).
 
 ## 26 December 2022
 
 - Restored and refined [Bootstrap Fullnode from Snapshot](nodes/full-node/bootstrap-fullnode.md) to simplify and expedite Aptos fullnode starts in devnet and testnet environments.
+
+## 23 December 2022
+
+- Added instructions for [manually installing build dependencies on Windows](guides/getting-started.md#set-up-build-dependencies).
 
 ## 20 December 2022
 
@@ -33,7 +127,7 @@ This page shows the key updates to the developer documentation on this site.
 
 ## 08 December 2022
 
-- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to mainnet:
 
   Framework upgrade through governance voting:
   - Testnet upgrade - Nov 30th

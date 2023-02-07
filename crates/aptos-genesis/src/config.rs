@@ -71,7 +71,7 @@ pub struct Layout {
 impl Layout {
     /// Read the layout from a YAML file on disk
     pub fn from_disk(path: &Path) -> anyhow::Result<Self> {
-        let mut file = File::open(&path).map_err(|e| {
+        let mut file = File::open(path).map_err(|e| {
             anyhow::Error::msg(format!("Failed to open file {}, {}", path.display(), e))
         })?;
         let mut contents = String::new();

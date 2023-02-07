@@ -17,7 +17,7 @@ use warp::Filter;
 
 pub fn block_route(
     server_context: RosettaContext,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
     warp::path!("block")
         .and(warp::post())
         .and(warp::body::json())

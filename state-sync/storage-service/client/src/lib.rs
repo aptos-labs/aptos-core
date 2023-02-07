@@ -5,9 +5,8 @@
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_network::{
-    application::{interface::NetworkClientInterface, storage::PeerMetadataStorage},
-    protocols::network::{NetworkApplicationConfig, RpcError},
-    ProtocolId,
+    application::{interface::NetworkClientInterface, storage::PeersAndMetadata},
+    protocols::network::RpcError,
 };
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -63,12 +62,13 @@ impl<NetworkClient: NetworkClientInterface<StorageServiceMessage>>
         }
     }
 
-    pub fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
-        self.network_client.get_peer_metadata_storage()
+    pub fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+        self.network_client
+            .get_available_peers()
+            .map_err(|error| Error::NetworkError(error.to_string()))
     }
-}
 
-/// Returns a network application config for the storage client
-pub fn storage_client_network_config() -> NetworkApplicationConfig {
-    NetworkApplicationConfig::client([ProtocolId::StorageServiceRpc])
+    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.network_client.get_peers_and_metadata()
+    }
 }

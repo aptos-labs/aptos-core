@@ -187,6 +187,12 @@ impl MockTimeService {
     }
 }
 
+impl Default for MockTimeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimeServiceTrait for MockTimeService {
     fn now(&self) -> Instant {
         let this = self.lock();

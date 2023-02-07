@@ -84,7 +84,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = BlockExecutor::<AptosVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
@@ -186,6 +186,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 #[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_new_genesis() {
     let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;

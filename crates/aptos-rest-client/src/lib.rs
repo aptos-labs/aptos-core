@@ -570,24 +570,24 @@ impl Client {
         let start = std::time::Instant::now();
         loop {
             let mut chain_timestamp_usecs = None;
-            match fetch(hash).await? {
-                WaitForTransactionResult::Success(result) => {
+            match fetch(hash).await {
+                Ok(WaitForTransactionResult::Success(result)) => {
                     return Ok(result);
                 },
-                WaitForTransactionResult::FailedExecution(vm_status) => {
+                Ok(WaitForTransactionResult::FailedExecution(vm_status)) => {
                     return Err(anyhow!(
                         "Transaction committed on chain, but failed execution: {}",
                         vm_status
                     ))?;
                 },
-                WaitForTransactionResult::Pending(state) => {
+                Ok(WaitForTransactionResult::Pending(state)) => {
                     reached_mempool = true;
                     if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
                         return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
                     }
                     chain_timestamp_usecs = Some(state.timestamp_usecs);
                 },
-                WaitForTransactionResult::NotFound(error) => {
+                Ok(WaitForTransactionResult::NotFound(error)) => {
                     if let RestError::Api(aptos_error_response) = error {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
@@ -619,6 +619,9 @@ impl Client {
                             self.path_prefix_string(),
                         )
                     );
+                },
+                Err(err) => {
+                    debug!("Fetching error, will retry: {}", err);
                 },
             }
 
@@ -1093,6 +1096,19 @@ impl Client {
         module_name: &str,
     ) -> AptosResult<Response<bytes::Bytes>> {
         let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get_bcs(url).await
+    }
+
+    pub async fn get_account_module_bcs_at_version(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+        version: u64,
+    ) -> AptosResult<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/module/{}?ledger_version={}",
+            address, module_name, version
+        ))?;
         self.get_bcs(url).await
     }
 

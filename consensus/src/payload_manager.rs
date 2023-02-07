@@ -20,6 +20,7 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
+    #[allow(dead_code)]
     InQuorumStore(BatchReader, Mutex<Sender<PayloadRequest>>),
 }
 

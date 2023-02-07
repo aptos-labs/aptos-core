@@ -5,7 +5,15 @@ slug: "run-validator-node-using-aws"
 
 # On AWS
 
-This is a step-by-step guide to install an Aptos node on AWS. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+This is a step-by-step guide to install an Aptos node on Amazon Web Services (AWS). Follow these steps to configure a validator node and a validator fullnode on separate machines. 
+
+:::caution Did you set up your AWS account?
+This guide assumes that you already have AWS account setup.
+:::
+
+:::danger Do you have stale volumes after bumping your deployment's era?
+`era` is a concept relevant only to Kubernetes deployments of an Aptos node. Changing the `era` provides an easy way to wipe your deployment's state. However, this may lead to dangling persistent volumes on validator fullnodes. Confirm the existence of these volumes with `kubectl get pvc` and delete them manually to minimize costs.
+:::
 
 ## Before you proceed
 
@@ -14,7 +22,7 @@ Make sure you complete these prerequisite steps before you proceed:
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
    - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-   - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+   - **Terraform 1.3.6**: https://www.terraform.io/downloads.html
    - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
    - **AWS CLI**: https://aws.amazon.com/cli/
 
@@ -61,7 +69,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
     ```
     terraform {
-      required_version = "~> 1.2.0"
+      required_version = "~> 1.3.6"
       backend "s3" {
         bucket = "terraform.aptos-node"
         key    = "state/aptos-node"
@@ -203,4 +211,6 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.
+You have successfully completed setting up your node. Make sure that you have set up one machine to run a validator node and a second machine to run a validator fullnode.
+
+Now proceed to [connecting to the Aptos network](../connect-to-aptos-network.md) and [establishing staking pool operations](../staking-pool-operations.md).

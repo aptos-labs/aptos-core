@@ -681,6 +681,14 @@ impl EpochManager {
                 .get_voting_power(&self.author)
                 .unwrap_or(0) as f64,
         );
+        epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .for_each(|peer_id| {
+                counters::ALL_VALIDATORS_VOTING_POWER
+                    .with_label_values(&[&peer_id.to_string()])
+                    .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
+            });
 
         let mut round_manager = RoundManager::new(
             epoch_state,

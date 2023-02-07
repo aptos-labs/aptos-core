@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use self::framework::FrameworkReleaseConfig;
 use crate::components::feature_flags::Features;
 use anyhow::{anyhow, Result};
-use aptos_crypto::HashValue;
+use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
+use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{GasScheduleV2, OnChainConfig, OnChainConsensusConfig, Version},
@@ -22,13 +24,14 @@ pub mod consensus_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
+pub mod transaction_fee;
 pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ReleaseConfig {
     pub testnet: bool,
     pub remote_endpoint: Option<Url>,
-    pub framework_release: bool,
+    pub framework_release: Option<FrameworkReleaseConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_schedule: Option<GasScheduleV2>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -122,15 +125,19 @@ impl ReleaseConfig {
         _client: &Option<Client>,
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
-        if self.framework_release {
-            result.append(&mut framework::generate_upgrade_proposals(
-                self.testnet,
-                if self.is_multi_step {
-                    Self::get_execution_hash(result)
-                } else {
-                    "".to_owned()
-                },
-            )?);
+        if let Some(framework_release) = &self.framework_release {
+            result.append(
+                &mut framework::generate_upgrade_proposals(
+                    framework_release,
+                    self.testnet,
+                    if self.is_multi_step {
+                        get_execution_hash(result)
+                    } else {
+                        "".to_owned().into_bytes()
+                    },
+                )
+                .unwrap(),
+            );
         }
         Ok(())
     }
@@ -146,9 +153,9 @@ impl ReleaseConfig {
                     gas_schedule,
                     self.testnet,
                     if self.is_multi_step {
-                        Self::get_execution_hash(result)
+                        get_execution_hash(result)
                     } else {
-                        "".to_owned()
+                        "".to_owned().into_bytes()
                     },
                 )?);
             }
@@ -167,9 +174,9 @@ impl ReleaseConfig {
                     version,
                     self.testnet,
                     if self.is_multi_step {
-                        Self::get_execution_hash(result)
+                        get_execution_hash(result)
                     } else {
-                        "".to_owned()
+                        "".to_owned().into_bytes()
                     },
                 )?);
             }
@@ -183,7 +190,7 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(feature_flags) = &self.feature_flags {
-            let mut needs_update = false;
+            let mut needs_update = true;
             if let Some(client) = client {
                 let features = block_on(async {
                     client
@@ -194,6 +201,8 @@ impl ReleaseConfig {
                         .await
                 })?;
                 // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
+                // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
+                // we would like to enable/disable, regardless of their current on chain state.
                 needs_update = feature_flags.has_modified(features.inner());
             }
             if needs_update {
@@ -201,9 +210,9 @@ impl ReleaseConfig {
                     feature_flags,
                     self.testnet,
                     if self.is_multi_step {
-                        Self::get_execution_hash(result)
+                        get_execution_hash(result)
                     } else {
-                        "".to_owned()
+                        "".to_owned().into_bytes()
                     },
                 )?);
             }
@@ -217,14 +226,14 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(consensus_config) = &self.consensus_config {
-            if fetch_and_equals(client, consensus_config)? {
+            if !fetch_and_equals(client, consensus_config)? {
                 result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
                     consensus_config,
                     self.testnet,
                     if self.is_multi_step {
-                        Self::get_execution_hash(result)
+                        get_execution_hash(result)
                     } else {
-                        "".to_owned()
+                        "".to_owned().into_bytes()
                     },
                 )?);
             }
@@ -268,27 +277,54 @@ impl ReleaseConfig {
     pub fn parse(serialized: &str) -> Result<Self> {
         serde_yaml::from_str(serialized).map_err(|e| anyhow!("Failed to parse the config: {:?}", e))
     }
-
-    fn get_execution_hash(result: &Vec<(String, String)>) -> String {
-        if result.is_empty() {
-            "vector::empty<u8>()".to_owned()
-        } else {
-            HashValue::sha3_256_of(result.last().unwrap().1.to_owned().as_bytes()).to_string()
-        }
-    }
 }
 
 impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
             testnet: true,
-            framework_release: true,
+            framework_release: Some(FrameworkReleaseConfig {
+                bytecode_version: 6,
+                git_hash: None,
+            }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
-            feature_flags: None,
+            feature_flags: Some(Features {
+                enabled: aptos_vm_genesis::default_features()
+                    .into_iter()
+                    .map(crate::components::feature_flags::FeatureFlag::from)
+                    .collect(),
+                disabled: vec![],
+            }),
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,
         }
+    }
+}
+
+pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
+    if result.is_empty() {
+        "vector::empty<u8>()".to_owned().into_bytes()
+    } else {
+        let temp_script_path = TempPath::new();
+        temp_script_path.create_as_file().unwrap();
+        let mut move_script_path = temp_script_path.path().to_path_buf();
+        move_script_path.set_extension("move");
+        std::fs::write(move_script_path.as_path(), result.last().unwrap().1.clone())
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to get execution hash: failed to write to file: {:?}",
+                    err
+                )
+            })
+            .unwrap();
+
+        let (_, hash) = GenerateExecutionHash {
+            script_path: Option::from(move_script_path),
+        }
+        .generate_hash()
+        .unwrap();
+        hash.to_vec()
     }
 }

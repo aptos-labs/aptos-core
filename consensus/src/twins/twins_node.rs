@@ -16,13 +16,13 @@ use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NodeConfig, WaypointConfig},
     generator::{self, ValidatorSwarm},
-    network_id::NetworkId,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_network::{
-    application::interface::NetworkClient,
+    application::interface::{NetworkClient, NetworkServiceEvents},
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
@@ -46,7 +46,7 @@ use aptos_types::{
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is preparing SMR for the test
 pub struct SMRNode {
@@ -87,6 +87,8 @@ impl SMRNode {
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
         let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel);
+        let network_service_events =
+            NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
@@ -123,16 +125,8 @@ impl SMRNode {
             })
             .unwrap();
 
-        let runtime = Builder::new_multi_thread()
-            .thread_name(format!(
-                "{}-node-{}",
-                twin_id.id,
-                std::thread::current().name().unwrap_or("")
-            ))
-            .disable_lifo_slot()
-            .enable_all()
-            .build()
-            .unwrap();
+        let thread_name = format!("twin-{}", twin_id.id,);
+        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
@@ -152,7 +146,8 @@ impl SMRNode {
             storage.clone(),
             reconfig_listener,
         );
-        let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
+        let (network_task, network_receiver) =
+            NetworkTask::new(network_service_events, self_receiver);
 
         runtime.spawn(network_task.start());
         runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
@@ -193,15 +188,19 @@ impl SMRNode {
         let ValidatorSwarm {
             nodes: mut node_configs,
         } = generator::validator_swarm_for_testing(num_nodes);
-        let peer_metadata_storage = playground.peer_protocols();
+        let peers_and_metadata = playground.peer_protocols();
         node_configs.iter().for_each(|config| {
-            let mut conn_meta = ConnectionMetadata::mock(author_from_config(config));
+            let peer_id = author_from_config(config);
+            let mut conn_meta = ConnectionMetadata::mock(peer_id);
             conn_meta.application_protocols = ProtocolIdSet::from_iter([
                 ProtocolId::ConsensusDirectSendJson,
                 ProtocolId::ConsensusDirectSendBcs,
                 ProtocolId::ConsensusRpcBcs,
             ]);
-            peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer_id);
+            peers_and_metadata
+                .insert_connection_metadata(peer_network_id, conn_meta)
+                .unwrap();
         });
 
         node_configs.sort_by_key(author_from_config);

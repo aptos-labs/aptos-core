@@ -13,6 +13,7 @@ use aptos_config::config::{
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{AptosDB, GetRestoreHandler};
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -53,6 +54,8 @@ struct Opt {
         help = "Skip the execution for txns that are known to break compatibility."
     )]
     txns_to_skip: Vec<Version>,
+    #[clap(long, help = "Do not quit right away when a replay issue is detected.")]
+    lazy_quit: bool,
 }
 
 #[tokio::main]
@@ -67,6 +70,7 @@ async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
 
     let opt = Opt::from_args();
+
     let restore_handler = Arc::new(AptosDB::open(
         opt.db_dir,
         false,                       /* read_only */
@@ -87,7 +91,7 @@ async fn main_impl() -> Result<()> {
         opt.start_version.unwrap_or(0),
         opt.end_version.unwrap_or(Version::MAX),
         opt.validate_modules,
-        opt.txns_to_skip,
+        VerifyExecutionMode::verify_except(opt.txns_to_skip).set_lazy_quit(opt.lazy_quit),
     )?
     .run()
     .await

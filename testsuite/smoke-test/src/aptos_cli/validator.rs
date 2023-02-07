@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{smoke_test_environment::SwarmBuilder, test_utils::MAX_CATCH_UP_WAIT_SECS};
 use aptos::{
     account::create::DEFAULT_FUNDED_COINS,
     common::types::TransactionSummary,
@@ -161,7 +161,7 @@ async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u
     for (_i, event) in info.blocks.iter().enumerate() {
         let previous_block_votes_bitvec: BitVec =
             event.event.previous_block_votes_bitvec().clone().into();
-        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index as u16) {
+        if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index) {
             first_vote = Some(event.event.round());
         }
 
@@ -306,7 +306,7 @@ async fn test_onchain_config_change() {
         .await
         .unwrap();
     swarm
-        .wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(30))
+        .wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
     println!(
@@ -418,7 +418,7 @@ async fn test_large_total_stake() {
     );
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(20))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 }
@@ -1005,7 +1005,8 @@ async fn test_join_and_leave_validator() {
     gas_used += get_gas(
         cli.withdraw_stake(validator_cli_index, withdraw_stake)
             .await
-            .unwrap(),
+            .unwrap()
+            .remove(0),
     );
 
     cli.assert_account_balance_now(
@@ -1246,7 +1247,7 @@ fn dns_name(addr: &str) -> DnsName {
     DnsName::try_from(addr.to_string()).unwrap()
 }
 
-struct ValidatorNodeKeys {
+pub struct ValidatorNodeKeys {
     account_private_key: Ed25519PrivateKey,
     network_private_key: x25519::PrivateKey,
     consensus_private_key: bls12381::PrivateKey,
@@ -1274,7 +1275,7 @@ impl ValidatorNodeKeys {
     }
 }
 
-async fn init_validator_account(
+pub async fn init_validator_account(
     cli: &mut CliTestFramework,
     keygen: &mut KeyGen,
     amount: Option<u64>,

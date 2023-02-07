@@ -15,6 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-logger = { workspace = true }
 backtrace = { workspace = true }
+move-core-types = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
-

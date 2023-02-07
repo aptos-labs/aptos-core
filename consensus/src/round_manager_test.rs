@@ -24,7 +24,10 @@ use crate::{
     util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_config::{
+    config::ConsensusConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
@@ -130,15 +133,19 @@ impl NodeSetup {
 
         let mut nodes = vec![];
         // pre-initialize the mapping to avoid race conditions (peer try to broadcast to someone not added yet)
-        let peer_metadata_storage = playground.peer_protocols();
+        let peers_and_metadata = playground.peer_protocols();
         for signer in signers.iter().take(num_nodes) {
-            let mut conn_meta = ConnectionMetadata::mock(signer.author());
+            let peer_id = signer.author();
+            let mut conn_meta = ConnectionMetadata::mock(peer_id);
             conn_meta.application_protocols = ProtocolIdSet::from_iter([
                 ProtocolId::ConsensusDirectSendJson,
                 ProtocolId::ConsensusDirectSendBcs,
                 ProtocolId::ConsensusRpcBcs,
             ]);
-            peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer_id);
+            peers_and_metadata
+                .insert_connection_metadata(peer_network_id, conn_meta)
+                .unwrap();
         }
         for (id, signer) in signers.iter().take(num_nodes).enumerate() {
             let (initial_data, storage) = MockStorage::start_for_testing((&validators).into());
@@ -401,9 +408,8 @@ impl NodeSetup {
     }
 
     pub fn no_next_ordered(&mut self) {
-        match self.ordered_blocks_events.next().now_or_never() {
-            Some(_) => panic!("Unexpected Ordered Blocks Event"),
-            None => {},
+        if self.ordered_blocks_events.next().now_or_never().is_some() {
+            panic!("Unexpected Ordered Blocks Event");
         }
     }
 
@@ -638,7 +644,7 @@ fn vote_on_successful_proposal() {
         assert_eq!(consensus_state.epoch(), 1);
         assert_eq!(consensus_state.last_voted_round(), 1);
         assert_eq!(consensus_state.preferred_round(), 0);
-        assert_eq!(consensus_state.in_validator_set(), true);
+        assert!(consensus_state.in_validator_set());
     });
 }
 
@@ -698,7 +704,7 @@ fn delay_proposal_processing_in_sync_only() {
         assert_eq!(consensus_state.epoch(), 1);
         assert_eq!(consensus_state.last_voted_round(), 1);
         assert_eq!(consensus_state.preferred_round(), 0);
-        assert_eq!(consensus_state.in_validator_set(), true);
+        assert!(consensus_state.in_validator_set());
     });
 }
 
@@ -1221,9 +1227,9 @@ fn recover_on_restart() {
     assert_eq!(consensus_state.epoch(), 1);
     assert_eq!(consensus_state.last_voted_round(), num_proposals);
     assert_eq!(consensus_state.preferred_round(), 0);
-    assert_eq!(consensus_state.in_validator_set(), true);
+    assert!(consensus_state.in_validator_set());
     for (block, _) in data {
-        assert_eq!(node.block_store.block_exists(block.id()), true);
+        assert!(node.block_store.block_exists(block.id()));
     }
 }
 

@@ -5,7 +5,6 @@ const lightCodeTheme = require("prism-react-renderer/themes/github");
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 const codeInjector = require("./src/remark/code-injector");
-const contributors = require("./src/remark/contributors");
 
 const { ProvidePlugin } = require("webpack");
 
@@ -35,7 +34,7 @@ const config = {
           sidebarPath: require.resolve("./sidebars.js"),
           sidebarCollapsible: false,
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
-          remarkPlugins: [codeInjector, math, contributors],
+          remarkPlugins: [codeInjector, math],
           path: "docs",
           rehypePlugins: [katex],
         },
@@ -97,7 +96,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Start Aptos",
+            label: "Get Started",
             position: "left",
             items: [
               {
@@ -106,17 +105,22 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
+                label: "Read the Aptos White Paper",
+                type: "doc",
+                docId: "aptos-white-paper/index",
+              },
+              {
                 label: "Learn Aptos Concepts",
                 type: "doc",
                 docId: "concepts/index",
               },
               {
-                label: "Set Environment",
+                label: "Prepare Your Environment",
                 type: "doc",
                 docId: "guides/getting-started",
               },
               {
-                label: "Integrate Aptos",
+                label: "Integrate with Aptos",
                 type: "doc",
                 docId: "guides/system-integrators-guide",
               },
@@ -129,38 +133,43 @@ const config = {
             items: [
               {
                 type: "doc",
-                label: "Follow Standards",
+                label: "Follow the Aptos Standards",
                 docId: "concepts/coin-and-token/index",
               },
               {
                 type: "doc",
-                label: "Develop by Tutorial",
+                label: "Read Blockchain Data",
+                docId: "/category/data",
+              },
+              {
+                type: "doc",
+                label: "Interact with the Blockchain",
+                docId: "guides/index",
+              },
+              {
+                type: "doc",
+                label: "Develop with the SDKs",
                 docId: "tutorials/index",
               },
               {
                 type: "doc",
-                label: "Use Aptos SDKs",
-                docId: "sdks/index",
+                label: "Integrate with Wallets",
+                docId: "concepts/wallet-adapter-concept",
               },
               {
                 type: "doc",
-                label: "Develop Locally",
-                docId: "nodes/local-testnet/index",
-              },
-              {
-                type: "doc",
-                label: "Interact with Blockchain",
-                docId: "guides/index",
+                label: "Build E2E Dapp on Aptos",
+                docId: "tutorials/build-e2e-dapp/index",
               },
             ],
           },
           {
             type: "dropdown",
-            label: "Write Move",
+            label: "Learn Move",
             position: "left",
             items: [
               {
-                label: "Write Smart Contracts with Move",
+                label: "Write Move Smart Contracts",
                 type: "doc",
                 docId: "guides/move-guides/index",
               },
@@ -168,6 +177,21 @@ const config = {
                 label: "Move on Aptos",
                 type: "doc",
                 docId: "guides/move-guides/move-on-aptos",
+              },
+              {
+                label: "Move Structure",
+                type: "doc",
+                docId: "guides/move-guides/move-structure",
+              },
+              {
+                label: "How Base Gas Works",
+                type: "doc",
+                docId: "concepts/base-gas",
+              },
+              {
+                label: "Interact with Move VM",
+                type: "doc",
+                docId: "guides/interacting-with-the-blockchain",
               },
               {
                 label: "Your First Move Module",
@@ -179,10 +203,42 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Create Tokens",
+            position: "left",
+            items: [
               {
-                label: "Move References",
                 type: "doc",
-                docId: "reference/move",
+                label: "Create Tokens on Aptos",
+                docId: "/category/nft",
+              },
+              {
+                type: "doc",
+                label: "Compare Token Standards",
+                docId: "concepts/coin-and-token/aptos-token-comparison",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with the SDKs",
+                docId: "tutorials/your-first-nft",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with the Aptos CLI",
+                docId: "guides/move-guides/mint-nft-cli",
+              },
+              {
+                type: "doc",
+                label: "Mint FTs with On-Chain Data",
+                docId: "concepts/coin-and-token/onchain-data",
+              },
+              {
+                type: "doc",
+                label: "Mint NFTs with the Mint Tool",
+                docId: "concepts/coin-and-token/nft-minting-tool",
               },
             ],
           },
@@ -192,27 +248,37 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Understand Nodes",
+                label: "Learn about Nodes",
                 type: "doc",
                 docId: "nodes/nodes-landing",
               },
               {
-                label: "Install Validators",
+                type: "doc",
+                label: "Develop Locally",
+                docId: "nodes/local-testnet/index",
+              },
+              {
+                label: "Run a Validator",
                 type: "doc",
                 docId: "nodes/validator-node/index",
               },
               {
-                label: "Install FullNodes",
+                label: "Run a FullNode",
                 type: "doc",
                 docId: "nodes/full-node/index",
               },
               {
-                label: "Measure Nodes",
+                label: "Run an Indexer",
+                type: "doc",
+                docId: "nodes/indexer-fullnode",
+              },
+              {
+                label: "Monitor a Node",
                 type: "doc",
                 docId: "nodes/measure/index",
               },
               {
-                label: "Configure Nodes",
+                label: "Configure a Node",
                 type: "doc",
                 docId: "nodes/identity-and-configuration",
               },
@@ -224,22 +290,19 @@ const config = {
             position: "left",
             items: [
               {
+                label: "Aptos References",
+                type: "doc",
+                docId: "reference/index",
+              },
+              {
                 label: "REST API",
                 type: "doc",
                 docId: "nodes/aptos-api-spec",
               },
               {
-                href: "https://aptos-labs.github.io/ts-sdk-doc/",
-                label: "TypeScript SDK",
-              },
-              {
-                href: "https://pypi.org/project/aptos-sdk/",
-                label: "Python SDK",
-              },
-              {
-                label: "Rust SDK",
+                label: "Aptos SDKs",
                 type: "doc",
-                docId: "sdks/rust-sdk",
+                docId: "sdks/index",
               },
               {
                 label: "Move References",

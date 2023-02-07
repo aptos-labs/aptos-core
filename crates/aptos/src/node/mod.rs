@@ -1422,11 +1422,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             println!("No data found for given input");
             return Ok(());
         }
-        let total_stats = stats
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .reduce(|a, b| a + b)
-            .unwrap();
+        let total_stats = stats.values().cloned().reduce(|a, b| a + b).unwrap();
         if print_detailed {
             println!(
                 "Detailed table for all epochs [{}, {}]:",
@@ -1594,7 +1590,8 @@ pub struct Time {
 
 impl Time {
     pub fn new(time: Duration) -> Self {
-        let date_time = NaiveDateTime::from_timestamp(time.as_secs() as i64, time.subsec_nanos());
+        let date_time =
+            NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
         let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time zone
         Self {

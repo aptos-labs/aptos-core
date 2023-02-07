@@ -9,18 +9,20 @@ use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 pub fn generate_consensus_upgrade_proposal(
     consensus_config: &OnChainConsensusConfig,
     is_testnet: bool,
-    next_execution_hash: String,
+    next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     let mut result = vec![];
 
     let writer = CodeWriter::new(Loc::default());
 
     emitln!(writer, "// Consensus config upgrade proposal\n");
+    let config_comment = format!("// config: {:#?}", consensus_config).replace('\n', "\n// ");
+    emitln!(writer, "{}\n", config_comment);
 
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        &next_execution_hash,
+        next_execution_hash.clone(),
         "aptos_framework::consensus_config",
         |writer| {
             let consensus_config_blob = bcs::to_bytes(consensus_config).unwrap();
@@ -30,10 +32,17 @@ pub fn generate_consensus_upgrade_proposal(
             generate_blob(writer, &consensus_config_blob);
             emitln!(writer, ";\n");
 
-            emitln!(
-                writer,
-                "consensus_config::set(framework_signer, consensus_blob);"
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "consensus_config::set(framework_signer, consensus_blob);"
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "consensus_config::set(&framework_signer, consensus_blob);"
+                );
+            }
         },
     );
 

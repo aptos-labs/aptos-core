@@ -144,7 +144,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVM, Transaction>::new(db_rw)),
         mempool,
         db,
         test_name,
@@ -160,7 +160,7 @@ pub struct TestContext {
     pub db: Arc<AptosDB>,
     rng: rand::rngs::StdRng,
     root_key: ConfigKey<Ed25519PrivateKey>,
-    executor: Arc<dyn BlockExecutorTrait>,
+    executor: Arc<dyn BlockExecutorTrait<Transaction>>,
     expect_status_code: u16,
     test_name: String,
     golden_output: Option<GoldenOutputs>,
@@ -174,7 +174,7 @@ impl TestContext {
         rng: rand::rngs::StdRng,
         root_key: Ed25519PrivateKey,
         validator_owner: AccountAddress,
-        executor: Box<dyn BlockExecutorTrait>,
+        executor: Box<dyn BlockExecutorTrait<Transaction>>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
         test_name: String,
@@ -579,7 +579,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),
@@ -643,7 +643,7 @@ impl TestContext {
             .context
             .get_latest_ledger_info_with_signatures()
             .unwrap();
-        let epoch = parent.ledger_info().epoch();
+        let epoch = parent.ledger_info().next_block_epoch();
         let version = parent.ledger_info().version() + (block_size as u64);
         let info = LedgerInfo::new(
             BlockInfo::new(

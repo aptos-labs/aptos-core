@@ -914,6 +914,19 @@ export class AptosClient {
     return this.client.blocks.getBlockByVersion(version, withTransactions);
   }
 
+  /**
+   * Call for a move view function
+   *
+   * @param payload Transaction payload
+   * @param version (optional) Ledger version to lookup block information for
+   *
+   * @returns MoveValue[]
+   */
+  @parseApiError
+  async view(payload: Gen.ViewRequest, ledger_version?: string): Promise<Gen.MoveValue[]> {
+    return this.client.view.view(payload, ledger_version);
+  }
+
   // eslint-disable-next-line class-methods-use-this
   clearCache(tags: string[]) {
     clear(tags);

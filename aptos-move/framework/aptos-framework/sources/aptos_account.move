@@ -2,6 +2,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::account::{Self, new_event_handle};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event};
     use std::error;
     use std::signer;
@@ -66,6 +67,11 @@ module aptos_framework::aptos_account {
         if (!account::exists_at(to)) {
             create_account(to)
         };
+        // Resource accounts can be created without registering them to receive APT.
+        // This conveniently does the registration if necessary.
+        if (!coin::is_account_registered<AptosCoin>(to)) {
+            coin::register<AptosCoin>(&create_signer(to));
+        };
         coin::transfer<AptosCoin>(source, to, amount)
     }
 
@@ -104,7 +110,7 @@ module aptos_framework::aptos_account {
                 can_receive_direct_coin_transfers(to),
                 error::permission_denied(EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS),
             );
-            coin::register<CoinType>(&account::create_signer(to));
+            coin::register<CoinType>(&create_signer(to));
         };
         coin::deposit<CoinType>(to, coins)
     }
@@ -177,6 +183,22 @@ module aptos_framework::aptos_account {
         assert!(coin::balance<AptosCoin>(carol) == 500, 1);
         transfer(alice, carol, 1500);
         assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
+
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test(alice = @0xa11ce, core = @0x1)]
+    public fun test_transfer_to_resource_account(alice: &signer, core: &signer) {
+        let (resource_account, _) = account::create_resource_account(alice, vector[]);
+        let resource_acc_addr = signer::address_of(&resource_account);
+        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
+
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
+        create_account(signer::address_of(alice));
+        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+        transfer(alice, resource_acc_addr, 500);
+        assert!(coin::balance<AptosCoin>(resource_acc_addr) == 500, 1);
 
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);

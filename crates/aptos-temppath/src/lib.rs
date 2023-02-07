@@ -39,7 +39,7 @@ impl TempPath {
         let mut rng = rand::thread_rng();
         let mut bytes = [0_u8; 16];
         rng.fill_bytes(&mut bytes);
-        temppath.push(hex::encode(&bytes));
+        temppath.push(hex::encode(bytes));
 
         TempPath {
             path_buf: temppath,

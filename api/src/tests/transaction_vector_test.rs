@@ -149,7 +149,7 @@ fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
     string::string_regex("[a-f0-9]+")
         .unwrap()
         .prop_filter("only even letters count", |s| s.len() % 2 == 0)
-        .prop_map(|s| hex::decode(&s).unwrap())
+        .prop_map(|s| hex::decode(s).unwrap())
 }
 
 #[cfg(test)]
@@ -297,9 +297,8 @@ async fn test_script_payload() {
         for arg in args.as_array_mut().unwrap() {
             let arg_obj = arg.as_object_mut().unwrap();
 
-            match arg_obj.get_mut("U8Vector") {
-                Some(val) => *val = byte_array_to_hex(val),
-                None => {},
+            if let Some(val) = arg_obj.get_mut("U8Vector") {
+                *val = byte_array_to_hex(val)
             }
         }
     }

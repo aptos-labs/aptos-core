@@ -3,7 +3,6 @@
 
 //! Convenience Network API for Aptos
 
-use super::wire::handshake::v1::ProtocolIdSet;
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
@@ -27,9 +26,7 @@ use futures::{
 };
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    cmp::min, fmt::Debug, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration,
-};
+use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -79,51 +76,68 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
     }
 }
 
+/// Configuration needed for the client side of AptosNet applications
+#[derive(Clone)]
+pub struct NetworkClientConfig {
+    /// Direct send protocols for the application (sorted by preference, highest to lowest)
+    pub direct_send_protocols_and_preferences: Vec<ProtocolId>,
+    /// RPC protocols for the application (sorted by preference, highest to lowest)
+    pub rpc_protocols_and_preferences: Vec<ProtocolId>,
+}
+
+impl NetworkClientConfig {
+    pub fn new(
+        direct_send_protocols_and_preferences: Vec<ProtocolId>,
+        rpc_protocols_and_preferences: Vec<ProtocolId>,
+    ) -> Self {
+        Self {
+            direct_send_protocols_and_preferences,
+            rpc_protocols_and_preferences,
+        }
+    }
+}
+
+/// Configuration needed for the service side of AptosNet applications
+#[derive(Clone)]
+pub struct NetworkServiceConfig {
+    /// Direct send protocols for the application (sorted by preference, highest to lowest)
+    pub direct_send_protocols_and_preferences: Vec<ProtocolId>,
+    /// RPC protocols for the application (sorted by preference, highest to lowest)
+    pub rpc_protocols_and_preferences: Vec<ProtocolId>,
+    /// The inbound queue config (from the network to the application)
+    pub inbound_queue_config: aptos_channel::Config,
+}
+
+impl NetworkServiceConfig {
+    pub fn new(
+        direct_send_protocols_and_preferences: Vec<ProtocolId>,
+        rpc_protocols_and_preferences: Vec<ProtocolId>,
+        inbound_queue_config: aptos_channel::Config,
+    ) -> Self {
+        Self {
+            direct_send_protocols_and_preferences,
+            rpc_protocols_and_preferences,
+            inbound_queue_config,
+        }
+    }
+}
+
 /// Configuration needed for AptosNet applications to register with the network
-/// builder. Supports client-only, service-only, and P2p (both) applications.
-// TODO(philiphayes): separate configs for client & server?
-#[derive(Clone, Default)]
+/// builder. Supports client and service side.
+#[derive(Clone)]
 pub struct NetworkApplicationConfig {
-    /// The set of protocols needed for this application.
-    pub protocols: ProtocolIdSet,
-    /// The config for the inbound message queue from network to the application.
-    /// Used for specifying the queue style (e.g. FIFO vs LIFO) and sub-queue max
-    /// capacity.
-    // TODO(philiphayes): only relevant for services
-    // TODO(philiphayes): in the future, use a Service trait here instead?
-    pub inbound_queue: Option<aptos_channel::Config>,
+    pub network_client_config: NetworkClientConfig,
+    pub network_service_config: NetworkServiceConfig,
 }
 
 impl NetworkApplicationConfig {
-    /// AptosNet client configuration. Requires the set of protocols used by the
-    /// client in its requests.
-    pub fn client(protocols: impl IntoIterator<Item = ProtocolId>) -> Self {
-        Self {
-            protocols: ProtocolIdSet::from_iter(protocols),
-            inbound_queue: None,
-        }
-    }
-
-    /// AptosNet service configuration. Requires both the set of protocols this
-    /// service can handle and the queue configuration.
-    pub fn service(
-        protocols: impl IntoIterator<Item = ProtocolId>,
-        inbound_queue: aptos_channel::Config,
+    pub fn new(
+        network_client_config: NetworkClientConfig,
+        network_service_config: NetworkServiceConfig,
     ) -> Self {
         Self {
-            protocols: ProtocolIdSet::from_iter(protocols),
-            inbound_queue: Some(inbound_queue),
-        }
-    }
-
-    /// AptosNet client and service configuration
-    pub fn client_and_service(
-        protocols: impl IntoIterator<Item = ProtocolId>,
-        inbound_queue: aptos_channel::Config,
-    ) -> Self {
-        Self {
-            protocols: ProtocolIdSet::from_iter(protocols),
-            inbound_queue: Some(inbound_queue),
+            network_client_config,
+            network_service_config,
         }
     }
 }

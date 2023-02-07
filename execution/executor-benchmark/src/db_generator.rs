@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::add_accounts_impl;
+use crate::{add_accounts_impl, benchmark_transaction::BenchmarkTransaction};
 use aptos_config::{
     config::{
         PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
@@ -10,19 +10,24 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_db::AptosDB;
-use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
+use aptos_executor::{
+    block_executor::TransactionBlockExecutor,
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
 
-pub fn run(
+pub fn run<V>(
     num_accounts: usize,
     init_account_balance: u64,
     block_size: usize,
     db_dir: impl AsRef<Path>,
     storage_pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-) {
+) where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     println!("Initializing...");
 
     if db_dir.as_ref().exists() {
@@ -38,7 +43,7 @@ pub fn run(
         db_dir.as_ref().display()
     );
 
-    add_accounts_impl(
+    add_accounts_impl::<V>(
         num_accounts,
         init_account_balance,
         block_size,
@@ -51,7 +56,7 @@ pub fn run(
 
 fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
     let (config, _genesis_key) = aptos_genesis::test_utils::test_config();
-    // Create executor.
+
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;
     let (_db, db_rw) = DbReaderWriter::wrap(

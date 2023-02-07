@@ -38,7 +38,7 @@ use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ResourceKey, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
     parser::parse_type_tag,
     transaction_argument::{convert_txn_args, TransactionArgument},
@@ -364,10 +364,8 @@ impl<'a> AptosTestAdapter<'a> {
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
     fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_access_path = AccessPath::resource_access_path(ResourceKey::new(
-            *signer_addr,
-            AccountResource::struct_tag(),
-        ));
+        let account_access_path =
+            AccessPath::resource_access_path(*signer_addr, AccountResource::struct_tag());
         let account_blob = self
             .storage
             .get_state_value(&StateKey::AccessPath(account_access_path))
@@ -385,10 +383,8 @@ impl<'a> AptosTestAdapter<'a> {
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
         let aptos_coin_tag = CoinStoreResource::struct_tag();
 
-        let coin_access_path = AccessPath::resource_access_path(ResourceKey::new(
-            *signer_addr,
-            aptos_coin_tag.clone(),
-        ));
+        let coin_access_path =
+            AccessPath::resource_access_path(*signer_addr, aptos_coin_tag.clone());
 
         let balance_blob = self
             .storage
