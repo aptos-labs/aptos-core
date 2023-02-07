@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::MINT_GAS_FEE_MULTIPLIER,
     transaction_generator::{TransactionExecutor, SEND_AMOUNT},
     EmitJobRequest, EmitModeParams,
 };
@@ -70,38 +69,37 @@ impl<'t> AccountMinter<'t> {
             (total_requested_accounts / 50).clamp(1, CREATION_PARALLELISM);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
-            .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn)
+            .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
             .unwrap()
-            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
+            .checked_add(req.max_gas_per_txn * req.gas_price)
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
         let coins_per_seed_account = (expected_children_per_seed_account as u64)
-            .checked_mul(coins_per_account + req.expected_gas_per_txn)
-            .unwrap()
-            .checked_add(
-                aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price * MINT_GAS_FEE_MULTIPLIER,
+            .checked_mul(
+                coins_per_account
+                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
             )
+            .unwrap()
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
             .unwrap();
         let coins_for_source = coins_per_seed_account
             .checked_mul(expected_num_seed_accounts as u64)
             .unwrap()
-            .checked_add(
-                aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price * MINT_GAS_FEE_MULTIPLIER,
-            )
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
             .unwrap();
         info!(
             "Account creation plan created for {} accounts with {} balance each.",
             num_accounts, coins_per_account
         );
         info!(
-            "    through {} seed accounts with {} each",
-            expected_num_seed_accounts, coins_per_seed_account
+            "    through {} seed accounts with {} each, each to fund {} accounts",
+            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
         );
         info!(
-            "    because of expecting {} txns and {} gas fee for each ",
-            req.expected_max_txns, req.expected_gas_per_txn
+            "    because of expecting {} txns and {} gas at {} gas price for each ",
+            req.expected_max_txns, req.expected_gas_per_txn, req.gas_price,
         );
 
         if req.mint_to_root {
@@ -127,7 +125,7 @@ impl<'t> AccountMinter<'t> {
             } else {
                 let max_allowed = 2 * req
                     .expected_max_txns
-                    .checked_mul(req.expected_gas_per_txn)
+                    .checked_mul(req.expected_gas_per_txn * req.gas_price)
                     .unwrap();
                 assert!(coins_for_source <= max_allowed,
                     "Estimated total coins needed for load test ({}) are larger than expected_max_txns * expected_gas_per_txn, multiplied by 2 to account for rounding up ({})",

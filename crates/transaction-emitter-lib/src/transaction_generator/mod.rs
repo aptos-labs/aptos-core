@@ -68,6 +68,7 @@ pub async fn create_txn_generator_creator(
     all_accounts: &mut [LocalAccount],
     txn_executor: &dyn TransactionExecutor,
     txn_factory: &TransactionFactory,
+    init_txn_factory: &TransactionFactory,
     stats: Arc<DynamicStatsTracking>,
 ) -> Box<dyn TransactionGeneratorCreator> {
     let all_addresses = Arc::new(RwLock::new(
@@ -125,6 +126,7 @@ pub async fn create_txn_generator_creator(
                 TransactionType::NftMintAndTransfer => Box::new(
                     NFTMintAndTransferGeneratorCreator::new(
                         txn_factory.clone(),
+                        init_txn_factory.clone(),
                         all_accounts.get_mut(0).unwrap(),
                         txn_executor,
                         num_workers,
@@ -144,6 +146,7 @@ pub async fn create_txn_generator_creator(
                     Box::new(
                         CallCustomModulesCreator::new(
                             txn_factory.clone(),
+                            init_txn_factory.clone(),
                             all_accounts,
                             txn_executor,
                             *entry_point,
