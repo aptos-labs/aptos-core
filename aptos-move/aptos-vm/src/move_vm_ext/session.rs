@@ -298,7 +298,6 @@ impl SessionOutput {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<ChangeSetExt, VMStatus> {
-        use MoveStorageOp::*;
         let Self {
             change_set,
             resource_group_change_set,
@@ -314,27 +313,14 @@ impl SessionOutput {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
                 let ap = ap_cache.get_resource_path(addr, struct_tag);
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => {
-                        if configs.creation_as_modification() {
-                            WriteOp::Modification(blob)
-                        } else {
-                            WriteOp::Creation(blob)
-                        }
-                    },
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
+                let op =
+                    convert_write_op(blob_op, configs.legacy_resource_creation_as_modification());
                 write_set_mut.insert((StateKey::access_path(ap), op))
             }
 
             for (name, blob_op) in modules {
                 let ap = ap_cache.get_module_path(ModuleId::new(addr, name));
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => WriteOp::Creation(blob),
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
+                let op = convert_write_op(blob_op, false);
 
                 write_set_mut.insert((StateKey::access_path(ap), op))
             }
@@ -344,17 +330,7 @@ impl SessionOutput {
             let (_, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
                 let ap = ap_cache.get_resource_group_path(addr, struct_tag);
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => {
-                        if configs.creation_as_modification() {
-                            WriteOp::Modification(blob)
-                        } else {
-                            WriteOp::Creation(blob)
-                        }
-                    },
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
+                let op = convert_write_op(blob_op, false);
                 write_set_mut.insert((StateKey::access_path(ap), op))
             }
         }
@@ -362,13 +338,8 @@ impl SessionOutput {
         for (handle, change) in table_change_set.changes {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                match value_op {
-                    Delete => write_set_mut.insert((state_key, WriteOp::Deletion)),
-                    New(bytes) => write_set_mut.insert((state_key, WriteOp::Creation(bytes))),
-                    Modify(bytes) => {
-                        write_set_mut.insert((state_key, WriteOp::Modification(bytes)))
-                    },
-                }
+                let op = convert_write_op(value_op, false);
+                write_set_mut.insert((state_key, op))
             }
         }
 
@@ -429,5 +400,25 @@ impl SessionOutput {
             .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
 
         Ok(())
+    }
+}
+
+fn convert_write_op(
+    move_storage_op: MoveStorageOp<Vec<u8>>,
+    creation_as_modification: bool,
+) -> WriteOp {
+    use MoveStorageOp::*;
+    use WriteOp::*;
+
+    match move_storage_op {
+        Delete => Deletion,
+        New(blob) => {
+            if creation_as_modification {
+                Modification(blob)
+            } else {
+                Creation(blob)
+            }
+        },
+        Modify(blob) => Modification(blob),
     }
 }
