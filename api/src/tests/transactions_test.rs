@@ -25,6 +25,8 @@ use move_core_types::{
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
+use std::path::PathBuf;
+
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_deserialize_genesis_transaction() {
@@ -816,10 +818,11 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
     .await;
 }
 
-#[ignore] // Re-enable when change is moved to new publish flow
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
+    let mut root = context.root_account();
+    let mut admin = create_account(&mut context, &mut root).await;
 
     let named_addresses = vec![
         ("entry_func_fail".to_string(), admin.address()),
@@ -833,6 +836,21 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     });
     context.publish_package(&mut admin0, txn).await;
 
+    let resp = context
+        .get(
+            format!(
+                "/transactions/by_hash/{}",
+                txn.committed_hash().to_hex_literal()
+            )
+                .as_str(),
+        )
+        .await;
+    assert_eq!(
+        resp["success"].as_bool().unwrap(),
+        false,
+        "{}",
+        pretty(&resp)
+    );
 }
 
 #[ignore] // re-enable after cleaning compiled code
@@ -1088,6 +1106,24 @@ fn gen_string(len: u64) -> String {
         .take(len as usize)
         .map(char::from)
         .collect()
+}
+
+async fn create_account(context: &mut TestContext, root: &mut LocalAccount) -> LocalAccount {
+    let account = context.gen_account();
+    let factory = context.transaction_factory();
+    let txn = root.sign_with_transaction_builder(
+        factory
+            .account_transfer(account.address(), 10_000_000)
+            .expiration_timestamp_secs(u64::MAX),
+    );
+
+    let bcs_txn = bcs::to_bytes(&txn).unwrap();
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs_txn)
+        .await;
+    context.commit_mempool_txns(1).await;
+    account
 }
 
 // For use when not using the methods on `TestContext` directly.

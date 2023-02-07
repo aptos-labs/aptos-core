@@ -415,7 +415,11 @@ impl TestContext {
     fn build_package(
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
+<<<<<<< HEAD
     ) -> TransactionPayload {
+=======
+    ) -> SignedTransaction {
+>>>>>>> 4591e5c18a ([transaction test] adding new move module for transaction tests and rewrite the test test_get_txn_execute_failed_by_entry_function_execution_failure)
         let mut build_options = aptos_framework::BuildOptions::default();
         let _ = named_addresses
             .into_iter()
@@ -440,7 +444,12 @@ impl TestContext {
         self.expect_status_code(202)
             .post_bcs_txn("/transactions", bcs_txn)
             .await;
+<<<<<<< HEAD
         context.commit_mempool_txns(1).await;
+=======
+        self.commit_mempool_txns(1).await;
+        txn
+>>>>>>> 4591e5c18a ([transaction test] adding new move module for transaction tests and rewrite the test test_get_txn_execute_failed_by_entry_function_execution_failure)
     }
 
     pub async fn commit_mempool_txns(&mut self, size: u64) {
