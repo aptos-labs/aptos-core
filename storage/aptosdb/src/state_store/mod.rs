@@ -73,7 +73,6 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Debug)]
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
@@ -81,7 +80,6 @@ pub(crate) struct StateDb {
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
-#[derive(Debug)]
 pub(crate) struct StateStore {
     pub(crate) state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`

@@ -201,6 +201,8 @@ impl ReleaseConfig {
                         .await
                 })?;
                 // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
+                // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
+                // we would like to enable/disable, regardless of their current on chain state.
                 needs_update = feature_flags.has_modified(features.inner());
             }
             if needs_update {
@@ -283,10 +285,17 @@ impl Default for ReleaseConfig {
             testnet: true,
             framework_release: Some(FrameworkReleaseConfig {
                 bytecode_version: 6,
+                git_hash: None,
             }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
-            feature_flags: None,
+            feature_flags: Some(Features {
+                enabled: aptos_vm_genesis::default_features()
+                    .into_iter()
+                    .map(crate::components::feature_flags::FeatureFlag::from)
+                    .collect(),
+                disabled: vec![],
+            }),
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,

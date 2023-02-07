@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{smoke_test_environment::SwarmBuilder, test_utils::MAX_CATCH_UP_WAIT_SECS};
 use aptos::{
     account::create::DEFAULT_FUNDED_COINS,
     common::types::TransactionSummary,
@@ -306,7 +306,7 @@ async fn test_onchain_config_change() {
         .await
         .unwrap();
     swarm
-        .wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(30))
+        .wait_for_all_nodes_to_catchup_to_next(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
     println!(
@@ -418,7 +418,7 @@ async fn test_large_total_stake() {
     );
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(20))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 }

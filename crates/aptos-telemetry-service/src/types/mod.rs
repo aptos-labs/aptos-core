@@ -11,6 +11,7 @@ pub mod common {
     use aptos_types::{chain_id::ChainId, PeerId};
     use serde::{Deserialize, Serialize};
     use std::{collections::HashMap, fmt};
+    use uuid::Uuid;
 
     pub type EpochNum = u64;
     pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
@@ -23,6 +24,7 @@ pub mod common {
         pub chain_id: ChainId,
         pub role_type: NodeType,
         pub epoch: u64,
+        pub uuid: Uuid,
     }
 
     impl From<Claims> for EventIdentity {
@@ -32,6 +34,7 @@ pub mod common {
                 chain_id: claims.chain_id,
                 role_type: claims.node_type,
                 epoch: claims.epoch,
+                uuid: claims.run_uuid,
             }
         }
     }

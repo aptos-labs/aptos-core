@@ -21,10 +21,10 @@ module aptos_std::aptos_hash {
     // Functions
     //
 
-    /// Returns the (non-cryptographic) SipHash of `bytes`. See https://en.wikipedia.org/wiki/SipHash.
+    /// Returns the (non-cryptographic) SipHash of `bytes`. See https://en.wikipedia.org/wiki/SipHash
     native public fun sip_hash(bytes: vector<u8>): u64;
 
-    /// Returns the (non-cryptographic) SipHash of the BCS serialization of `v`. See https://en.wikipedia.org/wiki/SipHash.
+    /// Returns the (non-cryptographic) SipHash of the BCS serialization of `v`. See https://en.wikipedia.org/wiki/SipHash
     public fun sip_hash_from_value<MoveValue>(v: &MoveValue): u64 {
         let bytes = bcs::to_bytes(v);
 
@@ -223,7 +223,7 @@ module aptos_std::aptos_hash {
         b"testing again", // empty message doesn't yield an output on the online generator
         ];
 
-        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256.
+        // From https://www.toolkitbay.com/tkb/tool/BLAKE2b_256
         //
         // For computing the hash of an empty string, we use the following Python3 script:
         // ```

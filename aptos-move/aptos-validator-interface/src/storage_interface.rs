@@ -62,10 +62,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        Ok(self
-            .0
-            .get_state_value_with_proof_by_version(state_key, version)?
-            .0)
+        self.0.get_state_value_by_version(state_key, version)
     }
 
     async fn get_committed_transactions(

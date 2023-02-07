@@ -18,7 +18,6 @@ use std::{
 
 /// Maintains the ledger pruner and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
-#[derive(Debug)]
 pub struct LedgerPrunerWorker {
     /// The worker will sleep for this period of time after pruning each batch.
     pruning_time_interval_in_ms: u64,
