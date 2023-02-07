@@ -1,6 +1,6 @@
 #[test_only]
 module aptos_framework::delegation_pool_integration_tests {
-    #[test_only]
+    use std::features;
     use std::signer;
 
     use aptos_std::bls12381;
@@ -30,8 +30,20 @@ module aptos_framework::delegation_pool_integration_tests {
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
     #[test_only]
+    const DELEGATION_POOLS: u64 = 10;
+
+    #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            1000000
+        );
     }
 
     #[test_only]
@@ -64,6 +76,7 @@ module aptos_framework::delegation_pool_integration_tests {
             voting_power_increase_limit
         );
         reconfiguration::initialize_for_test(aptos_framework);
+        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS], vector[]);
     }
 
     #[test_only]
@@ -134,7 +147,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_1: &signer,
         validator_2: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 100000);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            100000
+        );
         // Have one validator join the set to ensure the validator set is not empty when main validator joins.
         let (_sk_1, pk_1, pop_1) = generate_identity();
         initialize_test_validator(&pk_1, &pop_1, validator_1, 100 * ONE_APT, true, true);
@@ -269,7 +291,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_2: &signer,
     ) {
         // Only 50% voting power increase is allowed in each epoch.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 50);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            50
+        );
         let (_sk_1, pk_1, pop_1) = generate_identity();
         let (_sk_2, pk_2, pop_2) = generate_identity();
         initialize_test_validator(&pk_1, &pop_1, validator_1, 100 * ONE_APT, false, false);
@@ -290,7 +321,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_1: &signer,
         validator_2: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 10000);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            10000
+        );
         // Need 1 validator to be in the active validator set so joining limit works.
         let (_sk_1, pk_1, pop_1) = generate_identity();
         let (_sk_2, pk_2, pop_2) = generate_identity();
@@ -313,7 +353,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_2: &signer,
     ) {
         // 100% voting power increase is allowed in each epoch.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            100
+        );
         // Need 1 validator to be in the active validator set so joining limit works.
         let (_sk_1, pk_1, pop_1) = generate_identity();
         initialize_test_validator(&pk_1, &pop_1, validator_1, 100 * ONE_APT, true, true);
@@ -351,7 +400,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator: &signer,
     ) {
         // Only 50% voting power increase is allowed in each epoch.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 50);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            50
+        );
         // Add initial stake and join the validator set.
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
@@ -373,7 +431,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator: &signer,
     ) {
         // Only 50% voting power increase is allowed in each epoch.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 50);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            50
+        );
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
@@ -387,7 +454,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator: &signer,
     ) {
         // Reward rate = 10%.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            100
+        );
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
@@ -638,7 +714,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_2: &signer,
     ) {
         // Only 50% voting power increase is allowed in each epoch.
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 10, 50);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            10,
+            50
+        );
         let (_sk_1, pk_1, pop_1) = generate_identity();
         let (_sk_2, pk_2, pop_2) = generate_identity();
         initialize_test_validator(&pk_1, &pop_1, validator_1, 100 * ONE_APT, true, false);
@@ -658,7 +743,16 @@ module aptos_framework::delegation_pool_integration_tests {
         validator_2: &signer,
         validator_3: &signer
     ) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            100
+        );
         let (_sk_1, pk_1, pop_1) = generate_identity();
         let (_sk_2, pk_2, pop_2) = generate_identity();
         let (_sk_3, pk_3, pop_3) = generate_identity();
@@ -717,7 +811,16 @@ module aptos_framework::delegation_pool_integration_tests {
         aptos_framework: &signer,
         validator: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            100
+        );
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 0, false, false);
 
@@ -764,7 +867,16 @@ module aptos_framework::delegation_pool_integration_tests {
         aptos_framework: &signer,
         validator: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, false, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            false,
+            1,
+            100,
+            100
+        );
 
         // Joining the validator set should fail as post genesis validator set change is not allowed.
         let (_sk, pk, pop) = generate_identity();
@@ -789,7 +901,16 @@ module aptos_framework::delegation_pool_integration_tests {
         aptos_framework: &signer,
         validator: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, false, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            false,
+            1,
+            100,
+            100
+        );
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, false, false);
 
@@ -881,7 +1002,16 @@ module aptos_framework::delegation_pool_integration_tests {
         aptos_framework: &signer,
         validator: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            100
+        );
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
@@ -900,7 +1030,16 @@ module aptos_framework::delegation_pool_integration_tests {
         aptos_framework: &signer,
         validator: &signer,
     ) {
-        initialize_for_test_custom(aptos_framework, 50 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 100);
+        initialize_for_test_custom(
+            aptos_framework,
+            50 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            100
+        );
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);

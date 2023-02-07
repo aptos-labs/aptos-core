@@ -83,6 +83,7 @@
  */
 module aptos_framework::delegation_pool {
     use std::error;
+    use std::features;
     use std::signer;
     use std::vector;
 
@@ -126,6 +127,9 @@ module aptos_framework::delegation_pool {
     /// Cannot add less stake than `MIN_ADD_STAKE_AMOUNT`.
     const EINVALID_ADD_STAKE_AMOUNT: u64 = 8;
 
+    /// Creating delegation pools is not enabled yet.
+    const EDELEGATION_POOLS_DISABLED: u64 = 9;
+
     const MAX_U64: u64 = 18446744073709551615;
 
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
@@ -136,6 +140,9 @@ module aptos_framework::delegation_pool {
 
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
+    /// Special shareholder temporarily owning the `add_stake` fees charged during this epoch.
+    /// On each `add_stake` operation any resulted fee is used to buy active shares for this shareholder.
+    /// First synchronization after this epoch ends will distribute accumulated fees to the rest of the pool as refunds.
     const NULL_SHAREHOLDER: address = @0x0;
 
     /// Capability that represents ownership over privileged operations on the underlying stake pool.
@@ -170,6 +177,7 @@ module aptos_framework::delegation_pool {
         reactivate_stake_events: EventHandle<ReactivateStakeEvent>,
         unlock_stake_events: EventHandle<UnlockStakeEvent>,
         withdraw_stake_events: EventHandle<WithdrawStakeEvent>,
+        distribute_commission_events: EventHandle<DistributeCommissionEvent>,
     }
 
     struct AddStakeEvent has drop, store {
@@ -195,6 +203,13 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         delegator_address: address,
         amount_withdrawn: u64,
+    }
+
+    struct DistributeCommissionEvent has drop, store {
+        pool_address: address,
+        operator: address,
+        commission_active: u64,
+        commission_pending_inactive: u64,
     }
 
     #[view]
@@ -226,7 +241,10 @@ module aptos_framework::delegation_pool {
     #[view]
     /// Return the unique observed lockup cycle where delegator `delegator_address` may have
     /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at `pool_address`.
-    public fun has_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+    public fun has_pending_withdrawal(
+        pool_address: address,
+        delegator_address: address
+    ): (bool, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
         let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
@@ -234,9 +252,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
-    /// Return the stake amount on the pending withdrawal of regular delegator `delegator_address`
-    /// on `pool_address` and whether it can be executed (is inactive) or not.
-    public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64) acquires DelegationPool {
+    /// Return whether the given delegator has any withdrawable stake. If they recently requested to unlock
+    /// some stake and the stake pool's lockup cycle has not ended, their coins are not withdrawable yet.
+    public fun get_pending_withdrawal(
+        pool_address: address,
+        delegator_address: address
+    ): (bool, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
         let (
@@ -272,7 +293,7 @@ module aptos_framework::delegation_pool {
 
     #[view]
     /// Return total stake owned by `delegator_address` within delegation pool `pool_address`
-    /// in each of its individual states.
+    /// in each of its individual states: (`active`,`inactive`,`pending_inactive`)
     public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64) acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
@@ -291,13 +312,13 @@ module aptos_framework::delegation_pool {
             // exclude operator active rewards not converted to shares yet
             active - commission_active,
             pool_u64::total_shares(&pool.active_shares) -
-            if (pending_active == 0) {
-                // zero `pending_active` stake indicates that either there are no `add_stake` fees or
-                // previous epoch has ended and should identify shares owning these fees as released
-                pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER)
-            } else {
-                0
-            }
+                if (pending_active == 0) {
+                    // zero `pending_active` stake indicates that either there are no `add_stake` fees or
+                    // previous epoch has ended and should identify shares owning these fees as released
+                    pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER)
+                } else {
+                    0
+                }
         );
         // get state and stake (0 if there is none) of the pending withdrawal
         let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
@@ -350,14 +371,19 @@ module aptos_framework::delegation_pool {
     /// the validator had gone inactive before its lockup expired.
     public fun can_withdraw_pending_inactive(pool_address: address): bool {
         stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
-        timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
+            timestamp::now_seconds() >= stake::get_lockup_secs(pool_address)
     }
 
+    /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
+    /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
+    /// to host the delegation pool resource and own the underlying stake pool.
+    /// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
     public entry fun initialize_delegation_pool(
         owner: &signer,
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
     ) {
+        assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
         assert!(operator_commission_percentage <= MAX_FEE, error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE));
@@ -391,6 +417,7 @@ module aptos_framework::delegation_pool {
             reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(&stake_pool_signer),
             unlock_stake_events: account::new_event_handle<UnlockStakeEvent>(&stake_pool_signer),
             withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(&stake_pool_signer),
+            distribute_commission_events: account::new_event_handle<DistributeCommissionEvent>(&stake_pool_signer),
         });
 
         // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
@@ -421,7 +448,12 @@ module aptos_framework::delegation_pool {
     }
 
     /// Return the number of coins `shares` are worth in `pool` with custom total coins and shares numbers
-    fun shares_to_amount_with_total_stats(pool: &pool_u64::Pool, shares: u64, total_coins: u64, total_shares: u64): u64 {
+    fun shares_to_amount_with_total_stats(
+        pool: &pool_u64::Pool,
+        shares: u64,
+        total_coins: u64,
+        total_shares: u64
+    ): u64 {
         if (total_coins(pool) == 0 || total_shares == 0) {
             0
         } else {
@@ -430,7 +462,10 @@ module aptos_framework::delegation_pool {
     }
 
     /// Allows an owner to change the operator of the underlying stake pool.
-    public entry fun set_operator(owner: &signer, new_operator: address) acquires DelegationPoolOwnership, DelegationPool {
+    public entry fun set_operator(
+        owner: &signer,
+        new_operator: address
+    ) acquires DelegationPoolOwnership, DelegationPool {
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         // synchronize delegation and stake pools before any user operation
         // ensure the old operator is paid its uncommitted commission rewards
@@ -439,7 +474,10 @@ module aptos_framework::delegation_pool {
     }
 
     /// Allows an owner to change the delegated voter of the underlying stake pool.
-    public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires DelegationPoolOwnership, DelegationPool {
+    public entry fun set_delegated_voter(
+        owner: &signer,
+        new_voter: address
+    ) acquires DelegationPoolOwnership, DelegationPool {
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
@@ -560,7 +598,7 @@ module aptos_framework::delegation_pool {
         // exit if no withdrawal or (it is pending and cannot withdraw pending_inactive stake from stake pool)
         if (!(
             withdrawal_exists &&
-            (withdrawal_olc.index < pool.observed_lockup_cycle.index || can_withdraw_pending_inactive(pool_address))
+                (withdrawal_olc.index < pool.observed_lockup_cycle.index || can_withdraw_pending_inactive(pool_address))
         )) { return };
 
         amount = redeem_inactive_shares(pool, delegator_address, amount, withdrawal_olc);
@@ -793,6 +831,8 @@ module aptos_framework::delegation_pool {
         // previous epoch has ended and should release the shares owning the existing fees
         let (_, _, pending_active, _) = stake::get_stake(pool_address);
         if (pending_active == 0) {
+            // renounce ownership over the `add_stake` fees by redeeming all shares of
+            // the special shareholder, implicitly their equivalent coins, out of the active shares pool
             redeem_active_shares(pool, NULL_SHAREHOLDER, MAX_U64);
         };
 
@@ -801,14 +841,28 @@ module aptos_framework::delegation_pool {
         // otherwise, operator's new shares would additionally appreciate from rewards it does not own
 
         // update total coins accumulated by `active` + `pending_active` shares
+        // redeemed `add_stake` fees are restored and distributed to the rest of the pool as rewards
         pool_u64::update_total_coins(&mut pool.active_shares, active - commission_active);
         // update total coins accumulated by `pending_inactive` shares at current observed lockup cycle
-        pool_u64::update_total_coins(pending_inactive_shares_pool(pool), pending_inactive - commission_pending_inactive);
+        pool_u64::update_total_coins(
+            pending_inactive_shares_pool(pool),
+            pending_inactive - commission_pending_inactive
+        );
 
         // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
         pool_u64::buy_in(&mut pool.active_shares, stake::get_operator(pool_address), commission_active);
         // reward operator its commission out of uncommitted pending_inactive rewards
         buy_in_pending_inactive_shares(pool, stake::get_operator(pool_address), commission_pending_inactive);
+
+        event::emit_event(
+            &mut pool.distribute_commission_events,
+            DistributeCommissionEvent {
+                pool_address,
+                operator: stake::get_operator(pool_address),
+                commission_active,
+                commission_pending_inactive,
+            },
+        );
 
         // advance lockup cycle on delegation pool if already ended on stake pool (AND stake explicitly inactivated)
         if (lockup_cycle_ended) {
@@ -847,6 +901,9 @@ module aptos_framework::delegation_pool {
     const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
 
     #[test_only]
+    const DELEGATION_POOLS: u64 = 10;
+
+    #[test_only]
     public fun end_aptos_epoch() {
         stake::end_epoch(); // additionally forwards EPOCH_DURATION seconds
         reconfiguration::reconfigure_for_test_custom();
@@ -854,7 +911,16 @@ module aptos_framework::delegation_pool {
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            1000000
+        );
     }
 
     #[test_only]
@@ -880,6 +946,7 @@ module aptos_framework::delegation_pool {
             voting_power_increase_limit,
         );
         reconfiguration::initialize_for_test(aptos_framework);
+        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS], vector[]);
     }
 
     #[test_only]
@@ -911,6 +978,18 @@ module aptos_framework::delegation_pool {
         if (should_end_epoch) {
             end_aptos_epoch();
         };
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x30009, location = Self)]
+    public entry fun test_delegation_pools_disabled(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) {
+        initialize_for_test(aptos_framework);
+        features::change_feature_flags(aptos_framework, vector[], vector[DELEGATION_POOLS]);
+
+        initialize_delegation_pool(validator, 0, vector::empty<u8>());
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -998,7 +1077,16 @@ module aptos_framework::delegation_pool {
         delegator1: &signer,
         delegator2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
-        initialize_for_test_custom(aptos_framework, 100 * ONE_APT, 10000000 * ONE_APT, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+        initialize_for_test_custom(
+            aptos_framework,
+            100 * ONE_APT,
+            10000000 * ONE_APT,
+            LOCKUP_CYCLE_SECONDS,
+            true,
+            1,
+            100,
+            1000000
+        );
 
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
