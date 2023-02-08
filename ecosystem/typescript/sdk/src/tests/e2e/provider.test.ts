@@ -6,15 +6,9 @@ import { FaucetClient } from "../../providers/faucet_client";
 import { TokenClient } from "../../token_client";
 import { Network } from "../../utils/api-endpoints";
 
-const aptosClient = new AptosClient("https://fullnode.devnet.aptoslabs.com");
-const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com");
-const tokenClient = new TokenClient(aptosClient);
-const alice = new AptosAccount();
-
 describe("Provider", () => {
-  beforeAll(async () => {
-    await faucetClient.fundAccount(alice.address(), 100000000);
-  });
+  const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com");
+  const alice = new AptosAccount();
 
   it("uses provided network as API", async () => {
     const provider = new Provider(Network.TESTNET);
@@ -28,13 +22,14 @@ describe("Provider", () => {
     expect(provider.indexerClient.endpoint).toBe("indexer-url");
   });
 
-  it.only("throws error when endpoint not provided", async () => {
+  it("throws error when endpoint not provided", async () => {
     expect(() => {
       new Provider({ fullnodeUrl: "", indexerUrl: "" });
     }).toThrow("network is not provided");
   });
 
   it("gets genesis account from fullnode", async () => {
+    await faucetClient.fundAccount(alice.address(), 100000000);
     const provider = new Provider(Network.DEVNET);
     const genesisAccount = await provider.getAccount("0x1");
     expect(genesisAccount.authentication_key.length).toBe(66);
@@ -42,6 +37,9 @@ describe("Provider", () => {
   });
 
   it("gets account NFTs from indexer", async () => {
+    const aptosClient = new AptosClient("https://fullnode.devnet.aptoslabs.com");
+    const tokenClient = new TokenClient(aptosClient);
+    await faucetClient.fundAccount(alice.address(), 100000000);
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
