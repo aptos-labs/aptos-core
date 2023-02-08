@@ -30,7 +30,7 @@
     "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "scripts/checked_publish.sh",
     "generate-ts-docs": "scripts/generate_ts_docs.sh",
-    "indexer-codegen": "graphql-codegen --config ./indexer/codegen.ts"
+    "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml"
   },
   "repository": {
     "type": "git",
@@ -51,11 +51,16 @@
     "@scure/bip39": "1.1.0",
     "axios": "0.27.2",
     "form-data": "4.0.0",
-    "graphql": "^16.6.0",
+    "graphql": "^16.5.0",
     "tweetnacl": "1.0.3"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "3.0.0",
+    "graphql-tag": "^2.12.6",
+    "@graphql-codegen/cli": "^2.13.5",
+    "@graphql-codegen/import-types-preset": "^2.2.3",
+    "@graphql-codegen/typescript": "^2.7.3",
+    "@graphql-codegen/typescript-document-nodes": "2.2.13",
+    "@graphql-codegen/typescript-operations": "^2.5.3",
     "@types/jest": "28.1.8",
     "@types/node": "18.6.2",
     "@typescript-eslint/eslint-plugin": "5.36.2",
@@ -74,10 +79,7 @@
     "ts-node": "10.9.1",
     "tsup": "6.2.3",
     "typedoc": "^0.23.20",
-    "typescript": "4.8.2",
-    "@graphql-codegen/typescript": "3.0.0",
-    "@graphql-codegen/typescript-document-nodes": "3.0.0",
-    "@graphql-codegen/introspection": "3.0.0"
+    "typescript": "4.8.2"
   },
   "version": "1.6.0"
 }

@@ -1,8 +1,8 @@
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { bcsSerializeBool } from "./bcs";
+import { Connection } from "./aptos_connection";
 import { FaucetClient } from "./faucet_client";
-import { IndexerClient } from "./indexer_client";
 import { TokenClient } from "./token_client";
 
 const aptosClient = new AptosClient("https://fullnode.devnet.aptoslabs.com");
@@ -10,12 +10,19 @@ const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "
 const tokenClient = new TokenClient(aptosClient);
 const alice = new AptosAccount();
 
-describe("IndexerClient", () => {
+describe("ConnectionClient", () => {
   beforeAll(async () => {
     await faucetClient.fundAccount(alice.address(), 100000000);
   });
 
-  it("gets account NFTs", async () => {
+  it("gets genesis account with fullnode", async () => {
+    const connection = new Connection("devnet");
+    const genesisAccount = await connection.getAccount("0x1");
+    expect(genesisAccount.authentication_key.length).toBe(66);
+    expect(genesisAccount.sequence_number).not.toBeNull();
+  });
+
+  it("gets account NFTs with indexer", async () => {
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
@@ -45,17 +52,11 @@ describe("IndexerClient", () => {
       { checkSuccess: true },
     );
 
-    let connection = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
-    const accountNFTs = await connection.getAccountNFTs(alice.address().hex());
+    let connection = new Connection("devnet");
+    const accountNFTs = await connection.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
+
     expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
     expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
     expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
-
-    const tokenActivity = await connection.getTokenActivities(
-      accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
-    );
-    expect(tokenActivity.token_activities).toHaveLength(2);
-    expect(tokenActivity.token_activities[0]).toHaveProperty("from_address");
-    expect(tokenActivity.token_activities[0]).toHaveProperty("to_address");
   });
 });

@@ -1,12 +1,10 @@
 import { AnyNumber } from "./bcs/types";
 import axios from "axios";
+import { print } from "graphql/language/printer";
 
 import { MaybeHexString } from "./hex_string";
-
-const headers = {
-  Accept: "application/json",
-  "Content-Type": "application/json",
-};
+import { GetAccountCurrentTokens, GetTokenActivities } from "./indexer/generated/queries";
+import { GetAccountCurrentTokensQuery, GetTokenActivitiesQuery } from "./indexer/generated/operations";
 
 interface PaginationArgs {
   offset?: AnyNumber;
@@ -42,27 +40,20 @@ export class IndexerClient {
     }
   }
 
-  // TODO use graphql codegen for queries
-  async getAccountNFTs(ownerAddress: MaybeHexString, query?: PaginationArgs): Promise<any> {
+  async getAccountNFTs(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCurrentTokensQuery> {
     const graphqlQuery = {
-      query: `query AccountCurrentTokenOwnership($owner_address: String, $limit: Int, $offset: Int) {
-        current_token_ownerships(
-          where: { owner_address: { _eq: $owner_address }, amount: { _gt: "0" } }
-          limit: $limit
-          offset: $offset
-        ) {
-          token_data_id_hash
-          name
-          collection_name
-          table_type
-          property_version
-          amount
-        }
-      }
-    `,
-      variables: { owner_address: ownerAddress, limit: query?.limit, offset: query?.offset },
+      query: print(GetAccountCurrentTokens),
+      variables: { address: ownerAddress, offset: options?.offset, limit: options?.limit },
     };
 
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  async getTokenActivities(idHash: string): Promise<GetTokenActivitiesQuery> {
+    const graphqlQuery = {
+      query: print(GetTokenActivities),
+      variables: { idHash },
+    };
     return this.queryIndexer(graphqlQuery);
   }
 }
