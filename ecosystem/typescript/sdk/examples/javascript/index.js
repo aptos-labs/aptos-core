@@ -4,6 +4,7 @@ const aptos = require("aptos");
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+const INDEXER_URL = process.env.INDEXER_URL || "https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -68,7 +69,7 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
     { checkSuccess: true },
   );
 
-  let indexerClient = new aptos.IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  let indexerClient = new aptos.IndexerClient(INDEXER_URL);
   const response = await indexerClient.getAccountNFTs(account1.address().hex(), { limit: 20, offset: 0 });
   console.log(
     `account1 current token name: ${response.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,

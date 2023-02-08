@@ -2,8 +2,9 @@
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TokenClient, IndexerClient } from "aptos";
 import assert from "assert";
 
-const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
-const FAUCET_URL = "https://faucet.devnet.aptoslabs.com";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+const FAUCET_URL = process.env.APTOS_NODE_URL || "https://faucet.devnet.aptoslabs.com";
+const INDEXER_URL = process.env.INDEXER_URL || "https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql";
 
 export const aptosCoinStore = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -93,6 +94,7 @@ const {
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);
 
+  // test IndexerClient
   const tokenClient = new TokenClient(client);
   const collectionName = "AliceCollection";
   const tokenName = "Alice Token";
@@ -123,7 +125,7 @@ const {
     { checkSuccess: true },
   );
 
-  let indexerClient = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  let indexerClient = new IndexerClient(INDEXER_URL);
   const accountNFTs = await indexerClient.getAccountNFTs(account1.address().hex());
   console.log(
     `account1 token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,
