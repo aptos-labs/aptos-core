@@ -97,7 +97,7 @@ const fetchList = async () => {
 
 The `moduleAddress` is the address we publish the module under, i.e the account address you have in your `Move.toml` file (`myaddr`).
 
-The `client.getAccountResource()`expects an _account address_ that holds the resource we are looking for and a string representation of an on-chain _Move struct type_.
+The `client.getAccountResource()`expects an *account address* that holds the resource we are looking for and a string representation of an on-chain *Move struct type*.
 
 - account address - is the current connected account (we are getting it from the wallet account object)
 - Move struct type string syntax:

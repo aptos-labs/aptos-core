@@ -179,7 +179,7 @@ We haven’t added any tasks yet, so we simply see a box of empty data. Let’s 
 
 ## Add task
 
-1. Update our UI with an _add task_ input:
+1. Update our UI with an *add task* input:
 
 ```jsx
 {!accountHasList ? (
