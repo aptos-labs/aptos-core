@@ -1,23 +1,23 @@
 /**
  * Allow multiple delegators to participate in the same stake pool in order to collect the minimum
  * stake required to join the validator set. Delegators are rewarded out of the validator rewards
- * proportionally to their stake and provided the same stake-management API as the stake owner.
+ * proportionally to their stake and provided the same stake-management API as the stake pool owner.
  *
  * The main accounting logic in the delegation pool contract handles the following:
- * 1. Tracks how much stake each delegator owns, privately deposited and earned too.
+ * 1. Tracks how much stake each delegator owns, privately deposited as well as earned.
  * Accounting individual delegator stakes is achieved through the shares-based pool defined at
  * `aptos_std::pool_u64`, hence delegators own shares rather than absolute stakes into the delegation pool.
  * 2. Tracks rewards earned by the stake pool, implicitly by the delegation one, in the meantime
  * and distribute them accordingly.
  * 3. Tracks lockup cycles on the stake pool in order to separate inactive stake (not earning rewards)
- * from pending_inactive stake (earning rewards) and allow its delegators to withdraw it
+ * from pending_inactive stake (earning rewards) and allow its delegators to withdraw the former.
  * 4. Tracks how much commission fee has to be paid to the operator out of incoming rewards before
  * distributing them to the internal pool_u64 pools.
  *
  * In order to distinguish between stakes in different states and route rewards accordingly,
  * separate pool_u64 pools are used for individual stake states:
  *      1. one of `active` + `pending_active` stake
- *      2. one of `inactive` stake FOR each past observed lockup cycle (OLC) detected on the stake pool
+ *      2. one of `inactive` stake FOR each past observed lockup cycle (OLC) on the stake pool
  *      3. one of `pending_inactive` stake scheduled during this ongoing OLC
  *
  * As stake-state transitions and rewards are computed only at the stake pool level, the delegation pool
@@ -27,17 +27,17 @@
  * At synchronization:
  *  - stake deviations between the two pools are actually the rewards produced in the meantime.
  *  - the commission fee is extracted from the rewards, the remaining stake is distributed to the internal
- * pool_u64 pools and then commission stake used to buy shares for operator
+ * pool_u64 pools and then the commission stake used to buy shares for operator.
  *  - if detecting that the lockup expired on the stake pool, the delegation pool will isolate its
  * pending_inactive stake (now inactive) and create a new pool_u64 to host future pending_inactive stake
- * at the newly started lockup.
+ * scheduled this newly started lockup.
  * Detecting a lockup expiration on the stake pool resumes to detecting new inactive stake.
  *
  * Accounting main invariants:
  *  - each stake-management operation (add/unlock/reactivate/withdraw) and operator change triggers
  * the synchronization process before executing its own function.
  *  - each OLC maps to one or more real lockups on the stake pool, but not the opposite. Actually, only a real
- * lockup with 'activity' (existing unlocking stake) triggers the creation of a new OLC.
+ * lockup with 'activity' (which inactivated some unlocking stake) triggers the creation of a new OLC.
  *  - unlocking and/or unlocked stake originating from different real lockups are never mixed together into
  * the same pool_u64. This invalidates the accounting of which rewards belong to whom.
  *  - no delegator can have unlocking and/or unlocked stake (pending withdrawals) in different OLCs. This ensures
@@ -45,7 +45,7 @@
  * the existing one is executed (withdrawn) if is already inactive.
  *  - `add_stake` fees are always refunded, but only after the epoch when they have been charged ends.
  *  - withdrawing pending_inactive stake (when validator had gone inactive before its lockup expired)
- * does not inactivate any stake additional to the requested one to ensure OLC cannot advance indefinitely.
+ * does not inactivate any stake additional to the requested one to ensure OLC would not advance indefinitely.
  *  - the pending withdrawal exists at an OLC iff delegator owns some shares within the shares pool of that OLC.
  *
  * Example flow:
@@ -236,6 +236,13 @@ module aptos_framework::delegation_pool {
     public fun observed_lockup_cycle(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         borrow_global<DelegationPool>(pool_address).observed_lockup_cycle.index
+    }
+
+    #[view]
+    /// Return the operator commission percentage set on the delegation pool `pool_address`.
+    public fun operator_commission_percentage(pool_address: address): u64 acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        borrow_global<DelegationPool>(pool_address).operator_commission_percentage
     }
 
     #[view]
@@ -1054,7 +1061,7 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
 
         let validator_address = signer::address_of(validator);
-        initialize_delegation_pool(validator, 0, vector::empty<u8>());
+        initialize_delegation_pool(validator, 1234, vector::empty<u8>());
 
         assert_owner_cap_exists(validator_address);
         let pool_address = get_owned_pool_address(validator_address);
@@ -1066,6 +1073,7 @@ module aptos_framework::delegation_pool {
 
         assert!(observed_lockup_cycle(pool_address) == 0, 0);
         assert!(total_coins_inactive(pool_address) == 0, 0);
+        assert!(operator_commission_percentage(pool_address) == 1234, 0);
         assert_inactive_shares_pool(pool_address, 0, true, 0);
         stake::assert_stake_pool(pool_address, 0, 0, 0, 0);
     }
