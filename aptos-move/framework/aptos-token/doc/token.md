@@ -108,6 +108,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `direct_deposit`](#0x3_token_direct_deposit)
 -  [Function `assert_collection_exists`](#0x3_token_assert_collection_exists)
 -  [Function `assert_tokendata_exists`](#0x3_token_assert_tokendata_exists)
+-  [Function `assert_non_standard_reserved_property`](#0x3_token_assert_non_standard_reserved_property)
 -  [Function `initialize_token_script`](#0x3_token_initialize_token_script)
 -  [Function `initialize_token`](#0x3_token_initialize_token)
 
@@ -1288,6 +1289,16 @@ Token is not burnable by owner
 
 
 
+<a name="0x3_token_EPROPERTY_RESERVED_BY_STANDARD"></a>
+
+The property is reserved by token standard
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_EPROPERTY_RESERVED_BY_STANDARD">EPROPERTY_RESERVED_BY_STANDARD</a>: u64 = 40;
+</code></pre>
+
+
+
 <a name="0x3_token_EROYALTY_PAYEE_ACCOUNT_DOES_NOT_EXIST"></a>
 
 Royalty payee account does not exist
@@ -2227,6 +2238,7 @@ Allow creator to mutate the default properties in TokenData
     <b>let</b> i: u64 = 0;
     <b>let</b> old_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Option&lt;PropertyValue&gt;&gt; = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> new_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;PropertyValue&gt; = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(&keys);
     <b>while</b> (i &lt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&keys)){
         <b>let</b> key = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&keys, i);
         <b>let</b> old_pv = <b>if</b> (<a href="property_map.md#0x3_property_map_contains_key">property_map::contains_key</a>(&token_data.default_properties, key)) {
@@ -4321,7 +4333,7 @@ return if the collection maximum is mutable with collection mutability config
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(tokens, token_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ENO_TOKEN_IN_TOKEN_STORE">ENO_TOKEN_IN_TOKEN_STORE</a>));
 
     <b>let</b> value = &<b>mut</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(tokens, token_id).token_properties;
-
+    <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(&keys);
     <a href="property_map.md#0x3_property_map_update_property_map">property_map::update_property_map</a>(value, keys, values, types);
 }
 </code></pre>
@@ -4420,6 +4432,40 @@ Deposit the token balance into the recipients account and emit an event.
     <b>assert</b>!(<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ECOLLECTIONS_NOT_PUBLISHED">ECOLLECTIONS_NOT_PUBLISHED</a>));
     <b>let</b> all_token_data = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_addr).token_data;
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_token_data, token_data_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_DATA_NOT_PUBLISHED">ETOKEN_DATA_NOT_PUBLISHED</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x3_token_assert_non_standard_reserved_property"></a>
+
+## Function `assert_non_standard_reserved_property`
+
+
+
+<pre><code><b>fun</b> <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(keys: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(keys: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) {
+    <b>let</b> len = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(keys);
+    <b>let</b> i = 0;
+    <b>while</b> ( i &lt; len) {
+        <b>let</b> key = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(keys, i);
+        <b>let</b> length = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(key);
+        <b>if</b> (length &gt;= 6) {
+            <b>let</b> prefix = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_sub_string">string::sub_string</a>(&*key, 0, 6);
+            <b>assert</b>!(prefix != <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"TOKEN_"), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EPROPERTY_RESERVED_BY_STANDARD">EPROPERTY_RESERVED_BY_STANDARD</a>));
+        };
+        i = i + 1;
+    };
 }
 </code></pre>
 

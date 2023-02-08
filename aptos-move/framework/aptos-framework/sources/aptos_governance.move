@@ -129,14 +129,14 @@ module aptos_framework::aptos_governance {
         signer_address: address,
         signer_cap: SignerCapability,
     ) acquires GovernanceResponsbility {
-        system_addresses::assert_framework_reserved_address(aptos_framework);
-        let addr = signer::address_of(aptos_framework);
+        system_addresses::assert_aptos_framework(aptos_framework);
+        system_addresses::assert_framework_reserved(signer_address);
 
-        if (!exists<GovernanceResponsbility>(addr)) {
+        if (!exists<GovernanceResponsbility>(@aptos_framework)) {
             move_to(aptos_framework, GovernanceResponsbility { signer_caps: simple_map::create<address, SignerCapability>() });
         };
 
-        let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(addr).signer_caps;
+        let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(@aptos_framework).signer_caps;
         simple_map::add(signer_caps, signer_address, signer_cap);
     }
 

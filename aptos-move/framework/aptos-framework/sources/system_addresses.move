@@ -31,8 +31,12 @@ module aptos_framework::system_addresses {
     }
 
     public fun assert_framework_reserved_address(account: &signer) {
+        assert_framework_reserved(signer::address_of(account));
+    }
+
+    public fun assert_framework_reserved(addr: address) {
         assert!(
-            is_framework_reserved_address(signer::address_of(account)),
+            is_framework_reserved_address(addr),
             error::permission_denied(ENOT_FRAMEWORK_RESERVED_ADDRESS),
         )
     }

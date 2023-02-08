@@ -97,6 +97,8 @@ pub(crate) enum LogIngestError {
     UnexpectedContentEncoding,
     #[error("unable to ingest logs")]
     IngestionError,
+    #[error("peer id forbidden from posting logs")]
+    Forbidden(PeerId),
 }
 
 #[derive(Debug, ThisError)]

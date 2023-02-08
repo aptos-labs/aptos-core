@@ -22,6 +22,7 @@ use reqwest::{header::CONTENT_ENCODING, Response, StatusCode, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, RequestBuilder};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::{io::Write, sync::Arc};
+use uuid::Uuid;
 
 pub const DEFAULT_VERSION_PATH_BASE: &str = "api/v1/";
 
@@ -50,6 +51,7 @@ pub(crate) struct TelemetrySender {
     role_type: RoleType,
     client: ClientWithMiddleware,
     auth_context: Arc<AuthContext>,
+    uuid: Uuid,
 }
 
 impl TelemetrySender {
@@ -80,6 +82,7 @@ impl TelemetrySender {
             role_type: node_config.base.role,
             client,
             auth_context: Arc::new(AuthContext::new(node_config)),
+            uuid: uuid::Uuid::new_v4(),
         }
     }
 
@@ -313,11 +316,12 @@ impl TelemetrySender {
             role_type: self.role_type,
             server_public_key,
             handshake_msg: client_noise_msg,
+            run_uuid: self.uuid,
         };
 
         let response = self
             .client
-            .post(format!("{}/api/v1/auth", self.base_url))
+            .post(self.build_path("auth")?)
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;

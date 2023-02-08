@@ -3,7 +3,7 @@
 
 use crate::{
     clients::{big_query, humio, victoria_metrics_api::Client as MetricsClient},
-    context::{ClientTuple, Context, JsonWebTokenService, PeerStoreTuple},
+    context::{ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple},
     index::routes,
     metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
@@ -16,8 +16,15 @@ use gcp_bigquery_client::Client as BigQueryClient;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap, convert::Infallible, env, fs::File, io::Read, net::SocketAddr,
-    path::PathBuf, sync::Arc, time::Duration,
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    env,
+    fs::File,
+    io::Read,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
 };
 use types::common::ChainCommonName;
 use warp::{Filter, Reply};
@@ -88,11 +95,7 @@ impl AptosTelemetryServiceArgs {
             .cloned()
             .unwrap();
 
-        let humio_client = humio::IngestClient::new(
-            Url::parse(&config.humio_url).expect("invalid Humio ingest endpoint URL"),
-            env::var("HUMIO_INGEST_TOKEN")
-                .expect("environment variable HUMIO_INGEST_TOKEN must be set"),
-        );
+        let log_ingest_clients: LogIngestClients = config.humio_ingest_config.clone().into();
 
         let jwt_service = JsonWebTokenService::from_base64_secret(
             env::var("JWT_SIGNING_KEY")
@@ -114,7 +117,7 @@ impl AptosTelemetryServiceArgs {
             ClientTuple::new(
                 Some(bigquery_client),
                 Some(metrics_clients),
-                Some(humio_client),
+                Some(log_ingest_clients),
             ),
             jwt_service,
             config.log_env_map.clone(),
@@ -227,6 +230,57 @@ impl MetricsEndpointsConfig {
     }
 }
 
+/// A single log ingest endpoint config
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogIngestEndpoint {
+    pub endpoint_url: Url,
+    pub key_env_var: String,
+}
+
+impl LogIngestEndpoint {
+    #[cfg(test)]
+    fn default_for_test() -> Self {
+        Self {
+            endpoint_url: Url::parse("test://test").unwrap(),
+            key_env_var: "".into(),
+        }
+    }
+
+    fn make_client(&self) -> humio::IngestClient {
+        let secret = env::var(&self.key_env_var).unwrap_or_else(|_| {
+            panic!(
+                "environment variable {} must be set.",
+                self.key_env_var.clone()
+            )
+        });
+
+        humio::IngestClient::new(self.endpoint_url.clone(), secret)
+    }
+}
+
+/// Log ingest configuration for different sources
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogIngestConfig {
+    // Log endpoint for known nodes (nodes from validator set, whitelist, etc.)
+    pub known_logs_endpoint: LogIngestEndpoint,
+    // Log endpoint for unknown nodes
+    pub unknown_logs_endpoint: LogIngestEndpoint,
+    // Blacklisted peers from log ingestion
+    pub blacklist_peers: Option<HashSet<PeerId>>,
+}
+impl LogIngestConfig {
+    #[cfg(test)]
+    pub(crate) fn default_for_test() -> LogIngestConfig {
+        Self {
+            known_logs_endpoint: LogIngestEndpoint::default_for_test(),
+            unknown_logs_endpoint: LogIngestEndpoint::default_for_test(),
+            blacklist_peers: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TelemetryServiceConfig {
@@ -241,7 +295,7 @@ pub struct TelemetryServiceConfig {
     pub pfn_allowlist: HashMap<ChainId, HashMap<PeerId, x25519::PublicKey>>,
 
     pub custom_event_config: CustomEventConfig,
-    pub humio_url: String,
+    pub humio_ingest_config: LogIngestConfig,
 
     pub log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,

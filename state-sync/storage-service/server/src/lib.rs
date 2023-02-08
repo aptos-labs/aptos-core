@@ -365,7 +365,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                                 data_subscription,
                                 target_ledger_info,
                             ) {
-                                error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                                warn!(LogSchema::new(LogEntry::SubscriptionResponse)
                                     .error(&Error::UnexpectedErrorEncountered(error.to_string())));
                             }
                         }
@@ -428,7 +428,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 /// Identifies the data subscriptions that can be handled now.
 /// Returns the list of peers that made those subscriptions
 /// alongside the ledger info at the target version for the peer.
-fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
+pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
@@ -446,12 +446,14 @@ fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
 
     // Identify the peers with ready subscriptions
     let mut ready_subscriptions = vec![];
+    let mut invalid_peer_subscriptions = vec![];
     for (peer, data_subscription) in data_subscriptions.lock().iter() {
-        if data_subscription.highest_known_version() < highest_synced_version {
+        let highest_known_version = data_subscription.highest_known_version();
+        if highest_known_version < highest_synced_version {
             let highest_known_epoch = data_subscription.highest_known_epoch();
-            let target_ledger_info = if highest_known_epoch < highest_synced_epoch {
+            if highest_known_epoch < highest_synced_epoch {
                 // The peer needs to sync to their epoch ending ledger info
-                get_epoch_ending_ledger_info(
+                let epoch_ending_ledger_info = get_epoch_ending_ledger_info(
                     cached_storage_server_summary.clone(),
                     data_subscriptions.clone(),
                     highest_known_epoch,
@@ -459,13 +461,34 @@ fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
                     data_subscription.protocol,
                     storage.clone(),
                     time_service.clone(),
-                )?
+                )?;
+
+                // Check that we haven't been sent an invalid subscription request
+                // (i.e., a request that does not respect an epoch boundary).
+                if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version {
+                    invalid_peer_subscriptions.push(*peer);
+                } else {
+                    ready_subscriptions.push((*peer, epoch_ending_ledger_info));
+                }
             } else {
-                highest_synced_ledger_info.clone()
+                ready_subscriptions.push((*peer, highest_synced_ledger_info.clone()));
             };
-            ready_subscriptions.push((*peer, target_ledger_info));
         }
     }
+
+    // Remove the invalid subscriptions
+    for peer in invalid_peer_subscriptions {
+        if let Some(data_subscription) = data_subscriptions.lock().remove(&peer) {
+            debug!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                .error(&Error::InvalidRequest(
+                    "Mismatch between known version and epoch!".into()
+                ))
+                .request(&data_subscription.request)
+                .message("Dropping invalid subscription request!"));
+        }
+    }
+
+    // Return the ready subscriptions
     Ok(ready_subscriptions)
 }
 
@@ -666,7 +689,7 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 }
 
 /// Removes all expired data subscriptions
-fn remove_expired_data_subscriptions(
+pub(crate) fn remove_expired_data_subscriptions(
     config: StorageServiceConfig,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
 ) {

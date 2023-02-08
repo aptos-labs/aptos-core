@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
+use crate::{
+    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    test_utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
+};
 use aptos::{common::types::EncodingType, test::CliTestFramework};
 use aptos_config::{
     config::{
@@ -55,7 +58,7 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(vfn_peer_id)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -74,13 +77,13 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(pfn_peer_id)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
     // This node should connect
     FullNode::wait_for_connectivity(
         swarm.fullnode(pfn_peer_id).unwrap(),
-        Instant::now() + Duration::from_secs(10),
+        Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS),
     )
     .await
     .unwrap();
@@ -116,7 +119,7 @@ async fn test_connection_limiting() {
     swarm
         .fullnode_mut(pfn_peer_id_fail)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
     tokio::time::sleep(Duration::from_secs(5)).await;

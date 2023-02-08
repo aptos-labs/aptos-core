@@ -5,6 +5,7 @@ use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
+        MAX_HEALTHY_WAIT_SECS,
     },
 };
 use aptos_cached_packages::aptos_stdlib;
@@ -64,7 +65,7 @@ async fn test_basic_restartability() {
     let validator = swarm.validators_mut().next().unwrap();
     validator.restart().await.unwrap();
     validator
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 

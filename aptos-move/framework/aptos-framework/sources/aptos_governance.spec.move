@@ -9,13 +9,13 @@ spec aptos_framework::aptos_governance {
         signer_address: address,
         signer_cap: SignerCapability,
     ) {
-        let addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_framework_reserved_address(addr);
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        aborts_if !system_addresses::is_framework_reserved_address(signer_address);
 
-        let signer_caps = global<GovernanceResponsbility>(addr).signer_caps;
-        aborts_if exists<GovernanceResponsbility>(addr) &&
+        let signer_caps = global<GovernanceResponsbility>(@aptos_framework).signer_caps;
+        aborts_if exists<GovernanceResponsbility>(@aptos_framework) &&
             simple_map::spec_contains_key(signer_caps, signer_address);
-        ensures exists<GovernanceResponsbility>(addr);
+        ensures exists<GovernanceResponsbility>(@aptos_framework);
     }
 
     /// Signer address must be @aptos_framework.
