@@ -48,6 +48,12 @@ NETWORK_URLS = {
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 """Devnet faucet URL."""
 
+TEST_PASSWORD = "password"
+"""Test password for bypassing prompts."""
+
+USE_TEST_PASSWORD = True
+"""True if using test password for bypassing prompts."""
+
 
 def bytes_to_prefixed_hex(input_bytes: bytes) -> str:
     """Convert bytes to hex string with 0x prefix."""
@@ -77,9 +83,13 @@ def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
     encrypted_hex = data["encrypted_private_key"]  # Get encrypted key.
     # Convert encrypted private key hex to bytes.
     encrypted_private_key = prefixed_hex_to_bytes(encrypted_hex)
-    # Define password input prompt.
-    prompt = "Enter password for encrypted private key: "
-    password = getpass.getpass(prompt)  # Get keyfile password.
+    if USE_TEST_PASSWORD:  # If using test password:
+        print("Using test password.")  # Print user notice.
+        password = TEST_PASSWORD  # Set password to test password.
+    else:  # Otherwise:
+        # Define password input prompt.
+        prompt = "Enter password for encrypted private key: "
+        password = getpass.getpass(prompt)  # Get keyfile password.
     # Generate Fernet encryption assistant from password and salt.
     fernet = derive_password_protection_fernet(password, salt)
     try:  # Try decrypting private key.
@@ -132,14 +142,18 @@ def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
 
 def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     """Return encrypted private key and salt."""
-    # Define new password prompt.
-    message = "Enter new password for encrypting private key: "
-    password = getpass.getpass(message)  # Get keyfile password.
-    check_password_length(password)  # Check password length.
-    # Have user re-enter password.
-    check = getpass.getpass("Re-enter password: ")
-    # Assert passwords match.
-    assert password == check, "Passwords do not match."
+    if USE_TEST_PASSWORD:  # If using test password:
+        print("Using test password.")  # Print user notice.
+        password = TEST_PASSWORD  # Set password to test password.
+    else:  # Otherwise:
+        # Define new password prompt.
+        message = "Enter new password for encrypting private key: "
+        password = getpass.getpass(message)  # Get keyfile password.
+        check_password_length(password)  # Check password length.
+        # Have user re-enter password.
+        check = getpass.getpass("Re-enter password: ")
+        # Assert passwords match.
+        assert password == check, "Passwords do not match."
     salt = secrets.token_bytes(16)  # Generate encryption salt.
     # Generate Fernet encryption assistant from password and salt.
     fernet = derive_password_protection_fernet(password, salt)
@@ -156,7 +170,7 @@ def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def incorporate(args):
+def metafile_incorporate(args):
     """Incorporate single-signer keyfiles to multisig metadata file."""
     n_signers = len(args.keyfiles)  # Get number of signers.
     assert MIN_SIGNATORIES <= n_signers <= MAX_SIGNATORIES, (
@@ -170,8 +184,14 @@ def incorporate(args):
     multisig_name = check_name(args.name)  # Check name.
     signatories = []  # Initialize empty signatories list.
     public_keys = []  # Initialize empty public keys list.
+    signatory_names = []  # Initialize empty signatory names list.
     for keyfile in args.keyfiles:  # Loop over keyfiles.
         signatory = json.load(keyfile)  # Load signatory data.
+        signatory_name = signatory["signatory"]  # Get signatory name.
+        assert (  # Assert signatory name not reused.
+            not signatory_name in signatory_names
+        ), f"{signatory_name} already in multisig."
+        signatory_names.append(signatory_name)  # Append name.
         # Get signatory's public key as bytes.
         public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
         # Append public key to list of public keys.
@@ -294,8 +314,8 @@ def keyfile_fund(args):
     subprocess.run(command.split(), stdout=subprocess.PIPE)
     balance = RestClient(NETWORK_URLS["devnet"]).account_balance(
         AccountAddress(prefixed_hex_to_bytes(address))
-    ) # Check balance.
-    print(f"New balance: {balance}") # Print user feedback.
+    )  # Check balance.
+    print(f"New balance: {balance}")  # Print user feedback.
 
 
 def keyfile_verify(args):
@@ -531,45 +551,6 @@ network_parser.add_argument(
     help="Network to use, defaults to devnet.",
 )
 
-# Incorporate subcommand parser.
-parser_incorporate = subparsers.add_parser(
-    name="incorporate",
-    aliases=["i"],
-    description="""Incorporate multiple single-signer keyfiles into a multisig
-        metadata file.""",
-    help="Incorporate single signers into a multisig.",
-)
-parser_incorporate.set_defaults(func=incorporate)
-parser_incorporate.add_argument(
-    "name",
-    type=str,
-    nargs="+",
-    help="""The name of the multisig entity. For example 'Aptos' or 'The Aptos
-        Foundation'.""",
-)
-parser_incorporate.add_argument(
-    "-t",
-    "--threshold",
-    type=int,
-    help="""The number of single signers required to approve a transaction.""",
-    required=True,
-)
-parser_incorporate.add_argument(
-    "-k",
-    "--keyfiles",
-    action="extend",
-    nargs="+",
-    type=argparse.FileType("r", encoding="utf-8"),
-    help="""Relative paths to single-signer keyfiles in the multisig.""",
-    required=True,
-)
-parser_incorporate.add_argument(
-    "-m",
-    "--metafile",
-    type=Path,
-    help="""Custom relative path to desired multisig metadata file.""",
-)
-
 # Keyfile subcommand parser.
 parser_keyfile = subparsers.add_parser(
     name="keyfile",
@@ -667,6 +648,54 @@ parser_keyfile_fund.add_argument(
     "keyfile",
     type=argparse.FileType("r", encoding="utf-8"),
     help="""Relative path to keyfile.""",
+)
+
+# Metafile subcommand parser.
+parser_metafile = subparsers.add_parser(
+    name="metafile",
+    aliases=["m"],
+    description="Assorted multisig metadata file operations.",
+    help="Multisig metadata file operations.",
+)
+subparsers_metafile = parser_metafile.add_subparsers(required=True)
+
+# Metafile incorporate subcommand parser.
+parser_metafile_incorporate = subparsers_metafile.add_parser(
+    name="incorporate",
+    aliases=["i"],
+    description="""Incorporate multiple single-signer keyfiles into a multisig
+        metadata file.""",
+    help="Incorporate single signers into a multisig.",
+)
+parser_metafile_incorporate.set_defaults(func=metafile_incorporate)
+parser_metafile_incorporate.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""The name of the multisig entity. For example 'Aptos' or 'The Aptos
+        Foundation'.""",
+)
+parser_metafile_incorporate.add_argument(
+    "-t",
+    "--threshold",
+    type=int,
+    help="""The number of single signers required to approve a transaction.""",
+    required=True,
+)
+parser_metafile_incorporate.add_argument(
+    "-k",
+    "--keyfiles",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to single-signer keyfiles in the multisig.""",
+    required=True,
+)
+parser_metafile_incorporate.add_argument(
+    "-m",
+    "--metafile",
+    type=Path,
+    help="""Custom relative path to desired multisig metadata file.""",
 )
 
 # Rotate subcommand parser.
