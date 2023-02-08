@@ -31,7 +31,7 @@ const addNewList = async () => {
   // build a transaction payload to be submited
   const payload = {
     type: "entry_function_payload",
-    function: `${moduleAddress}::main::create_list`,
+    function: `${moduleAddress}::todolist::create_list`,
     type_arguments: [],
     arguments: [],
   };
@@ -74,7 +74,7 @@ Then we build our transaction payload to be submitted to chain:
 ```js
 const payload = {
   type: "entry_function_payload",
-  function: `${moduleAddress}::main::create_list`,
+  function: `${moduleAddress}::todolist::create_list`,
   type_arguments: [],
   arguments: [],
 };
@@ -103,7 +103,7 @@ const addNewList = async () => {
   // build a transaction payload to be submited
   const payload = {
     type: "entry_function_payload",
-    function: `${moduleAddress}::main::create_list`,
+    function: `${moduleAddress}::todolist::create_list`,
     type_arguments: [],
     arguments: [],
   };
