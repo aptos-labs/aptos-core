@@ -91,6 +91,12 @@ impl<'a, 'm, S: MoveResolverExt> TableResolver for MoveResolverWithVMMetadata<'a
     }
 }
 
+impl<'a, 'm, S: MoveResolverExt> ConfigStorage for MoveResolverWithVMMetadata<'a, 'm, S> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+        self.move_resolver.fetch_config(access_path)
+    }
+}
+
 impl<'a, 'm, S: MoveResolverExt> StateStorageUsageResolver
     for MoveResolverWithVMMetadata<'a, 'm, S>
 {
@@ -99,7 +105,15 @@ impl<'a, 'm, S: MoveResolverExt> StateStorageUsageResolver
     }
 }
 
-// Adapter to convert a `StateView` into a `RemoteCache`.
+impl<'a, 'm, S: MoveResolverExt> Deref for MoveResolverWithVMMetadata<'a, 'm, S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        self.move_resolver
+    }
+}
+
+/// Adapter to convert a `StateView` into a `MoveResolverExt`.
 pub struct StorageAdapter<'a, S>(&'a S);
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
@@ -202,6 +216,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
     }
 }
 
+/// Owned version of `StorageAdapter`.
 pub struct StorageAdapterOwned<S> {
     state_view: S,
 }
