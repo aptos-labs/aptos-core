@@ -15,7 +15,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aptos": "../../",
+    "aptos": "latest",
     "dotenv": "16.0.1"
   },
   "devDependencies": {

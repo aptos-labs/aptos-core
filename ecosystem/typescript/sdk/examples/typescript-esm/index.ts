@@ -123,16 +123,9 @@ const {
     { checkSuccess: true },
   );
 
-  let connection = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
-  const response = await connection.getAccountNFTs(account1.address().hex(), { limit: 20, offset: 0 });
-  console.log(`account1 current token name: ${response[0].name}. Should be Alice Token!`);
-
-  // using notStrictEqual because we also get token_data_id_hash in the response
-  assert.notStrictEqual(response[0], {
-    name: "Alice Token",
-    collection_name: "AliceCollection",
-    table_type: "0x3::token::TokenStore",
-    property_version: 0,
-    amount: 1,
-  });
+  let indexerClient = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  const accountNFTs = await indexerClient.getAccountNFTs(account1.address().hex());
+  console.log(
+    `account1 token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,
+  );
 })();

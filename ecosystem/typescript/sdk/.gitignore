@@ -15,6 +15,3 @@ build/
 
 # Doc generation output
 docs/
-
-# graphql-codegen generated code
-src/indexer/generated/

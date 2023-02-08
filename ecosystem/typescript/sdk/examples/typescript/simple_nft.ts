@@ -162,7 +162,9 @@ import { NODE_URL, FAUCET_URL } from "./common";
   console.log(`Bob's token balance: ${bobBalance3["amount"]}`);
 
   console.log("\n=== fetch Alice current tokens ===");
-  let connection = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
-  const response = await connection.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
-  console.log(`alice current token name: ${response[0].name}. Should be Alice's first token!`);
+  let indexerClient = new IndexerClient("https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql");
+  const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
+  console.log(
+    `alice current token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice's first token!`,
+  );
 })();

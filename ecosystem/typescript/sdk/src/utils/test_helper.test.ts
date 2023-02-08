@@ -1,4 +1,4 @@
-import { FaucetClient } from "../faucet_client";
+import { FaucetClient } from "../providers/faucet_client";
 import { OpenAPIConfig } from "../generated";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
