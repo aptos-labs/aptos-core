@@ -140,7 +140,7 @@ module aptos_std::algebra {
     /// Compute `pairing(a[0], b[0]) + ... + pairing(a[n-1], b[n-1])` for `n` elements of group `G1` and `n` elements of group `G2`.
     /// This is faster and cheaper than calling `pairing()` separately then aggregating with `group_add`.
     public fun multi_pairing<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G1>();
         abort_unless_structure_enabled<G2>();
         abort_unless_structure_enabled<Gt>();
@@ -163,7 +163,7 @@ module aptos_std::algebra {
 
     /// Convert a u64 to an element of an algebraic structure `S`.
     public fun from_u64<S>(value: u64): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: from_u64_internal<S>(value)
@@ -186,7 +186,7 @@ module aptos_std::algebra {
 
     /// Compute `-x` for an element `x` of a field `S`.
     public fun field_neg<S>(x: &Element<S>): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: field_neg_internal<S>(x.handle)
@@ -195,7 +195,7 @@ module aptos_std::algebra {
 
     /// Compute `x + y` for elements `x` and `y` of a field `S`.
     public fun field_add<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: field_add_internal<S>(x.handle, y.handle)
@@ -204,7 +204,7 @@ module aptos_std::algebra {
 
     /// Compute `x - y` for elements `x` and `y` of a field `S`.
     public fun field_sub<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: field_sub_internal<S>(x.handle, y.handle)
@@ -213,7 +213,7 @@ module aptos_std::algebra {
 
     /// Compute `x * y` for elements `x` and `y` of a field `S`.
     public fun field_mul<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: field_mul_internal<S>(x.handle, y.handle)
@@ -223,7 +223,7 @@ module aptos_std::algebra {
     /// Compute `x / y` for elements `x` and `y` of a field `S`.
     /// Return none if y is the additive identity of field `S`.
     public fun field_div<S>(x: &Element<S>, y: &Element<S>): Option<Element<S>> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         let (succ, handle) = field_div_internal<S>(x.handle, y.handle);
         if (succ) {
@@ -237,7 +237,7 @@ module aptos_std::algebra {
     /// Compute `x^(-1)` for an element `x` of a field `S`.
     /// Return none if `x` is the additive identity of field `S`.
     public fun field_inv<S>(x: &Element<S>): Option<Element<S>> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         let (succeeded, handle) = field_inv_internal<S>(x.handle);
         if (succeeded) {
@@ -248,25 +248,16 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `b^e` for an element `b` of a field `S` and an integer `e` in little-endian encoding.
-    public fun field_pow<S>(b: &Element<S>, e: &vector<u8>): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
-        abort_unless_structure_enabled<S>();
-        Element<S> {
-            handle: field_pow_internal<S>(b.handle, *e)
-        }
-    }
-
     /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
     public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         eq_internal<S>(x.handle, y.handle)
     }
 
     /// Get the identity of a group `G`.
     public fun group_identity<G>(): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         Element<G> {
             handle: group_identity_internal<G>()
@@ -275,7 +266,7 @@ module aptos_std::algebra {
 
     /// Get the fixed generator of a cyclic group `G`.
     public fun group_generator<G>(): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         Element<G> {
             handle: group_generator_internal<G>()
@@ -284,7 +275,7 @@ module aptos_std::algebra {
 
     /// Compute `-P` for an element `P` of a group `G`.
     public fun group_neg<G>(element_p: &Element<G>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         Element<G> {
             handle: element_neg_internal<G>(element_p.handle)
@@ -293,7 +284,7 @@ module aptos_std::algebra {
 
     /// Compute `P + Q` for elements `P` and `Q` of a group `G`.
     public fun group_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         Element<G> {
             handle: element_add_internal<G>(element_p.handle, element_q.handle)
@@ -302,7 +293,7 @@ module aptos_std::algebra {
 
     /// Compute `2*P` for an element `P` of a group `G`.
     public fun group_double<G>(element_p: &Element<G>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         Element<G> {
             handle: element_double_internal<G>(element_p.handle)
@@ -311,7 +302,7 @@ module aptos_std::algebra {
 
     /// Compute `k*p`, where `p` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
     public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         abort_unless_structure_enabled<S>();
         Element<G> {
@@ -326,7 +317,7 @@ module aptos_std::algebra {
     /// Abort if the number of elements and that of scalars do not match.
     /// This function is much faster and cheaper than calling `group_scalar_mul` and adding up the results using `group_add`.
     public fun group_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         abort_unless_structure_enabled<S>();
         let num_scalars = std::vector::length(scalars);
@@ -353,7 +344,7 @@ module aptos_std::algebra {
 
     /// Deserializate a byte array to an element of an algebraic structure `S` with a given scheme.
     public fun deserialize<S>(scheme_id: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         let (succeeded, handle) = deserialize_internal<S>(scheme_id, *bytes);
         if (succeeded) {
@@ -368,21 +359,21 @@ module aptos_std::algebra {
 
     /// Serialize an element of an algebraic structure `S` to a byte array with a given scheme.
     public fun serialize<S>(scheme_id: vector<u8>, scalar: &Element<S>): vector<u8> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         serialize_internal<S>(scheme_id, scalar.handle)
     }
 
     /// Get the order of group `G`, little-endian encoded as a byte array.
     public fun group_order<G>(): vector<u8> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<G>();
         group_order_internal<G>()
     }
 
     /// Cast an element of a structure `S` to a parent structure `L`.
     public fun upcast<S,L>(element: &Element<S>): Element<L> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         abort_unless_structure_enabled<L>();
         Element<L> {
@@ -392,7 +383,7 @@ module aptos_std::algebra {
 
     /// Cast an element of a structure `L` to a sub structure `S`.
     public fun downcast<L,S>(element: &Element<L>): Option<Element<S>> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         abort_unless_structure_enabled<L>();
         let (succ, new_handle) = downcast_internal<L,S>(element.handle);
@@ -406,22 +397,22 @@ module aptos_std::algebra {
     #[test_only]
     /// Generate a random element of an algebraic structure `S`.
     public fun insecure_random_element<S>(): Element<S> {
-        abort_if_generic_group_basic_operations_disabled();
+        abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_structure_enabled<S>();
         Element<S> {
             handle: insecure_random_element_internal<S>()
         }
     }
 
-    fun abort_if_generic_group_basic_operations_disabled() {
-        if (!std::features::generic_group_basic_operations_enabled()) {
+    fun abort_if_generic_algebra_basic_operations_disabled() {
+        if (!std::features::generic_algebra_basic_operations_enabled()) {
             abort(std::error::not_implemented(0))
         }
     }
 
     fun abort_unless_structure_enabled<S>() {
         let type = type_of<S>();
-        if ((type == type_of<BLS12_381_G1_SUB>() || type == type_of<BLS12_381_G2_SUB>() || type == type_of<BLS12_381_Gt>() || type == type_of<BLS12_381_Fr>())
+        if ((type == type_of<BLS12_381_G1_SUB>() || type == type_of<BLS12_381_G2_SUB>() || type == type_of<BLS12_381_Gt>() || type == type_of<BLS12_381_Fr>() || type == type_of<BLS12_381_Fq12>())
             && std::features::bls12_381_structures_enabled()
         ) {
             // Let go.
@@ -461,12 +452,12 @@ module aptos_std::algebra {
 
     #[test_only]
     public fun enable_initial_generic_algebraic_operations(fx: &signer) {
-        std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_generic_group_basic_operations_feature()), std::vector::empty());
+        std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_generic_agebraic_operations_feature()), std::vector::empty());
     }
 
     #[test_only]
     public fun enable_bls12_381_structures(fx: &signer) {
-        std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_bls12_381_groups_feature()), std::vector::empty());
+        std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_bls12_381_strutures_feature()), std::vector::empty());
     }
 
     const BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
@@ -513,58 +504,48 @@ module aptos_std::algebra {
         // Inversion.
         assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
         assert!(std::option::is_none(&field_inv(&val_0)), 1);
-
-        // Exponentiation.
-        let val_3 = from_u64<BLS12_381_Fr>(3);
-        let val_81 = from_u64<BLS12_381_Fr>(81);
-        assert!(eq(&val_81, &field_pow(&val_3, &x"04")), 1);
     }
 
-//    const BLS12_381_FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-//    const BLS12_381_FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const BLS12_381_FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const BLS12_381_FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-//    #[test(fx = @std)]
-//    fun test_bls12_381_fq12(fx: signer) {
-//        enable_initial_generic_algebraic_operations(&fx);
-//        enable_bls12_381_structures(&fx);
-//
-//        // Serialization/deserialization.
-//        let val_7 = from_u64<BLS12_381_Fq12>(7);
-//        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &BLS12_381_FQ12_VAL_7_SERIALIZED));
-//        assert!(eq(&val_7, &val_7_another), 1);
-//        assert!(BLS12_381_FQ12_VAL_7_SERIALIZED == serialize(bls12_381_fq12_format(), &val_7), 1);
-//        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffff")), 1);
-//
-//        // Negation.
-//        let val_minus_7 = field_neg(&val_7);
-//        assert!(BLS12_381_FQ12_VAL_7_NEG_SERIALIZED == serialize(bls12_381_fq12_format(), &val_minus_7), 1);
-//
-//        // Addition.
-//        let val_9 = from_u64<BLS12_381_Fq12>(9);
-//        let val_2 = from_u64<BLS12_381_Fq12>(2);
-//        assert!(eq(&val_2, &field_add(&val_minus_7, &val_9)), 1);
-//
-//        // Subtraction.
-//        assert!(eq(&val_9, &field_sub(&val_2, &val_minus_7)), 1);
-//
-//        // Multiplication.
-//        let val_63 = from_u64<BLS12_381_Fq12>(63);
-//        assert!(eq(&val_63, &field_mul(&val_7, &val_9)), 1);
-//
-//        // division.
-//        let val_0 = from_u64<BLS12_381_Fq12>(0);
-//        assert!(eq(&val_7, &std::option::extract(&mut field_div(&val_63, &val_9))), 1);
-//        assert!(std::option::is_none(&field_div(&val_63, &val_0)), 1);
-//
-//        // Inversion.
-//        assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
-//        assert!(std::option::is_none(&field_inv(&val_0)), 1);
-//
-//        // Exponentiation.
-//        let val_3 = from_u64<BLS12_381_Fq12>(3);
-//        let val_81 = from_u64<BLS12_381_Fq12>(81);
-//        assert!(eq(&val_81, &field_pow(&val_3, &x"04")), 1);
-//    }
+    #[test(fx = @std)]
+    fun test_bls12_381_fq12(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+
+        // Serialization/deserialization.
+        let val_7 = from_u64<BLS12_381_Fq12>(7);
+        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &BLS12_381_FQ12_VAL_7_SERIALIZED));
+        assert!(eq(&val_7, &val_7_another), 1);
+        assert!(BLS12_381_FQ12_VAL_7_SERIALIZED == serialize(bls12_381_fq12_format(), &val_7), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffff")), 1);
+
+        // Negation.
+        let val_minus_7 = field_neg(&val_7);
+        assert!(BLS12_381_FQ12_VAL_7_NEG_SERIALIZED == serialize(bls12_381_fq12_format(), &val_minus_7), 1);
+
+        // Addition.
+        let val_9 = from_u64<BLS12_381_Fq12>(9);
+        let val_2 = from_u64<BLS12_381_Fq12>(2);
+        assert!(eq(&val_2, &field_add(&val_minus_7, &val_9)), 1);
+
+        // Subtraction.
+        assert!(eq(&val_9, &field_sub(&val_2, &val_minus_7)), 1);
+
+        // Multiplication.
+        let val_63 = from_u64<BLS12_381_Fq12>(63);
+        assert!(eq(&val_63, &field_mul(&val_7, &val_9)), 1);
+
+        // division.
+        let val_0 = from_u64<BLS12_381_Fq12>(0);
+        assert!(eq(&val_7, &std::option::extract(&mut field_div(&val_63, &val_9))), 1);
+        assert!(std::option::is_none(&field_div(&val_63, &val_0)), 1);
+
+        // Inversion.
+        assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
+        assert!(std::option::is_none(&field_inv(&val_0)), 1);
+    }
 
 //    const BLS12_381_G1_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
 //    const BLS12_381_G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";

@@ -26,7 +26,7 @@ use ark_ec::PairingEngine;
 use ark_ec::ProjectiveCurve;
 use ark_ff::{Field, One, UniformRand, Zero};
 use ark_ff::PrimeField;
-use std::ops::{Mul, Neg};
+use std::ops::{Add, Mul, Neg};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
@@ -167,6 +167,17 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
+    group.bench_function("fr_mul_self", move |b| {
+        b.iter_with_setup(
+            || {
+                Fr::rand(&mut test_rng())
+            },
+            |k| {
+                let _k2 = k.mul(&k);
+            }
+        )
+    });
+
     group.bench_function("fr_neg", move |b| {
         b.iter_with_setup(
             || {
@@ -186,6 +197,17 @@ fn bench_group(c: &mut Criterion) {
             |k| {
                 let mut buf = vec![];
                 k.serialize_uncompressed(&mut buf).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("fr_sqr", move |b| {
+        b.iter_with_setup(
+            || {
+                Fr::rand(&mut test_rng())
+            },
+            |k| {
+                let _k2 = k.square();
             }
         )
     });
@@ -212,6 +234,28 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
+    group.bench_function("fq12_add", move |b| {
+        b.iter_with_setup(
+            || {
+                (Fq12::rand(&mut test_rng()), Fq12::rand(&mut test_rng()))
+            },
+            |(e_1, e_2)| {
+                let _e_3 = e_1 + e_2;
+            }
+        )
+    });
+
+    group.bench_function("fq12_add_self", move |b| {
+        b.iter_with_setup(
+            || {
+                Fq12::rand(&mut test_rng())
+            },
+            |e| {
+                let _e_2 = e.add(&e);
+            }
+        )
+    });
+
     group.bench_function("fq12_clone", move |b| {
         b.iter_with_setup(
             || {
@@ -233,6 +277,17 @@ fn bench_group(c: &mut Criterion) {
             },
             |buf| {
                 let _e = Fq12::deserialize_uncompressed(buf.as_slice()).unwrap();
+            }
+        )
+    });
+
+    group.bench_function("fq12_double", move |b| {
+        b.iter_with_setup(
+            || {
+                Fq12::rand(&mut test_rng())
+            },
+            |e| {
+                let _e_2 = e.double();
             }
         )
     });
@@ -272,6 +327,17 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
+    group.bench_function("fq12_mul_self", move |b| {
+        b.iter_with_setup(
+            || {
+                Fq12::rand(&mut test_rng())
+            },
+            |e| {
+                let _e_2 = e.mul(&e);
+            }
+        )
+    });
+
     group.bench_function("fq12_one", move |b| {
         b.iter(
             || {
@@ -305,7 +371,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fq12_square", move |b| {
+    group.bench_function("fq12_sqr", move |b| {
         b.iter_with_setup(
             || {
                 Fq12::rand(&mut test_rng())

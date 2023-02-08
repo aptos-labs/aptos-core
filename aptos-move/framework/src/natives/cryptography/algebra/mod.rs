@@ -219,6 +219,16 @@ static BLS12_381_FR_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0a").unwrap
 static BLS12_381_FR_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0a01").unwrap());
 
 
+macro_rules! ark_serialize_internal {
+    ($gas_params:expr, $context:expr, $structure:expr, $handle:expr, $scheme:expr, $typ:ty, $ser_func:ident) => {{
+            let element_ptr = get_obj_pointer!($context, $structure, $handle);
+            let element = element_ptr.downcast_ref::<$typ>().unwrap();
+            let mut buf = Vec::new();
+            <$typ>::$ser_func(&element, &mut buf).unwrap();
+            let cost = $gas_params.serialize($structure, $scheme);
+            (cost, buf)
+    }}
+}
 fn serialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -231,23 +241,17 @@ fn serialize_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match (structure_opt, scheme) {
         (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
-            let element_ptr = get_obj_pointer!(context, structure, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let buf = ark_serialize_uncompressed!(element);
-            Ok(NativeResult::ok(
-                gas_params.serialize(structure, scheme.clone()),
-                smallvec![Value::vector_u8(buf)],
-            ))
+            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, structure, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
         (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
-            let element_ptr = get_obj_pointer!(context, structure, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let mut buf = ark_serialize_uncompressed!(element);
+            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, structure, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
             buf.reverse();
-            Ok(NativeResult::ok(
-                gas_params.serialize(structure, scheme.clone()),
-                smallvec![Value::vector_u8(buf)],
-            ))
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fq12 && scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
+            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, structure, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
         // Some(Structure::BLS12_381_G2) => {
         //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
@@ -273,6 +277,32 @@ fn serialize_internal(
     }
 }
 
+macro_rules! ark_deserialize_internal {
+    ($gas_params:expr, $context:expr, $bytes:ident, $structure:expr, $expected_length:expr, $typ:ty, $deser_func:ident) => {{
+        if $bytes.len() != $expected_length {
+            return Ok(NativeResult::ok(
+                $gas_params.deserialize($structure),
+                smallvec![Value::bool(false), Value::u64(0)],
+            ));
+        }
+        match <$typ>::$deser_func($bytes.as_slice()) {
+            Ok(element) => {
+                let handle = store_obj!($context, $structure, element);
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize($structure),
+                    smallvec![Value::bool(true), Value::u64(handle as u64)],
+                ))
+            },
+            _ => {
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize($structure),
+                    smallvec![Value::bool(false), Value::u64(0)],
+                ))
+            }
+        }
+    }}
+}
+
 fn deserialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -285,39 +315,14 @@ fn deserialize_internal(
     let scheme = pop_arg!(args, Vec<u8>);
     match (structure,scheme) {
         (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
-            match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
-                Ok(element) => {
-                    let handle = store_obj!(context, structure, element);
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                },
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
+            ark_deserialize_internal!(gas_params, context, bytes, structure, 32, ark_bls12_381::Fr, deserialize_uncompressed)
         }
         (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
             bytes.reverse();
-            match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
-                Ok(element) => {
-                    let handle = store_obj!(context, structure, element);
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
-                        smallvec![Value::bool(true), Value::u64(handle as u64)],
-                    ))
-                },
-                _ => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_deser_base * NumArgs::one() + gas_params.ark_bls12_381_fr_deser_per_byte * NumArgs::from(bytes.len() as u64),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                }
-            }
+            ark_deserialize_internal!(gas_params, context, bytes, structure, 32, ark_bls12_381::Fr, deserialize_uncompressed)
+        }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fq12 && scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
+            ark_deserialize_internal!(gas_params, context, bytes, structure, 576, ark_bls12_381::Fq12, deserialize_uncompressed)
         }
         (Some(structure), scheme) if structure== Structure::BLS12_381_G1_SUB && scheme.as_slice() == BLS12_381_G1_SUB_UNCOMPRESSED_FORMAT.as_slice() => {
             match ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice()) {
@@ -403,29 +408,16 @@ fn deserialize_internal(
     }
 }
 
-fn scalar_serialize_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
-            let element = borrow_bls12_381_fr!(context, handle);
-            let buf = ark_serialize_uncompressed!(element);
+macro_rules! from_u64_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+            let value = pop_arg!($args, u64);
+            let element = <$typ>::from(value as u128);
+            let handle = store_obj!($context, $structure, element);
             Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_ser * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
+                $gas_params.from_u128($structure),
+                smallvec![Value::u64(handle as u64)],
             ))
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
+    }}
 }
 
 fn from_u64_internal(
@@ -435,20 +427,30 @@ fn from_u64_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
-    let value = pop_arg!(args, u64);
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let element = ark_bls12_381::Fr::from(value as u128);
-            let handle = store_obj!(context, structure, element);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_from_u128 * NumArgs::one(),
-                smallvec![Value::u64(handle as u64)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
+}
+
+macro_rules! ark_field_add_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle_2 = pop_arg!($args, u64) as usize;
+        let handle_1 = pop_arg!($args, u64) as usize;
+        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element_1.add(element_2);
+        let new_handle = store_obj!($context, $structure, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_add($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
 }
 
 fn field_add_internal(
@@ -459,24 +461,29 @@ fn field_add_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let handle_2 = pop_arg!(args, u64) as usize;
-            let handle_1 = pop_arg!(args, u64) as usize;
-            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
-            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
-            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let new_element = element_1.add(element_2);
-            let new_handle = store_obj!(context, structure, new_element);
-            Ok(NativeResult::ok(
-                gas_params.field_add(structure),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
+}
+
+macro_rules! ark_field_sub_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle_2 = pop_arg!($args, u64) as usize;
+        let handle_1 = pop_arg!($args, u64) as usize;
+        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element_1.sub(element_2);
+        let new_handle = store_obj!($context, $structure, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_sub($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
 }
 
 fn field_sub_internal(
@@ -486,36 +493,30 @@ fn field_sub_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
-            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
-            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let new_element = element_1.sub(element_2);
-            let new_handle = store_obj!(context, structure, new_element);
-            Ok(NativeResult::ok(
-                gas_params.field_sub(structure),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
-        }
-        Some(Structure::BLS12_381_Fq12) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
-            let scalar_1 = borrow_bls12_381_fq12!(context, handle_1);
-            let scalar_2 = borrow_bls12_381_fq12!(context, handle_2);
-            let result = scalar_1.add(scalar_2);
-            let result_handle = store_bls12_381_fq12!(context, result);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fq12_sub * NumArgs::one(),
-                smallvec![Value::u64(result_handle as u64)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
+}
+
+macro_rules! ark_field_mul_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle_2 = pop_arg!($args, u64) as usize;
+        let handle_1 = pop_arg!($args, u64) as usize;
+        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element_1.mul(element_2);
+        let new_handle = store_obj!($context, $structure, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_mul($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
 }
 
 fn field_mul_internal(
@@ -524,71 +525,10 @@ fn field_mul_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
-            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
-            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let new_element = element_1.mul(element_2);
-            let new_handle = store_obj!(context, structure, new_element);
-            Ok(NativeResult::ok(
-                gas_params.field_mul(structure),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
-
-fn vu8_to_vu64(v: &[u8]) -> Vec<u64> {
-    let mut ret = Vec::new();
-    for (i,&e) in v.iter().enumerate() {
-        if i%8==0 {
-            ret.push(e as u64);
-        } else {
-            ret[i/8] += (e as u64) << (8 * (i%8))
-        }
-    }
-    ret
-}
-
-#[test]
-fn test_vu8_to_vu64() {
-    assert_eq!(vec![0x03020100_u64, 0x0504], vu8_to_vu64(vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05].as_slice()));
-}
-
-macro_rules! field_pow_internal {
-    ($gas_params:ident, $context:ident, $args:ident, $structure:ident, $typ:ty) => {{
-        let exponent = vu8_to_vu64(pop_arg!($args, Vec<u8>).as_slice());
-        let handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $structure, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        let new_scalar = element.pow(exponent.as_slice());
-        let new_handle = store_obj!($context, $structure, new_scalar);
-        Ok(NativeResult::ok(
-            $gas_params.field_pow($structure, exponent.len()),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
-    }}
-}
-
-fn field_pow_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => field_pow_internal!(gas_params, context, args, structure, ark_bls12_381::Fr),
-        Some(structure) if structure == Structure::BLS12_381_Fq12 => field_pow_internal!(gas_params, context, args, structure, ark_bls12_381::Fq12),
+        Some(Structure::BLS12_381_Fr) => ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
@@ -634,6 +574,20 @@ fn field_div_internal(
     }
 }
 
+macro_rules! ark_neg_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element.neg();
+        let new_handle = store_obj!($context, $structure, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.neg($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
 fn field_neg_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -642,21 +596,35 @@ fn field_neg_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let handle = pop_arg!(args, u64) as usize;
-            let element_ptr = get_obj_pointer!(context, structure, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let new_element = element.neg();
-            let new_handle = store_obj!(context, structure, new_element);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_neg * NumArgs::one(),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
+}
+
+macro_rules! ark_field_inv_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        match element.inverse() {
+            Some(new_element) => {
+                let new_handle = store_obj!($context, $structure, new_element);
+                Ok(NativeResult::ok(
+                    $gas_params.field_inv($structure),
+                    smallvec![Value::bool(true), Value::u64(new_handle as u64)],
+                ))
+            }
+            None => {
+                Ok(NativeResult::ok(
+                    $gas_params.field_inv($structure),
+                    smallvec![Value::bool(false), Value::u64(0)],
+                ))
+            },
+        }
+    }}
 }
 
 fn field_inv_internal(
@@ -666,30 +634,28 @@ fn field_inv_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let handle = pop_arg!(args, u64) as usize;
-            let element_ptr = get_obj_pointer!(context, structure, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            match element.inverse() {
-                Some(new_element) => {
-                    let new_handle = store_obj!(context, structure, new_element);
-                    Ok(NativeResult::ok(
-                        gas_params.field_inv(structure),
-                        smallvec![Value::bool(true), Value::u64(new_handle as u64)],
-                    ))
-                }
-                None => {
-                    Ok(NativeResult::ok(
-                        gas_params.ark_bls12_381_fr_inv * NumArgs::one(),
-                        smallvec![Value::bool(false), Value::u64(0)],
-                    ))
-                },
-            }
-        }
+        Some(Structure::BLS12_381_Fr) => ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
     }
+}
+
+
+macro_rules! ark_eq_internal {
+    ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
+            let handle_2 = pop_arg!($args, u64) as usize;
+            let handle_1 = pop_arg!($args, u64) as usize;
+            let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+            let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+            let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+            let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+            Ok(NativeResult::ok(
+                $gas_params.eq($structure),
+                smallvec![Value::bool(element_1 == element_2)],
+            ))
+    }}
 }
 
 fn eq_internal(
@@ -699,19 +665,9 @@ fn eq_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
-    let handle_2 = pop_arg!(args, u64) as usize;
-    let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(structure) if structure == Structure::BLS12_381_Fr => {
-            let element_1_ptr = get_obj_pointer!(context, structure, handle_1);
-            let element_1 = element_1_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            let element_2_ptr = get_obj_pointer!(context, structure, handle_2);
-            let element_2 = element_2_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
-                smallvec![Value::bool(element_1 == element_2)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         _ => {
             Ok(NativeResult::err(
                 gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
@@ -1554,10 +1510,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "field_div_internal",
             make_native_from_func(gas_params.clone(), field_div_internal),
-        ),
-        (
-            "field_pow_internal",
-            make_native_from_func(gas_params.clone(), field_pow_internal),
         ),
         (
             "group_identity_internal",

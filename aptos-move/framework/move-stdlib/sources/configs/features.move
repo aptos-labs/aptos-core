@@ -121,16 +121,16 @@ module std::features {
         is_enabled(RESOURCE_GROUPS)
     }
 
-    const GENERIC_GROUP_BASIC_OPERATIONS: u64 = 10;
-    public fun get_generic_group_basic_operations_feature(): u64 { GENERIC_GROUP_BASIC_OPERATIONS }
-    public fun generic_group_basic_operations_enabled(): bool acquires Features {
-        is_enabled(GENERIC_GROUP_BASIC_OPERATIONS)
+    const GENERIC_ALGEBRAIC_OPERATIONS: u64 = 10;
+    public fun get_generic_agebraic_operations_feature(): u64 { GENERIC_ALGEBRAIC_OPERATIONS }
+    public fun generic_algebra_basic_operations_enabled(): bool acquires Features {
+        is_enabled(GENERIC_ALGEBRAIC_OPERATIONS)
     }
 
-    const BLS12_381_GROUPS: u64 = 11;
-    public fun get_bls12_381_groups_feature(): u64 { BLS12_381_GROUPS }
+    const BLS12_381_STRUCTURES: u64 = 11;
+    public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
     public fun bls12_381_structures_enabled(): bool acquires Features {
-        is_enabled(BLS12_381_GROUPS)
+        is_enabled(BLS12_381_STRUCTURES)
     }
 
     // ============================================================================================

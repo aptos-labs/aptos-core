@@ -15,8 +15,7 @@ pub struct GasParameters {
     pub blst_g2_proj_to_affine: InternalGasPerArg,
     pub blst_g2_affine_ser: InternalGasPerArg,
     pub ark_bls12_381_fr_add: InternalGasPerArg,
-    pub ark_bls12_381_fr_deser_base: InternalGasPerArg,
-    pub ark_bls12_381_fr_deser_per_byte: InternalGasPerArg,
+    pub ark_bls12_381_fr_deser: InternalGasPerArg,
     pub ark_bls12_381_fr_div: InternalGasPerArg,
     pub ark_bls12_381_fr_eq: InternalGasPerArg,
     pub ark_bls12_381_fr_from_u128: InternalGasPerArg,
@@ -30,11 +29,13 @@ pub struct GasParameters {
     pub ark_bls12_381_fr_to_repr: InternalGasPerArg,
     pub ark_bls12_381_fq12_add: InternalGasPerArg,
     pub ark_bls12_381_fq12_clone: InternalGasPerArg,
-    pub ark_bls12_381_fq12_deserialize: InternalGasPerArg,
+    pub ark_bls12_381_fq12_deser: InternalGasPerArg,
     pub ark_bls12_381_fq12_div: InternalGasPerArg,
     pub ark_bls12_381_fq12_eq: InternalGasPerArg,
+    pub ark_bls12_381_fq12_from_u128: InternalGasPerArg,
     pub ark_bls12_381_fq12_inv: InternalGasPerArg,
     pub ark_bls12_381_fq12_mul: InternalGasPerArg,
+    pub ark_bls12_381_fq12_neg: InternalGasPerArg,
     pub ark_bls12_381_fq12_one: InternalGasPerArg,
     pub ark_bls12_381_fq12_pow_base: InternalGasPerArg,
     pub ark_bls12_381_fq12_pow_per_exponent_u64: InternalGasPerArg,
@@ -94,6 +95,30 @@ pub struct GasParameters {
 fn to_size_in_u64(size_in_u8: usize) -> usize { (size_in_u8 + 7) / 8 }
 
 impl GasParameters {
+    pub fn deserialize(&self, structure: Structure) -> InternalGas {
+        match structure {
+            Structure::BLS12_381_Fr =>  self.ark_bls12_381_fr_deser * NumArgs::one(),
+            Structure::BLS12_381_Fq12 =>  self.ark_bls12_381_fq12_deser * NumArgs::one(),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn eq(&self, structure: Structure) -> InternalGas {
+        match structure {
+            Structure::BLS12_381_Fr =>  self.ark_bls12_381_fr_eq * NumArgs::one(),
+            Structure::BLS12_381_Fq12 =>  self.ark_bls12_381_fq12_eq * NumArgs::one(),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn from_u128(&self, structure: Structure) -> InternalGas {
+        match structure {
+            Structure::BLS12_381_Fr => self.ark_bls12_381_fr_from_u128 * NumArgs::one(),
+            Structure::BLS12_381_Fq12 => self.ark_bls12_381_fq12_from_u128 * NumArgs::one(),
+            _ => unreachable!()
+        }
+    }
+
     pub fn field_add(&self, structure: Structure) -> InternalGas {
         match structure {
             Structure::BLS12_381_Fr => self.ark_bls12_381_fr_add * NumArgs::one(),
@@ -142,17 +167,21 @@ impl GasParameters {
 
     pub fn field_div(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12_381_Fr => {
-                self.ark_bls12_381_fr_div * NumArgs::one()
-            },
-            Structure::BLS12_381_Fq12 => {
-                self.ark_bls12_381_fq12_div * NumArgs::one()
-            },
+            Structure::BLS12_381_Fr => self.ark_bls12_381_fr_div * NumArgs::one(),
+            Structure::BLS12_381_Fq12 => self.ark_bls12_381_fq12_div * NumArgs::one(),
             _ => unreachable!()
         }
     }
 
-    pub fn serialize(&self, structure: Structure, scheme: Vec<u8>) -> InternalGas {
+    pub fn neg(&self, structure: Structure) -> InternalGas {
+        match structure {
+            Structure::BLS12_381_Fr => self.ark_bls12_381_fr_neg * NumArgs::one(),
+            Structure::BLS12_381_Fq12 => self.ark_bls12_381_fq12_neg * NumArgs::one(),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn serialize(&self, structure: Structure, scheme: &[u8]) -> InternalGas {
         match (structure, scheme) {
             (Structure::BLS12_381_Fr, _) => self.ark_bls12_381_fr_ser * NumArgs::one(),
             (Structure::BLS12_381_Fq12, _) => self.ark_bls12_381_fq12_ser * NumArgs::one(),

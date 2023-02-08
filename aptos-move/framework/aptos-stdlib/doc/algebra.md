@@ -44,7 +44,6 @@
 -  [Function `field_mul`](#0x1_algebra_field_mul)
 -  [Function `field_div`](#0x1_algebra_field_div)
 -  [Function `field_inv`](#0x1_algebra_field_inv)
--  [Function `field_pow`](#0x1_algebra_field_pow)
 -  [Function `eq`](#0x1_algebra_eq)
 -  [Function `group_identity`](#0x1_algebra_group_identity)
 -  [Function `group_generator`](#0x1_algebra_group_generator)
@@ -58,7 +57,7 @@
 -  [Function `group_order`](#0x1_algebra_group_order)
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
--  [Function `abort_if_generic_group_basic_operations_disabled`](#0x1_algebra_abort_if_generic_group_basic_operations_disabled)
+-  [Function `abort_if_generic_algebra_basic_operations_disabled`](#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled)
 -  [Function `abort_unless_structure_enabled`](#0x1_algebra_abort_unless_structure_enabled)
 -  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
@@ -420,6 +419,24 @@ This struct represents an ephemeral element of an algebraic structure <code>S</c
 <a name="@Constants_0"></a>
 
 ## Constants
+
+
+<a name="0x1_algebra_BLS12_381_FQ12_VAL_7_NEG_SERIALIZED"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FQ12_VAL_7_NEG_SERIALIZED">BLS12_381_FQ12_VAL_7_NEG_SERIALIZED</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [164, 170, 255, 255, 255, 255, 254, 185, 255, 255, 83, 177, 254, 255, 171, 30, 36, 246, 176, 246, 160, 210, 48, 103, 191, 18, 133, 243, 132, 75, 119, 100, 215, 172, 75, 67, 182, 167, 27, 75, 154, 230, 127, 57, 234, 17, 1, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_FQ12_VAL_7_SERIALIZED"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FQ12_VAL_7_SERIALIZED">BLS12_381_FQ12_VAL_7_SERIALIZED</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+</code></pre>
+
 
 
 <a name="0x1_algebra_BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN"></a>
@@ -891,7 +908,7 @@ This is faster and cheaper than calling <code><a href="algebra.md#0x1_algebra_pa
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G1&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G2&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;Gt&gt;();
@@ -934,7 +951,7 @@ Convert a u64 to an element of an algebraic structure <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_from_u64">from_u64</a>&lt;S&gt;(value: u64): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_from_u64_internal">from_u64_internal</a>&lt;S&gt;(value)
@@ -1017,7 +1034,7 @@ Compute <code>-x</code> for an element <code>x</code> of a field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_neg">field_neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_neg_internal">field_neg_internal</a>&lt;S&gt;(x.handle)
@@ -1046,7 +1063,7 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1075,7 +1092,7 @@ Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sub">field_sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_sub_internal">field_sub_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1104,7 +1121,7 @@ Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_mul">field_mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_mul_internal">field_mul_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1134,7 +1151,7 @@ Return none if y is the additive identity of field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_div">field_div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succ, handle) = <a href="algebra.md#0x1_algebra_field_div_internal">field_div_internal</a>&lt;S&gt;(x.handle, y.handle);
     <b>if</b> (succ) {
@@ -1168,7 +1185,7 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv">field_inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;S&gt;(x.handle);
     <b>if</b> (succeeded) {
@@ -1176,35 +1193,6 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
         std::option::some(scalar)
     } <b>else</b> {
         std::option::none()
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_pow"></a>
-
-## Function `field_pow`
-
-Compute <code>b^e</code> for an element <code>b</code> of a field <code>S</code> and an integer <code>e</code> in little-endian encoding.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_pow">field_pow</a>&lt;S&gt;(b: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, e: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_pow">field_pow</a>&lt;S&gt;(b: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, e: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_pow_internal">field_pow_internal</a>&lt;S&gt;(b.handle, *e)
     }
 }
 </code></pre>
@@ -1230,7 +1218,7 @@ Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of a
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(x.handle, y.handle)
 }
@@ -1257,7 +1245,7 @@ Get the identity of a group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity">group_identity</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;()
@@ -1286,7 +1274,7 @@ Get the fixed generator of a cyclic group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_generator">group_generator</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_generator_internal">group_generator_internal</a>&lt;G&gt;()
@@ -1315,7 +1303,7 @@ Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg">group_neg</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_element_neg_internal">element_neg_internal</a>&lt;G&gt;(element_p.handle)
@@ -1344,7 +1332,7 @@ Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a g
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add">group_add</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_element_add_internal">element_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
@@ -1373,7 +1361,7 @@ Compute <code>2*P</code> for an element <code>P</code> of a group <code>G</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double">group_double</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_element_double_internal">element_double_internal</a>&lt;G&gt;(element_p.handle)
@@ -1402,7 +1390,7 @@ Compute <code>k*p</code>, where <code>p</code> is an element of a group <code>G<
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
@@ -1437,7 +1425,7 @@ This function is much faster and cheaper than calling <code>group_scalar_mul</co
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> num_scalars = std::vector::length(scalars);
@@ -1484,7 +1472,7 @@ Deserializate a byte array to an element of an algebraic structure <code>S</code
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize">deserialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S&gt;(scheme_id, *bytes);
     <b>if</b> (succeeded) {
@@ -1519,7 +1507,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array wi
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S&gt;(scheme_id, scalar.handle)
 }
@@ -1546,7 +1534,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte array.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_group_order_internal">group_order_internal</a>&lt;G&gt;()
 }
@@ -1573,7 +1561,7 @@ Cast an element of a structure <code>S</code> to a parent structure <code>L</cod
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_upcast">upcast</a>&lt;S,L&gt;(element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;L&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt; {
@@ -1603,7 +1591,7 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_downcast">downcast</a>&lt;L,S&gt;(element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;L&gt;();
     <b>let</b> (succ, new_handle) = <a href="algebra.md#0x1_algebra_downcast_internal">downcast_internal</a>&lt;L,S&gt;(element.handle);
@@ -1619,13 +1607,13 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_abort_if_generic_group_basic_operations_disabled"></a>
+<a name="0x1_algebra_abort_if_generic_algebra_basic_operations_disabled"></a>
 
-## Function `abort_if_generic_group_basic_operations_disabled`
+## Function `abort_if_generic_algebra_basic_operations_disabled`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>()
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>()
 </code></pre>
 
 
@@ -1634,8 +1622,8 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>() {
-    <b>if</b> (!std::features::generic_group_basic_operations_enabled()) {
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>() {
+    <b>if</b> (!std::features::generic_algebra_basic_operations_enabled()) {
         <b>abort</b>(std::error::not_implemented(0))
     }
 }
@@ -1662,7 +1650,7 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;() {
     <b>let</b> type = type_of&lt;S&gt;();
-    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;())
+    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a>&gt;())
         && std::features::bls12_381_structures_enabled()
     ) {
         // Let go.

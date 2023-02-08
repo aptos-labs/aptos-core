@@ -118,11 +118,41 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("g1_affine_deserialize_uncomp", move |b| {
+    group.bench_function("g1_affine_deserialize_uncomp_input_size_96", move |b| {
         b.iter_with_setup(
             || {
                 let p_affine = random_p1_affine();
                 let mut buf = vec![0_u8; 96];
+                unsafe { blst::blst_p1_affine_serialize(buf.as_mut_ptr(), &p_affine); }
+                buf
+            },
+            |buf| {
+                let mut p_affine = blst::blst_p1_affine::default();
+                unsafe { blst::blst_p1_deserialize(&mut p_affine, buf.as_ptr()); }
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_deserialize_uncomp_input_size_960", move |b| {
+        b.iter_with_setup(
+            || {
+                let p_affine = random_p1_affine();
+                let mut buf = vec![0xff_u8; 960];
+                unsafe { blst::blst_p1_affine_serialize(buf.as_mut_ptr(), &p_affine); }
+                buf
+            },
+            |buf| {
+                let mut p_affine = blst::blst_p1_affine::default();
+                unsafe { blst::blst_p1_deserialize(&mut p_affine, buf.as_ptr()); }
+            }
+        )
+    });
+
+    group.bench_function("g1_affine_deserialize_uncomp_input_size_9600", move |b| {
+        b.iter_with_setup(
+            || {
+                let p_affine = random_p1_affine();
+                let mut buf = vec![0xff_u8; 9600];
                 unsafe { blst::blst_p1_affine_serialize(buf.as_mut_ptr(), &p_affine); }
                 buf
             },
