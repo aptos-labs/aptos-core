@@ -323,7 +323,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_entry_function<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -507,7 +507,7 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn execute_modules<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -675,7 +675,7 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
+    pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
         &self,
         storage: &S,
         txn: &SignatureCheckedTransaction,
@@ -871,7 +871,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
+    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
@@ -1177,7 +1177,7 @@ impl VMAdapter for AptosVM {
             .any(|event| *event.key() == new_epoch_event_key)
     }
 
-    fn execute_single_transaction<S: MoveResolverExt + StateView>(
+    fn execute_single_transaction<S: MoveResolverExt>(
         &self,
         txn: &PreprocessedTransaction,
         data_cache: &S,
@@ -1283,7 +1283,7 @@ impl AptosSimulationVM {
     /*
     Executes a SignedTransaction without performing signature verification
      */
-    fn simulate_signed_transaction<S: MoveResolverExt + StateView>(
+    fn simulate_signed_transaction<S: MoveResolverExt>(
         &self,
         storage: &S,
         txn: &SignedTransaction,
