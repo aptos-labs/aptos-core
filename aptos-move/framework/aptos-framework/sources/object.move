@@ -39,6 +39,8 @@ module aptos_framework::object {
     const ECANNOT_DELETE: u64 = 5;
     /// Exceeds maximum nesting for an object transfer.
     const EMAXIMUM_NESTING: u64 = 6;
+    /// The resource is not stored at the specified address.
+    const ERESOURCE_DOES_NOT_EXIST: u64 = 7;
 
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
@@ -64,7 +66,7 @@ module aptos_framework::object {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The core of the object model that defines ownership, transferability, and events.
-    struct Object has key {
+    struct ObjectCore has key {
         /// Used by guid to guarantee globally unique objects and create event streams
         guid_creation_num: u64,
         /// The address (object or account) that owns this object
@@ -80,14 +82,17 @@ module aptos_framework::object {
     /// A shared resource group for storing object resources together in storage.
     struct ObjectGroup { }
 
-    /// Type safe way of designating an object as at this address.
-    struct ObjectId has copy, drop, store {
+    /// A pointer to an object -- these can only provide guarantees based upon the underlying data
+    /// type, that is the validity of T existing at an address is something that cannot be verified
+    /// by any other module than the module that defined T. Similarly, the module that defines T
+    /// can remove it from storage at any point in time.
+    struct Object<phantom T> has copy, drop, store {
         inner: address,
     }
 
     /// This is a one time ability given to the creator to configure the object as necessary
-    struct CreatorRef has drop {
-        self: ObjectId,
+    struct ConstructorRef has drop {
+        self: address,
         /// Set to true so long as deleting the object is possible. For example, the object was
         /// created via create_named_object.
         can_delete: bool,
@@ -95,162 +100,165 @@ module aptos_framework::object {
 
     /// Used to remove an object from storage.
     struct DeleteRef has drop, store {
-        self: ObjectId,
+        self: address,
     }
 
     /// Used to create events or move additional resources into object storage.
     struct ExtendRef has drop, store {
-        self: ObjectId,
+        self: address,
     }
 
     /// Used to create LinearTransferRef, hence ownership transfer.
     struct TransferRef has drop, store {
-        self: ObjectId,
+        self: address,
     }
 
     /// Used to perform transfers. This locks transferring ability to a single time use bound to
     /// the current owner.
     struct LinearTransferRef has drop {
-        self: ObjectId,
+        self: address,
         owner: address,
     }
 
     /// Emitted whenever the object's owner field is changed.
     struct TransferEvent has drop, store {
-        object_id: ObjectId,
+        object: address,
         from: address,
         to: address,
     }
 
     /// Produces an ObjectId from the given address. This is not verified.
-    public fun address_to_object_id(object_id: address): ObjectId {
-        ObjectId { inner: object_id }
+    public fun address_to_object<T: key>(object: address): Object<T> {
+        assert!(exists<ObjectCore>(object), error::not_found(EOBJECT_DOES_NOT_EXIST));
+        assert!(exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
+        Object<T>{ inner: object }
     }
 
-    /// Derives an object id from source material: sha3_256([creator address | seed | 0xFE]).
-    /// The ObjectId needs to be distinct from create_resource_address
-    public fun create_object_id(source: &address, seed: vector<u8>): ObjectId {
+    /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
+    public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
         vector::append(&mut bytes, seed);
         vector::push_back(&mut bytes, OBJECT_FROM_SEED_ADDRESS_SCHEME);
-        ObjectId { inner: from_bcs::to_address(hash::sha3_256(bytes)) }
+        from_bcs::to_address(hash::sha3_256(bytes))
     }
+
+    native fun exists_at<T: key>(object: address): bool;
 
     /// Returns the address of within an ObjectId.
-    public fun object_id_address(object_id: &ObjectId): address {
-        object_id.inner
+    public fun object_address<T>(object: &Object<T>): address {
+        object.inner
     }
 
-    /// Create a new named object and return the CreatorRef. Named objects can be queried globally
+    /// Create a new named object and return the ConstructorRef. Named objects can be queried globally
     /// by knowing the user generated seed used to create them. Named objects cannot be deleted.
-    public fun create_named_object(creator: &signer, seed: vector<u8>): CreatorRef {
+    public fun create_named_object(creator: &signer, seed: vector<u8>): ConstructorRef {
         let creator_address = signer::address_of(creator);
-        let id = create_object_id(&creator_address, seed);
-        create_object_internal(creator_address, id, false)
+        let obj_addr = create_object_address(&creator_address, seed);
+        create_object_internal(creator_address, obj_addr, false)
     }
 
     /// Create a new object from a GUID generated by an account.
-    public fun create_object_from_account(creator: &signer): CreatorRef {
+    public fun create_object_from_account(creator: &signer): ConstructorRef {
         let guid = account::create_guid(creator);
         create_object_from_guid(signer::address_of(creator), guid)
     }
 
     /// Create a new object from a GUID generated by an object.
-    public fun create_object_from_object(creator: &signer): CreatorRef acquires Object {
+    public fun create_object_from_object(creator: &signer): ConstructorRef acquires ObjectCore {
         let guid = create_guid(creator);
         create_object_from_guid(signer::address_of(creator), guid)
     }
 
-    fun create_object_from_guid(creator_address: address, guid: guid::GUID): CreatorRef {
+    fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
         let bytes = bcs::to_bytes(&guid);
         vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
-        let object_id = ObjectId { inner: from_bcs::to_address(hash::sha3_256(bytes)) };
-        create_object_internal(creator_address, object_id, true)
+        let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
+        create_object_internal(creator_address, obj_addr, true)
     }
 
     fun create_object_internal(
         creator_address: address,
-        id: ObjectId,
+        object: address,
         can_delete: bool,
-    ): CreatorRef {
-        assert!(!exists<Object>(id.inner), error::already_exists(EOBJECT_EXISTS));
+    ): ConstructorRef {
+        assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
 
-        let object_signer = create_signer(id.inner);
+        let object_signer = create_signer(object);
         let guid_creation_num = 0;
-        let transfer_events_guid = guid::create(id.inner, &mut guid_creation_num);
+        let transfer_events_guid = guid::create(object, &mut guid_creation_num);
 
         move_to(
             &object_signer,
-            Object {
+            ObjectCore {
                 guid_creation_num,
                 owner: creator_address,
                 allow_ungated_transfer: true,
                 transfer_events: event::new_event_handle(transfer_events_guid),
             },
         );
-        CreatorRef { self: id, can_delete }
+        ConstructorRef { self: object, can_delete }
     }
 
     // Creation helpers
 
-    /// Generates the DeleteRef, which can be used to remove Object from global storage.
-    public fun generate_delete_ref(ref: &CreatorRef): DeleteRef {
+    /// Generates the DeleteRef, which can be used to remove ObjectCore from global storage.
+    public fun generate_delete_ref(ref: &ConstructorRef): DeleteRef {
         assert!(ref.can_delete, error::permission_denied(ECANNOT_DELETE));
         DeleteRef { self: ref.self }
     }
 
     /// Generates the ExtendRef, which can be used to add new events and resources to the object.
-    public fun generate_extend_ref(ref: &CreatorRef): ExtendRef {
+    public fun generate_extend_ref(ref: &ConstructorRef): ExtendRef {
         ExtendRef { self: ref.self }
     }
 
     /// Generates the TransferRef, which can be used to manage object transfers.
-    public fun generate_transfer_ref(ref: &CreatorRef): TransferRef {
+    public fun generate_transfer_ref(ref: &ConstructorRef): TransferRef {
         TransferRef { self: ref.self }
     }
 
-    /// Create a signer for the CreatorRef
-    public fun generate_signer(ref: &CreatorRef): signer {
-        create_signer(ref.self.inner)
+    /// Create a signer for the ConstructorRef
+    public fun generate_signer(ref: &ConstructorRef): signer {
+        create_signer(ref.self)
     }
 
-    /// Returns the address of within a CreatorRef
-    public fun object_id_from_creator_ref(ref: &CreatorRef): ObjectId {
-        ref.self
+    /// Returns the address of within a ConstructorRef
+    public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
+        address_to_object<T>(ref.self)
     }
 
     // Signer required functions
 
     /// Create a guid for the object, typically used for events
-    public fun create_guid(object: &signer): guid::GUID acquires Object {
+    public fun create_guid(object: &signer): guid::GUID acquires ObjectCore {
         let addr = signer::address_of(object);
-        let object_data = borrow_global_mut<Object>(addr);
+        let object_data = borrow_global_mut<ObjectCore>(addr);
         guid::create(addr, &mut object_data.guid_creation_num)
     }
 
     /// Generate a new event handle.
     public fun new_event_handle<T: drop + store>(
         object: &signer,
-    ): event::EventHandle<T> acquires Object {
+    ): event::EventHandle<T> acquires ObjectCore {
         event::new_event_handle(create_guid(object))
     }
 
     // Deletion helpers
 
     /// Returns the address of within a DeleteRef.
-    public fun object_id_from_delete(ref: &DeleteRef): ObjectId {
-        ref.self
+    public fun object_from_delete_ref<T: key>(ref: &DeleteRef): Object<T> {
+        address_to_object<T>(ref.self)
     }
 
     /// Removes from the specified Object from global storage.
-    public fun delete(ref: DeleteRef) acquires Object {
-        let object = move_from<Object>(ref.self.inner);
-        let Object {
+    public fun delete(ref: DeleteRef) acquires ObjectCore {
+        let object_core = move_from<ObjectCore>(ref.self);
+        let ObjectCore {
             guid_creation_num: _,
             owner: _,
             allow_ungated_transfer: _,
             transfer_events,
-        } = object;
+        } = object_core;
         event::destroy_handle(transfer_events);
     }
 
@@ -258,27 +266,27 @@ module aptos_framework::object {
 
     /// Create a signer for the ExtendRef
     public fun generate_signer_for_extending(ref: &ExtendRef): signer {
-        create_signer(ref.self.inner)
+        create_signer(ref.self)
     }
 
     // Transfer functionality
 
     /// Disable direct transfer, transfers can only be triggered via a TransferRef
-    public fun disable_ungated_transfer(ref: &TransferRef) acquires Object {
-        let object = borrow_global_mut<Object>(ref.self.inner);
+    public fun disable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
+        let object = borrow_global_mut<ObjectCore>(ref.self);
         object.allow_ungated_transfer = false;
     }
 
     /// Enable direct transfer.
-    public fun enable_ungated_transfer(ref: &TransferRef) acquires Object {
-        let object = borrow_global_mut<Object>(ref.self.inner);
+    public fun enable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
+        let object = borrow_global_mut<ObjectCore>(ref.self);
         object.allow_ungated_transfer = true;
     }
 
     /// Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
     /// time of generation is the owner at the time of transferring.
-    public fun generate_linear_transfer_ref(ref: TransferRef): LinearTransferRef acquires Object {
-        let owner = owner(ref.self);
+    public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
+        let owner = owner(Object<ObjectCore> { inner: ref.self });
         LinearTransferRef {
             self: ref.self,
             owner,
@@ -286,12 +294,12 @@ module aptos_framework::object {
     }
 
     /// Transfer to the destination address using a LinearTransferRef.
-    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires Object {
-        let object = borrow_global_mut<Object>(ref.self.inner);
+    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore {
+        let object = borrow_global_mut<ObjectCore>(ref.self);
         event::emit_event(
             &mut object.transfer_events,
             TransferEvent {
-                object_id: ref.self,
+                object: ref.self,
                 from: object.owner,
                 to,
             },
@@ -302,59 +310,68 @@ module aptos_framework::object {
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     public entry fun transfer_call(
         owner: &signer,
-        object_id: address,
+        object: address,
         to: address,
-    ) acquires Object {
-        transfer(owner, ObjectId { inner: object_id }, to)
+    ) acquires ObjectCore {
+        transfer_raw(owner, object, to)
     }
 
-    /// Transfers the given object if allow_ungated_transfer is set true. Note, that this allows
-    /// the owner of a nested object to transfer that object, so long as allow_ungated_transfer is
-    /// enabled at each stage in the hierarchy.
-    public fun transfer(
+    public fun transfer<T: key>(
         owner: &signer,
-        object_id: ObjectId,
+        object: Object<T>,
         to: address,
-    ) acquires Object {
-        let owner_address = signer::address_of(owner);
-        verify_ungated_and_descendant(owner_address, object_id.inner);
+    ) acquires ObjectCore {
+        transfer_raw(owner, object.inner, to)
+    }
 
-        let object = borrow_global_mut<Object>(object_id.inner);
-        if (object.owner == to) {
+    /// Attempts to transfer using addresses only. Transfers the given object if
+    /// allow_ungated_transfer is set true. Note, that this allows the owner of a nested object to
+    /// transfer that object, so long as allow_ungated_transfer is enabled at each stage in the
+    /// hierarchy.
+    public fun transfer_raw(
+        owner: &signer,
+        object: address,
+        to: address,
+    ) acquires ObjectCore {
+        let owner_address = signer::address_of(owner);
+        verify_ungated_and_descendant(owner_address, object);
+
+        let object_core = borrow_global_mut<ObjectCore>(object);
+        if (object_core.owner == to) {
             return
         };
 
         event::emit_event(
-            &mut object.transfer_events,
+            &mut object_core.transfer_events,
             TransferEvent {
-                object_id: object_id,
-                from: object.owner,
+                object: object,
+                from: object_core.owner,
                 to,
             },
         );
-        object.owner = to;
+        object_core.owner = to;
     }
 
     /// Transfer the given object to another object. See `transfer` for more information.
-    public fun transfer_to_object(
+    public fun transfer_to_object<O: key, T: key>(
         owner: &signer,
-        object_id: ObjectId,
-        to: ObjectId,
-    ) acquires Object {
-        transfer(owner, object_id, to.inner)
+        object: Object<O>,
+        to: Object<T>,
+    ) acquires ObjectCore {
+        transfer(owner, object, to.inner)
     }
 
     /// This checks that the destination address is eventually owned by the owner and that each
     /// object between the two allows for ungated transfers. Note, this is limited to a depth of 8
     /// objects may have cyclic dependencies.
-    fun verify_ungated_and_descendant(owner: address, destination: address) acquires Object {
+    fun verify_ungated_and_descendant(owner: address, destination: address) acquires ObjectCore {
         let current_address = destination;
         assert!(
-            exists<Object>(current_address),
+            exists<ObjectCore>(current_address),
             error::not_found(EOBJECT_DOES_NOT_EXIST),
         );
 
-        let object = borrow_global<Object>(current_address);
+        let object = borrow_global<ObjectCore>(current_address);
         assert!(
             object.allow_ungated_transfer,
             error::permission_denied(ENO_UNGATED_TRANSFERS),
@@ -370,10 +387,10 @@ module aptos_framework::object {
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
-                exists<Object>(current_address),
+                exists<ObjectCore>(current_address),
                 error::permission_denied(ENOT_OBJECT_OWNER),
             );
-            let object = borrow_global<Object>(current_address);
+            let object = borrow_global<ObjectCore>(current_address);
             assert!(
                 object.allow_ungated_transfer,
                 error::permission_denied(ENO_UNGATED_TRANSFERS),
@@ -386,17 +403,17 @@ module aptos_framework::object {
     /// Accessors
 
     /// Return the current owner.
-    public fun owner(object_id: ObjectId): address acquires Object {
+    public fun owner<T: key>(object: Object<T>): address acquires ObjectCore {
         assert!(
-            exists<Object>(object_id.inner),
+            exists<ObjectCore>(object.inner),
             error::not_found(EOBJECT_DOES_NOT_EXIST),
         );
-        borrow_global<Object>(object_id.inner).owner
+        borrow_global<ObjectCore>(object.inner).owner
     }
 
     /// Return true if the provided address is the current owner.
-    public fun is_owner(object_id: ObjectId, owner: address): bool acquires Object {
-        owner(object_id) == owner
+    public fun is_owner<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
+        owner(object) == owner
     }
 
     #[test_only]
@@ -409,14 +426,14 @@ module aptos_framework::object {
 
     #[test_only]
     struct HeroEquipEvent has drop, store {
-        weapon_id: Option<ObjectId>,
+        weapon_id: Option<Object<Weapon>>,
     }
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct Hero has key {
         equip_events: event::EventHandle<HeroEquipEvent>,
-        weapon: Option<ObjectId>,
+        weapon: Option<Object<Weapon>>,
     }
 
     #[test_only]
@@ -424,7 +441,7 @@ module aptos_framework::object {
     struct Weapon has key { }
 
     #[test_only]
-    public fun create_hero(creator: &signer): ObjectId acquires Object {
+    public fun create_hero(creator: &signer): Object<Hero> acquires ObjectCore {
         let hero_creator_ref = create_named_object(creator, b"hero");
         let hero_signer = generate_signer(&hero_creator_ref);
         let guid_for_equip_events = create_guid(&hero_signer);
@@ -436,25 +453,25 @@ module aptos_framework::object {
             },
         );
 
-        object_id_from_creator_ref(&hero_creator_ref)
+        object_from_constructor_ref<Hero>(&hero_creator_ref)
     }
 
     #[test_only]
-    public fun create_weapon(creator: &signer): ObjectId {
+    public fun create_weapon(creator: &signer): Object<Weapon> {
         let weapon_creator_ref = create_named_object(creator, b"weapon");
         let weapon_signer = generate_signer(&weapon_creator_ref);
         move_to(&weapon_signer, Weapon { });
-        object_id_from_creator_ref(&weapon_creator_ref)
+        object_from_constructor_ref<Weapon>(&weapon_creator_ref)
     }
 
     #[test_only]
     public fun hero_equip(
         owner: &signer,
-        hero: ObjectId,
-        weapon: ObjectId,
-    ) acquires Hero, Object {
+        hero: Object<Hero>,
+        weapon: Object<Weapon>,
+    ) acquires Hero, ObjectCore {
         transfer_to_object(owner, weapon, hero);
-        let hero_obj = borrow_global_mut<Hero>(object_id_address(&hero));
+        let hero_obj = borrow_global_mut<Hero>(object_address(&hero));
         option::fill(&mut hero_obj.weapon, weapon);
         event::emit_event(
             &mut hero_obj.equip_events,
@@ -465,11 +482,11 @@ module aptos_framework::object {
     #[test_only]
     public fun hero_unequip(
         owner: &signer,
-        hero: ObjectId,
-        weapon: ObjectId,
-    ) acquires Hero, Object {
+        hero: Object<Hero>,
+        weapon: Object<Weapon>,
+    ) acquires Hero, ObjectCore {
         transfer(owner, weapon, signer::address_of(owner));
-        let hero = borrow_global_mut<Hero>(object_id_address(&hero));
+        let hero = borrow_global_mut<Hero>(object_address(&hero));
         option::extract(&mut hero.weapon);
         event::emit_event(
             &mut hero.equip_events,
@@ -478,7 +495,7 @@ module aptos_framework::object {
     }
 
     #[test(creator = @0x123)]
-    fun test_object(creator: &signer) acquires Hero, Object {
+    fun test_object(creator: &signer) acquires Hero, ObjectCore {
         let hero = create_hero(creator);
         let weapon = create_weapon(creator);
 
