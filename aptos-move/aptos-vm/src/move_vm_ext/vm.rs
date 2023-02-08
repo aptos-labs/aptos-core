@@ -25,6 +25,7 @@ use std::{ops::Deref, sync::Arc};
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
+    features: Arc<Features>,
 }
 
 pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u64) -> u32 {
@@ -55,6 +56,7 @@ impl MoveVmExt {
         let type_size_limit = timed_features.is_enabled(TimedFeatureFlag::EntryTypeSizeLimit);
 
         let verifier_config = verifier_config(&features, &timed_features);
+        let features = Arc::new(features);
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -63,7 +65,7 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                     timed_features,
-                    Arc::new(features),
+                    features.clone(),
                 ),
                 VMConfig {
                     verifier: verifier_config,
@@ -74,6 +76,7 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
+            features,
         })
     }
 
@@ -94,6 +97,7 @@ impl MoveVmExt {
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
+        let sender_opt = session_id.sender();
         let script_hash = match session_id {
             SessionId::Txn {
                 sender: _,
@@ -114,6 +118,8 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(remote, extensions),
             remote,
+            sender_opt,
+            self.features.clone(),
         )
     }
 }
