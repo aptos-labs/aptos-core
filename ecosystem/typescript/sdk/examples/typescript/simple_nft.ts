@@ -6,8 +6,8 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { AptosClient, AptosAccount, FaucetClient, TokenClient, CoinClient, IndexerClient } from "aptos";
-import { NODE_URL, FAUCET_URL, INDEXER_URL } from "./common";
+import { AptosClient, AptosAccount, FaucetClient, TokenClient, CoinClient } from "aptos";
+import { NODE_URL, FAUCET_URL } from "./common";
 
 (async () => {
   // Create API and faucet clients.
@@ -160,11 +160,4 @@ import { NODE_URL, FAUCET_URL, INDEXER_URL } from "./common";
   const bobBalance3 = await tokenClient.getTokenForAccount(bob.address(), tokenId);
   console.log(`Alice's token balance: ${aliceBalance3["amount"]}`);
   console.log(`Bob's token balance: ${bobBalance3["amount"]}`);
-
-  console.log("\n=== fetch Alice current tokens ===");
-  let indexerClient = new IndexerClient(INDEXER_URL);
-  const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
-  console.log(
-    `alice current token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice's first token!`,
-  );
 })();

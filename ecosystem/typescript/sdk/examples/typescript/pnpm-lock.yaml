@@ -9,7 +9,7 @@ specifiers:
   typescript: 4.8.2
 
 dependencies:
-  aptos: 1.6.0
+  aptos: 1.3.16
   dotenv: 16.0.1
 
 devDependencies:
@@ -96,8 +96,8 @@ packages:
       color-convert: 1.9.3
     dev: true
 
-  /aptos/1.6.0:
-    resolution: {integrity: sha512-5khjDwrDeNMDBFRcZAmETW20D+V2AqTdsgqkh6bvvl70BtRXdkitN0saM05gf1rK3atnO9PyUKO8iRaBDG5qtA==}
+  /aptos/1.3.16:
+    resolution: {integrity: sha512-LxI4XctQ5VeL+HokjwuGPwsb1fcydLIn4agFXyhn7hSYosTLNRxQ3UIixyP4Fmv6qPBjQVu8hELVSlThQk/EjA==}
     engines: {node: '>=11.0.0'}
     dependencies:
       '@noble/hashes': 1.1.3
