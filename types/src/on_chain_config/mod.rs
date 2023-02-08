@@ -23,6 +23,7 @@ mod aptos_version;
 mod chain_id;
 mod consensus_config;
 mod gas_schedule;
+mod timestamp;
 mod validator_set;
 
 pub use self::{
@@ -36,6 +37,7 @@ pub use self::{
         ProposerElectionType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    timestamp::CurrentTimeMicroseconds,
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
