@@ -40,7 +40,7 @@ impl Test for ThreeRegionSimulationTest {
 /// 2. Each region has minimal network delay amongst its nodes
 /// 3. Each region has a network delay to the other two regions, as estimated by https://www.cloudping.co/grid
 /// 4. Currently simulating a 50 percentile network delay between us-west <--> af-south <--> eu-north
-fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDelay {
+pub fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDelay {
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     // each region has 1/3 of the validators
@@ -110,7 +110,7 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
 }
 
 // 1 Gbps
-fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
+pub fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     SwarmNetworkBandwidth {
         rate: 1000,
         limit: 20971520,
@@ -118,7 +118,10 @@ fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
     }
 }
 
-fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> anyhow::Result<()> {
+pub fn add_execution_delay(
+    swarm: &mut dyn Swarm,
+    config: &ExecutionDelayConfig,
+) -> anyhow::Result<()> {
     let runtime = Runtime::new().unwrap();
     let validators = swarm.get_validator_clients_with_names();
 
@@ -156,7 +159,7 @@ fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> 
     })
 }
 
-fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+pub fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
     let runtime = Runtime::new().unwrap();
     let validators = swarm.get_validator_clients_with_names();
 
