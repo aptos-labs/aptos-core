@@ -1,5 +1,15 @@
 /* eslint-disable no-console */
-import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TokenClient, IndexerClient } from "aptos";
+import {
+  AptosClient,
+  AptosAccount,
+  FaucetClient,
+  BCS,
+  TxnBuilderTypes,
+  TokenClient,
+  IndexerClient,
+  Provider,
+  Network,
+} from "aptos";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
@@ -128,6 +138,12 @@ const {
   let indexerClient = new IndexerClient(INDEXER_URL);
   const accountNFTs = await indexerClient.getAccountNFTs(account1.address().hex());
   console.log(
-    `account1 token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,
+    `from indexer: account1 token name: ${accountNFTs.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,
+  );
+
+  const provider = new Provider(Network.DEVNET);
+  const nfts = await provider.getAccountNFTs(account1.address().hex());
+  console.log(
+    `from provider: account1 token name: ${nfts.current_token_ownerships[0].current_token_data?.name}. Should be Alice Token!`,
   );
 })();

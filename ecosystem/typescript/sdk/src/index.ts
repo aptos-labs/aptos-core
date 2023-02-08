@@ -17,3 +17,4 @@ export {
   deserializeValueBasedOnTypeTag,
   getPropertyValueRaw,
 } from "./utils/property_map_serde";
+export { Network, CustomEndpoints } from "./utils/api-endpoints";

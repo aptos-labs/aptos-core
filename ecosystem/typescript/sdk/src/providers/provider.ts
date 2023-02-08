@@ -2,7 +2,7 @@ import { AptosClient } from "./aptos_client";
 import { IndexerClient } from "./indexer";
 
 import * as Gen from "../generated/index";
-import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../utils/api-endpoints";
+import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../utils";
 
 /**
  * Builds a Provider class with an aptos client configured to connect to an Aptos node
