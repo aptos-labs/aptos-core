@@ -14,6 +14,7 @@ For that, we first need to check if the connected account has a `TodoList` resou
 To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
 
 To get started:
+
 1. Stop the local server if running.
 2. In the `client` directory, run: `npm i aptos@1.6.0`
 3. In the `App.tsx` file, import the `AptosClient` class like so:
@@ -85,7 +86,7 @@ const fetchList = async () => {
   try {
     const TodoListResource = await client.getAccountResource(
       account.address,
-      `${moduleAddress}::main::TodoList`
+      `${moduleAddress}::todolist::TodoList`
     );
     setAccountHasList(true);
   } catch (e: any) {
@@ -96,12 +97,12 @@ const fetchList = async () => {
 
 The `moduleAddress` is the address we publish the module under, i.e the account address you have in your `Move.toml` file (`myaddr`).
 
-The `client.getAccountResource()`expects an *account address* that holds the resource we are looking for and a string representation of an on-chain *Move struct type*.
+The `client.getAccountResource()`expects an _account address_ that holds the resource we are looking for and a string representation of an on-chain _Move struct type_.
 
 - account address - is the current connected account (we are getting it from the wallet account object)
 - Move struct type string syntax:
   - The account address who holds the move module = our profile account address (You might want to change the `moduleAddress` const to be your own account address)
-  - The module name the resource lives in = `main`
+  - The module name the resource lives in = `todolist`
   - The resource name = `TodoList`
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
