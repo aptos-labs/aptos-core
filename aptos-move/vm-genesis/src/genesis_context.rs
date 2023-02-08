@@ -26,7 +26,7 @@ impl GenesisStateView {
 
     pub(crate) fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) {
         self.state_data.insert(
-            StateKey::AccessPath(AccessPath::from(module_id)),
+            StateKey::access_path(AccessPath::from(module_id)),
             blob.to_vec(),
         );
     }

@@ -1095,7 +1095,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::AccessPath(ValidatorSet::access_path());
+    let state_key = StateKey::access_path(ValidatorSet::access_path());
     let bytes = writeset
         .get(&state_key)
         .unwrap()
