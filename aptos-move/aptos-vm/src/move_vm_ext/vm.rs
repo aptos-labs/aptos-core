@@ -23,6 +23,7 @@ use std::ops::Deref;
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
+    features: Features,
 }
 
 impl MoveVmExt {
@@ -59,6 +60,7 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
+            features,
         })
     }
 
@@ -78,6 +80,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
+        let sender_opt = session_id.sender();
         let script_hash = match session_id {
             SessionId::Txn {
                 sender: _,
@@ -99,7 +102,12 @@ impl MoveVmExt {
             self.inner.new_session_with_extensions(remote, extensions),
             self,
             remote,
+            sender_opt,
         )
+    }
+
+    pub fn features(&self) -> &Features {
+        &self.features
     }
 }
 
