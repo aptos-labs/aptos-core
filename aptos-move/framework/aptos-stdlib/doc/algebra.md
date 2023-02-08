@@ -5,22 +5,36 @@
 
 
 
--  [Struct `BLS12_381_G1`](#0x1_algebra_BLS12_381_G1)
--  [Struct `BLS12_381_G2`](#0x1_algebra_BLS12_381_G2)
+-  [Struct `BLS12_381_Fq`](#0x1_algebra_BLS12_381_Fq)
+-  [Struct `BLS12_381_Fq2`](#0x1_algebra_BLS12_381_Fq2)
+-  [Struct `BLS12_381_Fq6`](#0x1_algebra_BLS12_381_Fq6)
 -  [Struct `BLS12_381_Fq12`](#0x1_algebra_BLS12_381_Fq12)
+-  [Struct `BLS12_381_G1`](#0x1_algebra_BLS12_381_G1)
+-  [Struct `BLS12_381_G1_SUB`](#0x1_algebra_BLS12_381_G1_SUB)
+-  [Struct `BLS12_381_G2`](#0x1_algebra_BLS12_381_G2)
+-  [Struct `BLS12_381_G2_SUB`](#0x1_algebra_BLS12_381_G2_SUB)
 -  [Struct `BLS12_381_Gt`](#0x1_algebra_BLS12_381_Gt)
 -  [Struct `BLS12_381_Fr`](#0x1_algebra_BLS12_381_Fr)
 -  [Struct `Element`](#0x1_algebra_Element)
--  [Function `bls12_381_g1_serialization_scheme_uncompressed`](#0x1_algebra_bls12_381_g1_serialization_scheme_uncompressed)
--  [Function `bls12_381_g1_serialization_scheme_compressed`](#0x1_algebra_bls12_381_g1_serialization_scheme_compressed)
--  [Function `bls12_381_g2_serialization_scheme_uncompressed`](#0x1_algebra_bls12_381_g2_serialization_scheme_uncompressed)
--  [Function `bls12_381_g2_serialization_scheme_compressed`](#0x1_algebra_bls12_381_g2_serialization_scheme_compressed)
--  [Function `bls12_381_fq12_serialization_scheme`](#0x1_algebra_bls12_381_fq12_serialization_scheme)
--  [Function `bls12_381_gt_serialization_scheme`](#0x1_algebra_bls12_381_gt_serialization_scheme)
--  [Function `bls12_381_fr_serialization_scheme_lendian`](#0x1_algebra_bls12_381_fr_serialization_scheme_lendian)
--  [Function `bls12_381_fr_serialization_scheme_bendian`](#0x1_algebra_bls12_381_fr_serialization_scheme_bendian)
+-  [Constants](#@Constants_0)
+-  [Function `bls12_381_fq_format`](#0x1_algebra_bls12_381_fq_format)
+-  [Function `bls12_381_fq_bendian_format`](#0x1_algebra_bls12_381_fq_bendian_format)
+-  [Function `bls12_381_fq2_format`](#0x1_algebra_bls12_381_fq2_format)
+-  [Function `bls12_381_fq6_format`](#0x1_algebra_bls12_381_fq6_format)
+-  [Function `bls12_381_fq12_format`](#0x1_algebra_bls12_381_fq12_format)
+-  [Function `bls12_381_g1_uncompressed_format`](#0x1_algebra_bls12_381_g1_uncompressed_format)
+-  [Function `bls12_381_g1_compressed_format`](#0x1_algebra_bls12_381_g1_compressed_format)
+-  [Function `bls12_381_g1_sub_uncompressed_format`](#0x1_algebra_bls12_381_g1_sub_uncompressed_format)
+-  [Function `bls12_381_g1_sub_compressed_format`](#0x1_algebra_bls12_381_g1_sub_compressed_format)
+-  [Function `bls12_381_g2_uncompressed_format`](#0x1_algebra_bls12_381_g2_uncompressed_format)
+-  [Function `bls12_381_g2_compressed_format`](#0x1_algebra_bls12_381_g2_compressed_format)
+-  [Function `bls12_381_g2_sub_uncompressed_format`](#0x1_algebra_bls12_381_g2_sub_uncompressed_format)
+-  [Function `bls12_381_g2_sub_compressed_format`](#0x1_algebra_bls12_381_g2_sub_compressed_format)
+-  [Function `bls12_381_gt_format`](#0x1_algebra_bls12_381_gt_format)
+-  [Function `bls12_381_fr_lendian_format`](#0x1_algebra_bls12_381_fr_lendian_format)
+-  [Function `bls12_381_fr_bendian_format`](#0x1_algebra_bls12_381_fr_bendian_format)
 -  [Function `pairing`](#0x1_algebra_pairing)
--  [Function `pairing_product`](#0x1_algebra_pairing_product)
+-  [Function `multi_pairing`](#0x1_algebra_multi_pairing)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
 -  [Function `field_zero`](#0x1_algebra_field_zero)
 -  [Function `field_one`](#0x1_algebra_field_one)
@@ -81,24 +95,15 @@
 
 
 
-<a name="0x1_algebra_BLS12_381_G1"></a>
+<a name="0x1_algebra_BLS12_381_Fq"></a>
 
-## Struct `BLS12_381_G1`
+## Struct `BLS12_381_Fq`
 
-<code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> represents a group used in BLS12-381 pairing.
-<code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-<code>E(Fq)</code> is an elliptic curve <code>y^2=x^3+4</code> defined over <code>Fq</code>.
-<code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is constructed by a subset of the points on <code>E(Fq)</code> and the point at infinity, under point addition. (A subgroup of prime order on <code>E(Fq)</code>.)
-The prime order <code>r</code> of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
-There exists a bilinear mapping from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-
-An <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> represents an element in group <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>.
-Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;</code> requires a <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
+A finite field used BLS12-381 curves.
+It has a prime order <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
 
 
-
-<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a>
 </code></pre>
 
 
@@ -119,23 +124,42 @@ Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element<
 
 </details>
 
-<a name="0x1_algebra_BLS12_381_G2"></a>
+<a name="0x1_algebra_BLS12_381_Fq2"></a>
 
-## Struct `BLS12_381_G2`
+## Struct `BLS12_381_Fq2`
 
-<code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> represents a group used in BLS12-381 pairing.
-<code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
-<code>E(Fq2)</code> is an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code>Fq2</code>.
-<code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is constructed by a subset of the points on <code>E(Fq2)</code> and the point at infinity, under point addition. (A subgroup of prime order on <code>E(Fq2)</code>.)
-The prime order <code>r</code> of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001, same as <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>.
-The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
-There exists a bilinear mapping from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-
-Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>&gt;</code> requires a <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
+An extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
 
 
-<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_BLS12_381_Fq6"></a>
+
+## Struct `BLS12_381_Fq6`
+
+An extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code>, constructed as <code>Fq6=Fq2[v]/(v^3-u-1)</code>.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12_381_Fq6</a>
 </code></pre>
 
 
@@ -160,14 +184,130 @@ Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element<
 
 ## Struct `BLS12_381_Fq12`
 
-A field used in BLS12-381 pairing.
-<code>Fq</code> is a finite field with <code>q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab</code>.
-<code>Fq2</code> is an extension field of <code>Fq</code>, constructed as <code>Fq2=Fq[u]/(u^2+1)</code>.
-<code>Fq6</code> is an extension field of <code>Fq2</code>, constructed as <code>Fq6=Fq2[v]/(v^2-u-1)</code>.
-<code>Fq12</code> is an extension field of <code>Fq6</code>, constructed as <code>Fq12=Fq6[w]/(w^2-v)</code>.
+An extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12_381_Fq6</a></code>, constructed as <code>Fq12=Fq6[w]/(w^2-v)</code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_BLS12_381_G1"></a>
+
+## Struct `BLS12_381_G1`
+
+A group constructed by the points on a curve <code>E(Fq)</code> and the point at inifinity under the elliptic curve point addition.
+<code>E(Fq)</code> is an elliptic curve <code>y^2=x^3+4</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code>.
+The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_BLS12_381_G1_SUB"></a>
+
+## Struct `BLS12_381_G1_SUB`
+
+A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>.
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
+A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_BLS12_381_G2"></a>
+
+## Struct `BLS12_381_G2`
+
+A group constructed by the points on a curve <code>E(Fq2)</code> and the point at inifinity under the elliptic curve point addition.
+<code>E(Fq2)</code> is an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code>.
+The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_BLS12_381_G2_SUB"></a>
+
+## Struct `BLS12_381_G2_SUB`
+
+A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>.
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
+A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>
 </code></pre>
 
 
@@ -193,11 +333,10 @@ A field used in BLS12-381 pairing.
 ## Struct `BLS12_381_Gt`
 
 <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> represents the target group of the pairing defined over the BLS12-381 curves.
-<code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> is a multiplicative subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
-The order <code>r</code> of <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001. (Same as <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>.)
+A multiplicative subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>. (Same as <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code>.)
 The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is 1.
-There exists a bilinear mapping from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;</code> requires a <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code>.
+A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>
@@ -225,8 +364,8 @@ Scalar multiplication on <code><a href="algebra.md#0x1_algebra_Element">Element<
 
 ## Struct `BLS12_381_Fr`
 
-The scalar field for groups <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-A <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;</code> is an integer between 0 and <code>r-1</code> where <code>r</code> is the order of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>/<code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>/<code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
+A finite field thatshares the same prime number <code>r</code> with groups <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>,
+and thus can be their scalar field.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>
@@ -254,7 +393,7 @@ A <code><a href="algebra.md#0x1_algebra_Element">Element</a>&lt;<a href="algebra
 
 ## Struct `Element`
 
-This struct represents an element of some algebraic structure <code>S</code>.
+This struct represents an ephemeral element of an algebraic structure <code>S</code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; <b>has</b> <b>copy</b>, drop
@@ -278,20 +417,46 @@ This struct represents an element of some algebraic structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g1_serialization_scheme_uncompressed"></a>
+<a name="@Constants_0"></a>
 
-## Function `bls12_381_g1_serialization_scheme_uncompressed`
-
-A serialization scheme for <code>BLS12-381-G1</code> elements.
-It assumes a 96-byte serialization <code>[b_0, ..., b_95]</code> with the following rules.
-- <code>b_95 & 0x40</code> is the infinity flag.
-- The infinity flag is 1 if and only if the element is the point at infinity.
-- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>, with the following rules.
-- <code>[b_0, ..., b_47 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x</code>.
-- <code>[b_48, ..., b_95 & 0x3f]</code> is a 48-byte little-endian encoding of 'y'.
+## Constants
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_serialization_scheme_uncompressed">bls12_381_g1_serialization_scheme_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<a name="0x1_algebra_BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN">BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [250, 255, 255, 255, 254, 255, 255, 255, 254, 91, 254, 255, 2, 164, 189, 83, 5, 216, 161, 9, 8, 216, 57, 51, 72, 125, 157, 41, 83, 167, 237, 115];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN">BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN">BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+</code></pre>
+
+
+
+<a name="0x1_algebra_bls12_381_fq_format"></a>
+
+## Function `bls12_381_fq_format`
+
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using little-endian byte order.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_format">bls12_381_fq_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -300,30 +465,21 @@ It assumes a 96-byte serialization <code>[b_0, ..., b_95]</code> with the follow
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_serialization_scheme_uncompressed">bls12_381_g1_serialization_scheme_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(0)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_format">bls12_381_fq_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"01" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g1_serialization_scheme_compressed"></a>
+<a name="0x1_algebra_bls12_381_fq_bendian_format"></a>
 
-## Function `bls12_381_g1_serialization_scheme_compressed`
+## Function `bls12_381_fq_bendian_format`
 
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
-It assumes a 48-byte serialization <code>[b_0, ..., b_47]</code> with the following rules.
-- <code>b_47 & 0x40</code> is the infinity flag.
-- The infinity flag is 1 if and only if the element is the point at infinity.
-- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve, with the following rules.
-- <code>[b_0, ..., b_47 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x</code>.
-- <code>b_47 & 0x80</code> is the positiveness flag.
-- The positiveness flag is 1 if and only if <code>y &gt; -y</code>.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using big-endian byte order.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_serialization_scheme_compressed">bls12_381_g1_serialization_scheme_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_bendian_format">bls12_381_fq_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -332,33 +488,23 @@ It assumes a 48-byte serialization <code>[b_0, ..., b_47]</code> with the follow
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_serialization_scheme_compressed">bls12_381_g1_serialization_scheme_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(1)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_bendian_format">bls12_381_fq_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0101" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g2_serialization_scheme_uncompressed"></a>
+<a name="0x1_algebra_bls12_381_fq2_format"></a>
 
-## Function `bls12_381_g2_serialization_scheme_uncompressed`
+## Function `bls12_381_fq2_format`
 
-A serialization scheme for <code>BLS12-381-G2</code> elements.
-It assumes a 192-byte serialization <code>[b_0, ..., b_191]</code>, with the following rules.
-- <code>b_191 & 0x40</code> is the infinity flag.
-- The infinity flag is 1 if and only if the element is the point at infinity.
-- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>, with the following rules.
-- <code>[b_0, ..., b_95]</code> is a 96-byte serialization of <code>x=(x_0+x_1*u)</code>.
-- <code>[b_0, ..., b_47]</code> is a 48-byte little-endian encoding of <code>x_0</code>.
-- <code>[b_48, ..., b_95]</code> is a 48-byte little-endian encoding of <code>x_1</code>.
-- <code>[b_96, ..., b_191 & 0x3f]</code> is a 96-byte serialization of 'y=(y_0+y_1*u)'.
-- <code>[b_96, ..., b_143]</code> is a 48-byte little-endian encoding of <code>y_0</code>.
-- <code>[b_144, ..., b_191 & 0x3f]</code> is a 48-byte little-endian encoding of <code>y_1</code>.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code> element in form <code>(c_0+c_1*u)</code> is represented by a byte array <code>b[]</code> of size 96.
+<code>b[0..48]</code> is <code>c_0</code> serialized in <code>bls12_381_fq_format</code>.
+<code>b[48..96]</code> is <code>c_1</code> serialized in <code>bls12_381_fq_format</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_serialization_scheme_uncompressed">bls12_381_g2_serialization_scheme_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq2_format">bls12_381_fq2_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -367,33 +513,24 @@ It assumes a 192-byte serialization <code>[b_0, ..., b_191]</code>, with the fol
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_serialization_scheme_uncompressed">bls12_381_g2_serialization_scheme_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(2)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq2_format">bls12_381_fq2_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"02" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g2_serialization_scheme_compressed"></a>
+<a name="0x1_algebra_bls12_381_fq6_format"></a>
 
-## Function `bls12_381_g2_serialization_scheme_compressed`
+## Function `bls12_381_fq6_format`
 
-A serialization scheme for <code>BLS12-381-G2</code> elements.
-It assumes a 96-byte serialization <code>[b_0, ..., b_95]</code>, with the following rules.
-- <code>b_95 & 0x40</code> is the infinity flag.
-- The infinity flag is 1 if and only if the element is the point at infinity.
-- The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>, with the following rules.
-- <code>[b_0, ..., b_95 & 0x3f]</code> is a 96-byte little-endian encoding of <code>x=(x_0+x_1*u)</code>.
-- <code>[b_0, ..., b_47]</code> is a 48-byte little-endian encoding of <code>x_0</code>.
-- <code>[b_48, ..., b_95 & 0x3f]</code> is a 48-byte little-endian encoding of <code>x_1</code>.
-- <code>b_95 & 0x80</code> is the positiveness flag.
-- The positiveness flag is 1 if and only if <code>y &gt; -y</code>.
-- Here <code>a=(a_0+a_1*u)</code> is considered greater than <code>b=(b_0+b_1*u)</code> if <code>a_1&gt;b_1 OR (a_1=b_1 AND a_0&gt;b_0)</code>.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12_381_Fq6</a></code> element in form <code>(c_0+c_1*v+c_2*v^2)</code> is represented by a byte array <code>b[]</code> of size 288.
+<code>b[0..96]</code> is <code>c_0</code> serialized in <code>bls12_381_fq2_format</code>.
+<code>b[96..192]</code> is <code>c_1</code> serialized in <code>bls12_381_fq2_format</code>.
+<code>b[192..288]</code> is <code>c_2</code> serialized in <code>bls12_381_fq2_format</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_serialization_scheme_compressed">bls12_381_g2_serialization_scheme_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq6_format">bls12_381_fq6_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -402,27 +539,24 @@ It assumes a 96-byte serialization <code>[b_0, ..., b_95]</code>, with the follo
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_serialization_scheme_compressed">bls12_381_g2_serialization_scheme_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(3)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq6_format">bls12_381_fq6_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"03" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_fq12_serialization_scheme"></a>
+<a name="0x1_algebra_bls12_381_fq12_format"></a>
 
-## Function `bls12_381_fq12_serialization_scheme`
+## Function `bls12_381_fq12_format`
 
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code> elements.
-It assumes a 576-byte serialization <code>[b_0, ..., b_575]</code>, with the following rules.
-- Assume the given element is <code>e=c_0+c_1*w</code> where <code>c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1</code> and <code>c_ij=c_ij0+c_ij1*u for j=0..2</code>.
-- <code>[b_0, ..., b_575]</code> is a concatenation of 12 encoded <code>Fq</code> elements: <code>c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121</code>.
-- Every <code>c_ijk</code> uses a 48-byte little-endian encoding.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code> element in form <code>(c_0+c_1*w)</code> is represented by a byte array <code>b[]</code> of size 576.
+<code>b[0..288]</code> is <code>c_0</code> serialized in <code>bls12_381_fq6_format</code>.
+<code>b[288..576]</code> is <code>c_1</code> serialized in <code>bls12_381_fq6_format</code>.
+Also used in <code>ark_bls12_381::Fq12::deserialize()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq12_serialization_scheme">bls12_381_fq12_serialization_scheme</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -431,27 +565,26 @@ It assumes a 576-byte serialization <code>[b_0, ..., b_575]</code>, with the fol
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq12_serialization_scheme">bls12_381_fq12_serialization_scheme</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(5)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"04" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_gt_serialization_scheme"></a>
+<a name="0x1_algebra_bls12_381_g1_uncompressed_format"></a>
 
-## Function `bls12_381_gt_serialization_scheme`
+## Function `bls12_381_g1_uncompressed_format`
 
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
-It assumes a 576-byte serialization <code>[b_0, ..., b_575]</code>, with the following rules.
-- Assume the given element is <code>e=c_0+c_1*w</code> where <code>c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1</code> and <code>c_ij=c_ij0+c_ij1*u for j=0..2</code>.
-- <code>[b_0, ..., b_575]</code> is a concatenation of 12 encoded <code>Fq</code> elements: <code>c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121</code>.
-- Every <code>c_ijk</code> uses a 48-byte little-endian encoding.
+A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> element is represented by a byte array <code>b[]</code> of size 96.
+<code>b[95] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>,
+<code>[b[0], ..., b[47] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq_format</code>, and
+<code>[b[48], ..., b[95] & 0x3f]</code> is <code>y</code> serialized in <code>bls12_381_fq_format</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_gt_serialization_scheme">bls12_381_gt_serialization_scheme</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -460,24 +593,26 @@ It assumes a 576-byte serialization <code>[b_0, ..., b_575]</code>, with the fol
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_gt_serialization_scheme">bls12_381_gt_serialization_scheme</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(9)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"05" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_fr_serialization_scheme_lendian"></a>
+<a name="0x1_algebra_bls12_381_g1_compressed_format"></a>
 
-## Function `bls12_381_fr_serialization_scheme_lendian`
+## Function `bls12_381_g1_compressed_format`
 
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> elements.
-It assumes a 32-byte little-endian serialization.
+A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> element is represented by a byte array <code>b[]</code> of size 48.
+<code>b[47] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>,
+<code>[b[0], ..., b[47] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq_format</code>, and
+the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (as unsigned integers).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_serialization_scheme_lendian">bls12_381_fr_serialization_scheme_lendian</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -486,24 +621,21 @@ It assumes a 32-byte little-endian serialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_serialization_scheme_lendian">bls12_381_fr_serialization_scheme_lendian</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(0)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0501" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_fr_serialization_scheme_bendian"></a>
+<a name="0x1_algebra_bls12_381_g1_sub_uncompressed_format"></a>
 
-## Function `bls12_381_fr_serialization_scheme_bendian`
+## Function `bls12_381_g1_sub_uncompressed_format`
 
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> elements.
-It assumes a 32-byte big-endian serialization.
+Effectively <code>bls12_381_g1_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> elements.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_serialization_scheme_bendian">bls12_381_fr_serialization_scheme_bendian</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_uncompressed_format">bls12_381_g1_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -512,9 +644,201 @@ It assumes a 32-byte big-endian serialization.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_serialization_scheme_bendian">bls12_381_fr_serialization_scheme_bendian</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    std::vector::singleton(1)
-}
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_uncompressed_format">bls12_381_g1_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"06" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g1_sub_compressed_format"></a>
+
+## Function `bls12_381_g1_sub_compressed_format`
+
+Effectively <code>bls12_381_g1_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> elements.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_compressed_format">bls12_381_g1_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_compressed_format">bls12_381_g1_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0601" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g2_uncompressed_format"></a>
+
+## Function `bls12_381_g2_uncompressed_format`
+
+A serialization scheme where a <code>BLS12-381-G2</code> element is represented by a byte array <code>b[]</code> of size 192.
+<code>b[191] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
+<code>b[0..96]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
+<code>[b[96], ..., b[191] & 0x3f]</code> is <code>y</code> serialized in <code>bls12_381_fq2_format</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"07" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g2_compressed_format"></a>
+
+## Function `bls12_381_g2_compressed_format`
+
+A serialization scheme where a <code>BLS12-381-G2</code> element is represented by a byte array <code>b[]</code> of size 96.
+<code>b[95] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
+<code>[b[0], ..., b[95] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
+the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (as unsigned integers).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0701" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g2_sub_uncompressed_format"></a>
+
+## Function `bls12_381_g2_sub_uncompressed_format`
+
+Effectively <code>bls12_381_g2_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> elements.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_uncompressed_format">bls12_381_g2_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_uncompressed_format">bls12_381_g2_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"08" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g2_sub_compressed_format"></a>
+
+## Function `bls12_381_g2_sub_compressed_format`
+
+Effectively <code>bls12_381_g2_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> elements.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_compressed_format">bls12_381_g2_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_compressed_format">bls12_381_g2_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0801" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_gt_format"></a>
+
+## Function `bls12_381_gt_format`
+
+Effectively <code><a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_gt_format">bls12_381_gt_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_gt_format">bls12_381_gt_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"09" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_fr_lendian_format"></a>
+
+## Function `bls12_381_fr_lendian_format`
+
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using little-endian byte order.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_lendian_format">bls12_381_fr_lendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_lendian_format">bls12_381_fr_lendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0a" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_fr_bendian_format"></a>
+
+## Function `bls12_381_fr_bendian_format`
+
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using big-endian byte order.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_bendian_format">bls12_381_fr_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_bendian_format">bls12_381_fr_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0a01" }
 </code></pre>
 
 
@@ -525,8 +849,8 @@ It assumes a 32-byte big-endian serialization.
 
 ## Function `pairing`
 
-Computes a pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
-Returns an element in the target group <code>Gt</code>.
+Compute a pre-compiled pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
+Return an element in the target group <code>Gt</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1, G2, Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
@@ -549,14 +873,15 @@ Returns an element in the target group <code>Gt</code>.
 
 </details>
 
-<a name="0x1_algebra_pairing_product"></a>
+<a name="0x1_algebra_multi_pairing"></a>
 
-## Function `pairing_product`
+## Function `multi_pairing`
 
-Compute the product of multiple pairings.
+Compute <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[0], b[0]) + ... + <a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[n-1], b[n-1])</code> for <code>n</code> elements of group <code>G1</code> and <code>n</code> elements of group <code>G2</code>.
+This is faster and cheaper than calling <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> separately then aggregating with <code>group_add</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing_product">pairing_product</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
 </code></pre>
 
 
@@ -565,7 +890,7 @@ Compute the product of multiple pairings.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing_product">pairing_product</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
     <a href="algebra.md#0x1_algebra_abort_if_generic_group_basic_operations_disabled">abort_if_generic_group_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G1&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G2&gt;();
@@ -1337,8 +1662,8 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;() {
     <b>let</b> type = type_of&lt;S&gt;();
-    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;())
-        && std::features::bls12_381_groups_enabled()
+    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;())
+        && std::features::bls12_381_structures_enabled()
     ) {
         // Let go.
     } <b>else</b> {

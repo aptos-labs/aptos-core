@@ -134,7 +134,7 @@ impl GasParameters {
                 ark_bls12_381_g2_proj_eq: 0.into(),
                 ark_bls12_381_g2_affine_to_prepared: 0.into(),
                 ark_bls12_381_g2_proj_to_prepared: 0.into(),
-                ark_bls12_381_fq12_serialize: 0.into(),
+                ark_bls12_381_fq12_ser: 0.into(),
                 ark_bls12_381_fq12_deserialize: 0.into(),
                 ark_bls12_381_fq12_eq: 0.into(),
                 ark_bls12_381_fq12_one: 0.into(),

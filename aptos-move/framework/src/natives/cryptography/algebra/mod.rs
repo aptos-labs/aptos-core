@@ -36,11 +36,11 @@ pub mod gas;
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
-    BLS12_381_Fr,
     BLS12_381_Fq12,
-    BLS12_381_G1,
-    BLS12_381_G2,
+    BLS12_381_G1_SUB,
+    BLS12_381_G2_SUB,
     BLS12_381_Gt,
+    BLS12_381_Fr,
 }
 
 impl Structure {
@@ -48,8 +48,8 @@ impl Structure {
         match type_tag.to_string().as_str() {
             "0x1::algebra::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
             "0x1::algebra::BLS12_381_Fq12" => Some(Structure::BLS12_381_Fq12),
-            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
-            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
+            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12_381_G1_SUB),
+            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12_381_G2_SUB),
             "0x1::algebra::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
             _ => None
         }
@@ -201,6 +201,24 @@ macro_rules! get_obj_pointer {
     }}
 }
 
+static BLS12_381_FQ_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("01").unwrap());
+static BLS12_381_FQ_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0101").unwrap());
+static BLS12_381_FQ2_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("02").unwrap());
+static BLS12_381_FQ6_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("03").unwrap());
+static BLS12_381_FQ12_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("04").unwrap());
+static BLS12_381_G1_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("05").unwrap());
+static BLS12_381_G1_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0501").unwrap());
+static BLS12_381_G1_SUB_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("06").unwrap());
+static BLS12_381_G1_SUB_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0601").unwrap());
+static BLS12_381_G2_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("07").unwrap());
+static BLS12_381_G2_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0701").unwrap());
+static BLS12_381_G2_SUB_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("08").unwrap());
+static BLS12_381_G2_SUB_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0801").unwrap());
+static BLS12_381_GT_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("09").unwrap());
+static BLS12_381_FR_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0a").unwrap());
+static BLS12_381_FR_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0a01").unwrap());
+
+
 fn serialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -212,12 +230,22 @@ fn serialize_internal(
     let scheme = pop_arg!(args, Vec<u8>);
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match (structure_opt, scheme) {
-        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_LENDIAN.as_slice() => {
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
             let element_ptr = get_obj_pointer!(context, structure, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
             let buf = ark_serialize_uncompressed!(element);
             Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fr_ser * NumArgs::one(),
+                gas_params.serialize(structure, scheme.clone()),
+                smallvec![Value::vector_u8(buf)],
+            ))
+        }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
+            let element_ptr = get_obj_pointer!(context, structure, handle);
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let mut buf = ark_serialize_uncompressed!(element);
+            buf.reverse();
+            Ok(NativeResult::ok(
+                gas_params.serialize(structure, scheme.clone()),
                 smallvec![Value::vector_u8(buf)],
             ))
         }
@@ -245,53 +273,6 @@ fn serialize_internal(
     }
 }
 
-fn element_serialize_compressed_internal(
-    gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            let element = borrow_bls12_381_g1!(context, handle);
-            let buf = ark_serialize_compressed!(element);
-            Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_ser_comp) * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
-            ))
-        }
-        Some(Structure::BLS12_381_G2) => {
-            let element = borrow_bls12_381_g2!(context, handle);
-            let buf = ark_serialize_compressed!(element);
-            Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_comp) * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
-            ))
-        }
-        Some(Structure::BLS12_381_Gt) => {
-            let element = borrow_bls12_381_fq12!(context, handle);
-            let buf = ark_serialize_compressed!(element);
-            Ok(NativeResult::ok(
-                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one(),
-                smallvec![Value::vector_u8(buf)],
-            ))
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
-    }
-}
-
-static BLS12_381_FP_SERIALIZATION: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
-static BLS12_381_FR_SERIALIZATION_LENDIAN: Lazy<Vec<u8>> = Lazy::new(||vec![0x00]);
-static BLS12_381_FR_SERIALIZATION_BENDIAN: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
-static BLS12_381_FQ12_SERIALIZATION: Lazy<Vec<u8>> = Lazy::new(||vec![0x01]);
-static BLS12_381_G1_UNCOMPRESSED: Lazy<Vec<u8>> = Lazy::new(||vec![0x02]);
-static BLS12_381_G1_COMPRESSED: Lazy<Vec<u8>> = Lazy::new(||vec![0x03]);
-
 fn deserialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -303,7 +284,7 @@ fn deserialize_internal(
     let mut bytes = pop_arg!(args, Vec<u8>);
     let scheme = pop_arg!(args, Vec<u8>);
     match (structure,scheme) {
-        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_LENDIAN.as_slice() => {
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
             match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
                 Ok(element) => {
                     let handle = store_obj!(context, structure, element);
@@ -320,7 +301,7 @@ fn deserialize_internal(
                 }
             }
         }
-        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_SERIALIZATION_BENDIAN.as_slice() => {
+        (Some(structure), scheme) if structure == Structure::BLS12_381_Fr && scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
             bytes.reverse();
             match ark_bls12_381::Fr::deserialize_uncompressed(bytes.as_slice()) {
                 Ok(element) => {
@@ -338,7 +319,7 @@ fn deserialize_internal(
                 }
             }
         }
-        (Some(structure), scheme) if structure== Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED.as_slice() => {
+        (Some(structure), scheme) if structure== Structure::BLS12_381_G1_SUB && scheme.as_slice() == BLS12_381_G1_SUB_UNCOMPRESSED_FORMAT.as_slice() => {
             match ark_bls12_381::G1Affine::deserialize_uncompressed(bytes.as_slice()) {
                 Ok(element) => {
                     let handle = store_obj!(context, structure, element.into_projective());
@@ -355,7 +336,7 @@ fn deserialize_internal(
                 }
             }
         }
-        (Some(structure), scheme) if structure== Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_COMPRESSED.as_slice() => {
+        (Some(structure), scheme) if structure== Structure::BLS12_381_G1_SUB && scheme.as_slice() == BLS12_381_G1_SUB_COMPRESSED_FORMAT.as_slice() => {
             match ark_bls12_381::G1Affine::deserialize(bytes.as_slice()) {
                 Ok(element) => {
                     let handle = store_obj!(context, structure, element.into_projective());
@@ -749,7 +730,7 @@ fn group_identity_internal(
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G1Projective::zero();
             let handle = store_bls12_381_g1!(context, element);
@@ -758,7 +739,7 @@ fn group_identity_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G2Projective::zero();
             let handle = store_bls12_381_g2!(context, element);
@@ -807,7 +788,7 @@ fn group_generator_internal(
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = ark_bls12_381::G1Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g1!(context, element);
@@ -816,7 +797,7 @@ fn group_generator_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = ark_bls12_381::G2Projective::prime_subgroup_generator();
             let handle = store_bls12_381_g2!(context, element);
@@ -852,7 +833,7 @@ fn group_order_internal(
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) | Some(Structure::BLS12_381_G2) | Some(Structure::BLS12_381_Gt) => {
+        Some(Structure::BLS12_381_G1_SUB) | Some(Structure::BLS12_381_G2_SUB) | Some(Structure::BLS12_381_Gt) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -877,7 +858,7 @@ fn is_prime_order_internal(
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) | Some(Structure::BLS12_381_G2) | Some(Structure::BLS12_381_Gt) => {
+        Some(Structure::BLS12_381_G1_SUB) | Some(Structure::BLS12_381_G2_SUB) | Some(Structure::BLS12_381_Gt) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -926,7 +907,7 @@ fn random_element_internal(
     abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G1Projective::rand(&mut test_rng());
             let handle = store_bls12_381_g1!(context, element);
@@ -935,7 +916,7 @@ fn random_element_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = G2Projective::rand(&mut test_rng());
             let handle = store_bls12_381_g2!(context, element);
@@ -974,7 +955,7 @@ fn element_eq_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g1!(context, handle_1);
             let element_2 = borrow_bls12_381_g1!(context, handle_2);
@@ -983,7 +964,7 @@ fn element_eq_internal(
                 smallvec![Value::bool(element_1.eq(element_2))],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g2!(context, handle_1);
             let element_2 = borrow_bls12_381_g2!(context, handle_2);
@@ -1018,7 +999,7 @@ fn group_add_internal(
     let handle_2 = pop_arg!(args, u64) as usize;
     let handle_1 = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g1!(context, handle_1);
             let element_2 = borrow_bls12_381_g1!(context, handle_2);
@@ -1029,7 +1010,7 @@ fn group_add_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element_1 = borrow_bls12_381_g2!(context, handle_1);
             let element_2 = borrow_bls12_381_g2!(context, handle_2);
@@ -1069,7 +1050,7 @@ fn group_scalar_mul_internal(
     let scalar_handle = pop_arg!(args, u64) as usize;
     let element_handle = pop_arg!(args, u64) as usize;
     match (group_structure, scalar_structure) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) => {
+        (Some(Structure::BLS12_381_G1_SUB), Some(Structure::BLS12_381_Fr)) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, element_handle);
             let scalar = borrow_bls12_381_fr!(context, scalar_handle);
@@ -1080,7 +1061,7 @@ fn group_scalar_mul_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) => {
+        (Some(Structure::BLS12_381_G2_SUB), Some(Structure::BLS12_381_Fr)) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, element_handle);
             let scalar = borrow_bls12_381_fr!(context, scalar_handle);
@@ -1302,7 +1283,7 @@ fn group_multi_scalar_mul_internal(
         return Ok(NativeResult::err(InternalGas::zero(), abort_codes::NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS));
     }
     match (group_structure, scalar_structure) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) => {
+        (Some(Structure::BLS12_381_G1_SUB), Some(Structure::BLS12_381_Fr)) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             // Using blst multi-scalar multiplication API for better performance.
             let blst_g1_proj_points: Vec<blst::blst_p1> = element_handles.iter().map(|&handle|{
@@ -1329,7 +1310,7 @@ fn group_multi_scalar_mul_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) => {
+        (Some(Structure::BLS12_381_G2_SUB), Some(Structure::BLS12_381_Fr)) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             // Using blst multi-scalar multiplication API for better performance.
             let blst_points: Vec<blst::blst_p2> = element_handles.iter().map(|&handle|{
@@ -1384,7 +1365,7 @@ fn group_double_internal(
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, handle);
             let new_element = element.double();
@@ -1394,7 +1375,7 @@ fn group_double_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, handle);
             let new_element = element.double();
@@ -1430,7 +1411,7 @@ fn group_neg_internal(
     assert_eq!(1, ty_args.len());
     let handle = pop_arg!(args, u64) as usize;
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
+        Some(Structure::BLS12_381_G1_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g1!(context, handle);
             let new_element = element.neg();
@@ -1440,7 +1421,7 @@ fn group_neg_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        Some(Structure::BLS12_381_G2) => {
+        Some(Structure::BLS12_381_G2_SUB) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let element = borrow_bls12_381_g2!(context, handle);
             let new_element = element.neg();
@@ -1480,7 +1461,7 @@ fn pairing_product_internal(
     let g2_handles = pop_arg!(args, Vec<u64>);
     let g1_handles = pop_arg!(args, Vec<u64>);
     match (g1, g2, gt) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Gt)) => {
+        (Some(Structure::BLS12_381_G1_SUB), Some(Structure::BLS12_381_G2_SUB), Some(Structure::BLS12_381_Gt)) => {
             abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()

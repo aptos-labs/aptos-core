@@ -38,7 +38,7 @@ pub struct GasParameters {
     pub ark_bls12_381_fq12_one: InternalGasPerArg,
     pub ark_bls12_381_fq12_pow_base: InternalGasPerArg,
     pub ark_bls12_381_fq12_pow_per_exponent_u64: InternalGasPerArg,
-    pub ark_bls12_381_fq12_serialize: InternalGasPerArg,
+    pub ark_bls12_381_fq12_ser: InternalGasPerArg,
     pub ark_bls12_381_fq12_square: InternalGasPerArg,
     pub ark_bls12_381_fq12_sub: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_add: InternalGasPerArg,
@@ -148,6 +148,14 @@ impl GasParameters {
             Structure::BLS12_381_Fq12 => {
                 self.ark_bls12_381_fq12_div * NumArgs::one()
             },
+            _ => unreachable!()
+        }
+    }
+
+    pub fn serialize(&self, structure: Structure, scheme: Vec<u8>) -> InternalGas {
+        match (structure, scheme) {
+            (Structure::BLS12_381_Fr, _) => self.ark_bls12_381_fr_ser * NumArgs::one(),
+            (Structure::BLS12_381_Fq12, _) => self.ark_bls12_381_fq12_ser * NumArgs::one(),
             _ => unreachable!()
         }
     }

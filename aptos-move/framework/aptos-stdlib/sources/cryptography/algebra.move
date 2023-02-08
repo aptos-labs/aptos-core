@@ -2,149 +2,144 @@ module aptos_std::algebra {
     use std::option::{Option, some, none};
     use aptos_std::type_info::type_of;
 
-    /// `BLS12_381_G1` represents a group used in BLS12-381 pairing.
-    /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// `E(Fq)` is an elliptic curve `y^2=x^3+4` defined over `Fq`.
-    /// `BLS12_381_G1` is constructed by a subset of the points on `E(Fq)` and the point at infinity, under point addition. (A subgroup of prime order on `E(Fq)`.)
-    /// The prime order `r` of `BLS12_381_G1` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-    /// The identity of `BLS12_381_G1` is the point at infinity.
-    /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
-    ///
-    /// An `Element<BLS12_381_G1>` represents an element in group `BLS12_381_G1`.
-    /// Scalar multiplication on `Element<BLS12_381_G1>` requires a `Element<BLS12_381_Fr>`.
-    ///
-    ///
-    struct BLS12_381_G1 {}
+    /// A finite field used BLS12-381 curves.
+    /// It has a prime order `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
+    struct BLS12_381_Fq {}
 
-    /// A serialization scheme for `BLS12-381-G1` elements.
-    /// It assumes a 96-byte serialization `[b_0, ..., b_95]` with the following rules.
-    /// - `b_95 & 0x40` is the infinity flag.
-    /// - The infinity flag is 1 if and only if the element is the point at infinity.
-    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`, with the following rules.
-    ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
-    ///     - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of 'y'.
-    public fun bls12_381_g1_serialization_scheme_uncompressed(): vector<u8> {
-        std::vector::singleton(0)
-    }
+    /// A serialization scheme where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using little-endian byte order.
+    public fun bls12_381_fq_format(): vector<u8> { x"01" }
 
-    /// A serialization scheme for `BLS12_381_G1` elements.
-    /// It assumes a 48-byte serialization `[b_0, ..., b_47]` with the following rules.
-    /// - `b_47 & 0x40` is the infinity flag.
-    /// - The infinity flag is 1 if and only if the element is the point at infinity.
-    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve, with the following rules.
-    ///     - `[b_0, ..., b_47 & 0x3f]` is a 48-byte little-endian encoding of `x`.
-    ///     - `b_47 & 0x80` is the positiveness flag.
-    ///     - The positiveness flag is 1 if and only if `y > -y`.
-    public fun bls12_381_g1_serialization_scheme_compressed(): vector<u8> {
-        std::vector::singleton(1)
-    }
+    /// A serialization scheme where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using big-endian byte order.
+    public fun bls12_381_fq_bendian_format(): vector<u8> { x"0101" }
 
-    /// `BLS12_381_G2` represents a group used in BLS12-381 pairing.
-    /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
-    /// `E(Fq2)` is an elliptic curve `y^2=x^3+4(u+1)` defined over `Fq2`.
-    /// `BLS12_381_G2` is constructed by a subset of the points on `E(Fq2)` and the point at infinity, under point addition. (A subgroup of prime order on `E(Fq2)`.)
-    /// The prime order `r` of `BLS12_381_G2` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001, same as `BLS12_381_G1`.
-    /// The identity of `BLS12_381_G2` is the point at infinity.
-    /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
-    ///
-    /// Scalar multiplication on `Element<BLS12_381_G2>` requires a `Element<BLS12_381_Fr>`.
-    struct BLS12_381_G2 {}
 
-    /// A serialization scheme for `BLS12-381-G2` elements.
-    /// It assumes a 192-byte serialization `[b_0, ..., b_191]`, with the following rules.
-    /// - `b_191 & 0x40` is the infinity flag.
-    /// - The infinity flag is 1 if and only if the element is the point at infinity.
-    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
-    ///     - `[b_0, ..., b_95]` is a 96-byte serialization of `x=(x_0+x_1*u)`.
-    ///         - `[b_0, ..., b_47]` is a 48-byte little-endian encoding of `x_0`.
-    ///         - `[b_48, ..., b_95]` is a 48-byte little-endian encoding of `x_1`.
-    ///     - `[b_96, ..., b_191 & 0x3f]` is a 96-byte serialization of 'y=(y_0+y_1*u)'.
-    ///         - `[b_96, ..., b_143]` is a 48-byte little-endian encoding of `y_0`.
-    ///         - `[b_144, ..., b_191 & 0x3f]` is a 48-byte little-endian encoding of `y_1`.
-    public fun bls12_381_g2_serialization_scheme_uncompressed(): vector<u8> {
-        std::vector::singleton(2)
-    }
+    /// An extension field of `BLS12_381_Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
+    struct BLS12_381_Fq2 {}
 
-    /// A serialization scheme for `BLS12-381-G2` elements.
-    /// It assumes a 96-byte serialization `[b_0, ..., b_95]`, with the following rules.
-    /// - `b_95 & 0x40` is the infinity flag.
-    /// - The infinity flag is 1 if and only if the element is the point at infinity.
-    /// - The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`, with the following rules.
-    ///     - `[b_0, ..., b_95 & 0x3f]` is a 96-byte little-endian encoding of `x=(x_0+x_1*u)`.
-    ///         - `[b_0, ..., b_47]` is a 48-byte little-endian encoding of `x_0`.
-    ///         - `[b_48, ..., b_95 & 0x3f]` is a 48-byte little-endian encoding of `x_1`.
-    ///     - `b_95 & 0x80` is the positiveness flag.
-    ///     - The positiveness flag is 1 if and only if `y > -y`.
-    ///         - Here `a=(a_0+a_1*u)` is considered greater than `b=(b_0+b_1*u)` if `a_1>b_1 OR (a_1=b_1 AND a_0>b_0)`.
-    public fun bls12_381_g2_serialization_scheme_compressed(): vector<u8> {
-        std::vector::singleton(3)
-    }
+    /// A serialization scheme where a `BLS12_381_Fq2` element in form `(c_0+c_1*u)` is represented by a byte array `b[]` of size 96.
+    /// `b[0..48]` is `c_0` serialized in `bls12_381_fq_format`.
+    /// `b[48..96]` is `c_1` serialized in `bls12_381_fq_format`.
+    public fun bls12_381_fq2_format(): vector<u8> { x"02" }
 
-    /// A field used in BLS12-381 pairing.
-    /// `Fq` is a finite field with `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
-    /// `Fq2` is an extension field of `Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
-    /// `Fq6` is an extension field of `Fq2`, constructed as `Fq6=Fq2[v]/(v^2-u-1)`.
-    /// `Fq12` is an extension field of `Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
+    /// An extension field of `BLS12_381_Fq2`, constructed as `Fq6=Fq2[v]/(v^3-u-1)`.
+    struct BLS12_381_Fq6 {}
+
+    /// A serialization scheme where a `BLS12_381_Fq6` element in form `(c_0+c_1*v+c_2*v^2)` is represented by a byte array `b[]` of size 288.
+    /// `b[0..96]` is `c_0` serialized in `bls12_381_fq2_format`.
+    /// `b[96..192]` is `c_1` serialized in `bls12_381_fq2_format`.
+    /// `b[192..288]` is `c_2` serialized in `bls12_381_fq2_format`.
+    public fun bls12_381_fq6_format(): vector<u8> { x"03" }
+
+    /// An extension field of `BLS12_381_Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
     struct BLS12_381_Fq12 {}
 
-    /// A serialization scheme for `BLS12_381_Fq12` elements.
-    /// It assumes a 576-byte serialization `[b_0, ..., b_575]`, with the following rules.
-    ///     - Assume the given element is `e=c_0+c_1*w` where `c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1` and `c_ij=c_ij0+c_ij1*u for j=0..2`.
-    ///     - `[b_0, ..., b_575]` is a concatenation of 12 encoded `Fq` elements: `c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121`.
-    ///     - Every `c_ijk` uses a 48-byte little-endian encoding.
-    public fun bls12_381_fq12_serialization_scheme(): vector<u8> {
-        std::vector::singleton(5)
-    }
+    /// A serialization scheme where a `BLS12_381_Fq12` element in form `(c_0+c_1*w)` is represented by a byte array `b[]` of size 576.
+    /// `b[0..288]` is `c_0` serialized in `bls12_381_fq6_format`.
+    /// `b[288..576]` is `c_1` serialized in `bls12_381_fq6_format`.
+    /// Also used in `ark_bls12_381::Fq12::deserialize()`.
+    public fun bls12_381_fq12_format(): vector<u8> { x"04" }
+
+    /// A group constructed by the points on a curve `E(Fq)` and the point at inifinity under the elliptic curve point addition.
+    /// `E(Fq)` is an elliptic curve `y^2=x^3+4` defined over `BLS12_381_Fq`.
+    /// The identity of `BLS12_381_G1` is the point at infinity.
+    struct BLS12_381_G1 {}
+
+    /// A serialization scheme where an `BLS12_381_G1` element is represented by a byte array `b[]` of size 96.
+    /// `b[95] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`,
+    /// `[b[0], ..., b[47] & 0x3f]` is `x` serialized in `bls12_381_fq_format`, and
+    /// `[b[48], ..., b[95] & 0x3f]` is `y` serialized in `bls12_381_fq_format`.
+    public fun bls12_381_g1_uncompressed_format(): vector<u8> { x"05" }
+
+    /// A serialization scheme where an `BLS12_381_G1` element is represented by a byte array `b[]` of size 48.
+    /// `b[47] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`,
+    /// `[b[0], ..., b[47] & 0x3f]` is `x` serialized in `bls12_381_fq_format`, and
+    /// the positiveness flag `b_47 & 0x80` is 1 if and only if `y > -y` (as unsigned integers).
+    public fun bls12_381_g1_compressed_format(): vector<u8> { x"0501" }
+
+    /// A subgroup of `BLS12_381_G1`.
+    /// It has a prime order `r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`.
+    /// A bilinear map from `(BLS12_381_G1_SUB, BLS12_381_G2_SUB)` to `BLS12_381_Gt` exists.
+    struct BLS12_381_G1_SUB {}
+
+    /// Effectively `bls12_381_g1_uncompressed_format` but only applicable to `BLS12_381_G1_SUB` elements.
+    public fun bls12_381_g1_sub_uncompressed_format(): vector<u8> { x"06" }
+
+    /// Effectively `bls12_381_g1_compressed_format` but only applicable to `BLS12_381_G1_SUB` elements.
+    public fun bls12_381_g1_sub_compressed_format(): vector<u8> { x"0601" }
+
+
+    /// A group constructed by the points on a curve `E(Fq2)` and the point at inifinity under the elliptic curve point addition.
+    /// `E(Fq2)` is an elliptic curve `y^2=x^3+4(u+1)` defined over `BLS12_381_Fq2`.
+    /// The identity of `BLS12_381_G1` is the point at infinity.
+    struct BLS12_381_G2 {}
+
+    /// A serialization scheme where a `BLS12-381-G2` element is represented by a byte array `b[]` of size 192.
+    /// `b[191] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`,
+    /// `b[0..96]` is `x` serialized in `bls12_381_fq2_format`, and
+    /// `[b[96], ..., b[191] & 0x3f]` is `y` serialized in `bls12_381_fq2_format`.
+    public fun bls12_381_g2_uncompressed_format(): vector<u8> { x"07" }
+
+    /// A serialization scheme where a `BLS12-381-G2` element is represented by a byte array `b[]` of size 96.
+    /// `b[95] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`,
+    /// `[b[0], ..., b[95] & 0x3f]` is `x` serialized in `bls12_381_fq2_format`, and
+    /// the positiveness flag `b[95] & 0x80` is 1 if and only if `y > -y` (as unsigned integers).
+    public fun bls12_381_g2_compressed_format(): vector<u8> { x"0701" }
+
+    /// A subgroup of `BLS12_381_G2`.
+    /// It has a prime order `r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`.
+    /// A bilinear map from `(BLS12_381_G1_SUB, BLS12_381_G2_SUB)` to `BLS12_381_Gt` exists.
+    struct BLS12_381_G2_SUB {}
+
+    /// Effectively `bls12_381_g2_uncompressed_format` but only applicable to `BLS12_381_G2_SUB` elements.
+    public fun bls12_381_g2_sub_uncompressed_format(): vector<u8> { x"08" }
+
+    /// Effectively `bls12_381_g2_compressed_format` but only applicable to `BLS12_381_G2_SUB` elements.
+    public fun bls12_381_g2_sub_compressed_format(): vector<u8> { x"0801" }
 
     /// `BLS12_381_Gt` represents the target group of the pairing defined over the BLS12-381 curves.
-    /// `BLS12_381_Gt` is a multiplicative subgroup of `BLS12_381_Fq12`.
-    /// The order `r` of `BLS12_381_Gt` is 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001. (Same as `BLS12_381_G1` and `BLS12_381_G2`.)
+    /// A multiplicative subgroup of `BLS12_381_Fq12`.
+    /// It has a prime order `r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`. (Same as `BLS12_381_G1_SUB` and `BLS12_381_G2_SUB`.)
     /// The identity of `BLS12_381_G2` is 1.
-    /// There exists a bilinear mapping from `(BLS12_381_G1, BLS12_381_G2)` to `BLS12_381_Gt`.
-    /// Scalar multiplication on `Element<BLS12_381_Gt>` requires a `Element<BLS12_381_Fr>`.
+    /// A bilinear map from `(BLS12_381_G1_SUB, BLS12_381_G2_SUB)` to `BLS12_381_Gt` exists.
     struct BLS12_381_Gt {}
 
-    /// A serialization scheme for `BLS12_381_Gt` elements.
-    /// It assumes a 576-byte serialization `[b_0, ..., b_575]`, with the following rules.
-    ///     - Assume the given element is `e=c_0+c_1*w` where `c_i=c_i0+c_i1*v+c_i2*v^2 for i=0..1` and `c_ij=c_ij0+c_ij1*u for j=0..2`.
-    ///     - `[b_0, ..., b_575]` is a concatenation of 12 encoded `Fq` elements: `c_000, c_001, c_010, c_011, c_020, c_021, c_100, c_101, c_110, c_111, c_120, c_121`.
-    ///     - Every `c_ijk` uses a 48-byte little-endian encoding.
-    public fun bls12_381_gt_serialization_scheme(): vector<u8> {
-        std::vector::singleton(9)
-    }
+    /// Effectively `bls12_381_fq12_format()` but only applicable to `BLS12_381_Gt` elements.
+    public fun bls12_381_gt_format(): vector<u8> { x"09" }
 
-    /// The scalar field for groups `BLS12_381_G1`, `BLS12_381_G2` and `BLS12_381_Gt`.
-    /// A `Element<BLS12_381_Fr>` is an integer between 0 and `r-1` where `r` is the order of `BLS12_381_G1`/`BLS12_381_G2`/`BLS12_381_Gt`.
+    /// A finite field thatshares the same prime number `r` with groups `BLS12_381_G1_SUB`, `BLS12_381_G2_SUB` and `BLS12_381_Gt`,
+    /// and thus can be their scalar field.
     struct BLS12_381_Fr {}
 
-    /// A serialization scheme for `BLS12_381_Fr` elements.
-    /// It assumes a 32-byte little-endian serialization.
-    public fun bls12_381_fr_serialization_scheme_lendian(): vector<u8> {
-        std::vector::singleton(0)
-    }
+    /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using little-endian byte order.
+    public fun bls12_381_fr_lendian_format(): vector<u8> { x"0a" }
 
-    /// A serialization scheme for `BLS12_381_Fr` elements.
-    /// It assumes a 32-byte big-endian serialization.
-    public fun bls12_381_fr_serialization_scheme_bendian(): vector<u8> {
-        std::vector::singleton(1)
-    }
+    /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using big-endian byte order.
+    public fun bls12_381_fr_bendian_format(): vector<u8> { x"0a01" }
 
-    /// This struct represents an element of some algebraic structure `S`.
+    /// This struct represents an ephemeral element of an algebraic structure `S`.
     struct Element<phantom S> has copy, drop {
         handle: u64
     }
 
-    /// Computes a pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
-    /// Returns an element in the target group `Gt`.
+    /// Compute a pre-compiled pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
+    /// Return an element in the target group `Gt`.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         Element<Gt> {
             handle: pairing_product_internal<G1,G2,Gt>(std::vector::singleton(element_1.handle), std::vector::singleton(element_2.handle))
         }
     }
 
-    /// Compute the product of multiple pairings.
-    public fun pairing_product<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
+    /// Compute `pairing(a[0], b[0]) + ... + pairing(a[n-1], b[n-1])` for `n` elements of group `G1` and `n` elements of group `G2`.
+    /// This is faster and cheaper than calling `pairing()` separately then aggregating with `group_add`.
+    public fun multi_pairing<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
         abort_if_generic_group_basic_operations_disabled();
         abort_unless_structure_enabled<G1>();
         abort_unless_structure_enabled<G2>();
@@ -426,8 +421,8 @@ module aptos_std::algebra {
 
     fun abort_unless_structure_enabled<S>() {
         let type = type_of<S>();
-        if ((type == type_of<BLS12_381_G1>() || type == type_of<BLS12_381_G2>() || type == type_of<BLS12_381_Gt>() || type == type_of<BLS12_381_Fr>())
-            && std::features::bls12_381_groups_enabled()
+        if ((type == type_of<BLS12_381_G1_SUB>() || type == type_of<BLS12_381_G2_SUB>() || type == type_of<BLS12_381_Gt>() || type == type_of<BLS12_381_Fr>())
+            && std::features::bls12_381_structures_enabled()
         ) {
             // Let go.
         } else {
@@ -474,6 +469,10 @@ module aptos_std::algebra {
         std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_bls12_381_groups_feature()), std::vector::empty());
     }
 
+    const BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
+    const BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000007";
+    const BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN: vector<u8> = x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
+
     #[test(fx = @std)]
     fun test_bls12_381_fr(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
@@ -481,14 +480,18 @@ module aptos_std::algebra {
 
         // Serialization/deserialization.
         let val_7 = from_u64<BLS12_381_Fr>(7);
-        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_serialization_scheme_lendian(), &x"0700000000000000000000000000000000000000000000000000000000000000"));
-        assert!(eq(&val_7, &val_7_another), 1);
-        assert!(x"0700000000000000000000000000000000000000000000000000000000000000" == serialize(bls12_381_fr_serialization_scheme_lendian(), &val_7), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_serialization_scheme_lendian(), &x"ffff")), 1);
+        let val_7_2nd = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN));
+        let val_7_3rd = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN));
+        assert!(eq(&val_7, &val_7_2nd), 1);
+        assert!(eq(&val_7, &val_7_3rd), 1);
+        assert!(BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN == serialize(bls12_381_fr_lendian_format(), &val_7), 1);
+        assert!(BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN == serialize(bls12_381_fr_bendian_format(), &val_7), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &x"ffff")), 1);
 
         // Negation.
         let val_minus_7 = field_neg(&val_7);
-        assert!(x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73" == serialize(bls12_381_fr_serialization_scheme_lendian(), &val_minus_7), 1);
+        assert!(BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN == serialize(bls12_381_fr_lendian_format(), &val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<BLS12_381_Fr>(9);
@@ -516,7 +519,10 @@ module aptos_std::algebra {
         let val_81 = from_u64<BLS12_381_Fr>(81);
         assert!(eq(&val_81, &field_pow(&val_3, &x"04")), 1);
     }
-//
+
+//    const BLS12_381_FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+//    const BLS12_381_FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+
 //    #[test(fx = @std)]
 //    fun test_bls12_381_fq12(fx: signer) {
 //        enable_initial_generic_algebraic_operations(&fx);
@@ -524,14 +530,14 @@ module aptos_std::algebra {
 //
 //        // Serialization/deserialization.
 //        let val_7 = from_u64<BLS12_381_Fq12>(7);
-//        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fq12>(bls12_381_fq12_serialization_scheme(), &x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"));
+//        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &BLS12_381_FQ12_VAL_7_SERIALIZED));
 //        assert!(eq(&val_7, &val_7_another), 1);
-//        assert!(x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" == serialize(bls12_381_fq12_serialization_scheme(), &val_7), 1);
-//        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_serialization_scheme(), &x"ffff")), 1);
+//        assert!(BLS12_381_FQ12_VAL_7_SERIALIZED == serialize(bls12_381_fq12_format(), &val_7), 1);
+//        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffff")), 1);
 //
 //        // Negation.
 //        let val_minus_7 = field_neg(&val_7);
-//        assert!(x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" == serialize(bls12_381_fq12_serialization_scheme(), &val_minus_7), 1);
+//        assert!(BLS12_381_FQ12_VAL_7_NEG_SERIALIZED == serialize(bls12_381_fq12_format(), &val_minus_7), 1);
 //
 //        // Addition.
 //        let val_9 = from_u64<BLS12_381_Fq12>(9);
@@ -559,7 +565,7 @@ module aptos_std::algebra {
 //        let val_81 = from_u64<BLS12_381_Fq12>(81);
 //        assert!(eq(&val_81, &field_pow(&val_3, &x"04")), 1);
 //    }
-//
+
 //    const BLS12_381_G1_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
 //    const BLS12_381_G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
 //    const BLS12_381_G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117";

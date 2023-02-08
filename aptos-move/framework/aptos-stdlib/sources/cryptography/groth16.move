@@ -82,7 +82,7 @@ module aptos_std::groth16 {
         let g1_elements: vector<algebra::Element<G1>> = triplet(proof.a, algebra::group_multi_scalar_mul(&pvk.gamma_abc_g1, &scalars), proof.c);
         let g2_elements: vector<algebra::Element<G2>> = triplet(proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg);
 
-        algebra::eq(&pvk.alpha_g1_beta_g2, &algebra::pairing_product<G1,G2,Gt>(&g1_elements, &g2_elements))
+        algebra::eq(&pvk.alpha_g1_beta_g2, &algebra::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
     }
 
 //    #[test(fx = @std)]

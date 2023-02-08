@@ -331,7 +331,7 @@ Verify a Groth16 proof <code>proof</code> against the public inputs <code>public
     <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt; = <a href="groth16.md#0x1_groth16_triplet">triplet</a>(proof.a, <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">algebra::group_multi_scalar_mul</a>(&pvk.gamma_abc_g1, &scalars), proof.c);
     <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt; = <a href="groth16.md#0x1_groth16_triplet">triplet</a>(proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg);
 
-    <a href="algebra.md#0x1_algebra_eq">algebra::eq</a>(&pvk.alpha_g1_beta_g2, &<a href="algebra.md#0x1_algebra_pairing_product">algebra::pairing_product</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
+    <a href="algebra.md#0x1_algebra_eq">algebra::eq</a>(&pvk.alpha_g1_beta_g2, &<a href="algebra.md#0x1_algebra_multi_pairing">algebra::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
 }
 </code></pre>
 

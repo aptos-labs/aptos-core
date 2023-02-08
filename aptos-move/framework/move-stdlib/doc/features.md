@@ -28,7 +28,7 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `get_generic_group_basic_operations_feature`](#0x1_features_get_generic_group_basic_operations_feature)
 -  [Function `generic_group_basic_operations_enabled`](#0x1_features_generic_group_basic_operations_enabled)
 -  [Function `get_bls12_381_groups_feature`](#0x1_features_get_bls12_381_groups_feature)
--  [Function `bls12_381_groups_enabled`](#0x1_features_bls12_381_groups_enabled)
+-  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -651,13 +651,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_bls12_381_groups_enabled"></a>
+<a name="0x1_features_bls12_381_structures_enabled"></a>
 
-## Function `bls12_381_groups_enabled`
+## Function `bls12_381_structures_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_groups_enabled">bls12_381_groups_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool
 </code></pre>
 
 
@@ -666,7 +666,7 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_groups_enabled">bls12_381_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_GROUPS">BLS12_381_GROUPS</a>)
 }
 </code></pre>

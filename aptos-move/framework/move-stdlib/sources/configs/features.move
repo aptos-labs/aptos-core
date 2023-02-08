@@ -129,7 +129,7 @@ module std::features {
 
     const BLS12_381_GROUPS: u64 = 11;
     public fun get_bls12_381_groups_feature(): u64 { BLS12_381_GROUPS }
-    public fun bls12_381_groups_enabled(): bool acquires Features {
+    public fun bls12_381_structures_enabled(): bool acquires Features {
         is_enabled(BLS12_381_GROUPS)
     }
 
