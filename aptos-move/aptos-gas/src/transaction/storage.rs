@@ -240,7 +240,7 @@ impl ChangeSetConfigs {
         // Bug fixed at gas_feature_version 3 where (non-group) resource creation was converted to
         // modification.
         // Modules and table items were not affected (https://github.com/aptos-labs/aptos-core/pull/4722/commits/7c5e52297e8d1a6eac67a68a804ab1ca2a0b0f37).
-        // Resource groups were not affected because they were
+        // Resource groups and state values with metadata were not affected because they were
         // introduced later than feature_version 3 on all networks.
         self.gas_feature_version < 3
     }

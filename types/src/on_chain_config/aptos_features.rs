@@ -60,6 +60,10 @@ impl Features {
     pub fn are_resource_groups_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
+
+    pub fn is_storage_slot_metadata_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
 }
 
 // --------------------------------------------------------------------------------------------
