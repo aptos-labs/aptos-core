@@ -1,30 +1,21 @@
-name: "*replay-verify reusable workflow"
-
+name: "*run module-verify reusable workflow"
 on:
+  # This allows the workflow to be triggered from another workflow
   workflow_call:
-  workflow_dispatch:
     inputs:
       GIT_SHA:
         required: false
         type: string
         description: The git SHA1 to test. If not specified, it will use the latest commit on main.
-      # replay-verify config
+      # module-verify config
       BUCKET:
-        required: false
+        required: true
         type: string
         description: The bucket to use for the backup. If not specified, it will use the default bucket.
       SUB_DIR:
-        required: false
+        required: true
         type: string
         description: The subdirectory to use for the backup. If not specified, it will use the default subdirectory.
-      HISTORY_START:
-        required: false
-        type: string
-        description: The history start to use for the backup. If not specified, it will use the default history start.
-      TXNS_TO_SKIP:
-        required: false
-        type: string
-        description: The number of transactions to skip. If not specified, it will use the default number of transactions to skip.
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -36,13 +27,13 @@ on:
         required: true
         default: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES:
-        description: "The timeout for the job."
+        description: "Github job timeout in minutes"
         type: number
         required: true
         default: 720
 
 jobs:
-  replay-verify:
+  module-verify:
     # if we're running on a PR, it's only for testing purposes, so we can set a shorter timeout
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     runs-on: ${{ inputs.RUNS_ON }}
