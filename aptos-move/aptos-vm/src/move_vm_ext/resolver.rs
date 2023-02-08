@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
+use aptos_state_view::StateView;
+use aptos_types::on_chain_config::ConfigStorage;
 use move_binary_format::errors::{Location, PartialVMError, VMError};
 use move_core_types::{
     account_address::AccountAddress,
@@ -13,7 +15,7 @@ use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
-    MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver
+    MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 
