@@ -159,10 +159,7 @@ async fn test_remote_batch_reads() {
         .unwrap();
 }
 
-/// Checks that a validator can still get signatures on batches even if its db is reset (e.g.,
-/// the disk failed, or the validator had to be moved to another node).
-#[tokio::test]
-async fn test_batch_id_on_restart() {
+async fn test_batch_id_on_restart(do_wipe_db: bool) {
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         // TODO: remove when quorum store becomes the in-code default
@@ -209,12 +206,16 @@ async fn test_batch_id_on_restart() {
 
     info!("stop node 0");
     swarm.validator_mut(node_to_restart).unwrap().stop();
-    info!("nuke only quorum store db");
-    let node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
-    // TODO: get this dir from quorum store code
-    let db_dir = node0_config.storage.dir();
-    let quorum_store_db_dir = db_dir.join("quorumstoreDB");
-    fs::remove_dir_all(quorum_store_db_dir.clone()).unwrap();
+    if do_wipe_db {
+        info!("wipe only quorum store db");
+        let node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
+        // TODO: get this dir from quorum store code
+        let db_dir = node0_config.storage.dir();
+        let quorum_store_db_dir = db_dir.join("quorumstoreDB");
+        fs::remove_dir_all(quorum_store_db_dir.clone()).unwrap();
+    } else {
+        info!("don't do anything to quorum store db");
+    }
     info!("start node 0");
     swarm
         .validator_mut(node_to_restart)
@@ -234,4 +235,17 @@ async fn test_batch_id_on_restart() {
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
+}
+
+/// Checks that a validator can still get signatures on batches on restart when the db is intact.
+#[tokio::test]
+async fn test_batch_id_on_restart_same_db() {
+    test_batch_id_on_restart(false);
+}
+
+/// Checks that a validator can still get signatures on batches even if its db is reset (e.g.,
+/// the disk failed, or the validator had to be moved to another node).
+#[tokio::test]
+async fn test_batch_id_on_restart_wiped_db() {
+    test_batch_id_on_restart(true);
 }
