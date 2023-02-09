@@ -5,7 +5,8 @@ use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
-    chain_id::ChainId,
+    chain_id::{ChainId, NamedChain},
+    on_chain_config::TimedFeatureFlag,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
@@ -66,6 +67,7 @@ fn test_script(chain_id: ChainId, time: u64) {
         .script(Script::new(offending_script(), vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .ttl(5_000_000)
         .sign();
 
     let output = &executor.execute_transaction(txn);
@@ -85,6 +87,7 @@ fn test_script(chain_id: ChainId, time: u64) {
         .script(Script::new(offending_script(), vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .ttl(5_000_000)
         .sign();
 
     let output = &executor.execute_transaction(txn);
@@ -101,10 +104,16 @@ fn test_script(chain_id: ChainId, time: u64) {
 
 #[test]
 fn script_too_many_back_edges_testnet() {
-    test_script(ChainId::testnet(), 1675792800000)
+    test_script(
+        ChainId::testnet(),
+        TimedFeatureFlag::VerifierLimitBackEdges.activation_time_on(&NamedChain::TESTNET),
+    )
 }
 
 #[test]
 fn script_too_many_back_edges_mainnet() {
-    test_script(ChainId::mainnet(), 1676052000000)
+    test_script(
+        ChainId::mainnet(),
+        TimedFeatureFlag::VerifierLimitBackEdges.activation_time_on(&NamedChain::MAINNET),
+    )
 }

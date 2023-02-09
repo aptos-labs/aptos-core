@@ -69,10 +69,6 @@ use std::{
     },
 };
 
-// The time by which all features and hotfixes gated by time have been activated on any network.
-// Current value: Friday, February 10, 2023 10:00:00 AM GMT-08:00
-pub const LATEST_FEATURE_ACTIVATION_TIME: u64 = 1676052000000;
-
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();

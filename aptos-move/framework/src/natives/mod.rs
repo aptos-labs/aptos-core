@@ -17,6 +17,7 @@ pub mod util;
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
+use aptos_types::on_chain_config::TimedFeatures;
 use cryptography::ed25519;
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
@@ -30,6 +31,7 @@ pub mod status {
     pub const NFE_UNABLE_TO_PARSE_ADDRESS: u64 = 0x2;
 }
 
+/// All the gas parameters required by the aptos-framework natives.
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
@@ -184,6 +186,7 @@ impl GasParameters {
 pub fn all_natives(
     framework_addr: AccountAddress,
     gas_params: GasParameters,
+    timed_features: TimedFeatures,
     calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
@@ -208,7 +211,10 @@ pub fn all_natives(
         "secp256k1",
         cryptography::secp256k1::make_all(gas_params.secp256k1)
     );
-    add_natives_from_module!("aptos_hash", hash::make_all(gas_params.hash));
+    add_natives_from_module!(
+        "aptos_hash",
+        hash::make_all(gas_params.hash, timed_features)
+    );
     add_natives_from_module!(
         "ristretto255",
         cryptography::ristretto255::make_all(gas_params.ristretto255)

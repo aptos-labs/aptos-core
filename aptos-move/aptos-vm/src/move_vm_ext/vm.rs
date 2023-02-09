@@ -11,7 +11,7 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_types::chain_id::ChainId;
+use aptos_types::on_chain_config::{TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
@@ -32,7 +32,7 @@ impl MoveVmExt {
         treat_friend_as_private: bool,
         allow_binary_format_v6: bool,
         chain_id: u8,
-        timestamp_microseconds: u64,
+        timed_features: TimedFeatures,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
@@ -49,13 +49,10 @@ impl MoveVmExt {
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
+                    timed_features.clone(),
                 ),
                 VMConfig {
-                    verifier: verifier_config(
-                        treat_friend_as_private,
-                        chain_id,
-                        timestamp_microseconds,
-                    ),
+                    verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
@@ -111,17 +108,13 @@ impl Deref for MoveVmExt {
 
 pub fn verifier_config(
     _treat_friend_as_private: bool,
-    chain_id: u8,
-    time_microseconds: u64,
+    timed_features: &TimedFeatures,
 ) -> VerifierConfig {
     let mut max_back_edges_per_function = None;
     let mut max_back_edges_per_module = None;
     let mut max_basic_blocks_in_script = None;
 
-    if (chain_id == ChainId::testnet().id() && time_microseconds >= 1675792800000/* Tuesday, February 7, 2023 10:00:00 AM GMT-08:00 */)
-        || (chain_id == ChainId::mainnet().id() && time_microseconds >= 1676052000000/* Friday, February 10, 2023 10:00:00 AM GMT-08:00 */)
-        || (chain_id == ChainId::test().id())
-    {
+    if timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges) {
         max_back_edges_per_function = Some(20);
         max_back_edges_per_module = Some(400);
         max_basic_blocks_in_script = Some(1024);

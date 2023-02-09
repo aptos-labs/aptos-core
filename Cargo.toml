@@ -448,34 +448,34 @@ x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-binary-format = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-bytecode-verifier = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-bytecode-utils = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-cli = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-command-line-common = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-compiler ={ git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a", features = ["address32"] }
-move-docgen = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-ir-compiler = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-model = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-package = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-prover = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-prover-boogie-backend = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-stackless-bytecode = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-prover-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-resource-viewer = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-stackless-bytecode-interpreter = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-stdlib = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-symbol-pool = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-table-extension = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-transactional-test-runner = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-move-unit-test = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a", features = ["table-extension"] }
-move-vm-runtime = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-read-write-set = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
-read-write-set-dynamic = { git = "https://github.com/aptos-labs/move-private", rev = "e6b8217e738be59290a444385e19c586e5d20e1a" }
+move-abigen = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-binary-format = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-bytecode-verifier = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-bytecode-utils = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-cli = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-command-line-common = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-compiler ={ git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b", features = ["address32"] }
+move-docgen = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-ir-compiler = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-model = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-package = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-prover = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-prover-boogie-backend = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-stackless-bytecode = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-prover-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-resource-viewer = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-stdlib = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-symbol-pool = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-table-extension = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-transactional-test-runner = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+move-unit-test = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b", features = ["table-extension"] }
+move-vm-runtime = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b", features = ["table-extension"] }
+move-vm-types = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+read-write-set = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
+read-write-set-dynamic = { git = "https://github.com/aptos-labs/move-private", rev = "4bbe95ea2fc59cb94084c0d54b096666ff9ea81b" }
 # END MOVE DEPENDENCIES
 
 [profile.release]

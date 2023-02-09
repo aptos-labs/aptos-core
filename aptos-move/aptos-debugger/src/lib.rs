@@ -11,13 +11,13 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    on_chain_config::TimedFeatures,
     transaction::{ChangeSet, Transaction, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    aptos_vm::LATEST_FEATURE_ACTIVATION_TIME,
     data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMExecutor,
@@ -163,7 +163,7 @@ impl AptosDebugger {
             true,
             // FIXME: fetch chain id & timestamp from the state.
             ChainId::test().id(),
-            LATEST_FEATURE_ACTIVATION_TIME,
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);

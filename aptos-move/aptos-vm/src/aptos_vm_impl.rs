@@ -18,7 +18,6 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{
@@ -29,6 +28,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_types::{chain_id::ChainId, timestamp::Timestamp};
+use aptos_types::{on_chain_config::TimedFeatures, transaction::AbortInfo};
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features},
     timestamp::TimestampResource,
@@ -147,6 +147,8 @@ impl AptosVMImpl {
 
         let timestamp = fetch_timestamp(&storage);
 
+        let timed_features = TimedFeatures::new(chain_id, timestamp.timestamp.microseconds);
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
@@ -154,7 +156,7 @@ impl AptosVMImpl {
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
-            timestamp.timestamp.microseconds,
+            timed_features,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

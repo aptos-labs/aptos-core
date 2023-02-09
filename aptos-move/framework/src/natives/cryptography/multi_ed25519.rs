@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::cryptography::ed25519::GasParameters;
-use crate::natives::util::make_native_from_func;
+use crate::natives::helpers::make_native_from_func;
 #[cfg(feature = "testing")]
-use crate::natives::util::make_test_only_native_from_func;
+use crate::natives::helpers::make_test_only_native_from_func;
 #[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_crypto::ed25519::{ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH};
