@@ -749,11 +749,17 @@ mod tests {
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
         Schema, Value, Visitor,
     };
-    use chrono::{DateTime, Utc};
     #[cfg(test)]
+    use aptos_infallible::Mutex;
+    use aptos_speculative::{SpeculativeEvent, SpeculativeEvents};
+    use arc_swap::ArcSwapOption;
+    use chrono::{DateTime, Utc};
+    use claims::{assert_err, assert_ok};
+    use once_cell::sync::Lazy;
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
     use std::{
+        collections::HashSet,
         sync::{
             mpsc::{self, Receiver, SyncSender},
             Arc,
@@ -782,14 +788,16 @@ mod tests {
     struct LogStream {
         sender: SyncSender<LogEntry>,
         enable_backtrace: bool,
+        level: Level,
     }
 
     impl LogStream {
-        fn new(enable_backtrace: bool) -> (Self, Receiver<LogEntry>) {
+        fn new(level: Level, enable_backtrace: bool) -> (Self, Receiver<LogEntry>) {
             let (sender, receiver) = mpsc::sync_channel(1024);
             let log_stream = Self {
                 sender,
                 enable_backtrace,
+                level,
             };
             (log_stream, receiver)
         }
@@ -797,7 +805,7 @@ mod tests {
 
     impl Logger for LogStream {
         fn enabled(&self, metadata: &Metadata) -> bool {
-            metadata.level() <= Level::Debug
+            metadata.level() <= self.level
         }
 
         fn record(&self, event: &Event) {
@@ -812,17 +820,40 @@ mod tests {
         fn flush(&self) {}
     }
 
-    fn set_test_logger() -> Receiver<LogEntry> {
-        let (logger, receiver) = LogStream::new(true);
-        let logger = Arc::new(logger);
-        crate::logger::set_global_logger(logger, None);
-        receiver
+    static TEST_LOGGER_RECEIVER: Lazy<ArcSwapOption<Mutex<Receiver<LogEntry>>>> =
+        Lazy::new(|| ArcSwapOption::new(None));
+
+    pub(crate) fn set_test_logger(
+        level: Level,
+        enable_backtrace: bool,
+    ) -> Arc<Mutex<Receiver<LogEntry>>> {
+        if TEST_LOGGER_RECEIVER.load().is_none() {
+            let (logger, receiver) = LogStream::new(level, enable_backtrace);
+            let logger = Arc::new(logger);
+            let receiver_mutex = Arc::new(Mutex::new(receiver));
+
+            if TEST_LOGGER_RECEIVER
+                .compare_and_swap(&None::<Arc<_>>, Some(receiver_mutex))
+                .is_none()
+            {
+                // Successfully stored the receiver by the first test, set
+                // the global logger.
+                crate::logger::set_global_logger(logger, None);
+            }
+        }
+
+        TEST_LOGGER_RECEIVER
+            .load()
+            .as_ref()
+            .expect("Test logger receiver must be set")
+            .clone()
     }
 
     // TODO: Find a better mechanism for testing that allows setting the logger not globally
     #[test]
     fn basic() {
-        let receiver = set_test_logger();
+        let receiver_mutex = set_test_logger(Level::Debug, true);
+        let receiver = receiver_mutex.lock();
         let number = 12345;
 
         // Send an info log
@@ -1023,5 +1054,136 @@ mod tests {
                 "hyper",
                 "source_path"
             )));
+    }
+
+    // Test speculative logging via SpeculativeEvents, here because the testing infrastructure can be re-used.
+    struct SpeculativeLog {
+        level: Level,
+        message: String,
+    }
+
+    impl SpeculativeLog {
+        fn new(level: Level, message: String) -> Self {
+            Self { level, message }
+        }
+    }
+
+    impl SpeculativeEvent for SpeculativeLog {
+        fn dispatch(&self) {
+            match self.level {
+                Level::Debug => debug!("{}", self.message),
+                Level::Warn => warn!("{}", self.message),
+                Level::Error => error!("{}", self.message),
+                _ => {},
+            }
+        }
+    }
+
+    #[test]
+    fn test_speculative_logging() {
+        let receiver_mutex = set_test_logger(Level::Debug, true);
+        let receiver = receiver_mutex.lock();
+
+        while receiver.try_recv().is_ok() {}
+
+        let speculative_logs = SpeculativeEvents::<SpeculativeLog>::new(2);
+
+        // out of bounds
+        assert_err!(speculative_logs.record(
+            2,
+            SpeculativeLog::new(Level::Trace, "0/trace: A".to_string()),
+        ));
+
+        // level trace isn't enabled
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Trace, "0/trace: A".to_string()),
+        ));
+
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Debug, "0/debug: A".to_string()),
+        ));
+        assert_ok!(
+            speculative_logs.record(0, SpeculativeLog::new(Level::Info, "0/info: A".to_string()))
+        );
+        assert_ok!(
+            speculative_logs.record(0, SpeculativeLog::new(Level::Warn, "0/warn: A".to_string()))
+        );
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Error, "/0error: A".to_string()),
+        ));
+        assert_ok!(speculative_logs.record(
+            1,
+            SpeculativeLog::new(Level::Error, "1/error: A".to_string()),
+        ));
+        assert_ok!(
+            speculative_logs.record(0, SpeculativeLog::new(Level::Warn, "0/warn: B".to_string()))
+        );
+        // Clear everything above.
+        speculative_logs.clear_all_events();
+
+        assert_ok!(
+            speculative_logs.record(0, SpeculativeLog::new(Level::Warn, "0/warn: C".to_string()))
+        );
+        assert_ok!(speculative_logs.record(
+            1,
+            SpeculativeLog::new(Level::Error, "1/error: B".to_string()),
+        )); // Expected
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Error, "0/error: B".to_string()),
+        ));
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Error, "0/error: C".to_string()),
+        ));
+        assert_ok!(
+            speculative_logs.record(0, SpeculativeLog::new(Level::Info, "0/warn: B".to_string()))
+        );
+        // Clear only logs from transaction idx = 0.
+        assert_ok!(speculative_logs.clear_txn_events(0));
+
+        // Out of bounds.
+        assert_err!(speculative_logs.clear_txn_events(2));
+
+        assert_ok!(
+            speculative_logs.record(1, SpeculativeLog::new(Level::Warn, "1/warn: A".to_string()))
+        ); // Expected
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Trace, "0/trace: B".to_string()),
+        )); // not enabled
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Trace, "1/trace: A".to_string()),
+        )); // not enabled
+        assert_ok!(speculative_logs.record(
+            1,
+            SpeculativeLog::new(Level::Warn, "1/error: C".to_string()),
+        )); // Expected
+        assert_ok!(speculative_logs.record(
+            0,
+            SpeculativeLog::new(Level::Debug, "0/debug: B".to_string()),
+        )); // Expected
+
+        assert_err!(receiver.try_recv());
+        speculative_logs.flush();
+
+        // We expect 4 messages.
+        let expected = vec![
+            "1/error: B".to_string(),
+            "1/warn: A".to_string(),
+            "1/error: C".to_string(),
+            "0/debug: B".to_string(),
+        ];
+        let mut expected_set: HashSet<String> = expected.into_iter().collect();
+
+        for _ in 0..4 {
+            let m = receiver.recv();
+            assert!(expected_set.remove(m.expect("expected a message").message().unwrap()));
+        }
+        assert_err!(receiver.try_recv());
     }
 }

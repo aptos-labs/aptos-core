@@ -35,7 +35,10 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
+arc-swap = { workspace = true }
+claims = { workspace = true }
 pretty_assertions = { workspace = true }
+aptos-speculative = { workspace = true }
 
 [features]
 default = []

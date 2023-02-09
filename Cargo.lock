@@ -1648,8 +1648,11 @@ dependencies = [
  "aptos-infallible",
  "aptos-log-derive",
  "aptos-node-identity",
+ "aptos-speculative",
+ "arc-swap",
  "backtrace",
  "chrono",
+ "claims",
  "console-subscriber",
  "erased-serde",
  "futures",
@@ -2462,6 +2465,21 @@ dependencies = [
  "serde 1.0.149",
  "static_assertions",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-speculative"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-infallible",
+ "claims",
+ "crossbeam",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
+ "rayon",
 ]
 
 [[package]]
