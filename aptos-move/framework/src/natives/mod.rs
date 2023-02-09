@@ -140,8 +140,6 @@ impl GasParameters {
                 ark_bls12_381_fq12_mul: 0.into(),
                 ark_bls12_381_fq12_sub: 0.into(),
                 ark_bls12_381_fr_to_repr: 0.into(),
-                ark_bls12_381_pairing_product_base: 0.into(),
-                ark_bls12_381_pairing_product_per_pair: 0.into(),
                 ark_bls12_381_fq12_inv: 0.into(),
                 ark_bls12_381_fq12_is_one: 0.into(),
                 ark_bls12_381_fq12_square: 0.into(),
@@ -159,6 +157,7 @@ impl GasParameters {
                 ark_bls12_381_fr_zero: 0.into(),
                 ark_bls12_381_fq12_is_zero: 0.into(),
                 ark_bls12_381_fq12_zero: 0.into(),
+                ark_bls12_381_pairing: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),

@@ -135,7 +135,7 @@ module aptos_std::algebra {
     /// Return an element in the target group `Gt`.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
         Element<Gt> {
-            handle: pairing_product_internal<G1,G2,Gt>(std::vector::singleton(element_1.handle), std::vector::singleton(element_2.handle))
+            handle: pairing_internal<G1,G2,Gt>(element_1.handle, element_2.handle)
         }
     }
 
@@ -463,7 +463,7 @@ module aptos_std::algebra {
     native fun group_scalar_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
     native fun group_double_internal<G>(element_handle: u64): u64;
     native fun group_neg_internal<G>(handle: u64): u64;
-    native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
     native fun upcast_internal<S,L>(handle: u64): u64;
     native fun downcast_internal<L,S>(handle: u64): (bool, u64);
 
@@ -759,50 +759,22 @@ module aptos_std::algebra {
         assert!(eq(&field_one<BLS12_381_Fq12>(), &upcast<BLS12_381_Gt, BLS12_381_Fq12>(&identity)), 1);
     }
 
-//    #[test(fx = @std)]
-//    fun test_bls12381_pairing(fx: signer) {
-//        enable_initial_generic_algebraic_operations(&fx);
-//        enable_bls12_381_structures(&fx);
-//
-//        // Single pairing.
-//        let gt_point_1 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-//            &group_scalar_mul(&group_generator<BLS12_381_G1>(), &from_u64<BLS12_381_Fr>(5)),
-//            &group_scalar_mul(&group_generator<BLS12_381_G2>(), &from_u64<BLS12_381_Fr>(7)),
-//        );
-//        let gt_point_2 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-//            &group_scalar_mul(&group_generator(), &from_u64<BLS12_381_Fr>(1)),
-//            &group_scalar_mul(&group_generator(), &from_u64<BLS12_381_Fr>(35)),
-//        );
-//        let gt_point_3 = pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(
-//            &group_scalar_mul(&group_generator<BLS12_381_G1>(), &from_u64<BLS12_381_Fr>(35)),
-//            &group_scalar_mul(&group_generator<BLS12_381_G2>(), &from_u64<BLS12_381_Fr>(1)),
-//        );
-//        assert!(eq(&gt_point_1, &gt_point_2), 1);
-//        assert!(eq(&gt_point_1, &gt_point_3), 1);
-//
-//        // Pairing with random points.
-//        let g1_point = insecure_random_element<BLS12_381_G1>();
-//        let g2_point = insecure_random_element<BLS12_381_G2>();
-//        // e(k1*P1, k2*P2)
-//        let k1 = insecure_random_element<BLS12_381_Fr>();
-//        let k2 = insecure_random_element<BLS12_381_Fr>();
-//        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul(&g1_point, &k1), &group_scalar_mul(&g2_point, &k2));
-//        // e(P1,P2)^(k1*k2)
-//        let gt_element_another = group_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point, &g2_point), &field_mul(&k1, &k2));
-//        assert!(eq(&gt_element, &gt_element_another), 1);
-//
-//        // Multiple pairing.
-//        let g1_point_1 = group_generator<BLS12_381_G1>();
-//        let g2_point_1 = group_generator<BLS12_381_G2>();
-//        let g1_point_2 = group_scalar_mul(&g1_point_1, &from_u64<BLS12_381_Fr>(5));
-//        let g2_point_2 = group_scalar_mul(&g2_point_1, &from_u64<BLS12_381_Fr>(2));
-//        let g1_point_3 = group_scalar_mul(&g1_point_1, &from_u64<BLS12_381_Fr>(20));
-//        let g2_point_3 = group_scalar_mul(&g2_point_1, &from_u64<BLS12_381_Fr>(5));
-//        let expected = group_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&g1_point_1, &g2_point_1), &from_u64<BLS12_381_Fr>(111));
-//        let actual = pairing_product<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&triplet(g1_point_1, g1_point_2, g1_point_3), &triplet(g2_point_1, g2_point_2, g2_point_3));
-//        assert!(eq(&expected, &actual), 1);
-//    }
-//
+    #[test(fx = @std)]
+    fun test_bls12381_pairing(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+
+        // pairing(aP,bQ) == (a*b)*pairing(P,Q).
+        let element_p = insecure_random_element<BLS12_381_G1>();
+        let element_q = insecure_random_element<BLS12_381_G2>();
+        let a = insecure_random_element<BLS12_381_Fr>();
+        let b = insecure_random_element<BLS12_381_Fr>();
+        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul(&element_p, &a), &group_scalar_mul(&element_q, &b));
+        // e(P1,P2)^(k1*k2)
+        let gt_element_another = group_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
+        assert!(eq(&gt_element, &gt_element_another), 1);
+    }
+
 //    #[test_only]
 //    struct UnknownGroup {}
 //

@@ -1005,48 +1005,30 @@ fn group_neg_internal(
     }
 }
 
-fn pairing_product_internal(
+fn pairing_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(3, ty_args.len());
-    let g1 = structure_from_ty_arg!(context, &ty_args[0]);
-    let g2 = structure_from_ty_arg!(context, &ty_args[1]);
-    let gt = structure_from_ty_arg!(context, &ty_args[2]);
-    let g2_handles = pop_arg!(args, Vec<u64>);
-    let g1_handles = pop_arg!(args, Vec<u64>);
-    match (g1, g2, gt) {
+    let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
+    match (g1_opt, g2_opt, gt_opt) {
         (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Gt)) => {
-            let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
-                .iter()
-                .map(|&handle| {
-                    let element_ptr = get_obj_pointer!(context, handle as usize);
-                    let element = element_ptr.downcast_ref::<ark_bls12_381::G1Projective>().unwrap();
-                    ark_ec::prepare_g1::<ark_bls12_381::Bls12_381>(element.into_affine())
-                })
-                .collect();
-            let g2_prepared: Vec<ark_ec::models::bls12::g2::G2Prepared<Parameters>> = g2_handles
-                .iter()
-                .map(|&handle| {
-                    let element_ptr = get_obj_pointer!(context, handle as usize);
-                    let element = element_ptr.downcast_ref::<ark_bls12_381::G2Projective>().unwrap();
-                    ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(element.into_affine())
-                })
-                .collect();
-
-            let input_pairs: Vec<(
-                ark_ec::models::bls12::g1::G1Prepared<Parameters>,
-                ark_ec::models::bls12::g2::G2Prepared<Parameters>,
-            )> = g1_prepared
-                .into_iter()
-                .zip(g2_prepared.into_iter())
-                .collect();
-            let new_element = ark_bls12_381::Bls12_381::product_of_pairings(input_pairs.as_slice());
+            let g2_element_handle = pop_arg!(args, u64) as usize;
+            let g1_element_handle = pop_arg!(args, u64) as usize;
+            let g1_element_ptr = get_obj_pointer!(context, g1_element_handle);
+            let g2_element_ptr = get_obj_pointer!(context, g2_element_handle);
+            let g1_element = g1_element_ptr.downcast_ref::<ark_bls12_381::G1Projective>().unwrap();
+            let g2_element = g2_element_ptr.downcast_ref::<ark_bls12_381::G2Projective>().unwrap();
+            let g1_element_affine = g1_element.into_affine();
+            let g2_element_affine = g2_element.into_affine();
+            let new_element = ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine);
             let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
-                (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_to_prepared + gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_to_prepared + gas_params.ark_bls12_381_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.ark_bls12_381_pairing_product_base * NumArgs::one(),
+                gas_params.pairing(Structure::BLS12_381_G1, Structure::BLS12_381_G2, Structure::BLS12_381_Gt),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1141,6 +1123,14 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), from_u64_internal),
         ),
         (
+            "group_add_internal",
+            make_native_from_func(gas_params.clone(), group_add_internal),
+        ),
+        (
+            "group_double_internal",
+            make_native_from_func(gas_params.clone(), group_double_internal),
+        ),
+        (
             "group_identity_internal",
             make_native_from_func(gas_params.clone(), group_identity_internal),
         ),
@@ -1149,28 +1139,20 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_generator_internal),
         ),
         (
-            "group_add_internal",
-            make_native_from_func(gas_params.clone(), group_add_internal),
+            "group_neg_internal",
+            make_native_from_func(gas_params.clone(), group_neg_internal),
+        ),
+        (
+            "group_order_internal",
+            make_native_from_func(gas_params.clone(), group_order_internal),
         ),
         (
             "group_scalar_mul_internal",
             make_native_from_func(gas_params.clone(), group_scalar_mul_internal),
         ),
         (
-            "group_double_internal",
-            make_native_from_func(gas_params.clone(), group_double_internal),
-        ),
-        (
-            "group_neg_internal",
-            make_native_from_func(gas_params.clone(), group_neg_internal),
-        ),
-        (
-            "pairing_product_internal",
-            make_native_from_func(gas_params.clone(), pairing_product_internal),
-        ),
-        (
-            "group_order_internal",
-            make_native_from_func(gas_params.clone(), group_order_internal),
+            "pairing_internal",
+            make_native_from_func(gas_params.clone(), pairing_internal),
         ),
         (
             "serialize_internal",

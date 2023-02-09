@@ -91,8 +91,7 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_proj_sub: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_to_affine: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
-    pub ark_bls12_381_pairing_product_base: InternalGasPerArg,
-    pub ark_bls12_381_pairing_product_per_pair: InternalGasPerArg,
+    pub ark_bls12_381_pairing: InternalGasPerArg,
 }
 
 impl GasParameters {
@@ -268,6 +267,17 @@ impl GasParameters {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one(),
             Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn pairing(&self, g1: Structure, g2: Structure, g3: Structure) -> InternalGas {
+        match (g1, g2, g3) {
+            (Structure::BLS12_381_G1, Structure::BLS12_381_G2, Structure::BLS12_381_Gt) => {
+                (self.ark_bls12_381_pairing) * NumArgs::one()
+                    + self.ark_bls12_381_g1_proj_to_affine * NumArgs::one()
+                    + self.ark_bls12_381_g2_proj_to_affine * NumArgs::one()
+            },
             _ => unreachable!()
         }
     }
