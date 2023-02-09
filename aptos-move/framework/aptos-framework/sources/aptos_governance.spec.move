@@ -111,6 +111,7 @@ spec aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
+        // TODO: Too complicated, too many call levels.
         pragma aborts_if_is_partial;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
@@ -192,7 +193,7 @@ spec aptos_framework::aptos_governance {
 
     spec add_approved_script_hash(proposal_id: u64) {
         use aptos_framework::chain_status;
-        // Calling `voting::get_proposal_state`
+        // TODO: Calling `voting::get_proposal_state`
         // Can't cover all aborts_if conditions
         pragma aborts_if_is_partial;
 
@@ -256,7 +257,7 @@ spec aptos_framework::aptos_governance {
     /// limit addition overflow.
     /// pool_address must exist in StakePool.
     spec get_voting_power(pool_address: address): u64 {
-        // Too complicated,too many call levels.
+        // TODO: Too complicated,too many call levels.
         pragma aborts_if_is_partial;
 
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
