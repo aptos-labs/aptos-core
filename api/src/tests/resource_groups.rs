@@ -2,13 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-<<<<<<< HEAD
 use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_sdk::types::LocalAccount;
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
-=======
-use aptos_api_test_context::current_function_name;
->>>>>>> 6e88da1ea7 (address comments and further refactoring)
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -43,7 +37,7 @@ async fn test_read_resource_group() {
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/resource_groups/primary");
-        context.build_package(path, named_addresses_clone)
+        TestContext::build_package(path, named_addresses_clone)
     });
     context.publish_package(&mut admin0, txn).await;
 
@@ -51,7 +45,7 @@ async fn test_read_resource_group() {
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/resource_groups/secondary");
-        context.build_package(path, named_addresses_clone)
+        TestContext::build_package(path, named_addresses_clone)
     });
     context.publish_package(&mut admin1, txn).await;
 

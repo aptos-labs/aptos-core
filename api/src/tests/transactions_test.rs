@@ -831,9 +831,9 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("test-context/move");
-        context.build_package(path, named_addresses_clone)
+        TestContext::build_package(path, named_addresses_clone)
     });
-    context.publish_package(&mut admin0, txn).await;
+    let txn = context.publish_package(&mut admin, txn).await;
 
     let resp = context
         .get(

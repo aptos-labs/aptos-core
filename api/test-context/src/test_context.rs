@@ -22,13 +22,10 @@ use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
-    },
-};
+use aptos_sdk::{bcs, transaction_builder::TransactionFactory, types::{
+    account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
+    LocalAccount,
+}};
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -427,8 +424,7 @@ impl TestContext {
         let mut build_options = aptos_framework::BuildOptions::default();
         let _ = named_addresses
             .into_iter()
-            .map(|(name, address)| build_options.named_addresses.insert(name, address))
-            .collect::<Vec<_>>();
+            .for_each(|(name, address)| { build_options.named_addresses.insert(name, address); });
 
         let package = BuiltPackage::build(path, build_options).unwrap();
         let code = package.extract_code();
@@ -441,14 +437,15 @@ impl TestContext {
         &mut self,
         publisher: &mut LocalAccount,
         payload: TransactionPayload,
-    ) {
+    ) -> SignedTransaction {
         let txn =
-            publisher.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+            publisher.sign_with_transaction_builder(self.transaction_factory().payload(payload));
         let bcs_txn = bcs::to_bytes(&txn).unwrap();
         self.expect_status_code(202)
             .post_bcs_txn("/transactions", bcs_txn)
             .await;
         self.commit_mempool_txns(1).await;
+        txn
     }
 
     pub async fn commit_mempool_txns(&mut self, size: u64) {
