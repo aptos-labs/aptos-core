@@ -807,7 +807,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["epoch_duration_secs"] = 3600.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(900)
