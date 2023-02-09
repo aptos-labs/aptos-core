@@ -400,12 +400,13 @@ impl TestContext {
         ret
     }
 
-    pub async fn maybe_read_resource(
+    pub async fn read_resource(
         &self,
         account_address: &AccountAddress,
         resource: &str,
     ) -> Option<Value> {
-        let response = self.read_resources(account_address).await;
+        let request = format!("/accounts/{}/resources", account_address);
+        let response = self.get(&request).await;
         response
             .as_array()
             .unwrap()
@@ -419,23 +420,10 @@ impl TestContext {
         self.get(&request).await
     }
 
-    pub async fn read_resource(
-        &self,
-        account_address: &AccountAddress,
-        resource: &str,
-    ) -> Value {
-        let request = format!("/accounts/{}/resource/{}", account_address, resource);
-        self.get(&request).await
-    }
-
-    fn build_package(
+    pub fn build_package(
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
-<<<<<<< HEAD
     ) -> TransactionPayload {
-=======
-    ) -> SignedTransaction {
->>>>>>> 4591e5c18a ([transaction test] adding new move module for transaction tests and rewrite the test test_get_txn_execute_failed_by_entry_function_execution_failure)
         let mut build_options = aptos_framework::BuildOptions::default();
         let _ = named_addresses
             .into_iter()
@@ -460,12 +448,7 @@ impl TestContext {
         self.expect_status_code(202)
             .post_bcs_txn("/transactions", bcs_txn)
             .await;
-<<<<<<< HEAD
-        context.commit_mempool_txns(1).await;
-=======
         self.commit_mempool_txns(1).await;
-        txn
->>>>>>> 4591e5c18a ([transaction test] adding new move module for transaction tests and rewrite the test test_get_txn_execute_failed_by_entry_function_execution_failure)
     }
 
     pub async fn commit_mempool_txns(&mut self, size: u64) {
@@ -544,31 +527,8 @@ impl TestContext {
             .unwrap()
     }
 
-    pub async fn api_execute_entry_function(
-        &mut self,
-        account: &mut LocalAccount,
-        module: &str,
-        func: &str,
-        type_args: serde_json::Value,
-        args: serde_json::Value,
-    ) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "entry_function_payload",
-                "function": format!(
-                    "{}::{}::{}",
-                    account.address().to_hex_literal(),
-                    module,
-                    func
-                ),
-                "type_arguments": type_args,
-                "arguments": args
-            }),
-        )
-        .await;
-    }
 
+    // TODO: remove the helper function since we don't publish module directly anymore
     pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
         self.api_execute_txn(
             account,
@@ -582,7 +542,26 @@ impl TestContext {
         .await;
     }
 
-    pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
+    pub async fn api_execute_entry_function(
+        &mut self,
+        account: &mut LocalAccount,
+        function: &str,
+        type_args: serde_json::Value,
+        args: serde_json::Value,
+    ) {
+        self.api_execute_txn(
+            account,
+            json!({
+            "type": "entry_function_payload",
+            "function": function,
+            "type_arguments": type_args,
+            "arguments": args
+        }),
+        )
+            .await;
+    }
+
+    async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),

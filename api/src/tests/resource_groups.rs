@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
+<<<<<<< HEAD
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+=======
+use aptos_api_test_context::current_function_name;
+>>>>>>> 6e88da1ea7 (address comments and further refactoring)
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -56,20 +60,16 @@ async fn test_read_resource_group() {
     let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
 
     let response = context.read_resource(&admin0.address(), &primary).await;
-    assert_eq!(response["data"]["value"], "3");
-
-    let response = context.maybe_read_resource(&admin0.address(), &primary).await;
     assert_eq!(response.unwrap()["data"]["value"], "3");
 
     // Verify account is empty
-    let response = context.maybe_read_resource(&user.address(), &primary).await;
+    let response = context.read_resource(&user.address(), &primary).await;
     assert!(response.is_none());
-    let response = context.maybe_read_resource(&user.address(), &secondary).await;
+    let response = context.read_resource(&user.address(), &secondary).await;
     assert!(response.is_none());
 
    // Init secondary
-   execute_entry_function(
-       &mut context,
+   context.api_execute_entry_function(
        &mut user,
        &format!("0x{}::secondary::init", admin1.address()),
        json!([]),
@@ -77,17 +77,13 @@ async fn test_read_resource_group() {
    )
    .await;
    let response = context.read_resource(&user.address(), &secondary).await;
-   assert_eq!(response["data"]["value"], 55);
-
-   let response = context.maybe_read_resource(&user.address(), &secondary).await;
    assert_eq!(response.unwrap()["data"]["value"], 55);
 
-   let response = context.maybe_read_resource(&user.address(), &primary).await;
+   let response = context.read_resource(&user.address(), &primary).await;
    assert!(response.is_none());
 
    // Init primary
-   execute_entry_function(
-       &mut context,
+   context.api_execute_entry_function(
        &mut user,
        &format!("0x{}::primary::init", admin0.address()),
        json!([]),
@@ -95,15 +91,9 @@ async fn test_read_resource_group() {
    )
    .await;
    let response = context.read_resource(&user.address(), &primary).await;
-   assert_eq!(response["data"]["value"], "35");
-
-   let response = context.maybe_read_resource(&user.address(), &primary).await;
    assert_eq!(response.unwrap()["data"]["value"], "35");
 
    let response = context.read_resource(&user.address(), &secondary).await;
-   assert_eq!(response["data"]["value"], 55);
-
-   let response = context.maybe_read_resource(&user.address(), &secondary).await;
    assert_eq!(response.unwrap()["data"]["value"], 55);
 }
 

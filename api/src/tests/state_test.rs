@@ -324,7 +324,6 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
         .await;
     ctx.api_execute_entry_function(
         account,
-        "TableTestData",
         "make_test_tables",
         json!([]),
         json!([]),
