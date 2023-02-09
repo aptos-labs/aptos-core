@@ -310,7 +310,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<MockVM>::new(db);
+        let executor = BlockExecutor::<MockVM, Transaction>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
 

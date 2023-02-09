@@ -3,6 +3,7 @@
 
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
 use serde::{Deserialize, Serialize};
@@ -42,7 +43,35 @@ impl SerializedTransaction {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
+pub(crate) struct PersistedValue {
+    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
+    pub(crate) expiration: LogicalTime,
+    pub(crate) author: PeerId,
+    pub(crate) num_bytes: usize,
+}
+
+impl PersistedValue {
+    pub(crate) fn new(
+        maybe_payload: Option<Vec<SignedTransaction>>,
+        expiration: LogicalTime,
+        author: PeerId,
+        num_bytes: usize,
+    ) -> Self {
+        Self {
+            maybe_payload,
+            expiration,
+            author,
+            num_bytes,
+        }
+    }
+
+    pub(crate) fn remove_payload(&mut self) {
+        self.maybe_payload = None;
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
 pub struct FragmentInfo {
     epoch: u64,
     batch_id: u64,
@@ -114,7 +143,7 @@ impl Fragment {
     }
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if let Some(expiration) = &self.fragment_info.maybe_expiration {
+        if let Some(expiration) = &self.fragment_info.maybe_expiration() {
             if expiration.epoch() != self.fragment_info.epoch {
                 return Err(anyhow::anyhow!(
                     "Epoch mismatch: info: {}, expiration: {}",
@@ -153,6 +182,10 @@ impl Fragment {
     pub fn batch_id(&self) -> BatchId {
         self.fragment_info.batch_id()
     }
+
+    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
+        self.fragment_info.maybe_expiration()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -188,6 +221,14 @@ impl BatchRequest {
             ))
         }
     }
+
+    pub fn source(&self) -> PeerId {
+        self.source
+    }
+
+    pub fn digest(&self) -> HashValue {
+        self.batch_info.digest
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -199,9 +240,9 @@ pub struct Batch {
 
 impl Batch {
     pub fn new(
+        source: PeerId,
         epoch: u64,
         digest: HashValue,
-        source: PeerId,
         payload: Vec<SignedTransaction>,
     ) -> Self {
         let batch_info = BatchInfo { epoch, digest };
@@ -210,6 +251,10 @@ impl Batch {
             batch_info,
             payload,
         }
+    }
+
+    pub fn source(&self) -> PeerId {
+        self.source
     }
 
     pub fn epoch(&self) -> u64 {
@@ -229,7 +274,11 @@ impl Batch {
         }
     }
 
-    pub fn get_payload(self) -> Vec<SignedTransaction> {
+    pub fn into_payload(self) -> Vec<SignedTransaction> {
         self.payload
+    }
+
+    pub fn digest(&self) -> HashValue {
+        self.batch_info.digest
     }
 }

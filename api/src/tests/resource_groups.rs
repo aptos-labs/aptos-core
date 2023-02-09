@@ -6,7 +6,7 @@ use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_sdk::types::LocalAccount;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 
@@ -37,13 +37,21 @@ async fn test_read_resoure_group() {
         ("resource_groups_secondary".to_string(), admin1.address()),
     ];
 
-    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-        .join("../aptos-move/move-examples/resource_groups/primary");
-    publish_package(&mut context, &mut admin0, path, named_addresses.clone()).await;
+    let named_addresses_clone = named_addresses.clone();
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+            .join("../aptos-move/move-examples/resource_groups/primary");
+        build_package(path, named_addresses_clone)
+    });
+    publish_package(&mut context, &mut admin0, txn).await;
 
-    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-        .join("../aptos-move/move-examples/resource_groups/secondary");
-    publish_package(&mut context, &mut admin1, path, named_addresses.clone()).await;
+    let named_addresses_clone = named_addresses.clone();
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+            .join("../aptos-move/move-examples/resource_groups/secondary");
+        build_package(path, named_addresses_clone)
+    });
+    publish_package(&mut context, &mut admin1, txn).await;
 
     // Read default data
     let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
@@ -150,23 +158,28 @@ async fn read_resource(
     context.get(&request).await
 }
 
-async fn publish_package(
-    context: &mut TestContext,
-    publisher: &mut LocalAccount,
+fn build_package(
     path: PathBuf,
     named_addresses: Vec<(String, AccountAddress)>,
-) {
+) -> TransactionPayload {
     let mut build_options = aptos_framework::BuildOptions::default();
     let _ = named_addresses
         .into_iter()
         .map(|(name, address)| build_options.named_addresses.insert(name, address))
         .collect::<Vec<_>>();
 
-    let package = BuiltPackage::build(path.to_owned(), build_options).unwrap();
+    let package = BuiltPackage::build(path, build_options).unwrap();
     let code = package.extract_code();
     let metadata = package.extract_metadata().unwrap();
 
-    let payload = aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code);
+    aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
+}
+
+async fn publish_package(
+    context: &mut TestContext,
+    publisher: &mut LocalAccount,
+    payload: TransactionPayload,
+) {
     let txn =
         publisher.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     let bcs_txn = bcs::to_bytes(&txn).unwrap();
