@@ -87,8 +87,8 @@ impl Processor {
                 },
                 Err(err) => {
                     aptos_logger::info!(
-                        bucket=bucket_name,
-                        version=self.current_version,
+                        bucket = bucket_name,
+                        version = self.current_version,
                         error = err.to_string(),
                         "[indexer file store] Hit the head; retrying in 1 second"
                     );
