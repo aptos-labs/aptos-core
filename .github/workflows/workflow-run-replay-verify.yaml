@@ -86,6 +86,8 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
 
       - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install AWS CLI
         shell: bash
