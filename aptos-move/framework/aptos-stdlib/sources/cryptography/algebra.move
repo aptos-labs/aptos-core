@@ -585,6 +585,9 @@ module aptos_std::algebra {
         // Squaring.
         let val_x = insecure_random_element<BLS12_381_Fq12>();
         assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
+
+        // Downcasting.
+        assert!(eq(&group_identity<BLS12_381_Gt>(), &std::option::extract(&mut downcast<BLS12_381_Fq12, BLS12_381_Gt>(&val_1))), 1);
     }
 
     const BLS12_381_R: vector<u8> = x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";

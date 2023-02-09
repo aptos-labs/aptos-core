@@ -1065,7 +1065,7 @@ fn pairing_internal(
 }
 
 fn upcast_internal(
-    gas_params: &GasParameters,
+    _gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -1080,6 +1080,38 @@ fn upcast_internal(
                 InternalGas::zero(),
                 smallvec![Value::u64(handle as u64)],
             ))
+        }
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+fn downcast_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(2, ty_args.len());
+    let parent_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let child_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    match (parent_opt, child_opt) {
+        (Some(Structure::BLS12_381_Fq12), Some(Structure::BLS12_381_Gt)) => {
+            let handle = pop_arg!(args, u64) as usize;
+            let element_ptr = get_obj_pointer!(context, handle);
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                Ok(NativeResult::ok(
+                    gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
+                    smallvec![Value::bool(true), Value::u64(handle as u64)],
+                ))
+            } else {
+                Ok(NativeResult::ok(
+                    gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
+                    smallvec![Value::bool(false), Value::u64(handle as u64)],
+                ))
+            }
         }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
@@ -1187,6 +1219,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "upcast_internal",
             make_native_from_func(gas_params.clone(), upcast_internal),
+        ),
+        (
+            "downcast_internal",
+            make_native_from_func(gas_params.clone(), downcast_internal),
         ),
     ]);
 
