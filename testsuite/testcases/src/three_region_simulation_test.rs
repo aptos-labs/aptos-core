@@ -198,7 +198,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
             add_execution_delay(ctx.swarm(), config)?;
         }
 
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::AllFullnodes)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
