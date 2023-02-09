@@ -978,9 +978,9 @@ fn three_region_simulation_with_different_node_speed(config: ForgeConfig) -> For
 
 fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
     config
-        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
-        .with_initial_fullnode_count(12)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_fullnode_count(100)
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
         .with_network_tests(vec![&ThreeRegionSimulationTest {
             add_execution_delay: None,
         }])
