@@ -845,9 +845,8 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
                 .as_str(),
         )
         .await;
-    assert_eq!(
-        resp["success"].as_bool().unwrap(),
-        false,
+    assert!(
+        !resp["success"].as_bool().unwrap(),
         "{}",
         pretty(&resp)
     );
