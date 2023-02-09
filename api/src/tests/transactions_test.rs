@@ -822,7 +822,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
 async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
     let mut root = context.root_account();
-    let mut admin = create_account(&mut context, &mut root).await;
+    let mut admin = context.create_account(&mut root).await;
 
     let named_addresses = vec![
         ("entry_func_fail".to_string(), admin.address()),
@@ -1108,23 +1108,6 @@ fn gen_string(len: u64) -> String {
         .collect()
 }
 
-async fn create_account(context: &mut TestContext, root: &mut LocalAccount) -> LocalAccount {
-    let account = context.gen_account();
-    let factory = context.transaction_factory();
-    let txn = root.sign_with_transaction_builder(
-        factory
-            .account_transfer(account.address(), 10_000_000)
-            .expiration_timestamp_secs(u64::MAX),
-    );
-
-    let bcs_txn = bcs::to_bytes(&txn).unwrap();
-    context
-        .expect_status_code(202)
-        .post_bcs_txn("/transactions", bcs_txn)
-        .await;
-    context.commit_mempool_txns(1).await;
-    account
-}
 
 // For use when not using the methods on `TestContext` directly.
 fn build_path(path: &str) -> String {

@@ -312,6 +312,22 @@ impl TestContext {
         LocalAccount::generate(self.rng())
     }
 
+    pub async fn create_account(&mut self, root: &mut LocalAccount) -> LocalAccount {
+        let account = self.gen_account();
+        let factory = self.transaction_factory();
+        let txn = root.sign_with_transaction_builder(
+            factory
+                .account_transfer(account.address(), 10_000_000)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+
+        let bcs_txn = bcs::to_bytes(&txn).unwrap();
+        self.expect_status_code(202)
+            .post_bcs_txn("/transactions", bcs_txn)
+            .await;
+        self.commit_mempool_txns(1).await;
+        account
+    }
     pub fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account();
         self.create_user_account_by(&mut tc, account)
