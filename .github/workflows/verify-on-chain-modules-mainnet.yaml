@@ -29,3 +29,5 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/verify-modules
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}

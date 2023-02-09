@@ -1,7 +1,14 @@
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git"
+    required: false
+
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/rust-setup
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
     - name: install dependencies
       shell: bash
       run: |
