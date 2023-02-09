@@ -5,11 +5,15 @@ slug: "aptos-api"
 
 # Use the Aptos REST Read API
 
-If you provide blockchain services to your customers and wish to employ the Aptos API, then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
+If you provide blockchain services to your customers and wish to employ the [Aptos API](https://aptos.dev/nodes/aptos-api-spec/#/), then this guide is for you. This guide will walk you through all you need to integrate the Aptos blockchain into your platform with the Aptos API.
 
 :::tip
 Also see the [System Integrators Guide](./system-integrators-guide.md) for a thorough walkthrough of Aptos integration.
 :::
+
+## Understanding rate limits
+
+As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a rate limit of 1000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
 
 ## Viewing current and historical state
 
@@ -40,7 +44,11 @@ View functions do not modify blockchain state. A [View](https://github.com/aptos
 
 The View function operates similar to the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
-In the TypeScript Sdk, a view function request would look like this:
+In order to use the View functions, you need to pass `--bytecode-version 6` to the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) when publishing the module.
+
+> Note: Calling View functions is not yet supported by the Aptos CLI.
+
+In the TypeScript SDK, a view function request would look like this:
 ```
     const payload: Gen.ViewRequest = {
       function: "0x1::coin::balance",

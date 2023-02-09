@@ -28,6 +28,7 @@ Bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
+bool
 Bundlr
 CANCELLED
 CDN
@@ -175,6 +176,7 @@ RTT
 Recategorized
 Reusability
 Ruleset
+serde
 SDK
 SDKs
 SHA

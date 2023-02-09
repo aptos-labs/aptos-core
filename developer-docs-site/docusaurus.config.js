@@ -268,6 +268,11 @@ const config = {
                 docId: "nodes/full-node/index",
               },
               {
+                label: "Run an Indexer",
+                type: "doc",
+                docId: "nodes/indexer-fullnode",
+              },
+              {
                 label: "Monitor a Node",
                 type: "doc",
                 docId: "nodes/measure/index",

@@ -18,6 +18,7 @@ use aptos_release_builder::components::{
 use aptos_temppath::TempPath;
 use std::{fs, path::PathBuf, process::Command, sync::Arc, thread, time::Duration};
 
+// TODO: currently fails when quorum store is enabled by hard-coding. Investigate why.
 #[tokio::test]
 /// This test verifies the flow of aptos framework upgrade process.
 /// i.e: The network will be alive after applying the new aptos framework release.
@@ -60,6 +61,13 @@ async fn test_upgrade_flow() {
     gas_script_path.set_extension("move");
     fs::write(gas_script_path.as_path(), update_gas_script).unwrap();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     assert!(Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
         .args(&vec![
@@ -67,6 +75,8 @@ async fn test_upgrade_flow() {
             "run-script",
             "--script-path",
             gas_script_path.to_str().unwrap(),
+            "--framework-local-dir",
+            framework_path.as_os_str().to_str().unwrap(),
             "--sender-account",
             "0xA550C18",
             "--url",
@@ -105,6 +115,13 @@ async fn test_upgrade_flow() {
 
     scripts.sort();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     for path in scripts.iter() {
         assert!(Command::new(aptos_cli.as_path())
             .current_dir(workspace_root())
@@ -113,6 +130,8 @@ async fn test_upgrade_flow() {
                 "run-script",
                 "--script-path",
                 path.to_str().unwrap(),
+                "--framework-local-dir",
+                framework_path.as_os_str().to_str().unwrap(),
                 "--sender-account",
                 "0xA550C18",
                 "--url",

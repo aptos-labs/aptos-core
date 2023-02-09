@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::SafetyRulesConfig;
+use crate::config::{QuorumStoreConfig, SafetyRulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -30,6 +30,7 @@ pub struct ConsensusConfig {
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
     pub intra_consensus_channel_buffer_size: usize,
+    pub quorum_store_configs: QuorumStoreConfig,
 
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
@@ -65,10 +66,10 @@ impl Default for ConsensusConfig {
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded
-
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,
+            quorum_store_configs: QuorumStoreConfig::default(),
 
             window_for_chain_health: 100,
             chain_health_backoff: vec![

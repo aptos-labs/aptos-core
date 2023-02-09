@@ -140,6 +140,7 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
         body.peer_id,
         node_type,
         epoch,
+        body.run_uuid,
     )
     .map_err(|e| {
         error!("unable to create jwt token: {}", e);

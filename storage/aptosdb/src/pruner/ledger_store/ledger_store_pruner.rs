@@ -27,7 +27,6 @@ use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
 
-#[derive(Debug)]
 /// Responsible for pruning everything except for the state tree.
 pub(crate) struct LedgerPruner {
     db: Arc<DB>,

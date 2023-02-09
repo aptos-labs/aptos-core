@@ -211,6 +211,7 @@ pub struct NFTMintAndTransferGeneratorCreator {
 impl NFTMintAndTransferGeneratorCreator {
     pub async fn new(
         txn_factory: TransactionFactory,
+        init_txn_factory: TransactionFactory,
         root_account: &mut LocalAccount,
         txn_executor: &dyn TransactionExecutor,
         num_workers: usize,
@@ -224,7 +225,7 @@ impl NFTMintAndTransferGeneratorCreator {
             txn_executor,
             root_account,
             &mut creator_account,
-            &txn_factory,
+            &init_txn_factory,
             &collection_name,
             &token_name,
         )
@@ -241,7 +242,7 @@ impl NFTMintAndTransferGeneratorCreator {
                 creator_address,
                 &collection_name,
                 &token_name,
-                &txn_factory,
+                &init_txn_factory,
                 1_000_000_000,
             ));
             distribution_accounts.push(distribution_account);

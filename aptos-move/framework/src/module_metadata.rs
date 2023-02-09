@@ -56,13 +56,16 @@ pub struct RuntimeModuleMetadataV1 {
 /// Enumeration of potentially known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct KnownAttribute {
-    kind: u16,
+    kind: u8,
     args: Vec<String>,
 }
 
 /// Enumeration of known attributes
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
+    // An older compiler placed view functions at 0. This was then published to
+    // Testnet and now we need to recognize this as a legacy index.
+    LegacyViewFunction = 0,
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
@@ -71,28 +74,29 @@ pub enum KnownAttributeKind {
 impl KnownAttribute {
     pub fn view_function() -> Self {
         Self {
-            kind: KnownAttributeKind::ViewFunction as u16,
+            kind: KnownAttributeKind::ViewFunction as u8,
             args: vec![],
         }
     }
 
     pub fn is_view_function(&self) -> bool {
-        self.kind == (KnownAttributeKind::ViewFunction as u16)
+        self.kind == (KnownAttributeKind::LegacyViewFunction as u8)
+            || self.kind == (KnownAttributeKind::ViewFunction as u8)
     }
 
     pub fn resource_group(scope: ResourceGroupScope) -> Self {
         Self {
-            kind: KnownAttributeKind::ResourceGroup as u16,
+            kind: KnownAttributeKind::ResourceGroup as u8,
             args: vec![scope.as_str().to_string()],
         }
     }
 
     pub fn is_resource_group(&self) -> bool {
-        self.kind == KnownAttributeKind::ResourceGroup as u16
+        self.kind == KnownAttributeKind::ResourceGroup as u8
     }
 
     pub fn get_resource_group(&self) -> Option<ResourceGroupScope> {
-        if self.kind == KnownAttributeKind::ResourceGroup as u16 {
+        if self.kind == KnownAttributeKind::ResourceGroup as u8 {
             self.args.get(0).and_then(|scope| str::parse(scope).ok())
         } else {
             None
@@ -101,13 +105,13 @@ impl KnownAttribute {
 
     pub fn resource_group_member(container: String) -> Self {
         Self {
-            kind: KnownAttributeKind::ResourceGroupMember as u16,
+            kind: KnownAttributeKind::ResourceGroupMember as u8,
             args: vec![container],
         }
     }
 
     pub fn get_resource_group_member(&self) -> Option<StructTag> {
-        if self.kind == KnownAttributeKind::ResourceGroupMember as u16 {
+        if self.kind == KnownAttributeKind::ResourceGroupMember as u8 {
             self.args.get(0).and_then(|group| str::parse(group).ok())
         } else {
             None
@@ -115,7 +119,7 @@ impl KnownAttribute {
     }
 
     pub fn is_resource_group_member(&self) -> bool {
-        self.kind == KnownAttributeKind::ResourceGroupMember as u16
+        self.kind == KnownAttributeKind::ResourceGroupMember as u8
     }
 }
 
@@ -145,7 +149,16 @@ pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeMod
 /// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
 pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetadataV1> {
     if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY_V1) {
-        bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok()
+        let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
+        // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
+        // being used. Note, this should have been gated in the verify module metadata.
+        if module.version == 5 {
+            if let Some(metadata) = metadata.as_mut() {
+                metadata.struct_attributes.clear();
+                metadata.fun_attributes.clear();
+            }
+        }
+        metadata
     } else if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY) {
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
@@ -159,7 +172,7 @@ pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetad
 #[error("Unknown attribute ({}) for key: {}", self.attribute, self.key)]
 pub struct MetadataValidationError {
     pub key: String,
-    pub attribute: u16,
+    pub attribute: u8,
 }
 
 pub fn is_valid_view_function(
@@ -176,7 +189,7 @@ pub fn is_valid_view_function(
 
     Err(MetadataValidationError {
         key: fun.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 
@@ -192,13 +205,12 @@ pub fn is_valid_resource_group(
             {
                 return Ok(());
             }
-            println!("group {:?}", mod_struct);
         }
     }
 
     Err(MetadataValidationError {
         key: struct_.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 
@@ -211,13 +223,12 @@ pub fn is_valid_resource_group_member(
             if mod_struct.abilities.has_ability(Ability::Key) {
                 return Ok(());
             }
-            println!("member {:?}", mod_struct);
         }
     }
 
     Err(MetadataValidationError {
         key: struct_.to_string(),
-        attribute: KnownAttributeKind::ViewFunction as u16,
+        attribute: KnownAttributeKind::ViewFunction as u8,
     })
 }
 

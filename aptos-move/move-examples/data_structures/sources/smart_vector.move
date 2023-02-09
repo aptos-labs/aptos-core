@@ -210,7 +210,7 @@ module aptos_framework::smart_vector {
 
     /// Swap the elements at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
     /// for v.
-    public fun swap<T>(v: &mut SmartVector<T>, i: u64, j: u64) {
+    public fun swap<T: store>(v: &mut SmartVector<T>, i: u64, j: u64) {
         if (i > j) {
             return swap(v, j, i)
         };

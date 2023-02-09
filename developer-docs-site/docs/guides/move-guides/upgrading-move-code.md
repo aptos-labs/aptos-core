@@ -83,19 +83,11 @@ libraries, which have the `compatible` policy to allow critical upgrades and fix
 When using `compatible` upgrade policy, a module package can be upgraded. However, updates to existing modules already
 published previously need to be compatible and follow the rules below:
 - All existing structs' fields cannot be updated. This means no new fields can be added and existing fields cannot be
-modified.
-- Struct abilities (copy, drop, store, key) can be added but not removed.
-For example, `struct A has copy` {} can be updated to `struct A has copy, drop {}` (`drop` ability is added). But it
-cannot be updated `struct A has drop {}` as `copy` has been removed, which is not allowed.
+modified. Struct abilities also cannot be changed (no new ones added or existing removed).
 - All public and entry functions cannot change their signature (argument types, type argument, return types). However,
 argument names can change.
 - Public(friend) functions are treated as private and thus their signature can arbitrarily change. This is safe as
 only modules in the same package can call friend functions anyway and they need to be updated if the signature changes.
-- All public and entry functions' type arguments can have ability constraints (copy, drop, store) removed but not added.
-This is the opposite of the rule for struct abilities.
-For example `public fun my_function<T: copy + drop>()` can be updated to `public fun my_function<T: copy>()` as `drop`
-ability constraint is removed but it cannot be updated to `public fun my_function<T: copy + drop + store>()` as `store`
-has been added, which is not allowed.
 
 When updating your modules, if you see an incompatible error, make sure to check the above rules and fix any violations.
 

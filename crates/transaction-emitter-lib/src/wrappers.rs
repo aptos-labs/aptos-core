@@ -72,6 +72,11 @@ pub async fn emit_transactions_with_cluster(
                 num_modules: 1,
                 use_account_pool: true,
             },
+            TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Nop,
+                num_modules: 1,
+                use_account_pool: false,
+            },
         })
         .collect::<Vec<_>>();
 
@@ -121,8 +126,7 @@ pub async fn emit_transactions_with_cluster(
             .mode(emitter_mode)
             .transaction_mix_per_phase(transaction_mix_per_phase)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
-            .delay_after_minting(Duration::from_secs(args.delay_after_minting.unwrap_or(0)))
-            .gas_price(aptos_global_constants::GAS_UNIT_PRICE);
+            .delay_after_minting(Duration::from_secs(args.delay_after_minting.unwrap_or(0)));
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }
@@ -130,6 +134,19 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request =
             emit_job_request.max_transactions_per_account(max_transactions_per_account);
     }
+
+    if let Some(gas_price) = args.gas_price {
+        emit_job_request = emit_job_request.gas_price(gas_price);
+    }
+
+    if let Some(max_gas_per_txn) = args.max_gas_per_txn {
+        emit_job_request = emit_job_request.max_gas_per_txn(max_gas_per_txn);
+    }
+
+    if let Some(init_gas_price_multiplier) = args.init_gas_price_multiplier {
+        emit_job_request = emit_job_request.init_gas_price_multiplier(init_gas_price_multiplier);
+    }
+
     if let Some(expected_max_txns) = args.expected_max_txns {
         emit_job_request = emit_job_request.expected_max_txns(expected_max_txns);
     }
@@ -144,7 +161,7 @@ pub async fn emit_transactions_with_cluster(
             &mut coin_source_account,
             emit_job_request,
             duration,
-            (args.duration / 5).clamp(1, 10),
+            (args.duration / 10).clamp(1, 10),
         )
         .await?;
     Ok(stats)

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use self::framework::FrameworkReleaseConfig;
 use crate::components::feature_flags::Features;
 use anyhow::{anyhow, Result};
 use aptos::governance::GenerateExecutionHash;
@@ -30,7 +31,7 @@ pub mod version;
 pub struct ReleaseConfig {
     pub testnet: bool,
     pub remote_endpoint: Option<Url>,
-    pub framework_release: bool,
+    pub framework_release: Option<FrameworkReleaseConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_schedule: Option<GasScheduleV2>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -124,9 +125,10 @@ impl ReleaseConfig {
         _client: &Option<Client>,
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
-        if self.framework_release {
+        if let Some(framework_release) = &self.framework_release {
             result.append(
                 &mut framework::generate_upgrade_proposals(
+                    framework_release,
                     self.testnet,
                     if self.is_multi_step {
                         get_execution_hash(result)
@@ -188,7 +190,7 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(feature_flags) = &self.feature_flags {
-            let mut needs_update = false;
+            let mut needs_update = true;
             if let Some(client) = client {
                 let features = block_on(async {
                     client
@@ -199,6 +201,8 @@ impl ReleaseConfig {
                         .await
                 })?;
                 // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
+                // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
+                // we would like to enable/disable, regardless of their current on chain state.
                 needs_update = feature_flags.has_modified(features.inner());
             }
             if needs_update {
@@ -222,7 +226,7 @@ impl ReleaseConfig {
         result: &mut Vec<(String, String)>,
     ) -> Result<()> {
         if let Some(consensus_config) = &self.consensus_config {
-            if fetch_and_equals(client, consensus_config)? {
+            if !fetch_and_equals(client, consensus_config)? {
                 result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
                     consensus_config,
                     self.testnet,
@@ -279,10 +283,19 @@ impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
             testnet: true,
-            framework_release: true,
+            framework_release: Some(FrameworkReleaseConfig {
+                bytecode_version: 6,
+                git_hash: None,
+            }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
-            feature_flags: None,
+            feature_flags: Some(Features {
+                enabled: aptos_vm_genesis::default_features()
+                    .into_iter()
+                    .map(crate::components::feature_flags::FeatureFlag::from)
+                    .collect(),
+                disabled: vec![],
+            }),
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,

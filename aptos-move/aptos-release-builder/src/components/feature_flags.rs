@@ -13,7 +13,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
@@ -69,10 +69,15 @@ pub fn generate_feature_upgrade_proposal(
 
     let writer = CodeWriter::new(Loc::default());
 
+    emitln!(writer, "// Modifying on-chain feature flags: ");
+    emitln!(writer, "// Enabled Features: {:?}", features.enabled);
+    emitln!(writer, "// Disabled Features: {:?}", features.disabled);
+    emitln!(writer, "//");
+
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash,
+        next_execution_hash.clone(),
         "std::features",
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
@@ -83,10 +88,17 @@ pub fn generate_feature_upgrade_proposal(
             generate_features_blob(writer, &disabled);
             emitln!(writer, ";\n");
 
-            emitln!(
-                writer,
-                "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-            );
+            if is_testnet && next_execution_hash.is_empty() {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
+                );
+            } else {
+                emitln!(
+                    writer,
+                    "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
+                );
+            }
         },
     );
 

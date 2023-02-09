@@ -1,17 +1,11 @@
 ---
-title: "Set up React App"
+title: "2. Set up React App"
 id: "set-up-react-app"
 ---
 
-# Set up React App
+# 2. Set up React App
 
-Now that you have [created a smart contract](./1-create-smart-contract.md), we are going to set up React app.
-
-## Prerequisites
-
-Although we will explain some React decisions, we are not going to deep dive into how React works; so we assume you have some previous experience with React.
-
-Also make sure you have [node and npm installed](https://nodejs.org/en/).
+This is the second chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md) where you have already [created a smart contract](./1-create-smart-contract.md) and are now setting up a React app.
 
 ## Set up the app
 
@@ -92,4 +86,4 @@ import { Layout, Row, Col } from "antd";
 
 5. Run the local server with `npm start`, you should see the _header_ that matches our UI mockup.
 
-It is now time to [add wallet support](./3-add-wallet-support.md).
+It is now time to [add wallet support](./3-add-wallet-support.md) in chapter 3.

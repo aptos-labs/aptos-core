@@ -14,12 +14,15 @@ pub struct ParsedTransactionOutput {
     reconfig_events: Vec<ContractEvent>,
 }
 
+impl ParsedTransactionOutput {
+    pub fn parse_reconfig_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
+        events.iter().filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
+    }
+}
+
 impl From<TransactionOutput> for ParsedTransactionOutput {
     fn from(output: TransactionOutput) -> Self {
-        let reconfig_events = output
-            .events()
-            .iter()
-            .filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
+        let reconfig_events = Self::parse_reconfig_events(output.events())
             .cloned()
             .collect();
         Self {

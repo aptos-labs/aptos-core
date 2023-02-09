@@ -246,7 +246,8 @@ pub enum Scheme {
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
     /// when a their address matches matches an existing address of a MultiEd25519 wallet.
-    DeriveObjectId = 254,
+    DeriveObjectIdFromGuid = 253,
+    DeriveObjectIdFromSeed = 254,
     DeriveResourceAccountAddress = 255,
 }
 
@@ -255,7 +256,8 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
-            Scheme::DeriveObjectId => "DeriveObjectId",
+            Scheme::DeriveObjectIdFromGuid => "DeriveObjectIdFromGuid",
+            Scheme::DeriveObjectIdFromSeed => "DeriveObjectIdFromSeed",
             Scheme::DeriveResourceAccountAddress => "DeriveResourceAccountAddress",
         };
         write!(f, "Scheme::{}", display)
