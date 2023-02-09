@@ -6,6 +6,7 @@ use crate::quorum_store::{
     proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
     proof_manager::ProofManagerCommand,
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
+    types::BatchId,
 };
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
 use aptos_types::{
@@ -32,7 +33,7 @@ async fn test_proof_coordinator_basic() {
     assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
-            0,
+            BatchId::new_for_test(0),
             proof_tx
         ))
         .await
@@ -49,7 +50,7 @@ async fn test_proof_coordinator_basic() {
 
     // check normal path
     let (proof, batch_id) = proof_rx.await.expect("channel dropped").unwrap();
-    assert_eq!(batch_id, 0);
+    assert_eq!(batch_id, BatchId::new_for_test(0));
     assert_eq!(proof.digest().clone(), digest);
     assert!(proof.verify(&verifier).is_ok());
     match proof_manager_rx.recv().await.expect("channel dropped") {
@@ -62,14 +63,14 @@ async fn test_proof_coordinator_basic() {
     assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
-            4,
+            BatchId::new_for_test(4),
             proof_tx
         ))
         .await
         .is_ok());
     assert_eq!(
         proof_rx.await.expect("channel dropped"),
-        Err(ProofError::Timeout(4))
+        Err(ProofError::Timeout(BatchId::new_for_test(4)))
     );
     match proof_manager_rx.try_recv() {
         Err(TryRecvError::Empty) => {},
@@ -81,7 +82,7 @@ async fn test_proof_coordinator_basic() {
     assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info.clone(),
-            4,
+            BatchId::new_for_test(4),
             proof_tx
         ))
         .await
@@ -96,7 +97,7 @@ async fn test_proof_coordinator_basic() {
             .is_ok());
     }
     let (proof, batch_id) = proof_rx.await.expect("channel dropped").unwrap();
-    assert_eq!(batch_id, 4);
+    assert_eq!(batch_id, BatchId::new_for_test(4));
     assert_eq!(proof.digest().clone(), digest);
     assert!(proof.verify(&verifier).is_ok());
     match proof_manager_rx.recv().await.expect("channel dropped") {
@@ -109,7 +110,7 @@ async fn test_proof_coordinator_basic() {
     assert!(proof_coordinator_tx
         .send(ProofCoordinatorCommand::InitProof(
             signed_digest_info,
-            10,
+            BatchId::new_for_test(10),
             proof_tx
         ))
         .await
@@ -131,7 +132,7 @@ async fn test_proof_coordinator_basic() {
     }
     assert_eq!(
         proof_rx.await.expect("channel dropped"),
-        Err(ProofError::Timeout(10))
+        Err(ProofError::Timeout(BatchId::new_for_test(10)))
     );
     match proof_manager_rx.try_recv() {
         Err(TryRecvError::Empty) => {},

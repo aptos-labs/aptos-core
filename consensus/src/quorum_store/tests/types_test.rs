@@ -3,7 +3,7 @@
 
 use crate::quorum_store::{
     tests::utils::create_vec_signed_transactions,
-    types::{Batch, BatchRequest, Fragment, SerializedTransaction},
+    types::{Batch, BatchId, BatchRequest, Fragment, SerializedTransaction},
 };
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::hash::DefaultHasher;
@@ -36,7 +36,7 @@ fn test_batch() {
 #[test]
 fn test_fragment() {
     let epoch = 0;
-    let batch_id = 0;
+    let batch_id = BatchId::new_for_test(0);
     let fragment_id = 0;
     let mut data = Vec::new();
     let mut maybe_expiration = None;
