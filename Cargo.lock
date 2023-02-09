@@ -476,6 +476,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "futures",
@@ -533,11 +534,13 @@ dependencies = [
  "aptos-consensus-notifications",
  "aptos-consensus-types",
  "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-fallible",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
@@ -559,7 +562,9 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
  "bytes 1.2.1",
+ "chrono",
  "claims",
+ "dashmap",
  "fail 0.5.0",
  "futures",
  "futures-channel",
@@ -578,6 +583,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-metrics",
 ]
 
 [[package]]
@@ -613,6 +619,7 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
+ "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
  "serde_json",
@@ -3852,9 +3859,9 @@ dependencies = [
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e933c43a5db3779b3600cdab18856af2411ca2237e33ba8ab476d5d5b1a6c1e7"
+checksum = "22a3a81dfaf6b66bce5d159eddae701e3a002f194d378cbf7be5f053c281d9be"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -9923,6 +9930,17 @@ dependencies = [
  "proc-macro2 1.0.47",
  "quote 1.0.21",
  "syn 1.0.105",
+]
+
+[[package]]
+name = "tokio-metrics"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
+dependencies = [
+ "futures-util",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]

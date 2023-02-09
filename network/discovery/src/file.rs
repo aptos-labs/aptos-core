@@ -87,7 +87,7 @@ mod tests {
             Box::pin(listener).run().await
         };
 
-        spawn_named!("[Network] Listner Task", listener_task);
+        spawn_named!("[Network] Listener Task", listener_task);
         conn_mgr_reqs_rx
     }
 

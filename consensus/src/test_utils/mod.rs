@@ -17,6 +17,7 @@ use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
+pub mod mock_quorum_store_sender;
 mod mock_state_computer;
 mod mock_storage;
 

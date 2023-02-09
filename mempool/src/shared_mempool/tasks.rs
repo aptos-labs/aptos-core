@@ -444,7 +444,6 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
 {
     // Start latency timer
     let start_time = Instant::now();
-    debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
         QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {

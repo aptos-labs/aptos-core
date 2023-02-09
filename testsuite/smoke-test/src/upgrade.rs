@@ -18,6 +18,7 @@ use aptos_release_builder::components::{
 use aptos_temppath::TempPath;
 use std::{fs, path::PathBuf, process::Command, sync::Arc, thread, time::Duration};
 
+// TODO: currently fails when quorum store is enabled by hard-coding. Investigate why.
 #[tokio::test]
 /// This test verifies the flow of aptos framework upgrade process.
 /// i.e: The network will be alive after applying the new aptos framework release.
