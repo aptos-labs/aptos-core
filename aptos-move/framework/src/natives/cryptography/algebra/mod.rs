@@ -6,9 +6,8 @@ use std::any::{Any, TypeId};
 use std::collections::{HashMap, VecDeque};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
-use ark_bls12_381::{Fq12, Fr, FrParameters, G1Projective, G2Projective, Parameters};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{BigInteger256, Field, PrimeField};
+use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
@@ -285,7 +284,34 @@ fn deserialize_internal(
             ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), 96, ark_bls12_381::G2Affine, deserialize)
         }
         (Some(Structure::BLS12_381_Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Gt, scheme.as_slice(), 576, ark_bls12_381::Fq12, deserialize_uncompressed)
+            if bytes.len() != 576 {
+                return Ok(NativeResult::ok(
+                    gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
+                    smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
+                ));
+            }
+            match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes.as_slice()) {
+                Ok(element) => {
+                    if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                        let handle = store_obj!( context , element );
+                        Ok(NativeResult::ok(
+                            gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
+                            smallvec![ Value :: bool ( true ) , Value :: u64 ( handle as u64 ) ],
+                        ))
+                    } else {
+                        Ok(NativeResult::ok(
+                            gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
+                            smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
+                        ))
+                    }
+                }
+                _ => {
+                    Ok(NativeResult::ok(
+                        gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
+                        smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
+                    ))
+                }
+            }
         }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
@@ -733,9 +759,9 @@ fn group_identity_internal(
     }
 }
 
-static BLS12381_GT_GENERATOR: Lazy<Fq12> = Lazy::new(||{
+static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(||{
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
-    Fq12::deserialize(buf.as_slice()).unwrap()
+    ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap()
 });
 
 static BLS12381_R_LENDIAN: Lazy<Vec<u8>> = Lazy::new(||{
@@ -831,7 +857,7 @@ fn insecure_random_element_internal(
         Some(Structure::BLS12_381_G1) => ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective),
         Some(Structure::BLS12_381_G2) => ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective),
         Some(Structure::BLS12_381_Gt) => {
-            let k = Fr::rand(&mut test_rng());
+            let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
             let handle = store_obj!(context, element);
             Ok(NativeResult::ok(

@@ -610,9 +610,10 @@ module aptos_std::algebra {
         assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_g), 1);
         assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_g), 1);
         let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
-        assert!(eq(&point_g, &point_g_from_comp), 1);
         let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(eq(&point_g, &point_g_from_comp), 1);
         assert!(eq(&point_g, &point_g_from_uncomp), 1);
+
         let inf = group_identity<BLS12_381_G1>();
         assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &inf), 1);
         assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &inf), 1);
@@ -620,9 +621,25 @@ module aptos_std::algebra {
         let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_INF_SERIALIZED_COMP));
         assert!(eq(&inf, &inf_from_comp), 1);
         assert!(eq(&inf, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10"));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899"));
+
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+
+        // On the curve but not in the prime-order subgroup.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12a76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12")), 1);
+
+        // a valid point in (Fq,Fq) but not on the curve.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+
+        // an invalid point (x not in Fq).
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+
+        // Wrong size.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
@@ -686,6 +703,21 @@ module aptos_std::algebra {
         let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
+        // On the curve but not in the prime-order subgroup.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
+
+        // a valid point in (Fq2,Fq2) but not on the curve.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+
+        // an invalid point (x not in Fq2).
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+
+        // Wrong size.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
         let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
@@ -737,6 +769,12 @@ module aptos_std::algebra {
         let element_7g_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED));
         assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"ffff")), 1);
 
+        // In Fq12 but not in the prime-order subgroup.
+        assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+
+        // Wrong size.
+        assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+
         // Element scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
         let element_7g_calc = group_scalar_mul(&generator, &scalar_7);
@@ -770,37 +808,7 @@ module aptos_std::algebra {
         let a = insecure_random_element<BLS12_381_Fr>();
         let b = insecure_random_element<BLS12_381_Fr>();
         let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul(&element_p, &a), &group_scalar_mul(&element_q, &b));
-        // e(P1,P2)^(k1*k2)
         let gt_element_another = group_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
         assert!(eq(&gt_element, &gt_element_another), 1);
-    }
-
-//    #[test_only]
-//    struct UnknownGroup {}
-//
-//    #[test(fx = @std)]
-//    #[expected_failure(abort_code = 0x0c0000, location = Self)]
-//    fun test_unknown_group(fx: signer) {
-//        enable_initial_generic_algebraic_operations(&fx);
-//        enable_bls12_381_structures(&fx);
-//        let _ = group_order<UnknownGroup>();
-//    }
-//
-//    #[test(fx = @std)]
-//    #[expected_failure(abort_code = 0x0c0000, location = Self)]
-//    fun test_unknown_pairing(fx: signer) {
-//        enable_initial_generic_algebraic_operations(&fx);
-//        enable_bls12_381_structures(&fx);
-//        // Attempt an invalid pairing: (G2, G1) -> Gt
-//        pairing<BLS12_381_G2, BLS12_381_G1, BLS12_381_Gt>(&insecure_random_element<BLS12_381_G2>(), &insecure_random_element<BLS12_381_G1>());
-//    }
-
-    #[test_only]
-    fun triplet<T>(a: T, b: T, c: T): vector<T> {
-        let ret = std::vector::empty();
-        std::vector::push_back(&mut ret, a);
-        std::vector::push_back(&mut ret, b);
-        std::vector::push_back(&mut ret, c);
-        ret
     }
 }
