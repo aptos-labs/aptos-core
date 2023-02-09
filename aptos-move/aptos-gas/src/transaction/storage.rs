@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
+use crate::{
+    AptosGasParameters, FeePerByte, FeePerSlot, NumBasePoints, NumMicroseconds,
+    LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_types::{
     on_chain_config::StorageGasSchedule,
     state_store::state_key::StateKey,
@@ -98,12 +101,22 @@ impl StoragePricingV1 {
 pub struct StoragePricingV2 {
     pub feature_version: u64,
     pub free_write_bytes_quota: NumBytes,
+
+    // These are for gas
     pub per_item_read: InternalGasPerArg,
     pub per_item_create: InternalGasPerArg,
     pub per_item_write: InternalGasPerArg,
     pub per_byte_read: InternalGasPerByte,
     pub per_byte_create: InternalGasPerByte,
     pub per_byte_write: InternalGasPerByte,
+
+    // These are for deposit
+    pub per_slot_deposit: FeePerSlot,
+    pub per_excess_byte_penalty: FeePerByte,
+    pub max_slot_refund_ratio: NumBasePoints,
+    pub min_slot_refund_ratio: NumBasePoints,
+    pub refund_degrade_start: NumMicroseconds,
+    pub refund_degrade_period: NumMicroseconds,
 }
 
 impl StoragePricingV2 {
@@ -141,6 +154,12 @@ impl StoragePricingV2 {
             per_byte_read: storage_gas_schedule.per_byte_read.into(),
             per_byte_create: storage_gas_schedule.per_byte_create.into(),
             per_byte_write: storage_gas_schedule.per_byte_write.into(),
+            per_slot_deposit: gas_params.txn.per_storage_slot_deposit,
+            per_excess_byte_penalty: gas_params.txn.per_storage_excess_byte_penalty,
+            max_slot_refund_ratio: gas_params.txn.max_storage_slot_refund_ratio,
+            min_slot_refund_ratio: gas_params.txn.min_storage_slot_refund_ratio,
+            refund_degrade_start: gas_params.txn.storage_slot_refund_degrade_start,
+            refund_degrade_period: gas_params.txn.storage_slot_refund_degrade_period,
         }
     }
 
@@ -234,15 +253,25 @@ impl StoragePricing {
 #[derive(Clone)]
 pub struct ChangeSetConfigs {
     gas_feature_version: u64,
-    max_bytes_per_write_op: u64,
-    max_bytes_all_write_ops_per_transaction: u64,
-    max_bytes_per_event: u64,
-    max_bytes_all_events_per_transaction: u64,
+    max_bytes_per_write_op: NumBytes,
+    max_bytes_all_write_ops_per_transaction: NumBytes,
+    max_bytes_per_event: NumBytes,
+    max_bytes_all_events_per_transaction: NumBytes,
+}
+
+fn max_bytes() -> NumBytes {
+    NumBytes::new(u64::MAX)
 }
 
 impl ChangeSetConfigs {
     pub fn unlimited_at_gas_feature_version(gas_feature_version: u64) -> Self {
-        Self::new_impl(gas_feature_version, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+        Self::new_impl(
+            gas_feature_version,
+            max_bytes(),
+            max_bytes(),
+            max_bytes(),
+            max_bytes(),
+        )
     }
 
     pub fn new(feature_version: u64, gas_params: &AptosGasParameters) -> Self {
@@ -257,10 +286,10 @@ impl ChangeSetConfigs {
 
     fn new_impl(
         gas_feature_version: u64,
-        max_bytes_per_write_op: u64,
-        max_bytes_all_write_ops_per_transaction: u64,
-        max_bytes_per_event: u64,
-        max_bytes_all_events_per_transaction: u64,
+        max_bytes_per_write_op: NumBytes,
+        max_bytes_all_write_ops_per_transaction: NumBytes,
+        max_bytes_per_event: NumBytes,
+        max_bytes_all_events_per_transaction: NumBytes,
     ) -> Self {
         Self {
             gas_feature_version,
@@ -281,21 +310,19 @@ impl ChangeSetConfigs {
     }
 
     fn for_feature_version_3() -> Self {
-        const MB: u64 = 1 << 20;
+        let mb = NumBytes::new(1 << 20);
+        let gb = NumBytes::new(1 << 30);
 
-        Self::new_impl(3, MB, u64::MAX, MB, MB << 10)
+        Self::new_impl(3, mb, max_bytes(), mb, gb)
     }
 
     fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
         Self::new_impl(
             gas_feature_version,
-            gas_params.txn.max_bytes_per_write_op.into(),
-            gas_params
-                .txn
-                .max_bytes_all_write_ops_per_transaction
-                .into(),
-            gas_params.txn.max_bytes_per_event.into(),
-            gas_params.txn.max_bytes_all_events_per_transaction.into(),
+            gas_params.txn.max_bytes_per_write_op,
+            gas_params.txn.max_bytes_all_write_ops_per_transaction,
+            gas_params.txn.max_bytes_per_event,
+            gas_params.txn.max_bytes_all_events_per_transaction,
         )
     }
 }
@@ -308,12 +335,12 @@ impl CheckChangeSet for ChangeSetConfigs {
         for (key, op) in change_set.write_set() {
             if let Some(bytes) = op.bytes() {
                 let write_op_size = (bytes.len() + key.size()) as u64;
-                if write_op_size > self.max_bytes_per_write_op {
+                if write_op_size > self.max_bytes_per_write_op.into() {
                     return Err(VMStatus::Error(ERR));
                 }
                 write_set_size += write_op_size;
             }
-            if write_set_size > self.max_bytes_all_write_ops_per_transaction {
+            if write_set_size > self.max_bytes_all_write_ops_per_transaction.into() {
                 return Err(VMStatus::Error(ERR));
             }
         }
@@ -321,11 +348,11 @@ impl CheckChangeSet for ChangeSetConfigs {
         let mut total_event_size = 0;
         for event in change_set.events() {
             let size = event.event_data().len() as u64;
-            if size > self.max_bytes_per_event {
+            if size > self.max_bytes_per_event.into() {
                 return Err(VMStatus::Error(ERR));
             }
             total_event_size += size;
-            if total_event_size > self.max_bytes_all_events_per_transaction {
+            if total_event_size > self.max_bytes_all_events_per_transaction.into() {
                 return Err(VMStatus::Error(ERR));
             }
         }

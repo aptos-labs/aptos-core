@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 // Change log:
 // - V7
 //   - Native support for exists<T>
+//   - storage deposit
 // - V6
 //   - Added a new native function - blake2b_256.
 // - V5

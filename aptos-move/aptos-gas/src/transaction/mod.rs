@@ -4,7 +4,10 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{AbstractValueSize, FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
+use crate::algebra::{
+    AbstractValueSize, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasScalingFactor, GasUnit,
+    NumBasePoints, NumMicroseconds,
+};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes,
     ToUnitFractionalWithParams, ToUnitWithParams,
@@ -124,6 +127,42 @@ crate::params::define_gas_parameters!(
             max_bytes_all_events_per_transaction: NumBytes,
             { 5.. => "max_bytes_all_events_per_transaction"},
             10 << 20, // all events from a single transaction are 10MB max
+        ],
+        [
+            per_storage_slot_deposit: FeePerSlot,
+            { 7.. => "per_storage_slot_deposit"},
+            50_000, // 50k Octas each slot allocation, that's 500k APT for 1 billion slots
+        ],
+        [
+            per_storage_excess_byte_penalty: FeePerByte,
+            { 7.. => "per_storage_excess_byte_penalty"},
+            // If a storage write is larger than `free_write_bytes_quota`, each excess byte is
+            // 50 Octas. It's charged for both creation and modification.
+            // As a result, to allocate 1TB of state space by creating large slots, the cost is
+            // at least 500k APT.
+            50,
+        ],
+        [
+            max_storage_slot_refund_ratio: NumBasePoints,
+            { 7.. => "max_storage_slot_refund_ratio"},
+            90_00, // if deleted quickly, refund 90% of the deposit
+        ],
+        [
+            min_storage_slot_refund_ratio: NumBasePoints,
+            { 7.. => "max_storage_slot_refund_ratio"},
+            50_00, // deleting a fairly old item still yields 50% refund
+        ],
+        [
+            storage_slot_refund_degrade_start: NumMicroseconds,
+            { 7.. => "storage_slot_refund_degrade_start"},
+            86_400_000_000, // maximum refund if slot is freed within 24 hours
+        ],
+        [
+            storage_slot_refund_degrade_period: NumMicroseconds,
+            { 7.. => "storage_slot_refund_degrade_period"},
+            // Minimal refund if a slot if freed later than 31 days. That is "1 day" from the
+            // previous parameter plus "30 days", the value of this parameter.
+            2_592_000_000_000,
         ],
     ]
 );

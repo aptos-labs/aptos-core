@@ -18,6 +18,8 @@
 //!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrate it easily
 //!     in the future.
 
+extern crate core;
+
 #[macro_use]
 mod natives;
 
