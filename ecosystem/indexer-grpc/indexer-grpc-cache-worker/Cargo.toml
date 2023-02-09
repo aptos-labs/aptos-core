@@ -1,0 +1,35 @@
+[package]
+name = "aptos-indexer-grpc-cache-worker"
+description = "Indexer gRPC worker to collect on-chain data from node gRPC and push to cache."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-crash-handler = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
+aptos-runtimes = { workspace = true }
+async-trait = { workspace = true }
+backoff = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+futures-core = { workspace = true }
+once_cell = { workspace = true }
+redis = { workspace = true }
+redis-test = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+warp = { workspace = true }
