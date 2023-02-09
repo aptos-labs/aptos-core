@@ -12,13 +12,10 @@
 -  [Function `new_pvk`](#0x1_groth16_new_pvk)
 -  [Function `prepare_verifying_key`](#0x1_groth16_prepare_verifying_key)
 -  [Function `new_proof`](#0x1_groth16_new_proof)
--  [Function `verify_proof`](#0x1_groth16_verify_proof)
--  [Function `verify_proof_with_pvk`](#0x1_groth16_verify_proof_with_pvk)
 -  [Function `triplet`](#0x1_groth16_triplet)
 
 
 <pre><code><b>use</b> <a href="algebra.md#0x1_algebra">0x1::algebra</a>;
-<b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -270,68 +267,6 @@ Create a Groth16 proof.
 
 <pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_new_proof">new_proof</a>&lt;G1,G2,Gt&gt;(a: <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;, b: <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;, c: <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;): <a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt; {
     <a href="groth16.md#0x1_groth16_Proof">Proof</a> { a, b, c }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_groth16_verify_proof"></a>
-
-## Function `verify_proof`
-
-Verify a Groth16 proof.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1, G2, Gt, S&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">groth16::VerifyingKey</a>&lt;G1, G2, Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof">verify_proof</a>&lt;G1,G2,Gt,S&gt;(vk: &<a href="groth16.md#0x1_groth16_VerifyingKey">VerifyingKey</a>&lt;G1,G2,Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;): bool {
-    <b>let</b> left = <a href="algebra.md#0x1_algebra_pairing">algebra::pairing</a>&lt;G1,G2,Gt&gt;(&proof.a, &proof.b);
-    <b>let</b> right_1 = <a href="algebra.md#0x1_algebra_pairing">algebra::pairing</a>&lt;G1,G2,Gt&gt;(&vk.alpha_g1, &vk.beta_g2);
-    <b>let</b> scalars = std::vector::singleton(<a href="algebra.md#0x1_algebra_from_u64">algebra::from_u64</a>&lt;S&gt;(1));
-    std::vector::append(&<b>mut</b> scalars, *public_inputs);
-    <b>let</b> right_2 = <a href="algebra.md#0x1_algebra_pairing">algebra::pairing</a>(&<a href="algebra.md#0x1_algebra_group_multi_scalar_mul">algebra::group_multi_scalar_mul</a>(&vk.gamma_abc_g1, &scalars), &vk.gamma_g2);
-    <b>let</b> right_3 = <a href="algebra.md#0x1_algebra_pairing">algebra::pairing</a>(&proof.c, &vk.delta_g2);
-    <b>let</b> right = <a href="algebra.md#0x1_algebra_group_add">algebra::group_add</a>(&<a href="algebra.md#0x1_algebra_group_add">algebra::group_add</a>(&right_1, &right_2), &right_3);
-    <a href="algebra.md#0x1_algebra_eq">algebra::eq</a>(&left, &right)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_groth16_verify_proof_with_pvk"></a>
-
-## Function `verify_proof_with_pvk`
-
-Verify a Groth16 proof <code>proof</code> against the public inputs <code>public_inputs</code> with a prepared verification key <code>pvk</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_with_pvk">verify_proof_with_pvk</a>&lt;G1, G2, Gt, S&gt;(pvk: &<a href="groth16.md#0x1_groth16_PreparedVerifyingKey">groth16::PreparedVerifyingKey</a>&lt;G1, G2, Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">groth16::Proof</a>&lt;G1, G2, Gt&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="groth16.md#0x1_groth16_verify_proof_with_pvk">verify_proof_with_pvk</a>&lt;G1,G2,Gt,S&gt;(pvk: &<a href="groth16.md#0x1_groth16_PreparedVerifyingKey">PreparedVerifyingKey</a>&lt;G1,G2,Gt&gt;, public_inputs: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;, proof: &<a href="groth16.md#0x1_groth16_Proof">Proof</a>&lt;G1,G2,Gt&gt;): bool {
-    <b>let</b> scalars = std::vector::singleton(<a href="algebra.md#0x1_algebra_from_u64">algebra::from_u64</a>&lt;S&gt;(1));
-    std::vector::append(&<b>mut</b> scalars, *public_inputs);
-    <b>let</b> g1_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt; = <a href="groth16.md#0x1_groth16_triplet">triplet</a>(proof.a, <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">algebra::group_multi_scalar_mul</a>(&pvk.gamma_abc_g1, &scalars), proof.c);
-    <b>let</b> g2_elements: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt; = <a href="groth16.md#0x1_groth16_triplet">triplet</a>(proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg);
-
-    <a href="algebra.md#0x1_algebra_eq">algebra::eq</a>(&pvk.alpha_g1_beta_g2, &<a href="algebra.md#0x1_algebra_multi_pairing">algebra::multi_pairing</a>&lt;G1,G2,Gt&gt;(&g1_elements, &g2_elements))
 }
 </code></pre>
 

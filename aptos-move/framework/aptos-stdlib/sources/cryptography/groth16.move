@@ -63,27 +63,27 @@ module aptos_std::groth16 {
         Proof { a, b, c }
     }
 
-    /// Verify a Groth16 proof.
-    public fun verify_proof<G1,G2,Gt,S>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<algebra::Element<S>>, proof: &Proof<G1,G2,Gt>): bool {
-        let left = algebra::pairing<G1,G2,Gt>(&proof.a, &proof.b);
-        let right_1 = algebra::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
-        let scalars = std::vector::singleton(algebra::from_u64<S>(1));
-        std::vector::append(&mut scalars, *public_inputs);
-        let right_2 = algebra::pairing(&algebra::group_multi_scalar_mul(&vk.gamma_abc_g1, &scalars), &vk.gamma_g2);
-        let right_3 = algebra::pairing(&proof.c, &vk.delta_g2);
-        let right = algebra::group_add(&algebra::group_add(&right_1, &right_2), &right_3);
-        algebra::eq(&left, &right)
-    }
+//    /// Verify a Groth16 proof.
+//    public fun verify_proof<G1,G2,Gt,S>(vk: &VerifyingKey<G1,G2,Gt>, public_inputs: &vector<algebra::Element<S>>, proof: &Proof<G1,G2,Gt>): bool {
+//        let left = algebra::pairing<G1,G2,Gt>(&proof.a, &proof.b);
+//        let right_1 = algebra::pairing<G1,G2,Gt>(&vk.alpha_g1, &vk.beta_g2);
+//        let scalars = std::vector::singleton(algebra::from_u64<S>(1));
+//        std::vector::append(&mut scalars, *public_inputs);
+//        let right_2 = algebra::pairing(&algebra::group_multi_scalar_mul(&vk.gamma_abc_g1, &scalars), &vk.gamma_g2);
+//        let right_3 = algebra::pairing(&proof.c, &vk.delta_g2);
+//        let right = algebra::group_add(&algebra::group_add(&right_1, &right_2), &right_3);
+//        algebra::eq(&left, &right)
+//    }
 
-    /// Verify a Groth16 proof `proof` against the public inputs `public_inputs` with a prepared verification key `pvk`.
-    public fun verify_proof_with_pvk<G1,G2,Gt,S>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<algebra::Element<S>>, proof: &Proof<G1,G2,Gt>): bool {
-        let scalars = std::vector::singleton(algebra::from_u64<S>(1));
-        std::vector::append(&mut scalars, *public_inputs);
-        let g1_elements: vector<algebra::Element<G1>> = triplet(proof.a, algebra::group_multi_scalar_mul(&pvk.gamma_abc_g1, &scalars), proof.c);
-        let g2_elements: vector<algebra::Element<G2>> = triplet(proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg);
-
-        algebra::eq(&pvk.alpha_g1_beta_g2, &algebra::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
-    }
+//    /// Verify a Groth16 proof `proof` against the public inputs `public_inputs` with a prepared verification key `pvk`.
+//    public fun verify_proof_with_pvk<G1,G2,Gt,S>(pvk: &PreparedVerifyingKey<G1,G2,Gt>, public_inputs: &vector<algebra::Element<S>>, proof: &Proof<G1,G2,Gt>): bool {
+//        let scalars = std::vector::singleton(algebra::from_u64<S>(1));
+//        std::vector::append(&mut scalars, *public_inputs);
+//        let g1_elements: vector<algebra::Element<G1>> = triplet(proof.a, algebra::group_multi_scalar_mul(&pvk.gamma_abc_g1, &scalars), proof.c);
+//        let g2_elements: vector<algebra::Element<G2>> = triplet(proof.b, pvk.gamma_g2_neg, pvk.delta_g2_neg);
+//
+//        algebra::eq(&pvk.alpha_g1_beta_g2, &algebra::multi_pairing<G1,G2,Gt>(&g1_elements, &g2_elements))
+//    }
 
 //    #[test(fx = @std)]
 //    fun test_verify_mimc_proof(fx: signer) {

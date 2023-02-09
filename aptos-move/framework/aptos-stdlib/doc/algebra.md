@@ -9,10 +9,10 @@
 -  [Struct `BLS12_381_Fq2`](#0x1_algebra_BLS12_381_Fq2)
 -  [Struct `BLS12_381_Fq6`](#0x1_algebra_BLS12_381_Fq6)
 -  [Struct `BLS12_381_Fq12`](#0x1_algebra_BLS12_381_Fq12)
+-  [Struct `BLS12_381_G1_Parent`](#0x1_algebra_BLS12_381_G1_Parent)
 -  [Struct `BLS12_381_G1`](#0x1_algebra_BLS12_381_G1)
--  [Struct `BLS12_381_G1_SUB`](#0x1_algebra_BLS12_381_G1_SUB)
+-  [Struct `BLS12_381_G2_Parent`](#0x1_algebra_BLS12_381_G2_Parent)
 -  [Struct `BLS12_381_G2`](#0x1_algebra_BLS12_381_G2)
--  [Struct `BLS12_381_G2_SUB`](#0x1_algebra_BLS12_381_G2_SUB)
 -  [Struct `BLS12_381_Gt`](#0x1_algebra_BLS12_381_Gt)
 -  [Struct `BLS12_381_Fr`](#0x1_algebra_BLS12_381_Fr)
 -  [Struct `Element`](#0x1_algebra_Element)
@@ -22,19 +22,18 @@
 -  [Function `bls12_381_fq2_format`](#0x1_algebra_bls12_381_fq2_format)
 -  [Function `bls12_381_fq6_format`](#0x1_algebra_bls12_381_fq6_format)
 -  [Function `bls12_381_fq12_format`](#0x1_algebra_bls12_381_fq12_format)
+-  [Function `bls12_381_g1_parent_uncompressed_format`](#0x1_algebra_bls12_381_g1_parent_uncompressed_format)
+-  [Function `bls12_381_g1_parent_compressed_format`](#0x1_algebra_bls12_381_g1_parent_compressed_format)
 -  [Function `bls12_381_g1_uncompressed_format`](#0x1_algebra_bls12_381_g1_uncompressed_format)
 -  [Function `bls12_381_g1_compressed_format`](#0x1_algebra_bls12_381_g1_compressed_format)
--  [Function `bls12_381_g1_sub_uncompressed_format`](#0x1_algebra_bls12_381_g1_sub_uncompressed_format)
--  [Function `bls12_381_g1_sub_compressed_format`](#0x1_algebra_bls12_381_g1_sub_compressed_format)
+-  [Function `bls12_381_g2_parent_uncompressed_format`](#0x1_algebra_bls12_381_g2_parent_uncompressed_format)
+-  [Function `bls12_381_g2_parent_compressed_format`](#0x1_algebra_bls12_381_g2_parent_compressed_format)
 -  [Function `bls12_381_g2_uncompressed_format`](#0x1_algebra_bls12_381_g2_uncompressed_format)
 -  [Function `bls12_381_g2_compressed_format`](#0x1_algebra_bls12_381_g2_compressed_format)
--  [Function `bls12_381_g2_sub_uncompressed_format`](#0x1_algebra_bls12_381_g2_sub_uncompressed_format)
--  [Function `bls12_381_g2_sub_compressed_format`](#0x1_algebra_bls12_381_g2_sub_compressed_format)
 -  [Function `bls12_381_gt_format`](#0x1_algebra_bls12_381_gt_format)
 -  [Function `bls12_381_fr_lendian_format`](#0x1_algebra_bls12_381_fr_lendian_format)
 -  [Function `bls12_381_fr_bendian_format`](#0x1_algebra_bls12_381_fr_bendian_format)
 -  [Function `pairing`](#0x1_algebra_pairing)
--  [Function `multi_pairing`](#0x1_algebra_multi_pairing)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
 -  [Function `field_zero`](#0x1_algebra_field_zero)
 -  [Function `field_one`](#0x1_algebra_field_one)
@@ -51,7 +50,6 @@
 -  [Function `group_add`](#0x1_algebra_group_add)
 -  [Function `group_double`](#0x1_algebra_group_double)
 -  [Function `group_scalar_mul`](#0x1_algebra_group_scalar_mul)
--  [Function `group_multi_scalar_mul`](#0x1_algebra_group_multi_scalar_mul)
 -  [Function `deserialize`](#0x1_algebra_deserialize)
 -  [Function `serialize`](#0x1_algebra_serialize)
 -  [Function `group_order`](#0x1_algebra_group_order)
@@ -71,15 +69,14 @@
 -  [Function `field_pow_internal`](#0x1_algebra_field_pow_internal)
 -  [Function `field_sub_internal`](#0x1_algebra_field_sub_internal)
 -  [Function `field_zero_internal`](#0x1_algebra_field_zero_internal)
--  [Function `element_add_internal`](#0x1_algebra_element_add_internal)
+-  [Function `group_add_internal`](#0x1_algebra_group_add_internal)
 -  [Function `eq_internal`](#0x1_algebra_eq_internal)
 -  [Function `group_identity_internal`](#0x1_algebra_group_identity_internal)
 -  [Function `group_order_internal`](#0x1_algebra_group_order_internal)
 -  [Function `group_generator_internal`](#0x1_algebra_group_generator_internal)
--  [Function `element_mul_internal`](#0x1_algebra_element_mul_internal)
--  [Function `element_double_internal`](#0x1_algebra_element_double_internal)
--  [Function `element_neg_internal`](#0x1_algebra_element_neg_internal)
--  [Function `element_multi_scalar_mul_internal`](#0x1_algebra_element_multi_scalar_mul_internal)
+-  [Function `group_scalar_mul_internal`](#0x1_algebra_group_scalar_mul_internal)
+-  [Function `group_double_internal`](#0x1_algebra_group_double_internal)
+-  [Function `group_neg_internal`](#0x1_algebra_group_neg_internal)
 -  [Function `pairing_product_internal`](#0x1_algebra_pairing_product_internal)
 -  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
 -  [Function `downcast_internal`](#0x1_algebra_downcast_internal)
@@ -207,13 +204,43 @@ An extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12
 
 </details>
 
+<a name="0x1_algebra_BLS12_381_G1_Parent"></a>
+
+## Struct `BLS12_381_G1_Parent`
+
+A group constructed by the points on a curve <code>E(Fq)</code> and the point at inifinity, under the elliptic curve point addition.
+<code>E(Fq)</code> is an elliptic curve <code>y^2=x^3+4</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code>.
+The identity of <code>BLS12_381_G1_PARENT</code> is the point at infinity.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_BLS12_381_G1"></a>
 
 ## Struct `BLS12_381_G1`
 
-A group constructed by the points on a curve <code>E(Fq)</code> and the point at inifinity under the elliptic curve point addition.
-<code>E(Fq)</code> is an elliptic curve <code>y^2=x^3+4</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code>.
-The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
+A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code>.
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
+There exists a bilinear map from (<code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>) to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>
@@ -237,16 +264,16 @@ The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1
 
 </details>
 
-<a name="0x1_algebra_BLS12_381_G1_SUB"></a>
+<a name="0x1_algebra_BLS12_381_G2_Parent"></a>
 
-## Struct `BLS12_381_G1_SUB`
+## Struct `BLS12_381_G2_Parent`
 
-A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>.
-It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
-A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
+A group constructed by the points on a curve <code>E(Fq2)</code> and the point at inifinity under the elliptic curve point addition.
+<code>E(Fq2)</code> is an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code>.
+The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
 
 
-<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a>
 </code></pre>
 
 
@@ -271,42 +298,12 @@ A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS
 
 ## Struct `BLS12_381_G2`
 
-A group constructed by the points on a curve <code>E(Fq2)</code> and the point at inifinity under the elliptic curve point addition.
-<code>E(Fq2)</code> is an elliptic curve <code>y^2=x^3+4(u+1)</code> defined over <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code>.
-The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> is the point at infinity.
+A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code>.
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
+There exists a bilinear map from (<code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>) to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_algebra_BLS12_381_G2_SUB"></a>
-
-## Struct `BLS12_381_G2_SUB`
-
-A subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>.
-It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>.
-A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
-
-
-<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>
 </code></pre>
 
 
@@ -333,9 +330,10 @@ A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS
 
 <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> represents the target group of the pairing defined over the BLS12-381 curves.
 A multiplicative subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
-It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>. (Same as <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code>.)
+It has a prime order <code>r=0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001</code>,
+same as <code>BLS12_381_G1_SUB</code> and <code>BLS12_381_G2_SUB</code>.
 The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is 1.
-A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>, <a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>)</code> to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> exists.
+There exists a bilinear map from (<code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code>) to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>
@@ -363,7 +361,7 @@ A bilinear map from <code>(<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS
 
 ## Struct `BLS12_381_Fr`
 
-A finite field thatshares the same prime number <code>r</code> with groups <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>,
+A finite field that shares the same prime number <code>r</code> with groups <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code>, <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> and <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code>,
 and thus can be their scalar field.
 
 
@@ -462,6 +460,87 @@ This struct represents an ephemeral element of an algebraic structure <code>S</c
 
 
 <pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN">BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP">BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [183, 252, 126, 98, 112, 90, 239, 84, 45, 188, 197, 212, 188, 230, 42, 123, 242, 46, 239, 22, 145, 190, 243, 13, 172, 18, 31, 178, 0, 202, 125, 201, 164, 64, 59, 144, 218, 69, 1, 207, 238, 25, 53, 185, 190, 243, 40, 25];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP">BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [183, 252, 126, 98, 112, 90, 239, 84, 45, 188, 197, 212, 188, 230, 42, 123, 242, 46, 239, 22, 145, 190, 243, 13, 172, 18, 31, 178, 0, 202, 125, 201, 164, 64, 59, 144, 218, 69, 1, 207, 238, 25, 53, 185, 190, 243, 40, 25, 143, 144, 103, 215, 129, 19, 237, 95, 115, 79, 178, 225, 180, 151, 229, 32, 19, 218, 12, 157, 103, 154, 89, 45, 167, 53, 246, 113, 61, 46, 237, 41, 19, 249, 193, 18, 8, 210, 225, 244, 85, 176, 201, 148, 47, 100, 115, 9];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP">BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [183, 252, 126, 98, 112, 90, 239, 84, 45, 188, 197, 212, 188, 230, 42, 123, 242, 46, 239, 22, 145, 190, 243, 13, 172, 18, 31, 178, 0, 202, 125, 201, 164, 64, 59, 144, 218, 69, 1, 207, 238, 25, 53, 185, 190, 243, 40, 25, 28, 26, 152, 40, 126, 236, 17, 90, 140, 176, 161, 207, 73, 104, 198, 253, 16, 28, 164, 89, 57, 56, 215, 57, 24, 221, 142, 129, 71, 29, 138, 58, 196, 179, 137, 48, 174, 213, 57, 86, 68, 54, 182, 164, 186, 173, 141, 16];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP">BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [183, 252, 126, 98, 112, 90, 239, 84, 45, 188, 197, 212, 188, 230, 42, 123, 242, 46, 239, 22, 145, 190, 243, 13, 172, 18, 31, 178, 0, 202, 125, 201, 164, 64, 59, 144, 218, 69, 1, 207, 238, 25, 53, 185, 190, 243, 40, 153];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_SERIALIZED_COMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_SERIALIZED_COMP">BLS12_381_G1_GENERATOR_SERIALIZED_COMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [187, 198, 34, 219, 10, 240, 58, 251, 239, 26, 122, 249, 63, 232, 85, 108, 88, 172, 27, 23, 63, 58, 78, 161, 5, 185, 116, 151, 79, 140, 104, 195, 15, 172, 169, 79, 140, 99, 149, 38, 148, 215, 151, 49, 167, 211, 241, 23];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP">BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [187, 198, 34, 219, 10, 240, 58, 251, 239, 26, 122, 249, 63, 232, 85, 108, 88, 172, 27, 23, 63, 58, 78, 161, 5, 185, 116, 151, 79, 140, 104, 195, 15, 172, 169, 79, 140, 99, 149, 38, 148, 215, 151, 49, 167, 211, 241, 23, 225, 231, 197, 70, 41, 35, 170, 12, 228, 138, 136, 162, 68, 199, 60, 208, 237, 179, 4, 44, 203, 24, 219, 0, 246, 10, 208, 213, 149, 224, 245, 252, 228, 138, 29, 116, 237, 48, 158, 160, 241, 160, 170, 227, 129, 244, 179, 8];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_INF_SERIALIZED_COMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_INF_SERIALIZED_COMP">BLS12_381_G1_INF_SERIALIZED_COMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_G1_INF_SERIALIZED_UNCOMP"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_INF_SERIALIZED_UNCOMP">BLS12_381_G1_INF_SERIALIZED_UNCOMP</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64];
+</code></pre>
+
+
+
+<a name="0x1_algebra_BLS12_381_R"></a>
+
+
+
+<pre><code><b>const</b> <a href="algebra.md#0x1_algebra_BLS12_381_R">BLS12_381_R</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [1, 0, 0, 0, 255, 255, 255, 255, 254, 91, 254, 255, 2, 164, 189, 83, 5, 216, 161, 9, 8, 216, 57, 51, 72, 125, 157, 41, 83, 167, 237, 115];
 </code></pre>
 
 
@@ -589,16 +668,67 @@ Also used in <code>ark_bls12_381::Fq12::deserialize()</code>.
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g1_uncompressed_format"></a>
+<a name="0x1_algebra_bls12_381_g1_parent_uncompressed_format"></a>
 
-## Function `bls12_381_g1_uncompressed_format`
+## Function `bls12_381_g1_parent_uncompressed_format`
 
-A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> element is represented by a byte array <code>b[]</code> of size 96.
+A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
 <code>b[95] & 0x40</code> is the infinity flag.
 The infinity flag is 1 if and only if the element is the point at infinity.
 The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>,
 <code>[b[0], ..., b[47] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq_format</code>, and
 <code>[b[48], ..., b[95] & 0x3f]</code> is <code>y</code> serialized in <code>bls12_381_fq_format</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_uncompressed_format">bls12_381_g1_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_uncompressed_format">bls12_381_g1_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"05" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g1_parent_compressed_format"></a>
+
+## Function `bls12_381_g1_parent_compressed_format`
+
+A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 48.
+<code>b[47] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>,
+<code>[b[0], ..., b[47] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq_format</code>, and
+the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (as unsigned integers).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_compressed_format">bls12_381_g1_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_compressed_format">bls12_381_g1_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0501" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12_381_g1_uncompressed_format"></a>
+
+## Function `bls12_381_g1_uncompressed_format`
+
+Effectively <code>bls12_381_g1_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -610,7 +740,7 @@ The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"05" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"06" }
 </code></pre>
 
 
@@ -621,12 +751,7 @@ The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> 
 
 ## Function `bls12_381_g1_compressed_format`
 
-A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> element is represented by a byte array <code>b[]</code> of size 48.
-<code>b[47] & 0x40</code> is the infinity flag.
-The infinity flag is 1 if and only if the element is the point at infinity.
-The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq)</code>,
-<code>[b[0], ..., b[47] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq_format</code>, and
-the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (as unsigned integers).
+Effectively <code>bls12_381_g1_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -638,21 +763,26 @@ the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if <code>y &gt; 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0501" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0601" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g1_sub_uncompressed_format"></a>
+<a name="0x1_algebra_bls12_381_g2_parent_uncompressed_format"></a>
 
-## Function `bls12_381_g1_sub_uncompressed_format`
+## Function `bls12_381_g2_parent_uncompressed_format`
 
-Effectively <code>bls12_381_g1_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> elements.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 192.
+<code>b[191] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
+<code>b[0..96]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
+<code>[b[96], ..., b[191] & 0x3f]</code> is <code>y</code> serialized in <code>bls12_381_fq2_format</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_uncompressed_format">bls12_381_g1_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_uncompressed_format">bls12_381_g2_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -661,21 +791,26 @@ Effectively <code>bls12_381_g1_uncompressed_format</code> but only applicable to
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_uncompressed_format">bls12_381_g1_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"06" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_uncompressed_format">bls12_381_g2_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"07" }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_bls12_381_g1_sub_compressed_format"></a>
+<a name="0x1_algebra_bls12_381_g2_parent_compressed_format"></a>
 
-## Function `bls12_381_g1_sub_compressed_format`
+## Function `bls12_381_g2_parent_compressed_format`
 
-Effectively <code>bls12_381_g1_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a></code> elements.
+A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
+<code>b[95] & 0x40</code> is the infinity flag.
+The infinity flag is 1 if and only if the element is the point at infinity.
+The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
+<code>[b[0], ..., b[95] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
+the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (<code>y</code> and <code>-y</code> treated as unsigned integers).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_compressed_format">bls12_381_g1_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_compressed_format">bls12_381_g2_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -684,7 +819,7 @@ Effectively <code>bls12_381_g1_compressed_format</code> but only applicable to <
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_sub_compressed_format">bls12_381_g1_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0601" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_compressed_format">bls12_381_g2_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0701" }
 </code></pre>
 
 
@@ -695,12 +830,7 @@ Effectively <code>bls12_381_g1_compressed_format</code> but only applicable to <
 
 ## Function `bls12_381_g2_uncompressed_format`
 
-A serialization scheme where a <code>BLS12-381-G2</code> element is represented by a byte array <code>b[]</code> of size 192.
-<code>b[191] & 0x40</code> is the infinity flag.
-The infinity flag is 1 if and only if the element is the point at infinity.
-The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
-<code>b[0..96]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
-<code>[b[96], ..., b[191] & 0x3f]</code> is <code>y</code> serialized in <code>bls12_381_fq2_format</code>.
+Effectively <code>bls12_381_g2_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -712,7 +842,7 @@ The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"07" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"08" }
 </code></pre>
 
 
@@ -723,12 +853,7 @@ The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> 
 
 ## Function `bls12_381_g2_compressed_format`
 
-A serialization scheme where a <code>BLS12-381-G2</code> element is represented by a byte array <code>b[]</code> of size 96.
-<code>b[95] & 0x40</code> is the infinity flag.
-The infinity flag is 1 if and only if the element is the point at infinity.
-The infinity flag is 0 if and only if the element is a point <code>(x,y)</code> on curve <code>E(Fq2)</code>,
-<code>[b[0], ..., b[95] & 0x3f]</code> is <code>x</code> serialized in <code>bls12_381_fq2_format</code>, and
-the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if <code>y &gt; -y</code> (as unsigned integers).
+Effectively <code>bls12_381_g2_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -740,53 +865,7 @@ the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if <code>y &gt;
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0701" }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12_381_g2_sub_uncompressed_format"></a>
-
-## Function `bls12_381_g2_sub_uncompressed_format`
-
-Effectively <code>bls12_381_g2_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> elements.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_uncompressed_format">bls12_381_g2_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_uncompressed_format">bls12_381_g2_sub_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"08" }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12_381_g2_sub_compressed_format"></a>
-
-## Function `bls12_381_g2_sub_compressed_format`
-
-Effectively <code>bls12_381_g2_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a></code> elements.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_compressed_format">bls12_381_g2_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_sub_compressed_format">bls12_381_g2_sub_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0801" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0801" }
 </code></pre>
 
 
@@ -890,54 +969,12 @@ Return an element in the target group <code>Gt</code>.
 
 </details>
 
-<a name="0x1_algebra_multi_pairing"></a>
-
-## Function `multi_pairing`
-
-Compute <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[0], b[0]) + ... + <a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[n-1], b[n-1])</code> for <code>n</code> elements of group <code>G1</code> and <code>n</code> elements of group <code>G2</code>.
-This is faster and cheaper than calling <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> separately then aggregating with <code>group_add</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G1&gt;();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G2&gt;();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;Gt&gt;();
-    <b>let</b> num_g1 = std::vector::length(g1_elements);
-    <b>let</b> num_g2 = std::vector::length(g2_elements);
-    <b>assert</b>!(num_g1 == num_g2, std::error::invalid_argument(1));
-    <b>let</b> g1_handles = std::vector::empty();
-    <b>let</b> g2_handles = std::vector::empty();
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_g2) {
-        std::vector::push_back(&<b>mut</b> g1_handles, std::vector::borrow(g1_elements, i).handle);
-        std::vector::push_back(&<b>mut</b> g2_handles, std::vector::borrow(g2_elements, i).handle);
-        i = i + 1;
-    };
-
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="algebra.md#0x1_algebra_pairing_product_internal">pairing_product_internal</a>&lt;G1,G2,Gt&gt;(g1_handles, g2_handles)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_algebra_from_u64"></a>
 
 ## Function `from_u64`
 
+Compute <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[0], b[0]) + ... + <a href="algebra.md#0x1_algebra_pairing">pairing</a>(a[n-1], b[n-1])</code> for <code>n</code> elements of group <code>G1</code> and <code>n</code> elements of group <code>G2</code>.
+This is faster and cheaper than calling <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> separately then aggregating with <code>group_add</code>.
 Convert a u64 to an element of an algebraic structure <code>S</code>.
 
 
@@ -1306,7 +1343,7 @@ Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
     <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_element_neg_internal">element_neg_internal</a>&lt;G&gt;(element_p.handle)
+        handle: <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(element_p.handle)
     }
 }
 </code></pre>
@@ -1335,7 +1372,7 @@ Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a g
     <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_element_add_internal">element_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
+        handle: <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
     }
 }
 </code></pre>
@@ -1364,7 +1401,7 @@ Compute <code>2*P</code> for an element <code>P</code> of a group <code>G</code>
     <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_element_double_internal">element_double_internal</a>&lt;G&gt;(element_p.handle)
+        handle: <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_p.handle)
     }
 }
 </code></pre>
@@ -1394,60 +1431,8 @@ Compute <code>k*p</code>, where <code>p</code> is an element of a group <code>G<
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
+        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_multi_scalar_mul"></a>
-
-## Function `group_multi_scalar_mul`
-
-Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where
-<code>P[]</code> are elements of group <code>G</code>,
-<code>k[]</code> are elements of the scalar field <code>S</code> of group <code>G</code>,
-and both <code>P[]</code> and <code>k[]</code> have the same size <code>n</code>.
-Abort if the number of elements and that of scalars do not match.
-This function is much faster and cheaper than calling <code>group_scalar_mul</code> and adding up the results using <code>group_add</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;G&gt;();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
-    <b>let</b> num_scalars = std::vector::length(scalars);
-    <b>let</b> scalar_handles = std::vector::empty();
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_scalars) {
-        std::vector::push_back(&<b>mut</b> scalar_handles, std::vector::borrow(scalars, i).handle);
-        i = i + 1;
-    };
-
-    <b>let</b> num_elements = std::vector::length(elements);
-    <b>let</b> element_handles = std::vector::empty();
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_elements) {
-        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
-        i = i + 1;
-    };
-
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles, scalar_handles)
-    }
-
 }
 </code></pre>
 
@@ -1476,12 +1461,9 @@ Deserializate a byte array to an element of an algebraic structure <code>S</code
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S&gt;(scheme_id, *bytes);
     <b>if</b> (succeeded) {
-        <b>let</b> scalar = <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-            handle
-        };
-        std::option::some(scalar)
+        some(<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle })
     } <b>else</b> {
-        std::option::none()
+        none()
     }
 }
 </code></pre>
@@ -1497,7 +1479,7 @@ Deserializate a byte array to an element of an algebraic structure <code>S</code
 Serialize an element of an algebraic structure <code>S</code> to a byte array with a given scheme.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, element: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1506,10 +1488,10 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array wi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
-    <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S&gt;(scheme_id, scalar.handle)
+    <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S&gt;(scheme_id, element.handle)
 }
 </code></pre>
 
@@ -1650,7 +1632,7 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;() {
     <b>let</b> type = type_of&lt;S&gt;();
-    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1_SUB">BLS12_381_G1_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2_SUB">BLS12_381_G2_SUB</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a>&gt;())
+    <b>if</b> ((type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>&gt;() || type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a>&gt;())
         && std::features::bls12_381_structures_enabled()
     ) {
         // Let go.
@@ -1928,13 +1910,13 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_element_add_internal"></a>
+<a name="0x1_algebra_group_add_internal"></a>
 
-## Function `element_add_internal`
+## Function `group_add_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_element_add_internal">element_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
 </code></pre>
 
 
@@ -1943,7 +1925,7 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_element_add_internal">element_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
 </code></pre>
 
 
@@ -2038,13 +2020,13 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_element_mul_internal"></a>
+<a name="0x1_algebra_group_scalar_mul_internal"></a>
 
-## Function `element_mul_internal`
+## Function `group_scalar_mul_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64
 </code></pre>
 
 
@@ -2053,20 +2035,20 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_element_mul_internal">element_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64;
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_element_double_internal"></a>
+<a name="0x1_algebra_group_double_internal"></a>
 
-## Function `element_double_internal`
+## Function `group_double_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_element_double_internal">element_double_internal</a>&lt;G&gt;(element_handle: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_handle: u64): u64
 </code></pre>
 
 
@@ -2075,20 +2057,20 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_element_double_internal">element_double_internal</a>&lt;G&gt;(element_handle: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_handle: u64): u64;
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_algebra_element_neg_internal"></a>
+<a name="0x1_algebra_group_neg_internal"></a>
 
-## Function `element_neg_internal`
+## Function `group_neg_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_element_neg_internal">element_neg_internal</a>&lt;G&gt;(handle: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(handle: u64): u64
 </code></pre>
 
 
@@ -2097,29 +2079,7 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_element_neg_internal">element_neg_internal</a>&lt;G&gt;(handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_element_multi_scalar_mul_internal"></a>
-
-## Function `element_multi_scalar_mul_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_element_multi_scalar_mul_internal">element_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(handle: u64): u64;
 </code></pre>
 
 
