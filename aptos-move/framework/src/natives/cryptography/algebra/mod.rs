@@ -12,7 +12,7 @@ use ark_ff::{BigInteger256, Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
-use better_any::{Tid, TidAble};
+use better_any::{Tid, TidAble, type_id};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
 use move_core_types::language_storage::TypeTag;
@@ -65,21 +65,13 @@ pub mod abort_codes {
 #[derive(Tid)]
 pub struct AlgebraContext {
     features: Features,
-    bls12_381_fr_elements: Vec<Fr>,
-    bls12_381_g1_elements: Vec<G1Projective>,
-    bls12_381_g2_elements: Vec<G2Projective>,
-    bls12_381_fq12_elements: Vec<Fq12>,
-    objs: HashMap<Structure, Vec<Rc<dyn Any>>>,
+    objs: Vec<Rc<dyn Any>>,
 }
 
 impl AlgebraContext {
     pub fn new(features: Features) -> Self {
         Self {
-            bls12_381_fr_elements: vec![],
-            bls12_381_g1_elements: vec![],
-            bls12_381_g2_elements: vec![],
-            bls12_381_fq12_elements: vec![],
-            objs: HashMap::new(),
+            objs: Vec::new(),
             features,
         }
     }
@@ -93,22 +85,6 @@ macro_rules! abort_if_feature_disabled {
     };
 }
 
-macro_rules! ark_serialize_uncompressed {
-    ($ark_element:expr) => {{
-        let mut buf = vec![];
-        $ark_element.serialize_uncompressed(&mut buf).unwrap();
-        buf
-    }}
-}
-
-macro_rules! ark_serialize_compressed {
-    ($ark_element:expr) => {{
-        let mut buf = vec![];
-        $ark_element.serialize(&mut buf).unwrap();
-        buf
-    }}
-}
-
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
@@ -116,78 +92,9 @@ macro_rules! structure_from_ty_arg {
     }}
 }
 
-macro_rules! borrow_bls12_381_g1 {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<AlgebraContext>().bls12_381_g1_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_g1 {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
-        let ret = inner_ctxt.bls12_381_g1_elements.len();
-        inner_ctxt.bls12_381_g1_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_fr {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<AlgebraContext>().bls12_381_fr_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_fr {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
-        let ret = inner_ctxt.bls12_381_fr_elements.len();
-        inner_ctxt.bls12_381_fr_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_g2 {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<AlgebraContext>().bls12_381_g2_elements.get($handle).unwrap()
-    }}
-}
-
-macro_rules! store_bls12_381_g2 {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
-        let ret = inner_ctxt.bls12_381_g2_elements.len();
-        inner_ctxt.bls12_381_g2_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_fq12 {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions().get::<AlgebraContext>().bls12_381_fq12_elements.get($handle).unwrap()
-    }}
-}
-
-
-macro_rules! store_bls12_381_fq12 {
-    ($context:expr, $element:expr) => {{
-        let inner_ctxt = $context.extensions_mut().get_mut::<AlgebraContext>();
-        let ret = inner_ctxt.bls12_381_fq12_elements.len();
-        inner_ctxt.bls12_381_fq12_elements.push($element);
-        ret
-    }}
-}
-
-macro_rules! borrow_bls12_381_stuff {
-    ($context:expr, $struct_name:expr, $handle:expr, $assign_to:ident) => {
-        let pointer: Rc<dyn Any> = $context.extensions().get::<AlgebraContext>().objs.get(&$struct_name).unwrap().get($handle).unwrap();
-        let mut $assign_to = pointer.downcast_ref<ark_bls12_381::Fr>().unwrap();
-
-    }
-}
-
 macro_rules! store_obj {
-    ($context:expr, $structure:expr, $obj:expr) => {{
-        let target_vec = $context.extensions_mut().get_mut::<AlgebraContext>().objs.entry($structure).or_insert_with(Vec::new);
+    ($context:expr, $obj:expr) => {{
+        let target_vec = &mut $context.extensions_mut().get_mut::<AlgebraContext>().objs;
         let ret = target_vec.len();
         target_vec.push(Rc::new($obj));
         ret
@@ -195,9 +102,8 @@ macro_rules! store_obj {
 }
 
 macro_rules! get_obj_pointer {
-    ($context:expr, $structure:expr, $handle:expr) => {{
-        let target_vec = $context.extensions_mut().get_mut::<AlgebraContext>().objs.entry($structure).or_insert_with(Vec::new);
-        target_vec[$handle].clone()
+    ($context:expr, $handle:expr) => {{
+        $context.extensions_mut().get_mut::<AlgebraContext>().objs[$handle].clone()
     }}
 }
 
@@ -221,7 +127,7 @@ static BLS12_381_FR_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0a0
 
 macro_rules! ark_serialize_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $handle:expr, $scheme:expr, $typ:ty, $ser_func:ident) => {{
-            let element_ptr = get_obj_pointer!($context, $structure, $handle);
+            let element_ptr = get_obj_pointer!($context, $handle);
             let element = element_ptr.downcast_ref::<$typ>().unwrap();
             let mut buf = Vec::new();
             element.$ser_func(&mut buf).unwrap();
@@ -232,7 +138,7 @@ macro_rules! ark_serialize_internal {
 
 macro_rules! ark_ec_point_serialize_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $handle:expr, $scheme:expr, $typ:ty, $ser_func:ident) => {{
-        let element_ptr = get_obj_pointer!($context, $structure, $handle);
+        let element_ptr = get_obj_pointer!($context, $handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
@@ -302,7 +208,7 @@ macro_rules! ark_deserialize_internal {
         }
         match <$typ>::$deser_func($bytes.as_slice()) {
             Ok(element) => {
-                let handle = store_obj!($context, $structure, element);
+                let handle = store_obj!($context, element);
                 Ok(NativeResult::ok(
                     $gas_params.deserialize($structure, $scheme),
                     smallvec![Value::bool(true), Value::u64(handle as u64)],
@@ -329,7 +235,7 @@ macro_rules! ark_ec_point_deserialize_internal {
         match <$typ>::$deser_func($bytes.as_slice()) {
             Ok(element) => {
                 let element_proj = element.into_projective();
-                let handle = store_obj!($context, $structure, element_proj);
+                let handle = store_obj!($context, element_proj);
                 Ok(NativeResult::ok(
                     $gas_params.deserialize($structure, $scheme),
                     smallvec![Value::bool(true), Value::u64(handle as u64)],
@@ -391,7 +297,7 @@ macro_rules! from_u64_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
             let value = pop_arg!($args, u64);
             let element = <$typ>::from(value as u128);
-            let handle = store_obj!($context, $structure, element);
+            let handle = store_obj!($context, element);
             Ok(NativeResult::ok(
                 $gas_params.from_u128($structure),
                 smallvec![Value::u64(handle as u64)],
@@ -419,12 +325,12 @@ macro_rules! ark_field_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = pop_arg!($args, u64) as usize;
         let handle_1 = pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element_1.add(element_2);
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.field_add($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -452,12 +358,12 @@ macro_rules! ark_field_sub_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = pop_arg!($args, u64) as usize;
         let handle_1 = pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element_1.sub(element_2);
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.field_sub($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -485,12 +391,12 @@ macro_rules! ark_field_mul_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = pop_arg!($args, u64) as usize;
         let handle_1 = pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element_1.mul(element_2);
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.field_mul($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -518,9 +424,9 @@ macro_rules! ark_field_div_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:ident, $typ:ty) => {{
             let handle_2 = pop_arg!($args, u64) as usize;
             let handle_1 = pop_arg!($args, u64) as usize;
-            let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+            let element_1_ptr = get_obj_pointer!($context, handle_1);
             let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-            let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+            let element_2_ptr = get_obj_pointer!($context, handle_2);
             let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
             if element_2.is_zero() {
                 return Ok(NativeResult::ok(
@@ -529,7 +435,7 @@ macro_rules! ark_field_div_internal {
                 ));
             }
             let new_element = element_1.div(element_2);
-            let new_handle = store_obj!($context, $structure, new_element);
+            let new_handle = store_obj!($context, new_element);
             Ok(NativeResult::ok(
                 $gas_params.field_div($structure),
                 smallvec![Value::bool(true), Value::u64(new_handle as u64)],
@@ -556,10 +462,10 @@ fn field_div_internal(
 macro_rules! ark_neg_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element.neg();
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.neg($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -586,11 +492,11 @@ fn field_neg_internal(
 macro_rules! ark_field_inv_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         match element.inverse() {
             Some(new_element) => {
-                let new_handle = store_obj!($context, $structure, new_element);
+                let new_handle = store_obj!($context, new_element);
                 Ok(NativeResult::ok(
                     $gas_params.field_inv($structure),
                     smallvec![Value::bool(true), Value::u64(new_handle as u64)],
@@ -626,9 +532,9 @@ macro_rules! ark_eq_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
             let handle_2 = pop_arg!($args, u64) as usize;
             let handle_1 = pop_arg!($args, u64) as usize;
-            let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+            let element_1_ptr = get_obj_pointer!($context, handle_1);
             let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-            let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+            let element_2_ptr = get_obj_pointer!($context, handle_2);
             let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
             Ok(NativeResult::ok(
                 $gas_params.eq($structure),
@@ -662,7 +568,7 @@ fn eq_internal(
 macro_rules! ark_group_identity_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty, $func:ident) => {{
         let element = <$typ>::$func();
-        let handle = store_obj!($context, $structure, element);
+        let handle = store_obj!($context, element);
         Ok(NativeResult::ok(
             $gas_params.group_identity($structure),
             smallvec![Value::u64(handle as u64)],
@@ -706,7 +612,7 @@ static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(||{
 macro_rules! ark_group_generator_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty) => {{
         let element = <$typ>::prime_subgroup_generator();
-        let handle = store_obj!($context, $structure, element);
+        let handle = store_obj!($context, element);
         Ok(NativeResult::ok(
             $gas_params.group_generator($structure),
             smallvec![Value::u64(handle as u64)],
@@ -726,7 +632,7 @@ fn group_generator_internal(
         Some(Structure::BLS12_381_G2) => ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
         Some(Structure::BLS12_381_Gt) => {
             let element = BLS12381_GT_GENERATOR.clone();
-            let handle = store_obj!(context, Structure::BLS12_381_Gt, element);
+            let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
                 gas_params.group_generator(Structure::BLS12_381_Gt),
                 smallvec![Value::u64(handle as u64)],
@@ -774,7 +680,7 @@ fn random_element_internal(
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
             let element = G1Projective::rand(&mut test_rng());
-            let handle = store_obj!(context, Structure::BLS12_381_G1, element);
+            let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::u64(handle as u64)],
@@ -782,7 +688,7 @@ fn random_element_internal(
         }
         Some(Structure::BLS12_381_G2) => {
             let element = G2Projective::rand(&mut test_rng());
-            let handle = store_obj!(context, Structure::BLS12_381_G2, element);
+            let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::u64(handle as u64)],
@@ -791,7 +697,7 @@ fn random_element_internal(
         Some(Structure::BLS12_381_Gt) => {
             let k = Fr::rand(&mut test_rng());
             let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
-            let handle = store_obj!(context, Structure::BLS12_381_Gt, element);
+            let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::u64(handle as u64)],
@@ -810,12 +716,12 @@ macro_rules! ark_group_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle_2 = pop_arg!($args, u64) as usize;
         let handle_1 = pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, $structure, handle_1);
+        let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, $structure, handle_2);
+        let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element_1.$op(element_2);
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.group_add($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -843,12 +749,12 @@ macro_rules! ark_group_scalar_mul_internal {
     ($gas_params:expr, $context:expr, $args:ident, $group_structure:expr, $scalar_structure:expr, $group_typ:ty, $scalar_typ:ty, $op:ident) => {{
         let scalar_handle = pop_arg!($args, u64) as usize;
         let element_handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $group_structure, element_handle);
+        let element_ptr = get_obj_pointer!($context, element_handle);
         let element = element_ptr.downcast_ref::<$group_typ>().unwrap();
-        let scalar_ptr = get_obj_pointer!($context, $scalar_structure, scalar_handle);
+        let scalar_ptr = get_obj_pointer!($context, scalar_handle);
         let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
         let new_element = element.$op(scalar.into_repr());
-        let new_handle = store_obj!($context, $group_structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.group_scalar_mul($group_structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -884,10 +790,10 @@ fn group_scalar_mul_internal(
 macro_rules! ark_group_double_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element.$op();
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.group_double($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -921,10 +827,10 @@ fn group_double_internal(
 macro_rules! ark_group_neg_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle = pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, $structure, handle);
+        let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let new_element = element.$op();
-        let new_handle = store_obj!($context, $structure, new_element);
+        let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.group_neg($structure),
             smallvec![Value::u64(new_handle as u64)],
@@ -948,10 +854,10 @@ fn group_neg_internal(
         }
         Some(Structure::BLS12_381_Gt) => {
             let handle = pop_arg!( args , u64 ) as usize;
-            let element_ptr = get_obj_pointer!( context , Structure::BLS12_381_Gt , handle );
+            let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
             let new_element = element.inverse().unwrap();
-            let new_handle = store_obj!( context , Structure::BLS12_381_Gt , new_element );
+            let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.group_neg(Structure::BLS12_381_Gt),
                 smallvec![ Value :: u64 ( new_handle as u64 ) ],
@@ -980,14 +886,16 @@ fn pairing_product_internal(
             let g1_prepared: Vec<ark_ec::models::bls12::g1::G1Prepared<Parameters>> = g1_handles
                 .iter()
                 .map(|&handle| {
-                    let element = borrow_bls12_381_g1!(context, handle as usize);
+                    let element_ptr = get_obj_pointer!(context, handle as usize);
+                    let element = element_ptr.downcast_ref::<ark_bls12_381::G1Projective>().unwrap();
                     ark_ec::prepare_g1::<ark_bls12_381::Bls12_381>(element.into_affine())
                 })
                 .collect();
             let g2_prepared: Vec<ark_ec::models::bls12::g2::G2Prepared<Parameters>> = g2_handles
                 .iter()
                 .map(|&handle| {
-                    let element = borrow_bls12_381_g2!(context, handle as usize);
+                    let element_ptr = get_obj_pointer!(context, handle as usize);
+                    let element = element_ptr.downcast_ref::<ark_bls12_381::G2Projective>().unwrap();
                     ark_ec::prepare_g2::<ark_bls12_381::Bls12_381>(element.into_affine())
                 })
                 .collect();
@@ -1000,7 +908,7 @@ fn pairing_product_internal(
                 .zip(g2_prepared.into_iter())
                 .collect();
             let new_element = ark_bls12_381::Bls12_381::product_of_pairings(input_pairs.as_slice());
-            let new_handle = store_bls12_381_fq12!(context, new_element);
+            let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
                 (gas_params.ark_bls12_381_g1_proj_to_affine + gas_params.ark_bls12_381_g1_affine_to_prepared + gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_to_prepared + gas_params.ark_bls12_381_pairing_product_per_pair) * NumArgs::new(g1_handles.len() as u64) + gas_params.ark_bls12_381_pairing_product_base * NumArgs::one(),
                 smallvec![Value::u64(new_handle as u64)],
