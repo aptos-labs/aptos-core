@@ -12,7 +12,7 @@ on:
         description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
   pull_request:
     paths:
-      - ".github/workflows/nightly-replay-verify.yaml"
+      - ".github/workflows/verify-on-chain-modules-mainnet.yaml"
 
 env:
   BUCKET:  aptos-mainnet-backup-backup-831a69a8
@@ -29,3 +29,5 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/verify-modules
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
