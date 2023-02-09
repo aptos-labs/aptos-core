@@ -6,6 +6,7 @@ import getpass
 import json
 import secrets
 import subprocess
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, List
 from typing import Optional as Option
@@ -48,7 +49,7 @@ NETWORK_URLS = {
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 """Devnet faucet URL."""
 
-TEST_PASSWORD = "password"
+TEST_PASSWORD = "Aptos"
 """Test password for bypassing prompts."""
 
 USE_TEST_PASSWORD = True
@@ -172,20 +173,79 @@ def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def metafile_incorporate(args):
     """Incorporate single-signer keyfiles to multisig metadata file."""
-    n_signers = len(args.keyfiles)  # Get number of signers.
-    assert MIN_SIGNATORIES <= n_signers <= MAX_SIGNATORIES, (
+    metafile_merge_keyfiles(
+        metafile_json={"n_signatories": 0, "signatories": []},
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=args.keyfiles,
+        outfile=args.metafile,
+    )
+
+
+def metafile_append(args):
+    """Append signatory/signatories to a multisig metadata file."""
+    metafile_merge_keyfiles(
+        metafile_json=json.load(args.metafile),
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=args.keyfiles,
+        outfile=args.new_metafile,
+    )
+
+
+def check_signatories_threshold(n_signatories: int, threshold: int):
+    """Verify the number of signatories and threshold on a multisig."""
+    assert MIN_SIGNATORIES <= n_signatories <= MAX_SIGNATORIES, (
         f"Number of signatories must be between {MIN_SIGNATORIES} and "
         f"{MAX_SIGNATORIES} (inclusive)."
     )  # Assert valid number of signatories.
-    assert MIN_THRESHOLD <= args.threshold <= n_signers, (
+    assert MIN_THRESHOLD <= threshold <= n_signatories, (
         f"Signature threshold must be greater than {MIN_THRESHOLD} and less "
         f"than the number of signatories."
     )  # Assert valid signature threshold.
-    multisig_name = check_name(args.name)  # Check name.
-    signatories = []  # Initialize empty signatories list.
-    public_keys = []  # Initialize empty public keys list.
-    signatory_names = []  # Initialize empty signatory names list.
-    for keyfile in args.keyfiles:  # Loop over keyfiles.
+
+
+def metafile_remove(args):
+    """Remove signatories from a multisig metafile."""
+    metafile_json = json.load(args.metafile)  # Load metafile JSON.
+    # Sort 0-indexed signatory list indices from high to low.
+    args.signatories.sort(reverse=True)
+    # Loop over 0-indexed IDs to remove, high to low:
+    for index in args.signatories:
+        # Remove signatory at index from list.
+        del metafile_json["signatories"][index]
+    # Decrement signatory count.
+    metafile_json["n_signatories"] -= len(args.signatories)
+    metafile_merge_keyfiles(  # Check and write data to disk.
+        metafile_json=metafile_json,
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=[],
+        outfile=args.new_metafile,
+    )
+
+
+def metafile_merge_keyfiles(
+    metafile_json: Dict[Any, Any],
+    name_tokens: List[str],
+    threshold: int,
+    keyfiles: List[TextIOWrapper],
+    outfile: Path,
+):
+    """Append data from keyfiles to the end of a multisig metafile."""
+    # Get new number of signatories on multisig.
+    n_signatories = metafile_json["n_signatories"] + len(keyfiles)
+    # Check number of signatories and threshold.
+    check_signatories_threshold(n_signatories, threshold)
+    # Get signatories list.
+    signatories = metafile_json["signatories"]
+    # Get signatory names list.
+    signatory_names = [signatory["signatory"] for signatory in signatories]
+    public_keys = [  # Get signatory public keys list.
+        PublicKey(VerifyKey(prefixed_hex_to_bytes(signatory["public_key"])))
+        for signatory in signatories
+    ]
+    for keyfile in keyfiles:  # Loop over keyfiles.
         signatory = json.load(keyfile)  # Load signatory data.
         signatory_name = signatory["signatory"]  # Get signatory name.
         assert (  # Assert signatory name not reused.
@@ -199,21 +259,21 @@ def metafile_incorporate(args):
         # Append signatory public data to list of signatories.
         signatories.append(get_public_signatory_fields(signatory))
     # Initialize multisig public key.
-    multisig_public_key = MultiEd25519PublicKey(public_keys, args.threshold)
-    # Get authentication key as prefixed hex.
-    auth_key = bytes_to_prefixed_hex(multisig_public_key.auth_key())
+    multisig_public_key = MultiEd25519PublicKey(public_keys, threshold)
     # Get public key as prefixed hex.
-    public_key = bytes_to_prefixed_hex(multisig_public_key.to_bytes())
-    write_json_file(  # Write JSON to multisig metadata file.
-        path=get_file_path(args.metafile, args.name, "multisig"),
+    public_key_hex = bytes_to_prefixed_hex(multisig_public_key.to_bytes())
+    # Get authentication key as prefixed hex.
+    auth_key_hex = bytes_to_prefixed_hex(multisig_public_key.auth_key())
+    write_json_file(  # Write JSON to multisig metadata outfile.
+        path=get_file_path(outfile, name_tokens, "multisig"),
         data={
             "filetype": "Multisig metadata file",
-            "multisig_name": multisig_name,
+            "multisig_name": check_name(name_tokens),
             "address": None,
-            "threshold": args.threshold,
-            "n_signatories": n_signers,
-            "public_key": public_key,
-            "authentication_key": auth_key,
+            "threshold": threshold,
+            "n_signatories": n_signatories,
+            "public_key": public_key_hex,
+            "authentication_key": auth_key_hex,
             "signatories": signatories,
         },
         check_if_exists=True,
@@ -458,8 +518,8 @@ def assert_successful_transaction(
     print(f"Transaction successful: {tx_hash}")
 
 
-def rotate_execute_convert(args):
-    """Convert single-signer account to multisig account."""
+def rotate_execute_single(args):
+    """Rotate single-signer account to multisig account."""
     # Check password, get keyfile data and optional private key bytes.
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
@@ -647,7 +707,7 @@ parser_keyfile_fund.set_defaults(func=keyfile_fund)
 parser_keyfile_fund.add_argument(
     "keyfile",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Relative path to keyfile.""",
+    help="Relative path to keyfile.",
 )
 
 # Metafile subcommand parser.
@@ -658,6 +718,51 @@ parser_metafile = subparsers.add_parser(
     help="Multisig metadata file operations.",
 )
 subparsers_metafile = parser_metafile.add_subparsers(required=True)
+
+# Metafile append subcommand parser.
+parser_metafile_append = subparsers_metafile.add_parser(
+    name="append",
+    aliases=["a"],
+    description="Append a signatory or signatories to multisig metadata file.",
+    help="Append signer(s) to a multisig.",
+)
+parser_metafile_append.set_defaults(func=metafile_append)
+parser_metafile_append.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""The name of the new multisig entity. For example 'Aptos' or 'The
+        Aptos Foundation'.""",
+)
+parser_metafile_append.add_argument(
+    "-m",
+    "--metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metadata file to add to.",
+    required=True,
+)
+parser_metafile_append.add_argument(
+    "-t",
+    "--threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+    required=True,
+)
+parser_metafile_append.add_argument(
+    "-k",
+    "--keyfiles",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative paths to single-signer keyfiles in the multisig.",
+    required=True,
+)
+parser_metafile_append.add_argument(
+    "-n",
+    "--new-metafile",
+    type=Path,
+    help="Custom relative path to new multisig metadata file.",
+)
 
 # Metafile incorporate subcommand parser.
 parser_metafile_incorporate = subparsers_metafile.add_parser(
@@ -679,7 +784,7 @@ parser_metafile_incorporate.add_argument(
     "-t",
     "--threshold",
     type=int,
-    help="""The number of single signers required to approve a transaction.""",
+    help="The number of single signers required to approve a transaction.",
     required=True,
 )
 parser_metafile_incorporate.add_argument(
@@ -688,14 +793,60 @@ parser_metafile_incorporate.add_argument(
     action="extend",
     nargs="+",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Relative paths to single-signer keyfiles in the multisig.""",
+    help="Relative paths to single-signer keyfiles in the multisig.",
     required=True,
 )
 parser_metafile_incorporate.add_argument(
     "-m",
     "--metafile",
     type=Path,
-    help="""Custom relative path to desired multisig metadata file.""",
+    help="Custom relative path to desired multisig metadata file.",
+)
+
+# Metafile remove subcommand parser.
+parser_metafile_remove = subparsers_metafile.add_parser(
+    name="remove",
+    aliases=["r"],
+    description="Remove signatory or signatories from multisig metadata file.",
+    help="Remove signer(s) from a multisig.",
+)
+parser_metafile_remove.set_defaults(func=metafile_remove)
+parser_metafile_remove.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""The name of the new multisig entity. For example 'Aptos' or 'The
+        Aptos Foundation'.""",
+)
+parser_metafile_remove.add_argument(
+    "-m",
+    "--metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metadata file to add to.",
+    required=True,
+)
+parser_metafile_remove.add_argument(
+    "-t",
+    "--threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+    required=True,
+)
+parser_metafile_remove.add_argument(
+    "-s",
+    "--signatories",
+    action="extend",
+    nargs="+",
+    type=int,
+    help="""Signatory or signatories to remove, indicated by 0-indexed position
+        in signatories list.""",
+    required=True,
+)
+parser_metafile_remove.add_argument(
+    "-n",
+    "--new-metafile",
+    type=Path,
+    help="Custom relative path to new multisig metadata file.",
 )
 
 # Rotate subcommand parser.
@@ -798,29 +949,29 @@ parser_rotate_execute = subparsers_rotate.add_parser(
 tmp = parser_rotate_execute.add_subparsers(required=True)
 subparsers_rotate_execute = tmp  # Temp variable for line breaking.
 
-# Rotate execute convert subcommand parser.
-parser_rotate_execute_convert = subparsers_rotate_execute.add_parser(
-    name="convert",
-    aliases=["c"],
-    description="""Convert a single-signer account to a multisig account by
-        rotating its authentication key. Assumes account has not yet had its
-        authentication key rotated. Requires single-signer password
+# Rotate execute single subcommand parser.
+parser_rotate_execute_single = subparsers_rotate_execute.add_parser(
+    name="single",
+    aliases=["s"],
+    description="""Rotate the authentication key of a single-signer account to
+        the authentication key of a multisig account. Assumes account has not
+        yet had its authentication key rotated. Requires single-signer password
         approval.""",
     help="""Rotate single-signer account to multisig account.""",
     parents=[network_parser],
 )
-parser_rotate_execute_convert.set_defaults(func=rotate_execute_convert)
-parser_rotate_execute_convert.add_argument(
+parser_rotate_execute_single.set_defaults(func=rotate_execute_single)
+parser_rotate_execute_single.add_argument(
     "keyfile",
     type=Path,
     help="""Single-signer keyfile for account to convert.""",
 )
-parser_rotate_execute_convert.add_argument(
+parser_rotate_execute_single.add_argument(
     "metafile",
     type=Path,
     help="""Relative path to metadata file for multisig to rotate to.""",
 )
-parser_rotate_execute_convert.add_argument(
+parser_rotate_execute_single.add_argument(
     "signatures",
     action="extend",
     nargs="+",
