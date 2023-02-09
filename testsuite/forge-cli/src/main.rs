@@ -782,13 +782,13 @@ fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
 
 fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
         // if we have full nodes for subset of validators, TPS drops.
         // Validators without VFN are proposing almost empty blocks,
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(20)
+        .with_initial_fullnode_count(50)
         .with_network_tests(vec![&ThreeRegionSimulationTwoTrafficsTest {
             inner_tps: 15000,
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
