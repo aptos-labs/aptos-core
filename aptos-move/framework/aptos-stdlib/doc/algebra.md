@@ -34,6 +34,7 @@
 -  [Function `bls12_381_fr_lendian_format`](#0x1_algebra_bls12_381_fr_lendian_format)
 -  [Function `bls12_381_fr_bendian_format`](#0x1_algebra_bls12_381_fr_bendian_format)
 -  [Function `pairing`](#0x1_algebra_pairing)
+-  [Function `eq`](#0x1_algebra_eq)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
 -  [Function `field_zero`](#0x1_algebra_field_zero)
 -  [Function `field_one`](#0x1_algebra_field_one)
@@ -42,8 +43,10 @@
 -  [Function `field_sub`](#0x1_algebra_field_sub)
 -  [Function `field_mul`](#0x1_algebra_field_mul)
 -  [Function `field_div`](#0x1_algebra_field_div)
+-  [Function `field_sqr`](#0x1_algebra_field_sqr)
 -  [Function `field_inv`](#0x1_algebra_field_inv)
--  [Function `eq`](#0x1_algebra_eq)
+-  [Function `field_is_one`](#0x1_algebra_field_is_one)
+-  [Function `field_is_zero`](#0x1_algebra_field_is_zero)
 -  [Function `group_identity`](#0x1_algebra_group_identity)
 -  [Function `group_generator`](#0x1_algebra_group_generator)
 -  [Function `group_neg`](#0x1_algebra_group_neg)
@@ -63,10 +66,13 @@
 -  [Function `field_add_internal`](#0x1_algebra_field_add_internal)
 -  [Function `field_div_internal`](#0x1_algebra_field_div_internal)
 -  [Function `field_inv_internal`](#0x1_algebra_field_inv_internal)
+-  [Function `field_is_one_internal`](#0x1_algebra_field_is_one_internal)
+-  [Function `field_is_zero_internal`](#0x1_algebra_field_is_zero_internal)
 -  [Function `field_mul_internal`](#0x1_algebra_field_mul_internal)
 -  [Function `field_neg_internal`](#0x1_algebra_field_neg_internal)
 -  [Function `field_one_internal`](#0x1_algebra_field_one_internal)
 -  [Function `field_pow_internal`](#0x1_algebra_field_pow_internal)
+-  [Function `field_sqr_internal`](#0x1_algebra_field_sqr_internal)
 -  [Function `field_sub_internal`](#0x1_algebra_field_sub_internal)
 -  [Function `field_zero_internal`](#0x1_algebra_field_zero_internal)
 -  [Function `group_add_internal`](#0x1_algebra_group_add_internal)
@@ -1077,6 +1083,33 @@ Return an element in the target group <code>Gt</code>.
 
 </details>
 
+<a name="0x1_algebra_eq"></a>
+
+## Function `eq`
+
+Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of an algebraic structure <code>S</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
+    <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(x.handle, y.handle)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_from_u64"></a>
 
 ## Function `from_u64`
@@ -1304,7 +1337,35 @@ Return none if y is the additive identity of field <code>S</code>.
     } <b>else</b> {
         none()
     }
+}
+</code></pre>
 
+
+
+</details>
+
+<a name="0x1_algebra_field_sqr"></a>
+
+## Function `field_sqr`
+
+Compute <code>x^2</code> for an element <code>x</code> of a field <code>S</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr">field_sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr">field_sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+        handle: <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;S&gt;(x.handle)
+    }
 }
 </code></pre>
 
@@ -1346,14 +1407,14 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_eq"></a>
+<a name="0x1_algebra_field_is_one"></a>
 
-## Function `eq`
+## Function `field_is_one`
 
-Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of an algebraic structure <code>S</code>.
+Check if an element <code>x</code> is the multiplicative identity of field <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one">field_is_one</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
 </code></pre>
 
 
@@ -1362,10 +1423,33 @@ Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
-    <a href="algebra.md#0x1_algebra_abort_unless_structure_enabled">abort_unless_structure_enabled</a>&lt;S&gt;();
-    <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(x.handle, y.handle)
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one">field_is_one</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
+    <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;S&gt;(x.handle)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_field_is_zero"></a>
+
+## Function `field_is_zero`
+
+Check if an element <code>x</code> is the aditive identity of field <code>S</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero">field_is_zero</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero">field_is_zero</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
+    <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;S&gt;(x.handle)
 }
 </code></pre>
 
@@ -1886,6 +1970,50 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 </details>
 
+<a name="0x1_algebra_field_is_one_internal"></a>
+
+## Function `field_is_one_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;F&gt;(handle: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;F&gt;(handle: u64): bool;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_field_is_zero_internal"></a>
+
+## Function `field_is_zero_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;F&gt;(handle: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;F&gt;(handle: u64): bool;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_field_mul_internal"></a>
 
 ## Function `field_mul_internal`
@@ -1968,6 +2096,28 @@ Cast an element of a structure <code>L</code> to a sub structure <code>S</code>.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_pow_internal">field_pow_internal</a>&lt;F&gt;(handle: u64, e: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_field_sqr_internal"></a>
+
+## Function `field_sqr_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;G&gt;(handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;G&gt;(handle: u64): u64;
 </code></pre>
 
 

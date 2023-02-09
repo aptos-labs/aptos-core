@@ -443,6 +443,7 @@ macro_rules! ark_field_div_internal {
 
     }}
 }
+
 fn field_div_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -467,7 +468,7 @@ macro_rules! ark_neg_internal {
         let new_element = element.neg();
         let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
-            $gas_params.neg($structure),
+            $gas_params.field_neg($structure),
             smallvec![Value::u64(new_handle as u64)],
         ))
     }}
@@ -527,6 +528,142 @@ fn field_inv_internal(
     }
 }
 
+macro_rules! ark_field_sqr_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element.square();
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_sqr($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
+fn field_sqr_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12_381_Fr) => ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+macro_rules! ark_field_zero_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let new_element = <$typ>::zero();
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_zero($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
+fn field_zero_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12_381_Fr) => ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+macro_rules! ark_field_one_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let new_element = <$typ>::one();
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.field_one($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
+fn field_one_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12_381_Fr) => ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+macro_rules! ark_field_is_one_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let result = element.is_one();
+        Ok(NativeResult::ok(
+            $gas_params.field_is_one($structure),
+            smallvec![Value::bool(result)],
+        ))
+    }}
+}
+
+fn field_is_one_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12_381_Fr) => ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
+
+macro_rules! ark_field_is_zero_internal {
+    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let result = element.is_zero();
+        Ok(NativeResult::ok(
+            $gas_params.field_is_zero($structure),
+            smallvec![Value::bool(result)],
+        ))
+    }}
+}
+
+fn field_is_zero_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12_381_Fr) => ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => {
+            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        }
+    }
+}
 
 macro_rules! ark_eq_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
@@ -670,30 +807,29 @@ fn group_order_internal(
     }
 }
 
+macro_rules! ark_insecure_random_element_internal {
+    ($context:expr, $typ:ty) => {{
+        let element = <$typ>::rand(&mut test_rng());
+        let handle = store_obj!($context, element);
+        Ok(NativeResult::ok(
+            InternalGas::zero(),
+            smallvec![Value::u64(handle as u64)],
+        ))
+    }}
+}
+
 #[cfg(feature = "testing")]
-fn random_element_internal(
+fn insecure_random_element_internal(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            let element = G1Projective::rand(&mut test_rng());
-            let handle = store_obj!(context, element);
-            Ok(NativeResult::ok(
-                InternalGas::zero(),
-                smallvec![Value::u64(handle as u64)],
-            ))
-        }
-        Some(Structure::BLS12_381_G2) => {
-            let element = G2Projective::rand(&mut test_rng());
-            let handle = store_obj!(context, element);
-            Ok(NativeResult::ok(
-                InternalGas::zero(),
-                smallvec![Value::u64(handle as u64)],
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) => ark_insecure_random_element_internal!(context, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) => ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12),
+        Some(Structure::BLS12_381_G1) => ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12_381_G2) => ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective),
         Some(Structure::BLS12_381_Gt) => {
             let k = Fr::rand(&mut test_rng());
             let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
@@ -929,11 +1065,14 @@ fn upcast_internal(
     assert_eq!(2, ty_args.len());
     let child_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let handle = pop_arg!(args, u64);
     match (child_opt, parent_opt) {
-        // (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fq12)) => {
-        //     let handle = pop_arg!($args, u64) as usize;
-        //     Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        // }
+        (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fq12)) => {
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle as u64)],
+            ))
+        }
         _ => {
             Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
         }
@@ -946,10 +1085,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     // Always-on natives.
     natives.append(&mut vec![
         (
-            "serialize_internal",
-            make_native_from_func(gas_params.clone(), serialize_internal),
-        ),
-        (
             "deserialize_internal",
             make_native_from_func(gas_params.clone(), deserialize_internal),
         ),
@@ -958,32 +1093,52 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), eq_internal),
         ),
         (
-            "field_neg_internal",
-            make_native_from_func(gas_params.clone(), field_neg_internal),
+            "field_add_internal",
+            make_native_from_func(gas_params.clone(), field_add_internal),
+        ),
+        (
+            "field_div_internal",
+            make_native_from_func(gas_params.clone(), field_div_internal),
         ),
         (
             "field_inv_internal",
             make_native_from_func(gas_params.clone(), field_inv_internal),
         ),
         (
-            "from_u64_internal",
-            make_native_from_func(gas_params.clone(), from_u64_internal),
+            "field_is_one_internal",
+            make_native_from_func(gas_params.clone(), field_is_one_internal),
         ),
         (
-            "field_add_internal",
-            make_native_from_func(gas_params.clone(), field_add_internal),
-        ),
-        (
-            "field_sub_internal",
-            make_native_from_func(gas_params.clone(), field_sub_internal),
+            "field_is_zero_internal",
+            make_native_from_func(gas_params.clone(), field_is_zero_internal),
         ),
         (
             "field_mul_internal",
             make_native_from_func(gas_params.clone(), field_mul_internal),
         ),
         (
-            "field_div_internal",
-            make_native_from_func(gas_params.clone(), field_div_internal),
+            "field_neg_internal",
+            make_native_from_func(gas_params.clone(), field_neg_internal),
+        ),
+        (
+            "field_one_internal",
+            make_native_from_func(gas_params.clone(), field_one_internal),
+        ),
+        (
+            "field_sqr_internal",
+            make_native_from_func(gas_params.clone(), field_sqr_internal),
+        ),
+        (
+            "field_sub_internal",
+            make_native_from_func(gas_params.clone(), field_sub_internal),
+        ),
+        (
+            "field_zero_internal",
+            make_native_from_func(gas_params.clone(), field_zero_internal),
+        ),
+        (
+            "from_u64_internal",
+            make_native_from_func(gas_params.clone(), from_u64_internal),
         ),
         (
             "group_identity_internal",
@@ -1018,7 +1173,11 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_order_internal),
         ),
         (
-            "up_cast_internal",
+            "serialize_internal",
+            make_native_from_func(gas_params.clone(), serialize_internal),
+        ),
+        (
+            "upcast_internal",
             make_native_from_func(gas_params.clone(), upcast_internal),
         ),
     ]);
@@ -1027,8 +1186,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     #[cfg(feature = "testing")]
     natives.append(&mut vec![
         (
-            "random_element_internal",
-            make_test_only_native_from_func(random_element_internal),
+            "insecure_random_element_internal",
+            make_test_only_native_from_func(insecure_random_element_internal),
         ),
     ]);
 

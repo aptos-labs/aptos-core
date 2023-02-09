@@ -139,6 +139,13 @@ module aptos_std::algebra {
         }
     }
 
+    /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
+    public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
+        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_structure_enabled<S>();
+        eq_internal<S>(x.handle, y.handle)
+    }
+
     /// Compute `pairing(a[0], b[0]) + ... + pairing(a[n-1], b[n-1])` for `n` elements of group `G1` and `n` elements of group `G2`.
     /// This is faster and cheaper than calling `pairing()` separately then aggregating with `group_add`.
 //    public fun multi_pairing<G1, G2, Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
@@ -233,7 +240,16 @@ module aptos_std::algebra {
         } else {
             none()
         }
+    }
 
+    /// Compute `x^2` for an element `x` of a field `S`.
+    ///
+    public fun field_sqr<S>(x: &Element<S>): Element<S> {
+        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_structure_enabled<S>();
+        Element<S> {
+            handle: field_sqr_internal<S>(x.handle)
+        }
     }
 
     /// Compute `x^(-1)` for an element `x` of a field `S`.
@@ -250,11 +266,14 @@ module aptos_std::algebra {
         }
     }
 
-    /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
-    public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
-        abort_if_generic_algebra_basic_operations_disabled();
-        abort_unless_structure_enabled<S>();
-        eq_internal<S>(x.handle, y.handle)
+    /// Check if an element `x` is the multiplicative identity of field `S`.
+    public fun field_is_one<S>(x: &Element<S>): bool {
+        field_is_one_internal<S>(x.handle)
+    }
+
+    /// Check if an element `x` is the aditive identity of field `S`.
+    public fun field_is_zero<S>(x: &Element<S>): bool {
+        field_is_zero_internal<S>(x.handle)
     }
 
     /// Get the identity of a group `G`.
@@ -427,10 +446,13 @@ module aptos_std::algebra {
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_div_internal<F>(handle_1: u64, handle_2: u64): (bool, u64);
     native fun field_inv_internal<F>(handle: u64): (bool, u64);
+    native fun field_is_one_internal<F>(handle: u64): bool;
+    native fun field_is_zero_internal<F>(handle: u64): bool;
     native fun field_mul_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_neg_internal<F>(handle: u64): u64;
     native fun field_one_internal<S>(): u64;
     native fun field_pow_internal<F>(handle: u64, e: vector<u8>): u64;
+    native fun field_sqr_internal<G>(handle: u64): u64;
     native fun field_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun field_zero_internal<S>(): u64;
     native fun group_add_internal<G>(handle_1: u64, handle_2: u64): u64;
@@ -467,6 +489,12 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
+        // Special elements.
+        let val_0 = field_zero<BLS12_381_Fr>();
+        assert!(field_is_zero(&val_0), 1);
+        let val_1 = field_one<BLS12_381_Fr>();
+        assert!(field_is_one(&val_1), 1);
+
         // Serialization/deserialization.
         let val_7 = from_u64<BLS12_381_Fr>(7);
         let val_7_2nd = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN));
@@ -502,6 +530,10 @@ module aptos_std::algebra {
         // Inversion.
         assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
         assert!(std::option::is_none(&field_inv(&val_0)), 1);
+
+        // Squaring.
+        let val_x = insecure_random_element<BLS12_381_Fr>();
+        assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
     }
 
     const BLS12_381_FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -511,6 +543,12 @@ module aptos_std::algebra {
     fun test_bls12_381_fq12(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
+
+        // Special elements.
+        let val_0 = field_zero<BLS12_381_Fq12>();
+        assert!(field_is_zero(&val_0), 1);
+        let val_1 = field_one<BLS12_381_Fq12>();
+        assert!(field_is_one(&val_1), 1);
 
         // Serialization/deserialization.
         let val_7 = from_u64<BLS12_381_Fq12>(7);
@@ -543,6 +581,10 @@ module aptos_std::algebra {
         // Inversion.
         assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
         assert!(std::option::is_none(&field_inv(&val_0)), 1);
+
+        // Squaring.
+        let val_x = insecure_random_element<BLS12_381_Fq12>();
+        assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
     }
 
     const BLS12_381_R: vector<u8> = x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
@@ -684,21 +726,21 @@ module aptos_std::algebra {
         assert!(BLS12_381_R == group_order<BLS12_381_Gt>(), 1);
 
         // Serialization/deserialization.
-        let element_g = group_generator<BLS12_381_Gt>();
-        assert!(BLS12_381_GT_GENERATOR_SERIALIZED == serialize(bls12_381_gt_format(), &element_g), 1);
-        let element_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_SERIALIZED));
-        assert!(eq(&element_g, &element_g_from_uncomp), 1);
-        let inf = group_identity<BLS12_381_Gt>();
-        assert!(BLS12_381_FQ12_ONE_SERIALIZED == serialize(bls12_381_gt_format(), &inf), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_FQ12_ONE_SERIALIZED));
-        assert!(eq(&inf, &inf_from_uncomp), 1);
-        let element_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED));
+        let generator = group_generator<BLS12_381_Gt>();
+        assert!(BLS12_381_GT_GENERATOR_SERIALIZED == serialize(bls12_381_gt_format(), &generator), 1);
+        let generator_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_SERIALIZED));
+        assert!(eq(&generator, &generator_from_deser), 1);
+        let identity = group_identity<BLS12_381_Gt>();
+        assert!(BLS12_381_FQ12_ONE_SERIALIZED == serialize(bls12_381_gt_format(), &identity), 1);
+        let identity_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_FQ12_ONE_SERIALIZED));
+        assert!(eq(&identity, &identity_from_deser), 1);
+        let element_7g_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED));
         assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"ffff")), 1);
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let element_7g_calc = group_scalar_mul(&element_g, &scalar_7);
-        assert!(eq(&element_7g_calc, &element_7g_from_uncomp), 1);
+        let element_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
         assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize(bls12_381_gt_format(), &element_7g_calc), 1);
 
         // Element negation.
@@ -707,16 +749,16 @@ module aptos_std::algebra {
 
         // Element addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let element_9g = group_scalar_mul(&element_g, &scalar_9);
+        let element_9g = group_scalar_mul(&generator, &scalar_9);
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let element_2g = group_scalar_mul(&element_g, &scalar_2);
+        let element_2g = group_scalar_mul(&generator, &scalar_2);
         let element_2g_calc = group_add(&element_minus_7g_calc, &element_9g);
         assert!(eq(&element_2g, &element_2g_calc), 1);
 
         // Upcasting to BLS12_381_Fq12.
-//        let _fq12_element_from_cast = upcast<BLS12_381_Gt, BLS12_381_Fq12>(&element_minus_7g_calc);
+        assert!(eq(&field_one<BLS12_381_Fq12>(), &upcast<BLS12_381_Gt, BLS12_381_Fq12>(&identity)), 1);
     }
-//
+
 //    #[test(fx = @std)]
 //    fun test_bls12381_pairing(fx: signer) {
 //        enable_initial_generic_algebraic_operations(&fx);
