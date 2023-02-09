@@ -5,6 +5,7 @@ use crate::{
     aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
     txn_emitter::generate_traffic,
 };
+use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{NodeExt, Swarm, SwarmExt, TransactionType};
 use aptos_logger::info;
 use aptos_types::{
@@ -209,10 +210,9 @@ async fn test_batch_id_on_restart(do_wipe_db: bool) {
     if do_wipe_db {
         info!("wipe only quorum store db");
         let node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
-        // TODO: get this dir from quorum store code
         let db_dir = node0_config.storage.dir();
-        let quorum_store_db_dir = db_dir.join("quorumstoreDB");
-        fs::remove_dir_all(quorum_store_db_dir.clone()).unwrap();
+        let quorum_store_db_dir = db_dir.join(QUORUM_STORE_DB_NAME);
+        fs::remove_dir_all(quorum_store_db_dir).unwrap();
     } else {
         info!("don't do anything to quorum store db");
     }
@@ -240,12 +240,12 @@ async fn test_batch_id_on_restart(do_wipe_db: bool) {
 /// Checks that a validator can still get signatures on batches on restart when the db is intact.
 #[tokio::test]
 async fn test_batch_id_on_restart_same_db() {
-    test_batch_id_on_restart(false);
+    test_batch_id_on_restart(false).await;
 }
 
 /// Checks that a validator can still get signatures on batches even if its db is reset (e.g.,
 /// the disk failed, or the validator had to be moved to another node).
 #[tokio::test]
 async fn test_batch_id_on_restart_wiped_db() {
-    test_batch_id_on_restart(true);
+    test_batch_id_on_restart(true).await;
 }

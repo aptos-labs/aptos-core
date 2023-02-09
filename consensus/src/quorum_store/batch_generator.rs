@@ -86,7 +86,7 @@ impl BatchGenerator {
             BatchId::new(thread_rng().next_u64())
         };
         info!("Initialized with batch_id of {}", batch_id);
-        let mut incremented_batch_id = batch_id.clone();
+        let mut incremented_batch_id = batch_id;
         incremented_batch_id.increment();
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
@@ -195,7 +195,7 @@ impl BatchGenerator {
 
             counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 
-            let mut incremented_batch_id = batch_id.clone();
+            let mut incremented_batch_id = batch_id;
             incremented_batch_id.increment();
             self.db
                 .save_batch_id(self.latest_logical_time.epoch(), incremented_batch_id)
