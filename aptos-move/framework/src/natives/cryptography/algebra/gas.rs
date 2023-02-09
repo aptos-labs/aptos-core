@@ -22,8 +22,6 @@ pub struct GasParameters {
     pub ark_bls12_381_fr_inv: InternalGasPerArg,
     pub ark_bls12_381_fr_mul: InternalGasPerArg,
     pub ark_bls12_381_fr_neg: InternalGasPerArg,
-    pub ark_bls12_381_fr_pow_base: InternalGasPerArg,
-    pub ark_bls12_381_fr_pow_per_exponent_u64: InternalGasPerArg,
     pub ark_bls12_381_fr_ser: InternalGasPerArg,
     pub ark_bls12_381_fr_sub: InternalGasPerArg,
     pub ark_bls12_381_fr_to_repr: InternalGasPerArg,
@@ -37,8 +35,7 @@ pub struct GasParameters {
     pub ark_bls12_381_fq12_mul: InternalGasPerArg,
     pub ark_bls12_381_fq12_neg: InternalGasPerArg,
     pub ark_bls12_381_fq12_one: InternalGasPerArg,
-    pub ark_bls12_381_fq12_pow_base: InternalGasPerArg,
-    pub ark_bls12_381_fq12_pow_per_exponent_u64: InternalGasPerArg,
+    pub ark_bls12_381_fq12_pow_u256: InternalGasPerArg,
     pub ark_bls12_381_fq12_ser: InternalGasPerArg,
     pub ark_bls12_381_fq12_square: InternalGasPerArg,
     pub ark_bls12_381_fq12_sub: InternalGasPerArg,
@@ -159,20 +156,6 @@ impl GasParameters {
         }
     }
 
-    pub fn field_pow(&self, structure: Structure, exponent_size_in_bytes: usize) -> InternalGas {
-        match structure {
-            Structure::BLS12_381_Fr => {
-                self.ark_bls12_381_fr_pow_base * NumArgs::one()
-                    + self.ark_bls12_381_fr_pow_per_exponent_u64 * NumArgs::from(to_size_in_u64(exponent_size_in_bytes) as u64)
-            },
-            Structure::BLS12_381_Fq12 => {
-                self.ark_bls12_381_fq12_pow_base * NumArgs::one()
-                    + self.ark_bls12_381_fq12_pow_per_exponent_u64 * NumArgs::from(to_size_in_u64(exponent_size_in_bytes) as u64)
-            },
-            _ => unreachable!()
-        }
-    }
-
     pub fn field_div(&self, structure: Structure) -> InternalGas {
         match structure {
             Structure::BLS12_381_Fr => self.ark_bls12_381_fr_div * NumArgs::one(),
@@ -193,6 +176,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_add * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_add * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_mul * NumArgs::one(),
             _ => unreachable!()
         }
     }
@@ -201,6 +185,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_double * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_double * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_square * NumArgs::one(),
             _ => unreachable!()
         }
     }
@@ -209,6 +194,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_infinity * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_infinity * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_one * NumArgs::one(),
             _ => unreachable!()
         }
     }
@@ -217,6 +203,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_generator * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_generator * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_clone * NumArgs::one(),
             _ => unreachable!()
         }
     }
@@ -225,6 +212,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_neg * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_neg * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_inv * NumArgs::one(),
             _ => unreachable!()
         }
     }
@@ -233,6 +221,7 @@ impl GasParameters {
         match structure {
             Structure::BLS12_381_G1 => self.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one(),
             Structure::BLS12_381_G2 => self.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one(),
+            Structure::BLS12_381_Gt => self.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
             _ => unreachable!()
         }
     }
