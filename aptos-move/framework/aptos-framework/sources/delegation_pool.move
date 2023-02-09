@@ -312,21 +312,26 @@ module aptos_framework::delegation_pool {
             commission_pending_inactive
         ) = calculate_stake_pool_drift(pool);
 
+        let total_active_shares = pool_u64::total_shares(&pool.active_shares);
+        let delegator_active_shares = pool_u64::shares(&pool.active_shares, delegator_address);
+
         let (_, _, pending_active, _) = stake::get_stake(pool_address);
+        if (pending_active == 0) {
+            // zero `pending_active` stake indicates that either there are no `add_stake` fees or
+            // previous epoch has ended and should identify shares owning these fees as released
+            total_active_shares = total_active_shares - pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER);
+            if (delegator_address == NULL_SHAREHOLDER) {
+                delegator_active_shares = 0
+            }
+        };
         active = shares_to_amount_with_total_stats(
             &pool.active_shares,
-            pool_u64::shares(&pool.active_shares, delegator_address),
+            delegator_active_shares,
             // exclude operator active rewards not converted to shares yet
             active - commission_active,
-            pool_u64::total_shares(&pool.active_shares) -
-                if (pending_active == 0) {
-                    // zero `pending_active` stake indicates that either there are no `add_stake` fees or
-                    // previous epoch has ended and should identify shares owning these fees as released
-                    pool_u64::shares(&pool.active_shares, NULL_SHAREHOLDER)
-                } else {
-                    0
-                }
+            total_active_shares
         );
+
         // get state and stake (0 if there is none) of the pending withdrawal
         let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
         // report non-active stakes accordingly to the state of the pending withdrawal
@@ -1309,7 +1314,9 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 161250000000, 0, 0, 0);
 
         // check that shares of null shareholder have been released
+        assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
         synchronize_delegation_pool(pool_address);
+        assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
 
         // add 200 coins being pending_active until next epoch
@@ -1328,7 +1335,9 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 182862500000, 0, 0, 0);
 
         // check that shares of null shareholder have been released
+        assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
         synchronize_delegation_pool(pool_address);
+        assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
         assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
     }
 
