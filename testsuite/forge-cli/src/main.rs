@@ -796,14 +796,14 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             // Additionally - we are not really gracefully handling overlaods,
             // setting limits based on current reality, to make sure they
             // don't regress, but something to investigate
-            avg_tps: 3500,
+            avg_tps: 500,
             latency_thresholds: &[],
             add_execution_delay: None,
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 1000 })
+                .mode(EmitJobMode::ConstTps { tps: 500 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
