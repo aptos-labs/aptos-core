@@ -441,7 +441,6 @@ module aptos_std::algebra {
     native fun group_scalar_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
     native fun group_double_internal<G>(element_handle: u64): u64;
     native fun group_neg_internal<G>(handle: u64): u64;
-//    native fun group_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun pairing_product_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun upcast_internal<S,L>(handle: u64): u64;
     native fun downcast_internal<L,S>(handle: u64): (bool, u64);
@@ -551,8 +550,8 @@ module aptos_std::algebra {
     const BLS12_381_G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
     const BLS12_381_G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117";
     const BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117e1e7c5462923aa0ce48a88a244c73cd0edb3042ccb18db00f60ad0d595e0f5fce48a1d74ed309ea0f1a0aae381f4b308";
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10";
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10";
     const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32819";
     const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328198f9067d78113ed5f734fb2e1b497e52013da0c9d679a592da735f6713d2eed2913f9c11208d2e1f455b0c9942f647309";
 
@@ -567,137 +566,109 @@ module aptos_std::algebra {
         // Serialization/deserialization.
         let point_g = group_generator<BLS12_381_G1>();
         assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_g), 1);
-//        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_g), 1);
-//        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
-//        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
-//        assert!(eq(&point_g, &point_g_from_comp), 1);
-//        assert!(eq(&point_g, &point_g_from_uncomp), 1);
-//        let inf = group_identity<BLS12_381_G1>();
-//        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &inf), 1);
-//        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &inf), 1);
-//        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_INF_SERIALIZED_UNCOMP));
-//        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_INF_SERIALIZED_COMP));
-//        assert!(eq(&inf, &inf_from_comp), 1);
-//        assert!(eq(&inf, &inf_from_uncomp), 1);
-//        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10"));
-//        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899"));
-//        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
-//
-//        // Scalar multiplication.
-//        let scalar_7 = from_u64<BLS12_381_Fr>(7);
-//        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
-//        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-//        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_7g_calc), 1);
-//        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_7g_calc), 1);
-//
-//        // Doubling.
-//        let scalar_2 = from_u64<BLS12_381_Fr>(2);
-//        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-//        let point_double_g = group_double(&point_g);
-//        assert!(eq(&point_2g, &point_double_g), 1);
-//
-//        // Negation.
-//        let point_minus_7g_calc = group_neg(&point_7g_calc);
-//        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_minus_7g_calc), 1);
-//        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_minus_7g_calc), 1);
-//
-//        // Addition.
-//        let scalar_9 = from_u64<BLS12_381_Fr>(9);
-//        let point_9g = group_scalar_mul(&point_g, &scalar_9);
-//        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-//        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
-//        assert!(eq(&point_2g, &point_2g_calc), 1);
-//
-//        // Multi-scalar multiplication.
-//        let scalar_a = insecure_random_element<BLS12_381_Fr>();
-//        let scalar_b = insecure_random_element<BLS12_381_Fr>();
-//        let scalar_c = insecure_random_element<BLS12_381_Fr>();
-//        let point_p = insecure_random_element<BLS12_381_G1>();
-//        let point_q = insecure_random_element<BLS12_381_G1>();
-//        let point_r = insecure_random_element<BLS12_381_G1>();
-//        let naive = group_identity<BLS12_381_G1>();
-//        naive = group_add(&naive, &group_scalar_mul(&point_p, &scalar_a));
-//        naive = group_add(&naive, &group_scalar_mul(&point_q, &scalar_b));
-//        naive = group_add(&naive, &group_scalar_mul(&point_r, &scalar_c));
-//        let fast = group_multi_scalar_mul(&triplet(point_p, point_q, point_r), &triplet(scalar_a, scalar_b, scalar_c));
-//        assert!(eq(&naive, &fast), 1);
+        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_g), 1);
+        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
+        assert!(eq(&point_g, &point_g_from_comp), 1);
+        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(eq(&point_g, &point_g_from_uncomp), 1);
+        let inf = group_identity<BLS12_381_G1>();
+        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &inf), 1);
+        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &inf), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_INF_SERIALIZED_COMP));
+        assert!(eq(&inf, &inf_from_comp), 1);
+        assert!(eq(&inf, &inf_from_uncomp), 1);
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10"));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899"));
+        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+
+        // Scalar multiplication.
+        let scalar_7 = from_u64<BLS12_381_Fr>(7);
+        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
+        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_7g_calc), 1);
+
+        // Doubling.
+        let scalar_2 = from_u64<BLS12_381_Fr>(2);
+        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_double_g = group_double(&point_g);
+        assert!(eq(&point_2g, &point_double_g), 1);
+
+        // Negation.
+        let point_minus_7g_calc = group_neg(&point_7g_calc);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_minus_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_minus_7g_calc), 1);
+
+        // Addition.
+        let scalar_9 = from_u64<BLS12_381_Fr>(9);
+        let point_9g = group_scalar_mul(&point_g, &scalar_9);
+        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
+        assert!(eq(&point_2g, &point_2g_calc), 1);
     }
 
-//    const BLS12_381_G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
-//    const BLS12_381_G2_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
-//    const BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be0130128b808865493e189a2ac3bccc93a922cd16051699a426da7d3bd8caa9bfdad1a352edac6cdc98c116e7d7227d5e50cbe795ff05f07a9aaa11dec5c270d373fab992e57ab927426af63a7857e283ecb998bc22bb0d2ac32cc34a72ea0c40606";
-//    const BLS12_381_G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be013";
-//    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dddcc1399cdf852dab1e2c8dc3b0ce819362f3a12da56f37aee93d3881ca760e467942c92428864a6172c80bf4daeb7082070fa8e8937746ae82d57ec8b639977f8ceaef21a11375de52b02e145dc39021bf4cab7eeaa955688a1b75436f9ec05";
-//    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d";
-//    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dceddeb663207acdf4d1d8bd4c2f3c304eec676e4c67b3decd07eb16a68a416806f181fb1731fb7a482baff799c6349118b3a057176c88a4f17d2fcc4729c12a72b27020486c1f909dae682123f6f3d62bcb8808bc7fc85f41145c8e4b3181414";
-//    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673028d";
-//
-//    #[test(fx = @std)]
-//    fun test_bls12_381_g2(fx: signer) {
-//        enable_initial_generic_algebraic_operations(&fx);
-//        enable_bls12_381_structures(&fx);
-//
-//        // Group info.
-//        assert!(BLS12_381_R == group_order<BLS12_381_G2>(), 1);
-//
-//        // Serialization/deserialization.
-//        let point_g = group_generator<BLS12_381_G2>();
-//        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g2_serialization_scheme_uncompressed(), &point_g), 1);
-//        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g2_serialization_scheme_compressed(), &point_g), 1);
-//        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_uncompressed(), &BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
-//        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_compressed(), &BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
-//        assert!(eq(&point_g, &point_g_from_comp), 1);
-//        assert!(eq(&point_g, &point_g_from_uncomp), 1);
-//        let inf = group_identity<BLS12_381_G2>();
-//        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g2_serialization_scheme_uncompressed(), &inf), 1);
-//        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize(bls12_381_g2_serialization_scheme_compressed(), &inf), 1);
-//        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_uncompressed(), &BLS12_381_G2_INF_SERIALIZED_UNCOMP));
-//        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_compressed(), &BLS12_381_G2_INF_SERIALIZED_COMP));
-//        assert!(eq(&inf, &inf_from_comp), 1);
-//        assert!(eq(&inf, &inf_from_uncomp), 1);
-//        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_uncompressed(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-//        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_serialization_scheme_compressed(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
-//        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
-//
-//        // Scalar multiplication.
-//        let scalar_7 = from_u64<BLS12_381_Fr>(7);
-//        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
-//        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-//        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g2_serialization_scheme_uncompressed(), &point_7g_calc), 1);
-//        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g2_serialization_scheme_compressed(), &point_7g_calc), 1);
-//
-//        // Doubling.
-//        let scalar_2 = from_u64<BLS12_381_Fr>(2);
-//        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-//        let point_double_g = group_double(&point_g);
-//        assert!(eq(&point_2g, &point_double_g), 1);
-//
-//        // Negation.
-//        let point_minus_7g_calc = group_neg(&point_7g_calc);
-//        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g2_serialization_scheme_compressed(), &point_minus_7g_calc), 1);
-//        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g2_serialization_scheme_uncompressed(), &point_minus_7g_calc), 1);
-//
-//        // Addition.
-//        let scalar_9 = from_u64<BLS12_381_Fr>(9);
-//        let point_9g = group_scalar_mul(&point_g, &scalar_9);
-//        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-//        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
-//        assert!(eq(&point_2g, &point_2g_calc), 1);
-//
-//        // Multi-scalar multiplication.
-//        let scalar_a = insecure_random_element<BLS12_381_Fr>();
-//        let scalar_b = insecure_random_element<BLS12_381_Fr>();
-//        let scalar_c = insecure_random_element<BLS12_381_Fr>();
-//        let point_p = insecure_random_element<BLS12_381_G2>();
-//        let point_q = insecure_random_element<BLS12_381_G2>();
-//        let point_r = insecure_random_element<BLS12_381_G2>();
-//        let naive = group_identity<BLS12_381_G2>();
-//        naive = group_add(&naive, &group_scalar_mul(&point_p, &scalar_a));
-//        naive = group_add(&naive, &group_scalar_mul(&point_q, &scalar_b));
-//        naive = group_add(&naive, &group_scalar_mul(&point_r, &scalar_c));
-//        let fast = group_multi_scalar_mul(&triplet(point_p, point_q, point_r), &triplet(scalar_a, scalar_b, scalar_c));
-//        assert!(eq(&naive, &fast), 1);
-//    }
+    const BLS12_381_G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G2_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be0130128b808865493e189a2ac3bccc93a922cd16051699a426da7d3bd8caa9bfdad1a352edac6cdc98c116e7d7227d5e50cbe795ff05f07a9aaa11dec5c270d373fab992e57ab927426af63a7857e283ecb998bc22bb0d2ac32cc34a72ea0c40606";
+    const BLS12_381_G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be013";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dddcc1399cdf852dab1e2c8dc3b0ce819362f3a12da56f37aee93d3881ca760e467942c92428864a6172c80bf4daeb7082070fa8e8937746ae82d57ec8b639977f8ceaef21a11375de52b02e145dc39021bf4cab7eeaa955688a1b75436f9ec05";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dceddeb663207acdf4d1d8bd4c2f3c304eec676e4c67b3decd07eb16a68a416806f181fb1731fb7a482baff799c6349118b3a057176c88a4f17d2fcc4729c12a72b27020486c1f909dae682123f6f3d62bcb8808bc7fc85f41145c8e4b3181414";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673028d";
+
+    #[test(fx = @std)]
+    fun test_bls12_381_g2(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+
+        // Group info.
+        assert!(BLS12_381_R == group_order<BLS12_381_G2>(), 1);
+
+        // Serialization/deserialization.
+        let point_g = group_generator<BLS12_381_G2>();
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_g), 1);
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_g), 1);
+        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
+        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
+        assert!(eq(&point_g, &point_g_from_comp), 1);
+        assert!(eq(&point_g, &point_g_from_uncomp), 1);
+        let inf = group_identity<BLS12_381_G2>();
+        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &inf), 1);
+        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &inf), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_INF_SERIALIZED_COMP));
+        assert!(eq(&inf, &inf_from_comp), 1);
+        assert!(eq(&inf, &inf_from_uncomp), 1);
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+
+        // Scalar multiplication.
+        let scalar_7 = from_u64<BLS12_381_Fr>(7);
+        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
+        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_7g_calc), 1);
+
+        // Doubling.
+        let scalar_2 = from_u64<BLS12_381_Fr>(2);
+        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_double_g = group_double(&point_g);
+        assert!(eq(&point_2g, &point_double_g), 1);
+
+        // Negation.
+        let point_minus_7g_calc = group_neg(&point_7g_calc);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_minus_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_minus_7g_calc), 1);
+
+        // Addition.
+        let scalar_9 = from_u64<BLS12_381_Fr>(9);
+        let point_9g = group_scalar_mul(&point_g, &scalar_9);
+        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
+        assert!(eq(&point_2g, &point_2g_calc), 1);
+    }
 //
 //    const BLS12_381_FQ12_ONE_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 //    const BLS12_381_GT_GENERATOR_SERIALIZED: vector<u8> = x"b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f";

@@ -233,7 +233,7 @@ macro_rules! ark_serialize_internal {
 macro_rules! ark_ec_point_serialize_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $handle:expr, $scheme:expr, $typ:ty, $ser_func:ident) => {{
             let element_ptr = get_obj_pointer!($context, $structure, $handle);
-            let element = element_ptr.downcast_ref::<$typ>().unwrap()
+            let element = element_ptr.downcast_ref::<$typ>().unwrap();
             let element_affine = element.into_affine();
             let mut buf = Vec::new();
             element_affine.$ser_func(&mut buf).unwrap();
@@ -267,22 +267,21 @@ fn serialize_internal(
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
         (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize_uncompressed);
+            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
         (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize);
+            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        // Some(Structure::BLS12_381_G2) => {
-        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
-        //     let element = borrow_bls12_381_g2!(context, handle);
-        //     let buf = ark_serialize_uncompressed!(element);
-        //     Ok(NativeResult::ok(
-        //         (gas_params.ark_bls12_381_g2_proj_to_affine + gas_params.ark_bls12_381_g2_affine_ser_uncomp) * NumArgs::one(),
-        //         smallvec![Value::vector_u8(buf)],
-        //     ))
-        // }
+        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
+            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize_uncompressed);
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        }
+        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
+            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize);
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        }
         // Some(Structure::BLS12_381_Gt) => {
         //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
         //     let element = borrow_bls12_381_fq12!(context, handle);
@@ -324,6 +323,33 @@ macro_rules! ark_deserialize_internal {
     }}
 }
 
+macro_rules! ark_ec_point_deserialize_internal {
+    ($gas_params:expr, $context:expr, $bytes:ident, $structure:expr, $scheme:expr, $expected_length:expr, $typ:ty, $deser_func:ident) => {{
+        if $bytes.len() != $expected_length {
+            return Ok(NativeResult::ok(
+                $gas_params.deserialize($structure, $scheme),
+                smallvec![Value::bool(false), Value::u64(0)],
+            ));
+        }
+        match <$typ>::$deser_func($bytes.as_slice()) {
+            Ok(element) => {
+                let element_proj = element.into_projective();
+                let handle = store_obj!($context, $structure, element_proj);
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize($structure, $scheme),
+                    smallvec![Value::bool(true), Value::u64(handle as u64)],
+                ))
+            },
+            _ => {
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize($structure, $scheme),
+                    smallvec![Value::bool(false), Value::u64(0)],
+                ))
+            }
+        }
+    }}
+}
+
 fn deserialize_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -346,29 +372,17 @@ fn deserialize_internal(
             ark_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 576, ark_bls12_381::Fq12, deserialize_uncompressed)
         }
         (Some(structure), scheme) if structure == Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-            ark_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 96, ark_bls12_381::G1Affine, deserialize_uncompressed)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 96, ark_bls12_381::G1Affine, deserialize_uncompressed)
         }
         (Some(structure), scheme) if structure == Structure::BLS12_381_G1 && scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-            ark_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 48, ark_bls12_381::G1Affine, deserialize)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 48, ark_bls12_381::G1Affine, deserialize)
         }
-        // Some(Structure::BLS12_381_G2) => {
-        //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
-        //     match ark_bls12_381::G2Affine::deserialize_uncompressed(bytes.as_slice()) {
-        //         Ok(element) => {
-        //             let handle = store_bls12_381_g2!(context, element.into_projective());
-        //             Ok(NativeResult::ok(
-        //                 (gas_params.ark_bls12_381_g2_affine_deser_uncomp + gas_params.ark_bls12_381_g2_affine_to_proj) * NumArgs::one(),
-        //                 smallvec![Value::bool(true), Value::u64(handle as u64)],
-        //             ))
-        //         }
-        //         _ => {
-        //             Ok(NativeResult::ok(
-        //                 gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one(),
-        //                 smallvec![Value::bool(false), Value::u64(0)],
-        //             ))
-        //         }
-        //     }
-        // }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_G2 && scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 192, ark_bls12_381::G2Affine, deserialize_uncompressed)
+        }
+        (Some(structure), scheme) if structure == Structure::BLS12_381_G2 && scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, structure, scheme.as_slice(), 96, ark_bls12_381::G2Affine, deserialize)
+        }
         // Some(Structure::BLS12_381_Gt) => {
         //     abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
         //     match Fq12::deserialize(bytes.as_slice()) {
@@ -662,6 +676,7 @@ fn eq_internal(
         Some(Structure::BLS12_381_Fr) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
         Some(Structure::BLS12_381_Fq12) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
         Some(Structure::BLS12_381_G1) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12_381_G2) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
         _ => {
             Ok(NativeResult::err(
                 InternalGas::zero(),
@@ -773,33 +788,6 @@ fn group_order_internal(
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())],
-            ))
-        }
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
-    }
-}
-
-#[cfg(feature = "testing")]
-fn random_scalar_internal(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
-    assert_eq!(1, ty_args.len());
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => {
-            abort_if_feature_disabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
-            let scalar = Fr::rand(&mut test_rng());
-            let handle = store_bls12_381_fr!(context, scalar);
-            Ok(NativeResult::ok(
-                InternalGas::zero(),
-                smallvec![Value::u64(handle as u64)],
             ))
         }
         _ => {
@@ -989,10 +977,7 @@ fn group_neg_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
-    let x = Fq12::one();
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => {
             ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, neg)
@@ -1116,7 +1101,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_add_internal),
         ),
         (
-            "group_mul_internal",
+            "group_scalar_mul_internal",
             make_native_from_func(gas_params.clone(), group_scalar_mul_internal),
         ),
         (
@@ -1143,10 +1128,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "random_element_internal",
             make_test_only_native_from_func(random_element_internal),
-        ),
-        (
-            "random_scalar_internal",
-            make_test_only_native_from_func(random_scalar_internal),
         ),
     ]);
 
