@@ -44,7 +44,7 @@ async fn generate_traffic_and_assert_committed(swarm: &mut dyn Swarm, nodes: &[P
     ]])
     .await
     .unwrap();
-    println!("{:?}", txn_stat.rate(Duration::from_secs(20)));
+    println!("{:?}", txn_stat.rate());
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);
