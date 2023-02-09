@@ -36,10 +36,10 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
-mod firehose_streamer_config;
-pub use firehose_streamer_config::*;
 mod indexer_config;
 pub use indexer_config::*;
+mod indexer_grpc_config;
+pub use indexer_grpc_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -86,7 +86,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]
-    pub firehose_stream: FirehoseStreamerConfig,
+    pub indexer_grpc: IndexerGrpcConfig,
     #[serde(default)]
     pub indexer: IndexerConfig,
     #[serde(default)]
@@ -294,6 +294,7 @@ impl NodeConfig {
 
         let mut config = config
             .validate_indexer_configs()?
+            .validate_indexer_grpc_configs()?
             .validate_network_configs()?;
         config.set_data_dir(config.data_dir().to_path_buf());
         Ok(config)
@@ -381,6 +382,29 @@ impl NodeConfig {
             self.indexer.gap_lookback_versions.or(Some(1_500_000)),
             None,
         );
+
+        Ok(self)
+    }
+
+    /// Validate `IndexerGrpcConfig`, ensuring that it's set up correctly
+    /// Additionally, handles any strange missing default cases
+    fn validate_indexer_grpc_configs(mut self) -> Result<NodeConfig, Error> {
+        if !self.indexer_grpc.enabled {
+            return Ok(self);
+        }
+
+        self.indexer_grpc.address = self
+            .indexer_grpc
+            .address
+            .or_else(|| Some("0.0.0.0:50051".to_string()));
+
+        self.indexer_grpc.processor_task_count =
+            self.indexer_grpc.processor_task_count.or(Some(20));
+
+        self.indexer_grpc.processor_batch_size =
+            self.indexer_grpc.processor_batch_size.or(Some(1000));
+
+        self.indexer_grpc.output_batch_size = self.indexer_grpc.output_batch_size.or(Some(100));
 
         Ok(self)
     }
