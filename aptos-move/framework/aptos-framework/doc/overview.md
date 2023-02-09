@@ -40,6 +40,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::staking_contract`](staking_contract.md#0x1_staking_contract)
 -  [`0x1::staking_proxy`](staking_proxy.md#0x1_staking_proxy)
 -  [`0x1::state_storage`](state_storage.md#0x1_state_storage)
+-  [`0x1::storage_deposit`](storage_deposit.md#0x1_storage_deposit)
 -  [`0x1::storage_gas`](storage_gas.md#0x1_storage_gas)
 -  [`0x1::system_addresses`](system_addresses.md#0x1_system_addresses)
 -  [`0x1::timestamp`](timestamp.md#0x1_timestamp)

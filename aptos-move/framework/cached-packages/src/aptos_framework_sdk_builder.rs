@@ -489,6 +489,8 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    StorageDepositInitialize {},
+
     /// Updates the major version to a larger version.
     /// This can be called by on chain governance.
     VersionSetVersion {
@@ -858,6 +860,7 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            StorageDepositInitialize {} => storage_deposit_initialize(),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
@@ -2272,6 +2275,21 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
+pub fn storage_deposit_initialize() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("storage_deposit").to_owned(),
+        ),
+        ident_str!("initialize").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Updates the major version to a larger version.
 /// This can be called by on chain governance.
 pub fn version_set_version(major: u64) -> TransactionPayload {
@@ -3360,6 +3378,14 @@ mod decoder {
         }
     }
 
+    pub fn storage_deposit_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::StorageDepositInitialize {})
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
@@ -3807,6 +3833,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "storage_deposit_initialize".to_string(),
+            Box::new(decoder::storage_deposit_initialize),
         );
         map.insert(
             "version_set_version".to_string(),

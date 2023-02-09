@@ -16,6 +16,7 @@ module aptos_framework::coin {
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
+    friend aptos_framework::storage_deposit;
     friend aptos_framework::transaction_fee;
 
     //
@@ -175,6 +176,13 @@ module aptos_framework::coin {
         amount == 0
     }
 
+    public(friend) fun extract_from_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>, amount: u64): Coin<CoinType> {
+        aggregator::sub(&mut coin.value, (amount as u128));
+        Coin<CoinType> {
+            value: amount
+        }
+    }
+
     /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
     public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         spec {
@@ -184,10 +192,7 @@ module aptos_framework::coin {
         let amount = aggregator::read(&coin.value);
         assert!(amount <= MAX_U64, error::out_of_range(EAGGREGATABLE_COIN_VALUE_TOO_LARGE));
 
-        aggregator::sub(&mut coin.value, amount);
-        Coin<CoinType> {
-            value: (amount as u64),
-        }
+        extract_from_aggregatable_coin(coin, (amount as u64))
     }
 
     /// Merges `coin` into aggregatable coin (`dst_coin`).

@@ -21,6 +21,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
 -  [Function `initialize_aggregatable_coin`](#0x1_coin_initialize_aggregatable_coin)
 -  [Function `is_aggregatable_coin_zero`](#0x1_coin_is_aggregatable_coin_zero)
+-  [Function `extract_from_aggregatable_coin`](#0x1_coin_extract_from_aggregatable_coin)
 -  [Function `drain_aggregatable_coin`](#0x1_coin_drain_aggregatable_coin)
 -  [Function `merge_aggregatable_coin`](#0x1_coin_merge_aggregatable_coin)
 -  [Function `collect_into_aggregatable_coin`](#0x1_coin_collect_into_aggregatable_coin)
@@ -709,6 +710,33 @@ Returns true if the value of aggregatable coin is zero.
 
 </details>
 
+<a name="0x1_coin_extract_from_aggregatable_coin"></a>
+
+## Function `extract_from_aggregatable_coin`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_from_aggregatable_coin">extract_from_aggregatable_coin</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_from_aggregatable_coin">extract_from_aggregatable_coin</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+    <a href="aggregator.md#0x1_aggregator_sub">aggregator::sub</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>.value, (amount <b>as</b> u128));
+    <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+        value: amount
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_coin_drain_aggregatable_coin"></a>
 
 ## Function `drain_aggregatable_coin`
@@ -733,10 +761,7 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
     <b>let</b> amount = <a href="aggregator.md#0x1_aggregator_read">aggregator::read</a>(&<a href="coin.md#0x1_coin">coin</a>.value);
     <b>assert</b>!(amount &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="coin.md#0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE">EAGGREGATABLE_COIN_VALUE_TOO_LARGE</a>));
 
-    <a href="aggregator.md#0x1_aggregator_sub">aggregator::sub</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>.value, amount);
-    <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
-        value: (amount <b>as</b> u64),
-    }
+    <a href="coin.md#0x1_coin_extract_from_aggregatable_coin">extract_from_aggregatable_coin</a>(<a href="coin.md#0x1_coin">coin</a>, (amount <b>as</b> u64))
 }
 </code></pre>
 
