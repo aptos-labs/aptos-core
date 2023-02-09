@@ -231,12 +231,12 @@ spec aptos_framework::aptos_governance {
         aborts_if !proposal.is_resolved;
     }
 
-    spec reconfigure {
+    spec reconfigure(aptos_framework: &signer) {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
 
-        pragma aborts_if_is_strict = false;
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
 
         requires chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
