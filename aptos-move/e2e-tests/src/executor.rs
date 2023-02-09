@@ -21,6 +21,7 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -38,8 +39,8 @@ use aptos_types::{
     vm_status::VMStatus,
     write_set::WriteSet,
 };
+use aptos_types::{chain_id::ChainId, on_chain_config::TimedFeatures};
 use aptos_vm::{
-    aptos_vm::LATEST_FEATURE_ACTIVATION_TIME,
     block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
@@ -584,7 +585,7 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 // FIXME: should probably read the timestamp from storage.
-                LATEST_FEATURE_ACTIVATION_TIME,
+                TimedFeatures::enable_all(),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -633,7 +634,7 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
-            LATEST_FEATURE_ACTIVATION_TIME,
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

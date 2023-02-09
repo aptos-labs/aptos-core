@@ -18,7 +18,6 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    aptos_vm::LATEST_FEATURE_ACTIVATION_TIME,
     data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMExecutor,
@@ -184,7 +183,7 @@ impl AptosDebugger {
             LATEST_GAS_FEATURE_VERSION,
             ChainId::test().id(),
             features,
-            LATEST_FEATURE_ACTIVATION_TIME,
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);

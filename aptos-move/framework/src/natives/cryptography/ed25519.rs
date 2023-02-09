@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::util::make_native_from_func;
+use crate::natives::helpers::make_native_from_func;
 #[cfg(feature = "testing")]
-use crate::natives::util::make_test_only_native_from_func;
+use crate::natives::helpers::make_test_only_native_from_func;
 #[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
@@ -122,9 +122,10 @@ fn native_signature_verify_strict(
         + gas_params.per_msg_byte_hashing * NumBytes::new(msg.len() as u64);
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
-    Ok(NativeResult::ok(cost, smallvec![Value::bool(
-        verify_result
-    )]))
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(verify_result)],
+    ))
 }
 
 /***************************************************************************************************
@@ -180,10 +181,13 @@ fn native_test_only_generate_keys_internal(
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(key_pair.private_key.to_bytes()),
-        Value::vector_u8(key_pair.public_key.to_bytes())
-    ]))
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![
+            Value::vector_u8(key_pair.private_key.to_bytes()),
+            Value::vector_u8(key_pair.public_key.to_bytes())
+        ],
+    ))
 }
 
 #[cfg(feature = "testing")]
@@ -196,7 +200,8 @@ fn native_test_only_sign_internal(
     let sk_bytes = pop_arg!(args, Vec<u8>);
     let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(sig.to_bytes())
-    ]))
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(sig.to_bytes())],
+    ))
 }
