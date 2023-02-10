@@ -861,8 +861,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
+ "aptos-backup-service",
  "aptos-config",
  "aptos-db",
+ "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-logger",
  "aptos-push-metrics",
