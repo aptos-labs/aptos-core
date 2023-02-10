@@ -836,6 +836,8 @@ async fn finalize_storage_and_send_commit<
         )
         .map_err(|error| format!("Failed to finalize the state snapshot! Error: {:?}", error))?;
 
+    info!("All states have synced, version: {}", version);
+
     // Update the metadata storage
     metadata_storage.update_last_persisted_state_value_index(
             target_ledger_info,

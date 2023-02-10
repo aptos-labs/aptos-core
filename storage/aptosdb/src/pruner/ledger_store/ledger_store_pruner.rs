@@ -52,10 +52,7 @@ impl DBPruner for LedgerPruner {
         // Collect the schema batch writes
         let mut db_batch = SchemaBatch::new();
         let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
-        db_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerPrunerProgress,
-            &DbMetadataValue::Version(current_target_version),
-        )?;
+        self.save_min_readable_version(current_target_version, &db_batch)?;
         // Commit all the changes to DB atomically
         self.db.write_schemas(db_batch)?;
 
@@ -64,6 +61,17 @@ impl DBPruner for LedgerPruner {
         // progress.
         self.record_progress(current_target_version);
         Ok(current_target_version)
+    }
+
+    fn save_min_readable_version(
+        &self,
+        version: Version,
+        batch: &SchemaBatch,
+    ) -> anyhow::Result<()> {
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::LedgerPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
     }
 
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
@@ -172,6 +180,10 @@ impl LedgerPruner {
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_current_batch_target(max_versions as Version);
+
+        if current_target_version < min_readable_version {
+            return Ok(min_readable_version);
+        }
 
         self.transaction_store_pruner.prune(
             db_batch,
