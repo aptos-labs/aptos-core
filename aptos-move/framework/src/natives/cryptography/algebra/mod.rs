@@ -90,6 +90,8 @@ macro_rules! get_obj_pointer {
     }}
 }
 
+// Pre-defined serialization scheme IDs.
+// They has to match those in `aptos-move/framework/aptos-stdlib/sources/cryptography/algebra.move`.
 static BLS12_381_FQ12_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("04").unwrap());
 static BLS12_381_G1_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("06").unwrap());
 static BLS12_381_G1_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0601").unwrap());
