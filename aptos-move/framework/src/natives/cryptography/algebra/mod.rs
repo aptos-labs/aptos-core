@@ -1023,27 +1023,6 @@ fn pairing_internal(
     }
 }
 
-fn upcast_internal(
-    _gas_params: &GasParameters,
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert_eq!(2, ty_args.len());
-    let child_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
-    let handle = pop_arg!(args, u64);
-    match (child_opt, parent_opt) {
-        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
-            Ok(NativeResult::ok(
-                InternalGas::zero(),
-                smallvec![Value::u64(handle)],
-            ))
-        }
-        _ => unreachable!()
-    }
-}
-
 fn downcast_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -1069,6 +1048,27 @@ fn downcast_internal(
                     smallvec![Value::bool(false), Value::u64(handle as u64)],
                 ))
             }
+        }
+        _ => unreachable!()
+    }
+}
+
+fn upcast_internal(
+    _gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(2, ty_args.len());
+    let child_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let handle = pop_arg!(args, u64);
+    match (child_opt, parent_opt) {
+        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
+            Ok(NativeResult::ok(
+                InternalGas::zero(),
+                smallvec![Value::u64(handle)],
+            ))
         }
         _ => unreachable!()
     }
