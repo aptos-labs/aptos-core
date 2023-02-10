@@ -9,9 +9,11 @@ use crate::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
+    models::coin_models::{coin_activities::CoinActivity, coin_infos::CoinInfoQuery},
     models::token_models::{
         ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
         collection_datas::{CollectionData, CurrentCollectionData},
+        petra_activities::PetraActivity,
         token_activities::TokenActivity,
         token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
@@ -24,6 +26,7 @@ use crate::{
     schema,
 };
 use aptos_api_types::Transaction;
+use aptos_types::APTOS_COIN_TYPE;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -70,6 +73,7 @@ fn insert_to_db_impl(
     token_activities: &[TokenActivity],
     current_token_claims: &[CurrentTokenPendingClaim],
     current_ans_lookups: &[CurrentAnsLookup],
+    petra_activities: &[PetraActivity],
 ) -> Result<(), diesel::result::Error> {
     let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
     let (current_token_ownerships, current_token_datas, current_collection_datas) =
@@ -84,6 +88,7 @@ fn insert_to_db_impl(
     insert_token_activities(conn, token_activities)?;
     insert_current_token_claims(conn, current_token_claims)?;
     insert_current_ans_lookups(conn, current_ans_lookups)?;
+    insert_petra_activities(conn, petra_activities)?;
     Ok(())
 }
 
@@ -106,6 +111,7 @@ fn insert_to_db(
     token_activities: Vec<TokenActivity>,
     current_token_claims: Vec<CurrentTokenPendingClaim>,
     current_ans_lookups: Vec<CurrentAnsLookup>,
+    petra_activities: Vec<PetraActivity>,
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -131,6 +137,7 @@ fn insert_to_db(
                 &token_activities,
                 &current_token_claims,
                 &current_ans_lookups,
+                &petra_activities,
             )
         }) {
         Ok(_) => Ok(()),
@@ -160,6 +167,7 @@ fn insert_to_db(
                     &token_activities,
                     &current_token_claims,
                     &current_ans_lookups,
+                    &petra_activities,
                 )
             }),
     }
@@ -467,6 +475,27 @@ fn insert_current_ans_lookups(
     Ok(())
 }
 
+fn insert_petra_activities(
+    conn: &mut PgConnection,
+    items_to_insert: &[PetraActivity],
+) -> Result<(), diesel::result::Error> {
+    use schema::petra_activities::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), PetraActivity::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::petra_activities::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, account_address))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionProcessor for TokenTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -486,11 +515,17 @@ impl TransactionProcessor for TokenTransactionProcessor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
+        // get aptos_coin info for supply tracking
+        // TODO: This only needs to be fetched once. Need to persist somehow
+        let maybe_aptos_coin_info =
+            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap();
+
         let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
         let mut all_token_datas = vec![];
         let mut all_collection_datas = vec![];
         let mut all_token_activities = vec![];
+        let mut all_petra_activities = vec![];
 
         // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
         let mut all_current_token_ownerships: HashMap<
@@ -531,6 +566,18 @@ impl TransactionProcessor for TokenTransactionProcessor {
             // Track token activities
             let mut activities = TokenActivity::from_transaction(&txn);
             all_token_activities.append(&mut activities);
+
+            // Petra activities
+            let (
+                coin_activities,
+                _coin_balances,
+                _coin_infos,
+                _current_coin_balances,
+                _coin_supply,
+            ) = CoinActivity::from_transaction(&txn, maybe_aptos_coin_info);
+            let mut petra_activities =
+                PetraActivity::from_transaction(&txn, coin_activities, activities);
+            all_petra_activities.append(&mut petra_activities);
 
             // claims
             all_current_token_claims.extend(current_token_claims);
@@ -606,6 +653,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
             all_token_activities,
             all_current_token_claims,
             all_current_ans_lookups,
+            all_petra_activities,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

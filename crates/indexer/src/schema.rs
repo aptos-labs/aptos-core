@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -288,6 +285,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    petra_activities (account_address, transaction_version) {
+        transaction_version -> Int8,
+        account_address -> Varchar,
+        coin_activities -> Jsonb,
+        token_activities -> Jsonb,
+    }
+}
+
+diesel::table! {
     processor_status (processor) {
         processor -> Varchar,
         last_success_version -> Int8,
@@ -515,6 +521,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ledger_infos,
     move_modules,
     move_resources,
+    petra_activities,
     processor_status,
     processor_statuses,
     proposal_votes,
