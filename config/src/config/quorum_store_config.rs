@@ -39,7 +39,7 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
-            mempool_pulling_interval: 100,
+            mempool_pulling_interval: 200,
             end_batch_ms: 500,
             max_batch_counts: 80,
             max_batch_bytes: 1000000,
