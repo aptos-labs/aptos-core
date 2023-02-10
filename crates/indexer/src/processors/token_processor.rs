@@ -9,18 +9,20 @@ use crate::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::coin_models::{coin_activities::CoinActivity, coin_infos::CoinInfoQuery},
-    models::token_models::{
-        ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
-        collection_datas::{CollectionData, CurrentCollectionData},
-        petra_activities::PetraActivity,
-        token_activities::TokenActivity,
-        token_claims::CurrentTokenPendingClaim,
-        token_datas::{CurrentTokenData, TokenData},
-        token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-        tokens::{
-            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
-            TokenDataIdHash,
+    models::{
+        coin_models::{coin_activities::CoinActivity, coin_infos::CoinInfoQuery},
+        token_models::{
+            ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
+            collection_datas::{CollectionData, CurrentCollectionData},
+            petra_activities::PetraActivity,
+            token_activities::TokenActivity,
+            token_claims::CurrentTokenPendingClaim,
+            token_datas::{CurrentTokenData, TokenData},
+            token_ownerships::{CurrentTokenOwnership, TokenOwnership},
+            tokens::{
+                CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
+                TokenDataIdHash,
+            },
         },
     },
     schema,

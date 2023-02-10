@@ -1,10 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::models::coin_models::coin_activities::CoinActivity;
-use crate::models::token_models::token_activities::TokenActivity;
-use crate::schema::petra_activities;
-use crate::util::standardize_address;
+use crate::{
+    models::{
+        coin_models::coin_activities::CoinActivity, token_models::token_activities::TokenActivity,
+    },
+    schema::petra_activities,
+    util::standardize_address,
+};
 use aptos_api_types::Transaction as APITransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
