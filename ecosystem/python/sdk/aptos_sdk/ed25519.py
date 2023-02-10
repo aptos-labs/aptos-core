@@ -116,6 +116,16 @@ class MultiEd25519PublicKey:
             concatenated_keys += key.key.encode()
         return concatenated_keys + bytes([self.threshold])
 
+    @staticmethod
+    def from_bytes(key: bytes) -> MultiEd25519PublicKey:
+        n_signers = int(len(key) / PublicKey.LENGTH)
+        keys = []
+        for i in range(n_signers):
+            start_byte = i * PublicKey.LENGTH
+            end_byte = (i + 1) * PublicKey.LENGTH
+            keys.append(PublicKey(VerifyKey(key[start_byte:end_byte])))
+        return MultiEd25519PublicKey(keys, int(key[-1]))
+
     def serialize(self, serializer: Serializer):
         serializer.to_bytes(self.to_bytes())
 

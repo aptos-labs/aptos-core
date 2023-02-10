@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import datetime
 import getpass
 import json
 import secrets
@@ -16,11 +17,12 @@ from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.authenticator import Authenticator
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.client import RestClient
+from aptos_sdk.client import ClientConfig, RestClient
 from aptos_sdk.ed25519 import (MultiEd25519PublicKey, MultiEd25519Signature,
                                PublicKey, Signature)
-from aptos_sdk.transactions import (EntryFunction, SignedTransaction,
-                                    TransactionArgument, TransactionPayload)
+from aptos_sdk.transactions import (EntryFunction, RawTransaction,
+                                    SignedTransaction, TransactionArgument,
+                                    TransactionPayload)
 from cryptography.exceptions import InvalidSignature
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -493,12 +495,11 @@ def get_rotation_challenge_bcs(proposal_data: Dict[str, str]) -> bytes:
 
 def rotate_challenge_sign(args):
     """Sign a rotation proof challenge proposal, storing output file."""
-    name = check_name(args.name)  # Get name for the signature.
     proposal_data = json.load(args.proposal)  # Load proposal data.
     # Check password, get keyfile data and optional private key bytes.
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
-        return  # Return
+        return  # Return.
     # Get rotation proof challenged BCS bytes.
     rotation_proof_challenge_bcs = get_rotation_challenge_bcs(proposal_data)
     # Create Aptos-style account.
@@ -509,7 +510,7 @@ def rotate_challenge_sign(args):
         path=get_file_path(args.outfile, args.name, "challenge_signature"),
         data={
             "filetype": "Rotation proof challenge signature",
-            "description": name,
+            "description": check_name(args.name),
             "challenge_proposal": proposal_data,
             "signatory": get_public_signatory_fields(keyfile_data),
             "signature": bytes_to_prefixed_hex(signature),
@@ -651,44 +652,126 @@ def rotate_transaction_propose(args):
     """Propose authentication key rotation transaction from multisig."""
     # Initialize empty from and to signatures for challenge proposal.
     challenge_from_signatures, challenge_to_signatures = [], []
-    proposal = extract_challenge_proposal_data(
+    challenge_proposal = extract_challenge_proposal_data(
         signature_files=args.from_signatures,
         proposal=None,
         signatures_manifest=challenge_from_signatures,
     )  # Extract from challenge proposal signatures.
-    proposal = extract_challenge_proposal_data(
+    challenge_proposal = extract_challenge_proposal_data(
         signature_files=args.to_signatures,
-        proposal=None,
+        proposal=challenge_proposal,
         signatures_manifest=challenge_to_signatures,
     )  # Extract to challenge proposal signatures.
     write_json_file(  # Write JSON to transaction proposal file.
         path=get_file_path(
             optional_path=args.outfile,
-            name_tokens=proposal["description"].split(),
+            name_tokens=args.name,
             extension="rotation_transaction_proposal",
         ),
         data={
             "filetype": "Rotation transaction proposal",
             "description": check_name(args.name),
-            "challenge_proposal": proposal,
+            "challenge_proposal": challenge_proposal,
             "challenge_from_signatures": challenge_from_signatures,
             "challenge_to_signatures": challenge_to_signatures,
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
         },
         check_if_exists=True,
     )
 
 
-def signature_map_to_hex(
-    signature_map: List[Tuple[PublicKey, Signature]]
-) -> List[Tuple[str, str]]:
-    """Convert a class-based signature map to a prefixed hex version."""
-    return [
+def signature_json_to_map(
+    manifest: List[Dict[str, Any]]
+) -> List[Tuple[PublicKey, Signature]]:
+    """Convert a JSON signature manifest to a classed signature map."""
+    to_bytes = prefixed_hex_to_bytes  # Shorten func name for brevity.
+    return [  # Return list comprehension.
         (
-            bytes_to_prefixed_hex(entry[0].key.encode()),
-            bytes_to_prefixed_hex(entry[1].data()),
+            PublicKey(VerifyKey(to_bytes(entry["signatory"]["public_key"]))),
+            Signature(to_bytes(entry["signature"])),
         )
-        for entry in signature_map
+        for entry in manifest
     ]
+
+
+def rotate_transaction_sign(args):
+    """Sign an authentication key rotation transaction from a multisig
+    account."""
+    proposal_data = json.load(args.proposal)  # Load proposal data.
+    # Check password, get keyfile data and optional private key bytes.
+    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is None:  # If can't decrypt private key:
+        return  # Return.
+    # Get rotation proof challenge proposal.
+    challenge_proposal = proposal_data["challenge_proposal"]
+    from_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["from_public_key"]
+    )  # Get from public key bytes.
+    cap_rotate_key = MultiEd25519Signature(
+        MultiEd25519PublicKey.from_bytes(from_public_key_bytes),
+        signature_json_to_map(proposal_data["challenge_from_signatures"]),
+    ).to_bytes()  # Get key rotation capability signature.
+    to_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["new_public_key"]
+    )  # Get public key bytes for to account.
+    # If account to rotate to is a single signer:
+    if challenge_proposal["to_is_single_signer"]:
+        to_scheme = Authenticator.ED25519  # Scheme is single-signer.
+        cap_update_table = prefixed_hex_to_bytes(
+            proposal_data["challenge_to_signatures"][0]["signature"]
+        )  # Update table capability signature is only one provided.
+    else:  # If account to rotate to is a multisig:
+        to_scheme = Authenticator.MULTI_ED25519  # Scheme is multisig.
+        cap_update_table = MultiEd25519Signature(
+            MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
+            signature_json_to_map(proposal_data["challenge_to_signatures"]),
+        ).to_bytes()  # Get table update capability signature.
+    payload = EntryFunction.natural(
+        module="0x1::account",
+        function="rotate_authentication_key",
+        ty_args=[],
+        args=[
+            TransactionArgument(Authenticator.MULTI_ED25519, Serializer.u8),
+            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(to_scheme, Serializer.u8),
+            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
+            TransactionArgument(cap_update_table, Serializer.to_bytes),
+        ],
+    )  # Construct entry function payload.
+    # Get account address bytes of transaction sender.
+    sender_bytes = prefixed_hex_to_bytes(challenge_proposal["originator"])
+    # Get expiry datetime.
+    expiry = datetime.datetime.fromisoformat(proposal_data["expiry"])
+    raw_transaction = RawTransaction(
+        sender=AccountAddress(sender_bytes),
+        sequence_number=challenge_proposal["sequence_number"],
+        payload=TransactionPayload(payload),
+        max_gas_amount=ClientConfig.max_gas_amount,
+        gas_unit_price=ClientConfig.gas_unit_price,
+        expiration_timestamps_secs=int(expiry.timestamp()),
+        chain_id=proposal_data["chain_id"],
+    )
+    # Create Aptos-style account.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    # Sign raw transaction.
+    signature = account.sign(raw_transaction.keyed())
+    write_json_file(  # Write JSON to signature file.
+        path=get_file_path(
+            optional_path=args.outfile,
+            name_tokens=args.name,
+            extension="rotation_transaction_signature",
+        ),
+        data={
+            "filetype": "Rotation transaction signature",
+            "description": check_name(args.name),
+            "transaction_proposal": proposal_data,
+            "signatory": get_public_signatory_fields(keyfile_data),
+            "signature": bytes_to_prefixed_hex(signature.signature),
+        },
+        check_if_exists=True,
+    )
 
 
 def update_multisig_address(path: Path, address_prefixed_hex: str):
@@ -1150,14 +1233,15 @@ parser_rotate_transaction_propose = subparsers_rotate_transaction.add_parser(
     aliases=["p"],
     description="""Propose an authentication key rotation from a multisig
         account originator.""",
-    help="Rotate authentication key for multisig account.",
+    help="Propose authentication key rotation for multisig account.",
+    parents=[network_parser],
 )
 parser_rotate_transaction_propose.set_defaults(func=rotate_transaction_propose)
 parser_rotate_transaction_propose.add_argument(
     "name",
     type=str,
     nargs="+",
-    help="Description for rotation signature.",
+    help="Description for rotation transaction proposal.",
 )
 parser_rotate_transaction_propose.add_argument(
     "-f",
@@ -1181,11 +1265,50 @@ parser_rotate_transaction_propose.add_argument(
     required=True,
 )
 parser_rotate_transaction_propose.add_argument(
+    "-e",
+    "--expiry",
+    required=True,
+    help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.datetime.fromisoformat,
+)
+parser_rotate_transaction_propose.add_argument(
     "-o",
     "--outfile",
     type=Path,
     help="Relative path to rotation transaction proposal outfile.",
 )
+
+# Rotate transaction sign subcommand parser.
+parser_rotate_transaction_sign = subparsers_rotate_transaction.add_parser(
+    name="sign",
+    aliases=["s"],
+    description="Sign an authentication key rotation transaction.",
+    help="Authentication key rotation transaction signing.",
+)
+parser_rotate_transaction_sign.set_defaults(func=rotate_transaction_sign)
+parser_rotate_transaction_sign.add_argument(
+    "proposal",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Rotation transaction proposal file.",
+)
+parser_rotate_transaction_sign.add_argument(
+    "keyfile",
+    type=Path,
+    help="Relative path to single-signer keyfile for signing proposal.",
+)
+parser_rotate_transaction_sign.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="Description for transaction signature.",
+)
+parser_rotate_transaction_sign.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="Relative path to rotation transaction signature outfile.",
+)
+
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
 parsed_args.func(parsed_args)  # Call command line argument function.

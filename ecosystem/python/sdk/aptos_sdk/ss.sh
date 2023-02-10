@@ -1,5 +1,6 @@
-# Rotate from Ace to multisig, then increase threshold.
+# Rotate from Ace to multisig, increase threshold, rotate back to Ace.
 if test $1 = r; then
+    rm -rf tmp # Clear temp dir.
     mkdir tmp # Make temp dir.
     # Generate Ace keyfile.
     python amee.py k g Ace -v=0xace -k tmp/ace.keyfile
@@ -35,13 +36,17 @@ if test $1 = r; then
         -f tmp/ace_increase.challenge_signature \
         -t tmp/ace_increase.challenge_signature \
             tmp/bob_increase.challenge_signature \
-        -o tmp/increase_threshold.rotation_transaction_proposal
-
-
+        -o tmp/increase_threshold.rotation_transaction_proposal \
+        -e 2023-02-25T20:12:26+02:00
+    # Sign rotation transaction proposal.
+    python amee.py r t s tmp/increase_threshold.rotation_transaction_proposal \
+        tmp/ace.keyfile Ace transaction \
+        -o tmp/ace_transaction_signature.rotation_transaction_signature
     rm -rf tmp # Clear temp dir.
 
 # Mutate metafile.
 elif test $1 = m; then
+    rm -rf tmp # Clear temp dir.
     mkdir tmp # Make temp dir.
     # Generate Ace keyfile.
     python amee.py k g Ace -v=0xace -k tmp/ace.keyfile
