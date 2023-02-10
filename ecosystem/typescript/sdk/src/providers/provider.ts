@@ -36,7 +36,7 @@ export class Provider {
     let fullNodeUrl = null;
     let indexerUrl = null;
 
-    if (typeof network === "object" && this.isCustomEndpoints(network)) {
+    if (typeof network === "object" && isCustomEndpoints(network)) {
       fullNodeUrl = network.fullnodeUrl;
       indexerUrl = network.indexerUrl;
     } else {
@@ -50,16 +50,6 @@ export class Provider {
 
     this.aptosClient = new AptosClient(fullNodeUrl, config, doNotFixNodeUrl);
     this.indexerClient = new IndexerClient(indexerUrl);
-  }
-
-  // use exhaustive type predicates
-  private isCustomEndpoints(network: CustomEndpoints): network is CustomEndpoints {
-    return (
-      network.fullnodeUrl !== undefined &&
-      typeof network.fullnodeUrl === "string" &&
-      network.indexerUrl !== undefined &&
-      typeof network.indexerUrl === "string"
-    );
   }
 }
 
@@ -75,7 +65,7 @@ Here, we combine AptosClient and IndexerClient classes into one Provider class t
 methods and properties from both classes.
 */
 applyMixins(Provider, [AptosClient, IndexerClient]);
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function applyMixins(derivedCtor: any, constructors: any[]) {
   Object.getOwnPropertyNames(AptosClient.prototype).forEach((propertyName) => {
     const propertyDescriptor = Object.getOwnPropertyDescriptor(AptosClient.prototype, propertyName);
@@ -96,4 +86,14 @@ function applyMixins(derivedCtor: any, constructors: any[]) {
     };
     Object.defineProperty(Provider.prototype, propertyName, propertyDescriptor);
   });
+}
+
+// use exhaustive type predicates
+function isCustomEndpoints(network: CustomEndpoints): network is CustomEndpoints {
+  return (
+    network.fullnodeUrl !== undefined &&
+    typeof network.fullnodeUrl === "string" &&
+    network.indexerUrl !== undefined &&
+    typeof network.indexerUrl === "string"
+  );
 }
