@@ -25,8 +25,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
 -  [Function `get_resource_groups_feature`](#0x1_features_get_resource_groups_feature)
 -  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
--  [Function `get_generic_agebraic_operations_feature`](#0x1_features_get_generic_agebraic_operations_feature)
--  [Function `generic_algebra_basic_operations_enabled`](#0x1_features_generic_algebra_basic_operations_enabled)
+-  [Function `get_generic_agebraic_structures_basic_operations_feature`](#0x1_features_get_generic_agebraic_structures_basic_operations_feature)
+-  [Function `generic_algebraic_structures_basic_operations_enabled`](#0x1_features_generic_algebraic_structures_basic_operations_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -146,11 +146,11 @@ The provided signer has not a framework address.
 
 
 
-<a name="0x1_features_GENERIC_ALGEBRAIC_OPERATIONS"></a>
+<a name="0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS"></a>
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_OPERATIONS">GENERIC_ALGEBRAIC_OPERATIONS</a>: u64 = 10;
+<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>: u64 = 10;
 </code></pre>
 
 
@@ -583,13 +583,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_generic_agebraic_operations_feature"></a>
+<a name="0x1_features_get_generic_agebraic_structures_basic_operations_feature"></a>
 
-## Function `get_generic_agebraic_operations_feature`
+## Function `get_generic_agebraic_structures_basic_operations_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_operations_feature">get_generic_agebraic_operations_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64
 </code></pre>
 
 
@@ -598,20 +598,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_operations_feature">get_generic_agebraic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_OPERATIONS">GENERIC_ALGEBRAIC_OPERATIONS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_generic_algebra_basic_operations_enabled"></a>
+<a name="0x1_features_generic_algebraic_structures_basic_operations_enabled"></a>
 
-## Function `generic_algebra_basic_operations_enabled`
+## Function `generic_algebraic_structures_basic_operations_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebra_basic_operations_enabled">generic_algebra_basic_operations_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool
 </code></pre>
 
 
@@ -620,8 +620,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebra_basic_operations_enabled">generic_algebra_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_ALGEBRAIC_OPERATIONS">GENERIC_ALGEBRAIC_OPERATIONS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>)
 }
 </code></pre>
 

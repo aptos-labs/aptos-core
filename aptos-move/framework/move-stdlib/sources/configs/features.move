@@ -121,10 +121,10 @@ module std::features {
         is_enabled(RESOURCE_GROUPS)
     }
 
-    const GENERIC_ALGEBRAIC_OPERATIONS: u64 = 10;
-    public fun get_generic_agebraic_operations_feature(): u64 { GENERIC_ALGEBRAIC_OPERATIONS }
-    public fun generic_algebra_basic_operations_enabled(): bool acquires Features {
-        is_enabled(GENERIC_ALGEBRAIC_OPERATIONS)
+    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 10;
+    public fun get_generic_agebraic_structures_basic_operations_feature(): u64 { GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS }
+    public fun generic_algebraic_structures_basic_operations_enabled(): bool acquires Features {
+        is_enabled(GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS)
     }
 
     const BLS12_381_STRUCTURES: u64 = 11;

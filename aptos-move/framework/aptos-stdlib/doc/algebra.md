@@ -83,7 +83,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_order`](#0x1_algebra_group_order)
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
--  [Function `abort_unless_generic_algebra_basic_operations_enabled`](#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled)
+-  [Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`](#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled)
 -  [Function `abort_unless_type_enabled_for_basic_operation`](#0x1_algebra_abort_unless_type_enabled_for_basic_operation)
 -  [Function `abort_unless_type_serialization_scheme_enabled`](#0x1_algebra_abort_unless_type_serialization_scheme_enabled)
 -  [Function `abort_unless_type_triplet_enabled_for_pairing`](#0x1_algebra_abort_unless_type_triplet_enabled_for_pairing)
@@ -1100,7 +1100,7 @@ Return an element in the target group <code>Gt</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1,G2,Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_triplet_enabled_for_pairing">abort_unless_type_triplet_enabled_for_pairing</a>&lt;G1,G2,Gt&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
         handle: <a href="algebra.md#0x1_algebra_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(element_1.handle, element_2.handle)
@@ -1129,7 +1129,7 @@ Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of a
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(x.handle, y.handle)
 }
@@ -1156,7 +1156,7 @@ Convert a u64 to an element of an algebraic structure <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_from_u64">from_u64</a>&lt;S&gt;(value: u64): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_from_u64_internal">from_u64_internal</a>&lt;S&gt;(value)
@@ -1185,7 +1185,7 @@ Return the additive identity of a field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_zero">field_zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_zero_internal">field_zero_internal</a>&lt;S&gt;()
@@ -1214,7 +1214,7 @@ Return the multiplicative identity of a field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_one">field_one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_one_internal">field_one_internal</a>&lt;S&gt;()
@@ -1243,7 +1243,7 @@ Compute <code>-x</code> for an element <code>x</code> of a field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_neg">field_neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_neg_internal">field_neg_internal</a>&lt;S&gt;(x.handle)
@@ -1272,7 +1272,7 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1301,7 +1301,7 @@ Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sub">field_sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_sub_internal">field_sub_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1330,7 +1330,7 @@ Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a f
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_mul">field_mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_mul_internal">field_mul_internal</a>&lt;S&gt;(x.handle, y.handle)
@@ -1360,7 +1360,7 @@ Return none if y is the additive identity of field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_div">field_div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <b>let</b> (succ, handle) = <a href="algebra.md#0x1_algebra_field_div_internal">field_div_internal</a>&lt;S&gt;(x.handle, y.handle);
     <b>if</b> (succ) {
@@ -1392,7 +1392,7 @@ Compute <code>x^2</code> for an element <code>x</code> of a field <code>S</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr">field_sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;S&gt;(x.handle)
@@ -1422,7 +1422,7 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv">field_inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;S&gt;(x.handle);
     <b>if</b> (succeeded) {
@@ -1455,7 +1455,7 @@ Check if an element <code>x</code> is the multiplicative identity of field <code
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one">field_is_one</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;S&gt;(x.handle)
 }
@@ -1482,7 +1482,7 @@ Check if an element <code>x</code> is the aditive identity of field <code>S</cod
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero">field_is_zero</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;S&gt;();
     <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;S&gt;(x.handle)
 }
@@ -1509,7 +1509,7 @@ Get the identity of a group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity">group_identity</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;()
@@ -1538,7 +1538,7 @@ Get the fixed generator of a cyclic group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_generator">group_generator</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_generator_internal">group_generator_internal</a>&lt;G&gt;()
@@ -1567,7 +1567,7 @@ Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg">group_neg</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(element_p.handle)
@@ -1596,7 +1596,7 @@ Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a g
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add">group_add</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
@@ -1625,7 +1625,7 @@ Compute <code>2*P</code> for an element <code>P</code> of a group <code>G</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double">group_double</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_p.handle)
@@ -1654,7 +1654,7 @@ Compute <code>k*p</code>, where <code>p</code> is an element of a group <code>G<
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_pair_enabled_for_group_scalar_mul">abort_unless_type_pair_enabled_for_group_scalar_mul</a>&lt;G,S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
         handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
@@ -1683,7 +1683,7 @@ Deserializate a byte array to an element of an algebraic structure <code>S</code
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize">deserialize</a>&lt;S&gt;(scheme: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_serialization_scheme_enabled">abort_unless_type_serialization_scheme_enabled</a>&lt;S&gt;(scheme);
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S&gt;(scheme, bytes);
     <b>if</b> (succeeded) {
@@ -1715,7 +1715,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S&gt;(scheme: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_serialization_scheme_enabled">abort_unless_type_serialization_scheme_enabled</a>&lt;S&gt;(scheme);
     <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S&gt;(scheme, element.handle)
 }
@@ -1742,7 +1742,7 @@ Get the order of group <code>G</code>, little-endian encoded as a byte array.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
     <a href="algebra.md#0x1_algebra_group_order_internal">group_order_internal</a>&lt;G&gt;()
 }
@@ -1769,7 +1769,7 @@ Cast an element of a structure <code>S</code> to a parent structure <code>L</cod
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_upcast">upcast</a>&lt;S,L&gt;(element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_pair_enabled_for_upcast">abort_unless_type_pair_enabled_for_upcast</a>&lt;S,L&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt; {
         handle: <a href="algebra.md#0x1_algebra_upcast_internal">upcast_internal</a>&lt;S,L&gt;(element.handle)
@@ -1798,7 +1798,7 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_downcast">downcast</a>&lt;L,S&gt;(element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;L&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_pair_enabled_for_upcast">abort_unless_type_pair_enabled_for_upcast</a>&lt;S,L&gt;();
     <b>let</b> (succ, new_handle) = <a href="algebra.md#0x1_algebra_downcast_internal">downcast_internal</a>&lt;L,S&gt;(element.handle);
     <b>if</b> (succ) {
@@ -1813,13 +1813,13 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 
 </details>
 
-<a name="0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled"></a>
+<a name="0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled"></a>
 
-## Function `abort_unless_generic_algebra_basic_operations_enabled`
+## Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>()
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>()
 </code></pre>
 
 
@@ -1828,8 +1828,8 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebra_basic_operations_enabled">abort_unless_generic_algebra_basic_operations_enabled</a>() {
-    <b>if</b> (generic_algebra_basic_operations_enabled()) <b>return</b>;
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>() {
+    <b>if</b> (generic_algebraic_structures_basic_operations_enabled()) <b>return</b>;
     <b>abort</b>(std::error::not_implemented(0))
 }
 </code></pre>
