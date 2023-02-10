@@ -186,9 +186,7 @@ fn serialize_internal(
             let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_Gt, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -300,27 +298,25 @@ fn deserialize_internal(
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_obj!( context , element );
                         Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
-                            smallvec![ Value :: bool ( true ) , Value :: u64 ( handle as u64 ) ],
+                            gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                            smallvec![Value::bool(true), Value::u64(handle as u64)],
                         ))
                     } else {
                         Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
-                            smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
+                            gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                            smallvec![Value::bool(false), Value::u64(0)],
                         ))
                     }
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
-                        smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
+                        gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                        smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
             }
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -344,11 +340,11 @@ fn from_u64_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -377,11 +373,11 @@ fn field_add_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -410,11 +406,11 @@ fn field_sub_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -443,16 +439,16 @@ fn field_mul_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
 macro_rules! ark_field_div_internal {
-    ($gas_params:ident, $context:ident, $args:ident, $structure:ident, $typ:ty) => {{
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
             let handle_2 = pop_arg!($args, u64) as usize;
             let handle_1 = pop_arg!($args, u64) as usize;
             let element_1_ptr = get_obj_pointer!($context, handle_1);
@@ -483,11 +479,11 @@ fn field_div_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(s) if s == Structure::BLS12_381_Fr => ark_field_div_internal!(gas_params, context, args, s, ark_bls12_381::Fr),
-        Some(s) if s == Structure::BLS12_381_Fq12 => ark_field_div_internal!(gas_params, context, args, s, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_div_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_div_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -513,11 +509,11 @@ fn field_neg_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -551,11 +547,11 @@ fn field_inv_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -580,11 +576,11 @@ fn field_sqr_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -606,11 +602,11 @@ fn field_zero_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -632,11 +628,11 @@ fn field_one_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -660,11 +656,11 @@ fn field_is_one_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -688,11 +684,11 @@ fn field_is_zero_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -719,17 +715,17 @@ fn eq_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        Some(Structure::BLS12_381_G1) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
-        Some(Structure::BLS12_381_Gt) => ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12),
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
+        Some(Structure::BLS12_381_Fr) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12_381_G1) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12_381_G2) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
+        Some(Structure::BLS12_381_Gt) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12),
+        _ => unreachable!()
     }
 }
 
@@ -752,15 +748,13 @@ fn group_identity_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, zero),
-        Some(Structure::BLS12_381_G2) => ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, zero),
-        Some(Structure::BLS12_381_Gt) => ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, one),
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
+        Some(Structure::BLS12_381_G1) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, zero),
+        Some(Structure::BLS12_381_G2) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, zero),
+        Some(Structure::BLS12_381_Gt) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, one),
+        _ => unreachable!()
     }
 }
 
@@ -796,8 +790,10 @@ fn group_generator_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) => ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
+        Some(Structure::BLS12_381_G1) =>
+            ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12_381_G2) =>
+            ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
         Some(Structure::BLS12_381_Gt) => {
             let element = BLS12381_GT_GENERATOR.clone();
             let handle = store_obj!(context, element);
@@ -806,12 +802,7 @@ fn group_generator_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -829,12 +820,7 @@ fn group_order_internal(
                 smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -857,10 +843,14 @@ fn insecure_random_element_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) => ark_insecure_random_element_internal!(context, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) => ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12),
-        Some(Structure::BLS12_381_G1) => ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) => ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective),
+        Some(Structure::BLS12_381_Fr) =>
+            ark_insecure_random_element_internal!(context, ark_bls12_381::Fr),
+        Some(Structure::BLS12_381_Fq12) =>
+            ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12),
+        Some(Structure::BLS12_381_G1) =>
+            ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12_381_G2) =>
+            ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective),
         Some(Structure::BLS12_381_Gt) => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
@@ -870,12 +860,7 @@ fn insecure_random_element_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(
-                InternalGas::zero(),
-                NOT_IMPLEMENTED,
-            ))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -904,10 +889,13 @@ fn group_add_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, add),
-        Some(Structure::BLS12_381_G2) => ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, add),
-        Some(Structure::BLS12_381_Gt) => ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, mul),
-        _ => Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
+        Some(Structure::BLS12_381_G1) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, add),
+        Some(Structure::BLS12_381_G2) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, add),
+        Some(Structure::BLS12_381_Gt) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, mul),
+        _ => unreachable!()
     }
 }
 
@@ -935,21 +923,16 @@ fn group_scalar_mul_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(2, ty_args.len());
-    let group_structure = structure_from_ty_arg!(context, &ty_args[0]);
-    let scalar_structure = structure_from_ty_arg!(context, &ty_args[1]);
-    match (group_structure, scalar_structure) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) => {
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G1, Structure::BLS12_381_Fr, ark_bls12_381::G1Projective, ark_bls12_381::Fr, mul)
-        }
-        (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) => {
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G2, Structure::BLS12_381_Fr, ark_bls12_381::G2Projective, ark_bls12_381::Fr, mul)
-        }
-        (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fr)) => {
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_Gt, Structure::BLS12_381_Fr, ark_bls12_381::Fq12, ark_bls12_381::Fr, pow)
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+    let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    match (group_opt, scalar_field_opt) {
+        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G1, Structure::BLS12_381_Fr, ark_bls12_381::G1Projective, ark_bls12_381::Fr, mul),
+        (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G2, Structure::BLS12_381_Fr, ark_bls12_381::G2Projective, ark_bls12_381::Fr, mul),
+        (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_Gt, Structure::BLS12_381_Fr, ark_bls12_381::Fq12, ark_bls12_381::Fr, pow),
+        _ => unreachable!()
     }
 }
 
@@ -975,18 +958,13 @@ fn group_double_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, double)
-        }
-        Some(Structure::BLS12_381_G2) => {
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, double)
-        }
-        Some(Structure::BLS12_381_Gt) => {
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, square)
-        }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        Some(Structure::BLS12_381_G1) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, double),
+        Some(Structure::BLS12_381_G2) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, double),
+        Some(Structure::BLS12_381_Gt) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, square),
+        _ => unreachable!()
     }
 }
 
@@ -1012,12 +990,10 @@ fn group_neg_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) => {
-            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, neg)
-        }
-        Some(Structure::BLS12_381_G2) => {
-            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, neg)
-        }
+        Some(Structure::BLS12_381_G1) =>
+            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, neg),
+        Some(Structure::BLS12_381_G2) =>
+            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, neg),
         Some(Structure::BLS12_381_Gt) => {
             let handle = pop_arg!( args , u64 ) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
@@ -1029,9 +1005,7 @@ fn group_neg_internal(
                 smallvec![ Value :: u64 ( new_handle as u64 ) ],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -1062,9 +1036,7 @@ fn pairing_internal(
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), abort_codes::NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -1085,9 +1057,7 @@ fn upcast_internal(
                 smallvec![Value::u64(handle as u64)],
             ))
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -1117,9 +1087,7 @@ fn downcast_internal(
                 ))
             }
         }
-        _ => {
-            Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED))
-        }
+        _ => unreachable!()
     }
 }
 
@@ -1131,6 +1099,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "deserialize_internal",
             make_native_from_func(gas_params.clone(), deserialize_internal),
+        ),
+        (
+            "downcast_internal",
+            make_native_from_func(gas_params.clone(), downcast_internal),
         ),
         (
             "eq_internal",
@@ -1223,10 +1195,6 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "upcast_internal",
             make_native_from_func(gas_params.clone(), upcast_internal),
-        ),
-        (
-            "downcast_internal",
-            make_native_from_func(gas_params.clone(), downcast_internal),
         ),
     ]);
 
