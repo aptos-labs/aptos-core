@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use move_vm_runtime::native_functions::NativeFunctionTable;
-
-use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
+use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{

@@ -29,12 +29,12 @@ base64 = { workspace = true }
 bcs = { workspace = true }
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
-blst = {workspace = true }
+blst = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }
 flate2 = { workspace = true }
-hex.workspace = true
+hex = { workspace = true }
 include_dir = { workspace = true }
 itertools = { workspace = true }
 libsecp256k1 = { workspace = true }
@@ -56,6 +56,7 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+rand = { workspace = true }
 rand_core = { workspace = true }
 rayon = { workspace = true }
 ripemd = { workspace = true }
@@ -70,7 +71,6 @@ smallvec = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
-rand.workspace = true
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

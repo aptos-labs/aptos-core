@@ -19,7 +19,6 @@ use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use cryptography::ed25519;
-
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
@@ -287,7 +286,10 @@ pub fn all_natives(
         "create_signer",
         create_signer::make_all(gas_params.account.create_signer.clone())
     );
-    add_natives_from_module!("algebra", cryptography::algebra::make_all(gas_params.algebra.clone()));
+    add_natives_from_module!(
+        "algebra",
+        cryptography::algebra::make_all(gas_params.algebra.clone())
+    );
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!(
         "genesis",
