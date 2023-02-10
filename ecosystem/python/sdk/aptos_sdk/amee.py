@@ -733,12 +733,12 @@ subparsers_keyfile = parser_keyfile.add_subparsers(required=True)
 parser_keyfile_change_password = subparsers_keyfile.add_parser(
     name="change-password",
     aliases=["c"],
-    description="""Change password for a single-singer keyfile.""",
+    description="Change password for a single-singer keyfile.",
     help="Change keyfile password.",
 )
 parser_keyfile_change_password.set_defaults(func=keyfile_change_password)
 parser_keyfile_change_password.add_argument(
-    "keyfile", type=Path, help="""Relative path to keyfile."""
+    "keyfile", type=Path, help="Relative path to keyfile."
 )
 
 # Keyfile extract subcommand parser.
@@ -751,13 +751,13 @@ parser_keyfile_extract = subparsers_keyfile.add_parser(
 )
 parser_keyfile_extract.set_defaults(func=keyfile_extract)
 parser_keyfile_extract.add_argument(
-    "keyfile", type=Path, help="""Relative path to keyfile to extract from."""
+    "keyfile", type=Path, help="Relative path to keyfile to extract from."
 )
 parser_keyfile_extract.add_argument(
     "account_store",
     metavar="account-store",
     type=Path,
-    help="""Relative path to account file to store in.""",
+    help="Relative path to account file to store in.",
 )
 
 # Keyfile generate subcommand parser.
@@ -776,7 +776,7 @@ parser_keyfile_generate.add_argument(
         or 'The Aptos Foundation'.""",
 )
 parser_keyfile_generate.add_argument(
-    "-k", "--keyfile", type=Path, help="""Relative path to desired keyfile."""
+    "-k", "--keyfile", type=Path, help="Relative path to desired keyfile."
 )
 exclusive_group = parser_keyfile_generate.add_mutually_exclusive_group()
 exclusive_group.add_argument(
@@ -790,7 +790,7 @@ exclusive_group.add_argument(
     "-v",
     "--vanity-prefix",
     type=str,
-    help="""Vanity address prefix, for example 0xf00.""",
+    help="Vanity address prefix, for example 0xf00.",
 )
 
 # Keyfile verify subcommand parser.
@@ -802,7 +802,7 @@ parser_keyfile_verify = subparsers_keyfile.add_parser(
 )
 parser_keyfile_verify.set_defaults(func=keyfile_verify)
 parser_keyfile_verify.add_argument(
-    "keyfile", type=Path, help="""Relative path to keyfile."""
+    "keyfile", type=Path, help="Relative path to keyfile."
 )
 
 # Keyfile fund subcommand parser.
@@ -1040,25 +1040,25 @@ parser_rotate_challenge_propose.add_argument(
     "name",
     type=str,
     nargs="+",
-    help="""Description for rotation. For example 'Setup' or 'Add signer'.""",
+    help="Description for rotation. For example 'Setup' or 'Add signer'.",
 )
 parser_rotate_challenge_propose.add_argument(
     "-f",
     "--from-single",
     action="store_true",
-    help="""If originator is a single signer.""",
+    help="If originator is a single signer.",
 )
 parser_rotate_challenge_propose.add_argument(
     "-t",
     "--to-single",
     action="store_true",
-    help="""If authentication key to rotate to is for single signer.""",
+    help="If authentication key to rotate to is for single signer.",
 )
 parser_rotate_challenge_propose.add_argument(
     "-o",
     "--outfile",
     type=Path,
-    help="""Relative path to rotation proof challenge proposal outfile.""",
+    help="Relative path to rotation proof challenge proposal outfile.",
 )
 
 # Rotate challenge sign subcommand parser.
@@ -1072,24 +1072,24 @@ parser_rotate_challenge_sign.set_defaults(func=rotate_challenge_sign)
 parser_rotate_challenge_sign.add_argument(
     "proposal",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Rotation proof challenge proposal file.""",
+    help="Rotation proof challenge proposal file.",
 )
 parser_rotate_challenge_sign.add_argument(
     "keyfile",
     type=Path,
-    help="""Single-signer keyfile for signing challenge proposal.""",
+    help="Single-signer keyfile for signing challenge proposal.",
 )
 parser_rotate_challenge_sign.add_argument(
     "name",
     type=str,
     nargs="+",
-    help="""Description for rotation signature.""",
+    help="Description for rotation signature.",
 )
 parser_rotate_challenge_sign.add_argument(
     "-o",
     "--outfile",
     type=Path,
-    help="""Relative path to rotation proof challenge signature outfile.""",
+    help="Relative path to rotation proof challenge signature outfile.",
 )
 
 # Rotate execute subcommand parser.
@@ -1110,19 +1110,19 @@ parser_rotate_execute_single = subparsers_rotate_execute.add_parser(
         the authentication key of a multisig account. Assumes single-signer
         account address is identical to its authentication key. Requires
         single-signer password approval.""",
-    help="""Rotate single-signer account to multisig account.""",
+    help="Rotate single-signer account to multisig account.",
     parents=[network_parser],
 )
 parser_rotate_execute_single.set_defaults(func=rotate_execute_single)
 parser_rotate_execute_single.add_argument(
     "keyfile",
     type=Path,
-    help="""Single-signer keyfile for account to convert.""",
+    help="Single-signer keyfile for account to convert.",
 )
 parser_rotate_execute_single.add_argument(
     "metafile",
     type=Path,
-    help="""Relative path to metafile for multisig to rotate to.""",
+    help="Relative path to metafile for multisig to rotate to.",
 )
 parser_rotate_execute_single.add_argument(
     "signatures",
@@ -1150,14 +1150,14 @@ parser_rotate_transaction_propose = subparsers_rotate_transaction.add_parser(
     aliases=["p"],
     description="""Propose an authentication key rotation from a multisig
         account originator.""",
-    help="""Rotate authentication key for multisig account.""",
+    help="Rotate authentication key for multisig account.",
 )
 parser_rotate_transaction_propose.set_defaults(func=rotate_transaction_propose)
 parser_rotate_transaction_propose.add_argument(
     "name",
     type=str,
     nargs="+",
-    help="""Description for rotation signature.""",
+    help="Description for rotation signature.",
 )
 parser_rotate_transaction_propose.add_argument(
     "-f",
@@ -1184,7 +1184,7 @@ parser_rotate_transaction_propose.add_argument(
     "-o",
     "--outfile",
     type=Path,
-    help="""Relative path to rotation transaction proposal outfile.""",
+    help="Relative path to rotation transaction proposal outfile.",
 )
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
