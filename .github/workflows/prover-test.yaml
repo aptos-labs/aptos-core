@@ -17,8 +17,8 @@ on:
      paths:
        - '**.move'
        - 'Cargo.toml'
-  # Allow us to manually run this specific workflow without a PR
-  workflow_dispatch:
+   # Allow us to manually run this specific workflow without a PR
+   workflow_dispatch:
 
 env:
   CARGO_INCREMENTAL: "0"
