@@ -3,6 +3,7 @@
 
 use anyhow::{Context, Result};
 use aptos_logger::info;
+use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::Version;
 use std::cmp::min;
 
@@ -30,6 +31,9 @@ pub trait DBPruner: Send + Sync {
 
     /// Initializes the least readable version stored in underlying DB storage
     fn initialize_min_readable_version(&self) -> Result<Version>;
+
+    /// Saves the min readable version.
+    fn save_min_readable_version(&self, version: Version, batch: &SchemaBatch) -> Result<()>;
 
     /// Returns the least readable version stores in the DB pruner
     fn min_readable_version(&self) -> Version;
