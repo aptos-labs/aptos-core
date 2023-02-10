@@ -150,13 +150,13 @@ module aptos_std::algebra {
     struct BLS12_381_G1 {}
 
     /// Return the ID of a serialization scheme,
-    /// which is essentially `bls12_381_g1_parent_uncompressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// which is essentially `bls12_381_g1_parent_uncompressed_format()` but only applicable to `BLS12_381_G1` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_uncompressed_format(): vector<u8> { x"06" }
 
     /// Return the ID of a serialization scheme,
-    /// which is essentially `bls12_381_g1_parent_compressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// which is essentially `bls12_381_g1_parent_compressed_format()` but only applicable to `BLS12_381_G1` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_compressed_format(): vector<u8> { x"0601" }
@@ -198,13 +198,13 @@ module aptos_std::algebra {
     struct BLS12_381_G2 {}
 
     /// Return the ID of a serialization scheme,
-    /// which is essentially `bls12_381_g2_parent_uncompressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// which is essentially `bls12_381_g2_parent_uncompressed_format()` but only applicable to `BLS12_381_G2` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_uncompressed_format(): vector<u8> { x"08" }
 
     /// Return the ID of a serialization scheme,
-    /// which is essentially `bls12_381_g2_parent_compressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// which is essentially `bls12_381_g2_parent_compressed_format()` but only applicable to `BLS12_381_G2` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_compressed_format(): vector<u8> { x"0801" }

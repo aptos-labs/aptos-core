@@ -693,7 +693,7 @@ NOTE: currently information-only, not implemented.
 ## Function `bls12_381_g1_uncompressed_format`
 
 Return the ID of a serialization scheme,
-which is essentially <code>bls12_381_g1_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+which is essentially <code><a href="algebra.md#0x1_algebra_bls12_381_g1_parent_uncompressed_format">bls12_381_g1_parent_uncompressed_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
@@ -719,7 +719,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 ## Function `bls12_381_g1_compressed_format`
 
 Return the ID of a serialization scheme,
-which is essentially <code>bls12_381_g1_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+which is essentially <code><a href="algebra.md#0x1_algebra_bls12_381_g1_parent_compressed_format">bls12_381_g1_parent_compressed_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
@@ -807,7 +807,7 @@ NOTE: currently information-only, not implemented.
 ## Function `bls12_381_g2_uncompressed_format`
 
 Return the ID of a serialization scheme,
-which is essentially <code>bls12_381_g2_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+which is essentially <code><a href="algebra.md#0x1_algebra_bls12_381_g2_parent_uncompressed_format">bls12_381_g2_parent_uncompressed_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
@@ -833,7 +833,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 ## Function `bls12_381_g2_compressed_format`
 
 Return the ID of a serialization scheme,
-which is essentially <code>bls12_381_g2_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+which is essentially <code><a href="algebra.md#0x1_algebra_bls12_381_g2_parent_compressed_format">bls12_381_g2_parent_compressed_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
