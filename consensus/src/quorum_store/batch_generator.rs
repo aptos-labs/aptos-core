@@ -105,7 +105,7 @@ impl BatchGenerator {
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
         end_batch_when_back_pressure: bool,
-    ) -> (Option<(ProofCompletedChannel, bool)>) {
+    ) -> Option<(ProofCompletedChannel, bool)> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
