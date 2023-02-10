@@ -18,14 +18,13 @@ use std::path::PathBuf;
 // 9. Init data for that resource group / member
 // 10. Read and ensure data is present
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_read_resource_group() {
+async fn test_gen_resource_group() {
     let mut context = new_test_context(current_function_name!());
 
     // Prepare accounts
-    let mut root = context.root_account();
-    let mut admin0 = context.create_account(&mut root).await;
-    let mut admin1 = context.create_account(&mut root).await;
-    let mut user = context.create_account(&mut root).await;
+    let mut admin0 = context.create_account().await;
+    let mut admin1 = context.create_account().await;
+    let mut user = context.create_account().await;
 
     // Publish packages
     let named_addresses = vec![
@@ -53,13 +52,13 @@ async fn test_read_resource_group() {
     let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
     let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
 
-    let response = context.read_resource(&admin0.address(), &primary).await;
+    let response = context.gen_resource(&admin0.address(), &primary).await;
     assert_eq!(response.unwrap()["data"]["value"], "3");
 
     // Verify account is empty
-    let response = context.read_resource(&user.address(), &primary).await;
+    let response = context.gen_resource(&user.address(), &primary).await;
     assert!(response.is_none());
-    let response = context.read_resource(&user.address(), &secondary).await;
+    let response = context.gen_resource(&user.address(), &secondary).await;
     assert!(response.is_none());
 
    // Init secondary
@@ -70,10 +69,10 @@ async fn test_read_resource_group() {
        json!([55]),
    )
    .await;
-   let response = context.read_resource(&user.address(), &secondary).await;
+   let response = context.gen_resource(&user.address(), &secondary).await;
    assert_eq!(response.unwrap()["data"]["value"], 55);
 
-   let response = context.read_resource(&user.address(), &primary).await;
+   let response = context.gen_resource(&user.address(), &primary).await;
    assert!(response.is_none());
 
    // Init primary
@@ -84,10 +83,10 @@ async fn test_read_resource_group() {
        json!(["35"]),
    )
    .await;
-   let response = context.read_resource(&user.address(), &primary).await;
+   let response = context.gen_resource(&user.address(), &primary).await;
    assert_eq!(response.unwrap()["data"]["value"], "35");
 
-   let response = context.read_resource(&user.address(), &secondary).await;
+   let response = context.gen_resource(&user.address(), &secondary).await;
    assert_eq!(response.unwrap()["data"]["value"], 55);
 }
 
