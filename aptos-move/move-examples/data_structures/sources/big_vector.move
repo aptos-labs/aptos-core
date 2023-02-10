@@ -83,11 +83,17 @@ module aptos_std::big_vector {
     /// This operation will cost more gas when it adds new bucket.
     public fun push_back<T: store>(v: &mut BigVector<T>, val: T) {
         let num_buckets = table_with_length::length(&v.buckets);
+        spec {
+            assume num_buckets * v.bucket_size <= MAX_U64;
+        };
         if (v.end_index == num_buckets * v.bucket_size) {
             table_with_length::add(&mut v.buckets, num_buckets, vector::empty());
             vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets), val);
         } else {
             vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1), val);
+        };
+        spec {
+            assume v.end_index + 1 <= MAX_U64;
         };
         v.end_index = v.end_index + 1;
     }
