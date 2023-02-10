@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as Types from './types';
 
 export type GetAccountCurrentTokensQueryVariables = Types.Exact<{

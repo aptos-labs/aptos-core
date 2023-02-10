@@ -5,12 +5,16 @@ generates:
   src/indexer/generated/types.ts:
     plugins:
       - typescript
+      - add:
+          content: "/* eslint-disable */"
   src/indexer/generated/operations.ts:
     preset: import-types-preset
     presetConfig:
       typesPath: ./types
     plugins:
       - typescript-operations
+      - add:
+          content: "/* eslint-disable */"
   src/indexer/generated/queries.ts:
     preset: import-types-preset
     presetConfig:
