@@ -130,6 +130,9 @@ module aptos_framework::delegation_pool {
     /// Creating delegation pools is not enabled yet.
     const EDELEGATION_POOLS_DISABLED: u64 = 9;
 
+    /// Cannot request to withdraw zero stake.
+    const EWITHDRAW_ZERO_STAKE: u64 = 10;
+
     const MAX_U64: u64 = 18446744073709551615;
 
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
@@ -243,19 +246,6 @@ module aptos_framework::delegation_pool {
     public fun operator_commission_percentage(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         borrow_global<DelegationPool>(pool_address).operator_commission_percentage
-    }
-
-    #[view]
-    /// Return the unique observed lockup cycle where delegator `delegator_address` may have
-    /// unlocking (or already unlocked) stake to be withdrawn from delegation pool at `pool_address`.
-    public fun has_pending_withdrawal(
-        pool_address: address,
-        delegator_address: address
-    ): (bool, u64) acquires DelegationPool {
-        assert_delegation_pool_exists(pool_address);
-        let pool = borrow_global<DelegationPool>(pool_address);
-        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
-        (withdrawal_exists, withdrawal_olc.index)
     }
 
     #[view]
@@ -594,8 +584,7 @@ module aptos_framework::delegation_pool {
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
     public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
-        // short-circuit if amount to withdraw is 0 so no event is emitted
-        if (amount == 0) { return };
+        assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
         withdraw_internal(borrow_global_mut<DelegationPool>(pool_address), signer::address_of(delegator), amount);
@@ -1056,6 +1045,17 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
         initialize_delegation_pool(validator, 0, x"00");
         initialize_delegation_pool(validator, 0, x"01");
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x1000A, location = Self)]
+    public entry fun test_cannot_withdraw_zero_stake(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool {
+        initialize_for_test(aptos_framework);
+        initialize_delegation_pool(validator, 0, x"00");
+        withdraw(validator, get_owned_pool_address(signer::address_of(validator)), 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -2399,9 +2399,11 @@ module aptos_framework::delegation_pool {
         inactive: bool,
         stake: u64,
     ) acquires DelegationPool {
-        let (withdrawal_exists, withdrawal_olc) = has_pending_withdrawal(pool_address, delegator_address);
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let (withdrawal_exists, withdrawal_olc) = pending_withdrawal_exists(pool, delegator_address);
         assert!(withdrawal_exists == exists, 0);
-        assert!(withdrawal_olc == olc, withdrawal_olc);
+        assert!(withdrawal_olc.index == olc, withdrawal_olc.index);
         let (withdrawal_inactive, withdrawal_stake) = get_pending_withdrawal(pool_address, delegator_address);
         assert!(withdrawal_inactive == inactive, 0);
         assert!(withdrawal_stake == stake, withdrawal_stake);
@@ -2414,10 +2416,11 @@ module aptos_framework::delegation_pool {
         exists: bool,
         stake: u64,
     ) acquires DelegationPool {
-        let inactive_shares = &borrow_global<DelegationPool>(pool_address).inactive_shares;
-        assert!(table::contains(inactive_shares, olc_with_index(olc)) == exists, 0);
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        assert!(table::contains(&pool.inactive_shares, olc_with_index(olc)) == exists, 0);
         if (exists) {
-            let actual_stake = total_coins(table::borrow(inactive_shares, olc_with_index(olc)));
+            let actual_stake = total_coins(table::borrow(&pool.inactive_shares, olc_with_index(olc)));
             assert!(actual_stake == stake, actual_stake);
         } else {
             assert!(0 == stake, 0);
