@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{SpeculativeCounter, SpeculativeEvent, SpeculativeEvents};
+use crate::{SpeculativeCounter, SpeculativeEvent, SpeculativeEvents};
 use claims::{assert_err, assert_ok};
 use crossbeam::utils::CachePadded;
 use parking_lot::RwLock;
@@ -37,7 +37,7 @@ impl CounterEvent {
 }
 
 impl SpeculativeEvent for CounterEvent {
-    fn dispatch(&self) {
+    fn dispatch(self) {
         assert_ok!(self
             .shared_counter
             .upgrade()
@@ -47,6 +47,12 @@ impl SpeculativeEvent for CounterEvent {
     }
 }
 
+// The work that's generated for testing purposes for workers / threads consists of these
+// operators, e.g. checking that a specific index is out of bounds of Speculative storage,
+// or invoking addition on the speculative counter (event does addition via SpeculativeEvents
+// interface). Clear operator clears speculative events storage or counter at a given index.
+// Finally, prior number of clears is provided and used as a barrier so the results can be
+// deterministic despite concurrency in the multi-threaded testing.
 #[derive(Clone)]
 enum Operator {
     OutOfBounds(usize),         // txn_idx

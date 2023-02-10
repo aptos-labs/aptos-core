@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // Suppress incorrect warning, as without mut the take_counts method stops compiling.
@@ -6,17 +6,18 @@
 
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
-use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(test)]
 mod tests;
 
+const EVENT_DISPATCH_BATCH_SIZE: usize = 25;
+
 /// This crate is designed to help with tracking events and state that might be speculative in
 /// nature due to speculative execution of transactions (e.g. by BlockSTM parallel executor, but
 /// also in any other context). The idea is that a transaction may be speculative executed, but
-/// then the this speculative execution might be invalidated and discarded, possibly triggering
+/// then the speculative execution might be invalidated and discarded, possibly triggering
 /// another re-execution. In this case, it is convenient to buffer certain state and events and
 /// also discard them, while having a way to flush in case the execution is actually finalized.
 /// All components here can (and are intended to) be used in a concurrent fashion.
@@ -28,80 +29,49 @@ mod tests;
 /// As far as the state is concerned, the crate currently just implements a SpeculativeCounter.
 /// In the future, we could easily implement a structure similar to SpeculativeEvents to
 /// keep track of any speculative state, where a trait could allow updating it (running state).
+///
+/// An example of using the crate for speculative logging can be founds in tests/logging.rs
 
-// A struct that allows storing elements of type T as in a Vec and at any moment clearing
-// the stored elements but only in a lazy / logical manner - i.e. the elements are still
-// stored, but ignored. Useful to defer costs off the critical path.
-struct LazyClearVec<T> {
-    // Stores the elements, including some that might be logically cleared.
-    elements: Vec<T>,
-    // Logically recording the size of the logically cleared prefix.
-    skip_cleared: usize,
-}
-
-impl<T> LazyClearVec<T> {
-    fn push(&mut self, element: T) {
-        self.elements.push(element);
-    }
-
-    fn clear(&mut self) {
-        self.skip_cleared = self.elements.len();
-    }
-
-    fn as_slice(&mut self) -> &[T] {
-        &self.elements[self.skip_cleared..]
-    }
-}
-
-impl<T> Default for LazyClearVec<T> {
-    fn default() -> Self {
-        Self {
-            elements: Vec::new(),
-            skip_cleared: 0,
-        }
-    }
-}
+/// ============================================================================================
 
 /// A trait for a speculative event, only requiring a dispatch() method that destroys the
 /// event and manifests the desired behavior as a side effect (returning nothing). This occurs
 /// if and when a speculative event actually gets finalized.
 pub trait SpeculativeEvent {
-    fn dispatch(&self);
+    fn dispatch(self);
 }
 
-// A type alias for event storage container.
-type EventStore<T> = Vec<CachePadded<Mutex<LazyClearVec<T>>>>;
+// A type alias for an event storage container.
+type EventStore<T> = Vec<CachePadded<Mutex<Vec<T>>>>;
 
 /// A struct that stores speculative events for transactions, indexed by an usize. Allows
 /// clearing the speculative events for a specific transaction or all transactions, and flushing
 /// the (non-cleared) events when the executions are finalized. The underlying storage must be
-/// sized fit the indices of transactions, set by the new(num_txns) call for initialization.
+/// sized to fit the indices of transactions, set by the new(num_txns) call for initialization.
 pub struct SpeculativeEvents<E: Send> {
-    events: OnceCell<EventStore<E>>,
+    events: EventStore<E>,
 }
 
 impl<E: Send + SpeculativeEvent + 'static> SpeculativeEvents<E> {
     // Returns a ref to the current storage of all events if its length is sufficiently large.
     fn events_with_checked_length(&self, min_length: usize) -> anyhow::Result<&EventStore<E>> {
-        let events = self.events.get().unwrap();
-        if events.len() < min_length {
+        let len = self.events.len();
+        if len < min_length {
             anyhow::bail!(
                 "speculative events storage len = {} < required {} (was not sized appropriately)",
-                events.len(),
+                len,
                 min_length
             );
         }
-        Ok(events)
+        Ok(&self.events)
     }
 
     /// Create a new storage for recording speculative events by transactions indexed 0..num_txns.
     pub fn new(num_txns: usize) -> Self {
         Self {
-            events: OnceCell::with_value(
-                (0..num_txns)
-                    .map(|_| CachePadded::new(Mutex::new(LazyClearVec::default())))
-                    .collect(),
-            ),
+            events: (0..num_txns)
+                .map(|_| CachePadded::new(Mutex::new(Vec::new())))
+                .collect(),
         }
     }
 
@@ -110,6 +80,8 @@ impl<E: Send + SpeculativeEvent + 'static> SpeculativeEvents<E> {
     pub fn record(&self, txn_idx: usize, event: E) -> anyhow::Result<()> {
         let events = self.events_with_checked_length(txn_idx + 1)?;
 
+        // TODO: check the common size and the number of elements, as it may be worthwhile
+        // to override the capacity defaults of a Vec.
         events[txn_idx].lock().push(event);
         Ok(())
     }
@@ -124,22 +96,22 @@ impl<E: Send + SpeculativeEvent + 'static> SpeculativeEvents<E> {
     /// Logically clears all events.
     pub fn clear_all_events(&self) {
         // TODO: Parallelize if needed.
-        let events = self.events.get().unwrap();
-        for event in events {
+        for event in &self.events {
             event.lock().clear();
         }
     }
 
     /// Flush the stored events asynchronously by spawning global rayon threads.
     pub fn flush(mut self) {
-        let events = self.events.take().unwrap();
-
         rayon::spawn(move || {
-            events.par_iter().with_min_len(25).for_each(|m| {
-                for event in m.lock().as_slice() {
-                    event.dispatch();
-                }
-            });
+            self.events
+                .into_par_iter()
+                .with_min_len(EVENT_DISPATCH_BATCH_SIZE)
+                .for_each(|m| {
+                    for event in m.into_inner().into_inner() {
+                        event.dispatch();
+                    }
+                });
         });
     }
 }
@@ -178,27 +150,27 @@ impl CounterStore {
 /// it is needed to track the counts per individual transactions.
 #[derive(Debug)]
 pub struct SpeculativeCounter {
-    count_store: OnceCell<CounterStore>,
+    count_store: CounterStore,
 }
 
 impl SpeculativeCounter {
     // Returns a ref to the current storage of all counters if its length is sufficiently large.
     fn store_with_checked_length(&self, min_length: usize) -> anyhow::Result<&CounterStore> {
-        let store = self.count_store.get().unwrap();
-        if store.counts.len() < min_length {
+        let len = self.count_store.counts.len();
+        if len < min_length {
             anyhow::bail!(
                 "speculative counters storage len = {} < required {} (was not sized appropriately)",
-                store.counts.len(),
+                len,
                 min_length
             );
         }
-        Ok(store)
+        Ok(&self.count_store)
     }
 
     /// Create a new storage for speculative counting by transactions indexed 0..num_txns.
     pub fn new(num_txns: usize) -> Self {
         Self {
-            count_store: OnceCell::with_value(CounterStore::new(num_txns)),
+            count_store: CounterStore::new(num_txns),
         }
     }
 
@@ -231,11 +203,11 @@ impl SpeculativeCounter {
 
     /// Consume self and return the total counter (sum across per-txn counters) value.
     pub fn take_total(self) -> usize {
-        self.count_store.get().unwrap().total.load(Ordering::SeqCst)
+        self.count_store.total.load(Ordering::SeqCst)
     }
 
     /// Consume self and return the final values of all counters.
     pub fn take_counts(mut self) -> Vec<usize> {
-        self.count_store.take().unwrap().take_counts()
+        self.count_store.take_counts()
     }
 }

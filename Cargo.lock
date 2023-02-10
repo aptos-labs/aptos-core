@@ -1648,11 +1648,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-log-derive",
  "aptos-node-identity",
- "aptos-speculative",
- "arc-swap",
  "backtrace",
  "chrono",
- "claims",
  "console-subscriber",
  "erased-serde",
  "futures",
@@ -2468,7 +2465,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-speculative"
+name = "aptos-speculative-state-helper"
 version = "0.1.0"
 dependencies = [
  "anyhow",

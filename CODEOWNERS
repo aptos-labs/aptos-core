@@ -59,8 +59,8 @@
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
 
-# Owners for the aptos-speculative crate
-/crates/aptos-speculative @gelash
+# Owners for the aptos-speculative-state-helper crate
+/crates/aptos-speculative-state-helper @gelash
 
 # Owners for the `telemetry` related crates.
 /crates/aptos-telemetry @ibalajiarun @geekflyer

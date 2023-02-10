@@ -1,5 +1,5 @@
 [package]
-name = "aptos-speculative"
+name = "aptos-speculative-state-helper"
 description = "Aptos utils for speculative events & state (due to speculative txn execution)"
 version = "0.1.0"
 
@@ -17,8 +17,8 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-infallible = { workspace = true }
-once_cell = { workspace = true }
 crossbeam = { workspace = true }
+once_cell = { workspace = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
