@@ -76,14 +76,6 @@ impl AlgebraContext {
     }
 }
 
-macro_rules! abort_if_feature_disabled {
-    ($context:expr, $feature:expr) => {
-        if !$context.extensions().get::<AlgebraContext>().features.is_enabled($feature) {
-            return Ok(NativeResult::err(InternalGas::zero(), NOT_IMPLEMENTED));
-        }
-    };
-}
-
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
@@ -897,7 +889,6 @@ fn group_add_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    abort_if_feature_disabled!(context, FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12_381_G1) => ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, add),
