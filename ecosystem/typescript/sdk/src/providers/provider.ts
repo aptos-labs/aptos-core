@@ -25,6 +25,7 @@ import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from 
  */
 export class Provider {
   aptosClient: AptosClient;
+
   indexerClient: IndexerClient;
 
   constructor(
@@ -35,7 +36,7 @@ export class Provider {
     let fullNodeUrl = null;
     let indexerUrl = null;
 
-    if (typeof network === "object") {
+    if (typeof network === "object" && this.isCustomEndpoints(network)) {
       fullNodeUrl = network.fullnodeUrl;
       indexerUrl = network.indexerUrl;
     } else {
@@ -50,6 +51,16 @@ export class Provider {
     this.aptosClient = new AptosClient(fullNodeUrl, config, doNotFixNodeUrl);
     this.indexerClient = new IndexerClient(indexerUrl);
   }
+
+  // use exhaustive type predicates
+  private isCustomEndpoints(network: CustomEndpoints): network is CustomEndpoints {
+    return (
+      network.fullnodeUrl !== undefined &&
+      typeof network.fullnodeUrl === "string" &&
+      network.indexerUrl !== undefined &&
+      typeof network.indexerUrl === "string"
+    );
+  }
 }
 
 export interface Provider extends AptosClient, IndexerClient {}
@@ -58,6 +69,8 @@ export interface Provider extends AptosClient, IndexerClient {}
 In TypeScript, we can’t inherit or extend from more than one class,
 Mixins helps us to get around that by creating a partial classes 
 that we can combine to form a single class that contains all the methods and properties from the partial classes.
+https://www.typescriptlang.org/docs/handbook/mixins.html#alternative-pattern
+
 Here, we combine AptosClient and IndexerClient classes into one Provider class that holds all 
 methods and properties from both classes.
 */
@@ -67,6 +80,7 @@ function applyMixins(derivedCtor: any, constructors: any[]) {
   Object.getOwnPropertyNames(AptosClient.prototype).forEach((propertyName) => {
     const propertyDescriptor = Object.getOwnPropertyDescriptor(AptosClient.prototype, propertyName);
     if (!propertyDescriptor) return;
+    // eslint-disable-next-line func-names
     propertyDescriptor.value = function (...args: any) {
       return (this as any).aptosClient[propertyName](...args);
     };
@@ -76,6 +90,7 @@ function applyMixins(derivedCtor: any, constructors: any[]) {
   Object.getOwnPropertyNames(IndexerClient.prototype).forEach((propertyName) => {
     const propertyDescriptor = Object.getOwnPropertyDescriptor(IndexerClient.prototype, propertyName);
     if (!propertyDescriptor) return;
+    // eslint-disable-next-line func-names
     propertyDescriptor.value = function (...args: any) {
       return (this as any).indexerClient[propertyName](...args);
     };

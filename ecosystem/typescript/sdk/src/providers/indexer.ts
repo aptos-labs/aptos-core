@@ -1,10 +1,9 @@
-import { AnyNumber } from "../bcs/types";
 import axios from "axios";
-import { print } from "graphql";
 
+import { AnyNumber } from "../bcs/types";
 import { MaybeHexString } from "../hex_string";
-import { GetAccountCurrentTokens, GetTokenActivities } from "../indexer/generated/queries";
 import { GetAccountCurrentTokensQuery, GetTokenActivitiesQuery } from "../indexer/generated/operations";
+import { GetAccountCurrentTokens, GetTokenActivities } from "../indexer/generated/queries";
 
 interface PaginationArgs {
   offset?: AnyNumber;
@@ -17,7 +16,8 @@ type GraphqlQuery = {
 };
 /**
  * Provides methods for retrieving data from Aptos Indexer.
- * For more detailed Queries specification see {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
+ * For more detailed Queries specification see
+ * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
  */
 export class IndexerClient {
   endpoint: string;
@@ -42,12 +42,11 @@ export class IndexerClient {
         data: graphqlQuery,
       });
       if (data.errors) {
-        console.log("data error", data.errors);
         return data.errors;
       }
       return data.data;
     } catch (error) {
-      console.log("error", error);
+      return error;
     }
   }
 
@@ -59,7 +58,7 @@ export class IndexerClient {
    */
   async getAccountNFTs(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCurrentTokensQuery> {
     const graphqlQuery = {
-      query: print(GetAccountCurrentTokens),
+      query: GetAccountCurrentTokens,
       variables: { address: ownerAddress, offset: options?.offset, limit: options?.limit },
     };
 
@@ -74,7 +73,7 @@ export class IndexerClient {
    */
   async getTokenActivities(idHash: string): Promise<GetTokenActivitiesQuery> {
     const graphqlQuery = {
-      query: print(GetTokenActivities),
+      query: GetTokenActivities,
       variables: { idHash },
     };
     return this.queryIndexer(graphqlQuery);

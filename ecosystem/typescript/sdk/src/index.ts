@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from "./aptos_account";
-export * from "./providers/aptos_client";
 export * from "./providers/index";
 export * as BCS from "./bcs";
 export * from "./coin_client";

@@ -4,7 +4,7 @@ specifiers:
   '@graphql-codegen/cli': ^2.13.5
   '@graphql-codegen/import-types-preset': ^2.2.3
   '@graphql-codegen/typescript': ^2.7.3
-  '@graphql-codegen/typescript-document-nodes': 2.2.13
+  '@graphql-codegen/typescript-graphql-request': ^4.5.8
   '@graphql-codegen/typescript-operations': ^2.5.3
   '@noble/hashes': 1.1.3
   '@scure/bip39': 1.1.0
@@ -21,7 +21,7 @@ specifiers:
   eslint-plugin-import: 2.26.0
   form-data: 4.0.0
   graphql: ^16.5.0
-  graphql-tag: ^2.12.6
+  graphql-request: ^5.1.0
   jest: 28.1.3
   openapi-typescript-codegen: https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz
   prettier: 2.6.2
@@ -38,14 +38,13 @@ dependencies:
   '@scure/bip39': 1.1.0
   axios: 0.27.2
   form-data: 4.0.0
-  graphql: 16.6.0
   tweetnacl: 1.0.3
 
 devDependencies:
   '@graphql-codegen/cli': 2.16.5_za2aozsjcrllrsiclf5lajw72u
   '@graphql-codegen/import-types-preset': 2.2.6_graphql@16.6.0
   '@graphql-codegen/typescript': 2.8.8_graphql@16.6.0
-  '@graphql-codegen/typescript-document-nodes': 2.2.13_graphql@16.6.0
+  '@graphql-codegen/typescript-graphql-request': 4.5.8_mvbpkrlomotgouznb4aiye7i74
   '@graphql-codegen/typescript-operations': 2.5.13_graphql@16.6.0
   '@types/jest': 28.1.8
   '@types/node': 18.6.2
@@ -57,7 +56,8 @@ devDependencies:
   eslint-config-airbnb-typescript: 17.0.0_ormpz3f5cezs3vksgs6xr4qcde
   eslint-config-prettier: 8.5.0_eslint@8.23.0
   eslint-plugin-import: 2.26.0_iepzrjnvahcxaf6zc7cutko6om
-  graphql-tag: 2.12.6_graphql@16.6.0
+  graphql: 16.6.0
+  graphql-request: 5.1.0_graphql@16.6.0
   jest: 28.1.3_seampb7kvrlatjhbvs2ov4kp2i
   openapi-typescript-codegen: '@github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz'
   prettier: 2.6.2
@@ -1070,15 +1070,18 @@ packages:
       tslib: 2.4.1
     dev: true
 
-  /@graphql-codegen/typescript-document-nodes/2.2.13_graphql@16.6.0:
-    resolution: {integrity: sha512-BPKlWwRSLyWz5hHrErdzrjoopavKhkr3/X2UQ6Ia6+UfkHOG+QJ3onjUEmd1SRMIotkKtJJ0ZMyJdOfrlAxYLA==}
+  /@graphql-codegen/typescript-graphql-request/4.5.8_mvbpkrlomotgouznb4aiye7i74:
+    resolution: {integrity: sha512-XsuAA35Ou03LsklNgnIWXZ5HOHsJ5w1dBuDKtvqM9rD0cAI8x0f4TY0n6O1EraSBSvyHLP3npb1lOTPZzG2TjA==}
     peerDependencies:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
+      graphql-request: ^3.4.0 || ^4.0.0 || ^5.0.0
+      graphql-tag: ^2.0.0
     dependencies:
       '@graphql-codegen/plugin-helpers': 2.7.2_graphql@16.6.0
-      '@graphql-codegen/visitor-plugin-common': 2.9.1_graphql@16.6.0
+      '@graphql-codegen/visitor-plugin-common': 2.13.1_graphql@16.6.0
       auto-bind: 4.0.0
       graphql: 16.6.0
+      graphql-request: 5.1.0_graphql@16.6.0
       tslib: 2.4.1
     transitivePeerDependencies:
       - encoding
@@ -1149,27 +1152,6 @@ packages:
       '@graphql-tools/utils': 9.2.0_graphql@16.6.0
       auto-bind: 4.0.0
       change-case-all: 1.0.15
-      dependency-graph: 0.11.0
-      graphql: 16.6.0
-      graphql-tag: 2.12.6_graphql@16.6.0
-      parse-filepath: 1.0.2
-      tslib: 2.4.1
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
-    dev: true
-
-  /@graphql-codegen/visitor-plugin-common/2.9.1_graphql@16.6.0:
-    resolution: {integrity: sha512-j9eGOSGt+sJcwv0ijhZiQ2cF/0ponscekNVoF+vHdOT4RB0qgOQxykPBk6EbKxIHECnkdV8ARdPVTA21A93/QQ==}
-    peerDependencies:
-      graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
-    dependencies:
-      '@graphql-codegen/plugin-helpers': 2.7.2_graphql@16.6.0
-      '@graphql-tools/optimize': 1.3.1_graphql@16.6.0
-      '@graphql-tools/relay-operation-optimizer': 6.5.16_graphql@16.6.0
-      '@graphql-tools/utils': 8.13.1_graphql@16.6.0
-      auto-bind: 4.0.0
-      change-case-all: 1.0.14
       dependency-graph: 0.11.0
       graphql: 16.6.0
       graphql-tag: 2.12.6_graphql@16.6.0
@@ -4025,6 +4007,7 @@ packages:
   /graphql/16.6.0:
     resolution: {integrity: sha512-KPIBPDlW7NxrbT/eh4qPXz5FiFdL5UbaA0XUNz2Rp3Z3hqBSkbj0GVjwFDztsWVauZUWsbKHgMg++sk8UX0bkw==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+    dev: true
 
   /handlebars/4.7.7:
     resolution: {integrity: sha512-aAcXm5OAfE/8IXkcZvCepKU3VzW1/39Fb5ZuqMtgI/hT8X2YgoMvBY5dLhq/cpOvw7Lk1nK/UF71aLG/ZnVYRA==}

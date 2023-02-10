@@ -12,5 +12,11 @@ generates:
     plugins:
       - typescript-operations
   src/indexer/generated/queries.ts:
+    preset: import-types-preset
+    presetConfig:
+      typesPath: ./operations
     plugins:
-      - typescript-document-nodes
+      - typescript-graphql-request
+    config:
+      documentMode: string
+      documentVariableSuffix: ""
