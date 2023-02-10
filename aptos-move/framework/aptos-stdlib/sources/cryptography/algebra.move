@@ -60,12 +60,14 @@ module aptos_std::algebra {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq {}
 
-    /// A serialization scheme where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using little-endian byte order.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using little-endian byte order.
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq_format(): vector<u8> { x"01" }
 
-    /// A serialization scheme where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using big-endian byte order.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using big-endian byte order.
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq_bendian_format(): vector<u8> { x"0101" }
@@ -76,7 +78,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq2 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq2` element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fq2` element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96.
     /// `b[0..48]` is $c_0$ serialized in `bls12_381_fq_format`.
     /// `b[48..96]` is $c_1$ serialized in `bls12_381_fq_format`.
     ///
@@ -89,7 +92,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq6 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq6` element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fq6` element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288.
     /// `b[0..96]` is $c_0$ serialized in `bls12_381_fq2_format`.
     /// `b[96..192]` is $c_1$ serialized in `bls12_381_fq2_format`.
     /// `b[192..288]` is $c_2$ serialized in `bls12_381_fq2_format`.
@@ -101,11 +105,12 @@ module aptos_std::algebra {
     /// It is an extension field of `BLS12_381_Fq6`, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct BLS12_381_Fq12 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq12` element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fq12` element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576.
     /// `b[0..288]` is $c_0$ serialized in `bls12_381_fq6_format`.
     /// `b[288..576]` is $c_1$ serialized in `bls12_381_fq6_format`.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_fq12_format(): vector<u8> { x"04" }
 
     /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at inifinity,
@@ -116,7 +121,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_G1_Parent {}
 
-    /// A serialization scheme where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 96.
+    /// Return the ID of a serialization scheme,
+    /// where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 96.
     /// `b[95] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_q)$,
@@ -126,7 +132,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g1_parent_uncompressed_format(): vector<u8> { x"05" }
 
-    /// A serialization scheme where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 48.
+    /// Return the ID of a serialization scheme,
+    /// where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 48.
     /// `b[47] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(Fq)$,
@@ -136,20 +143,22 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g1_parent_compressed_format(): vector<u8> { x"0501" }
 
-    /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is subgroup of `BLS12_381_G1_Parent`.
     /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
     struct BLS12_381_G1 {}
 
-    /// Effectively `bls12_381_g1_parent_uncompressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// Return the ID of a serialization scheme,
+    /// which is essentially `bls12_381_g1_parent_uncompressed_format` but only applicable to `BLS12_381_G1` elements.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_uncompressed_format(): vector<u8> { x"06" }
 
-    /// Effectively `bls12_381_g1_parent_compressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// Return the ID of a serialization scheme,
+    /// which is essentially `bls12_381_g1_parent_compressed_format` but only applicable to `BLS12_381_G1` elements.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_compressed_format(): vector<u8> { x"0601" }
 
 
@@ -160,7 +169,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_G2_Parent {}
 
-    /// A serialization scheme where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 192.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 192.
     /// `b[191] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
@@ -170,7 +180,8 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g2_parent_uncompressed_format(): vector<u8> { x"07" }
 
-    /// A serialization scheme where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 96.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 96.
     /// `b[95] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
@@ -180,44 +191,51 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g2_parent_compressed_format(): vector<u8> { x"0701" }
 
-    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `BLS12_381_G2_Parent`.
     /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
     struct BLS12_381_G2 {}
 
-    /// Effectively `bls12_381_g2_parent_uncompressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// Return the ID of a serialization scheme,
+    /// which is essentially `bls12_381_g2_parent_uncompressed_format` but only applicable to `BLS12_381_G2` elements.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_uncompressed_format(): vector<u8> { x"08" }
 
-    /// Effectively `bls12_381_g2_parent_compressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// Return the ID of a serialization scheme,
+    /// which is essentially `bls12_381_g2_parent_compressed_format` but only applicable to `BLS12_381_G2` elements.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_compressed_format(): vector<u8> { x"0801" }
 
-    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a multiplicative subgroup of `BLS12_381_Fq12`.
     /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
     /// The identity of `BLS12_381_Gt` is 1.
     struct BLS12_381_Gt {}
 
-    /// Effectively `bls12_381_fq12_format()` but only applicable to `BLS12_381_Gt` elements.
+    /// Return the ID of a serialization scheme,
+    /// which is essentially `bls12_381_fq12_format()` but only applicable to `BLS12_381_Gt` elements.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_gt_format(): vector<u8> { x"09" }
 
     /// The finite field $F_r$ that can be used as the scalar fields
     /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct BLS12_381_Fr {}
 
-    /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using little-endian byte order.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using little-endian byte order.
     ///
-    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
+    /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.3.0, blst-0.3.7).
     public fun bls12_381_fr_lendian_format(): vector<u8> { x"0a" }
 
-    /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using big-endian byte order.
+    /// Return the ID of a serialization scheme,
+    /// where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using big-endian byte order.
+    ///
+    /// NOTE: the same scheme is also used in other implementations (e.g., blst-0.3.7).
     public fun bls12_381_fr_bendian_format(): vector<u8> { x"0a01" }
 
     // Marker types (and their serialization schemes) end.
@@ -467,6 +485,7 @@ module aptos_std::algebra {
 
     /// Try casting an element `x` of a structure `L` to a sub-structure `S`.
     /// Return none if `x` is not a member of `S`.
+    ///
     /// NOTE: Membership check is performed inside, which can be expensive, depending on the structures `L` and `S`.
     public fun downcast<L,S>(element_x: &Element<L>): Option<Element<S>> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();

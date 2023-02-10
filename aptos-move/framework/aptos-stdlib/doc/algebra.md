@@ -310,7 +310,7 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 ## Struct `BLS12_381_G1`
 
-The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
 It is subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
@@ -373,7 +373,7 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 ## Struct `BLS12_381_G2`
 
-The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
 It is a subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
@@ -404,7 +404,7 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 
 ## Struct `BLS12_381_Gt`
 
-The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
 It is a multiplicative subgroup of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
 (so <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
@@ -493,7 +493,8 @@ This struct represents an element of an algebraic structure <code>S</code>.
 
 ## Function `bls12_381_fq_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using little-endian byte order.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using little-endian byte order.
 
 NOTE: currently information-only, not implemented.
 
@@ -518,7 +519,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_fq_bendian_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using big-endian byte order.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using big-endian byte order.
 
 NOTE: currently information-only, not implemented.
 
@@ -543,7 +545,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_fq2_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code> element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code> element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96.
 <code>b[0..48]</code> is $c_0$ serialized in <code>bls12_381_fq_format</code>.
 <code>b[48..96]</code> is $c_1$ serialized in <code>bls12_381_fq_format</code>.
 
@@ -570,7 +573,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_fq6_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12_381_Fq6</a></code> element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 288.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq6">BLS12_381_Fq6</a></code> element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 288.
 <code>b[0..96]</code> is $c_0$ serialized in <code>bls12_381_fq2_format</code>.
 <code>b[96..192]</code> is $c_1$ serialized in <code>bls12_381_fq2_format</code>.
 <code>b[192..288]</code> is $c_2$ serialized in <code>bls12_381_fq2_format</code>.
@@ -598,11 +602,12 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_fq12_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code> element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code> element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
 <code>b[0..288]</code> is $c_0$ serialized in <code>bls12_381_fq6_format</code>.
 <code>b[288..576]</code> is $c_1$ serialized in <code>bls12_381_fq6_format</code>.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -625,7 +630,8 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_g1_parent_uncompressed_format`
 
-A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
+Return the ID of a serialization scheme,
+where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
 <code>b[95] & 0x40</code> is the infinity flag.
 The infinity flag is 1 if and only if the element is the point at infinity.
 The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_q)$,
@@ -655,7 +661,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_g1_parent_compressed_format`
 
-A serialization scheme where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 48.
+Return the ID of a serialization scheme,
+where an <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 48.
 <code>b[47] & 0x40</code> is the infinity flag.
 The infinity flag is 1 if and only if the element is the point at infinity.
 The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(Fq)$,
@@ -685,9 +692,10 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_g1_uncompressed_format`
 
-Effectively <code>bls12_381_g1_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+Return the ID of a serialization scheme,
+which is essentially <code>bls12_381_g1_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_uncompressed_format">bls12_381_g1_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -710,9 +718,10 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_g1_compressed_format`
 
-Effectively <code>bls12_381_g1_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+Return the ID of a serialization scheme,
+which is essentially <code>bls12_381_g1_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_compressed_format">bls12_381_g1_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -735,7 +744,8 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_g2_parent_uncompressed_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 192.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 192.
 <code>b[191] & 0x40</code> is the infinity flag.
 The infinity flag is 1 if and only if the element is the point at infinity.
 The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
@@ -765,7 +775,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_g2_parent_compressed_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> element is represented by a byte array <code>b[]</code> of size 96.
 <code>b[95] & 0x40</code> is the infinity flag.
 The infinity flag is 1 if and only if the element is the point at infinity.
 The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
@@ -795,9 +806,10 @@ NOTE: currently information-only, not implemented.
 
 ## Function `bls12_381_g2_uncompressed_format`
 
-Effectively <code>bls12_381_g2_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+Return the ID of a serialization scheme,
+which is essentially <code>bls12_381_g2_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_uncompressed_format">bls12_381_g2_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -820,9 +832,10 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_g2_compressed_format`
 
-Effectively <code>bls12_381_g2_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+Return the ID of a serialization scheme,
+which is essentially <code>bls12_381_g2_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_compressed_format">bls12_381_g2_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -845,9 +858,10 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_gt_format`
 
-Effectively <code><a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
+Return the ID of a serialization scheme,
+which is essentially <code><a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_gt_format">bls12_381_gt_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -870,9 +884,10 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_fr_lendian_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using little-endian byte order.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using little-endian byte order.
 
-NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
+NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.3.0, blst-0.3.7).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_lendian_format">bls12_381_fr_lendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -895,7 +910,10 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 
 ## Function `bls12_381_fr_bendian_format`
 
-A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using big-endian byte order.
+Return the ID of a serialization scheme,
+where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using big-endian byte order.
+
+NOTE: the same scheme is also used in other implementations (e.g., blst-0.3.7).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fr_bendian_format">bls12_381_fr_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -1675,6 +1693,7 @@ Cast an element of a structure <code>S</code> to a parent structure <code>L</cod
 
 Try casting an element <code>x</code> of a structure <code>L</code> to a sub-structure <code>S</code>.
 Return none if <code>x</code> is not a member of <code>S</code>.
+
 NOTE: Membership check is performed inside, which can be expensive, depending on the structures <code>L</code> and <code>S</code>.
 
 
