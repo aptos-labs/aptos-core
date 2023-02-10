@@ -52,16 +52,6 @@ impl Features {
     pub fn are_resource_groups_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
     }
-
-    pub fn enable(&mut self, flag: FeatureFlag) {
-        let bit_id = flag as usize;
-        let byte_id = bit_id / 8;
-        if self.features.len() < byte_id + 1 {
-            self.features.resize(byte_id + 1, 0);
-        }
-        self.features[byte_id] |= 1 << (bit_id % 8);
-    }
-
 }
 
 // --------------------------------------------------------------------------------------------
