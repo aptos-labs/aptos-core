@@ -1097,6 +1097,55 @@ fn group_identity_internal(
     }
 }
 
+macro_rules! ark_group_is_identity_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
+        let handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let result = element.$op();
+        Ok(NativeResult::ok(
+            $gas_params.group_is_identity($structure),
+            smallvec![Value::bool(result)],
+        ))
+    }};
+}
+
+fn group_is_identity_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12381G1) => ark_group_is_identity_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G1,
+            ark_bls12_381::G1Projective,
+            is_zero
+        ),
+        Some(Structure::BLS12381G2) => ark_group_is_identity_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G2,
+            ark_bls12_381::G2Projective,
+            is_zero
+        ),
+        Some(Structure::BLS12381Gt) => ark_group_is_identity_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381Gt,
+            ark_bls12_381::Fq12,
+            is_one
+        ),
+        _ => unreachable!(),
+    }
+}
+
 static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(|| {
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
     ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap()
@@ -1261,6 +1310,59 @@ fn group_add_internal(
             Structure::BLS12381Gt,
             ark_bls12_381::Fq12,
             mul
+        ),
+        _ => unreachable!(),
+    }
+}
+
+macro_rules! ark_group_sub_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
+        let handle_2 = pop_arg!($args, u64) as usize;
+        let handle_1 = pop_arg!($args, u64) as usize;
+        let element_1_ptr = get_obj_pointer!($context, handle_1);
+        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
+        let element_2_ptr = get_obj_pointer!($context, handle_2);
+        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        let new_element = element_1.$op(element_2);
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.group_sub($structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }};
+}
+
+fn group_sub_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12381G1) => ark_group_sub_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G1,
+            ark_bls12_381::G1Projective,
+            sub
+        ),
+        Some(Structure::BLS12381G2) => ark_group_sub_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G2,
+            ark_bls12_381::G2Projective,
+            sub
+        ),
+        Some(Structure::BLS12381Gt) => ark_group_sub_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381Gt,
+            ark_bls12_381::Fq12,
+            div
         ),
         _ => unreachable!(),
     }
@@ -1609,12 +1711,16 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_double_internal),
         ),
         (
+            "group_generator_internal",
+            make_native_from_func(gas_params.clone(), group_generator_internal),
+        ),
+        (
             "group_identity_internal",
             make_native_from_func(gas_params.clone(), group_identity_internal),
         ),
         (
-            "group_generator_internal",
-            make_native_from_func(gas_params.clone(), group_generator_internal),
+            "group_is_identity_internal",
+            make_native_from_func(gas_params.clone(), group_is_identity_internal),
         ),
         (
             "group_neg_internal",
@@ -1627,6 +1733,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "group_scalar_mul_internal",
             make_native_from_func(gas_params.clone(), group_scalar_mul_internal),
+        ),
+        (
+            "group_sub_internal",
+            make_native_from_func(gas_params.clone(), group_sub_internal),
         ),
         (
             "pairing_internal",

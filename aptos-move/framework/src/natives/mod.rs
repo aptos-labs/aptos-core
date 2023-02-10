@@ -149,6 +149,8 @@ impl GasParameters {
                 ark_bls12_381_fq12_is_zero: 0.into(),
                 ark_bls12_381_fq12_zero: 0.into(),
                 ark_bls12_381_pairing: 0.into(),
+                ark_bls12_381_g1_proj_is_zero: 0.into(),
+                ark_bls12_381_g2_proj_is_zero: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),

@@ -10,17 +10,41 @@
 /// and use the schemes with different underlying algebraic structures by simply changing some type parameters.
 /// E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
 ///
-/// Currently supported structures include:
-/// - BLS12-381 structures,
-///   - (groups) BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt,
-///   - (fields) BLS12_381_Fq12, BLS12_381_Fr.
+/// Below are the structures currently supported.
+/// - BLS12-381 structures.
+///   - Group `BLS12_381_G1`.
+///   - Group `BLS12_381_G2`.
+///   - Group `BLS12_381_Gt`.
+///   - Field `BLS12_381_Fq12`.
+///   - Field `BLS12_381_Fr`.
 ///
-/// Currently supported operations include:
-/// - serialization/deserialization,
-/// - group/field metadata,
-/// - group/field basic arithmetic,
-/// - pairing,
-/// - upcasting/downcasting.
+/// Below are the operations currently supported.
+/// - Serialization/deserialization.
+/// - Group operations.
+///   - Getting group order.
+///   - Getting group identity.
+///   - Getting group generator.
+///   - Addition.
+///   - Subtraction.
+///   - Negation.
+///   - Efficient sclar multiplication.
+///   - Efficient doubling.
+///   - Equal-to-identity check.
+/// - Field operations.
+///   - Getting additive identity.
+///   - Getting multiplicative identity.
+///   - Conversion from integers.
+///   - Addition.
+///   - Negation.
+///   - Subtraction.
+///   - Multiplication.
+///   - Inversion.
+///   - Division.
+///   - Efficient squaring.
+///   - Equal-to-additive-identity check.
+///   - Equal-to-multiplicative-identity check.
+/// - Equality check.
+/// - Upcasting/downcasting between structures.
 ///
 /// Note: in `algebra.move` additive group notions are used.
 module aptos_std::algebra {
@@ -30,8 +54,8 @@ module aptos_std::algebra {
 
     // Marker types (and their serialization schemes) begin.
 
-    /// A finite field used in BLS12-381 curves.
-    /// It has a prime order `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
+    /// The finite field $F_q$ used in BLS12-381 curves.
+    /// It has a prime order $q$ equal to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq {}
 
@@ -41,71 +65,77 @@ module aptos_std::algebra {
     /// A serialization scheme where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using big-endian byte order.
     public fun bls12_381_fq_bendian_format(): vector<u8> { x"0101" }
 
-    /// An extension field of `BLS12_381_Fq`, constructed as `Fq2=Fq[u]/(u^2+1)`.
+    /// The finite field $F_{q^2}$ used in BLS12-381 curves.
+    /// It is an extension field of `BLS12_381_Fq`, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq2 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq2` element in form `(c_0+c_1*u)` is represented by a byte array `b[]` of size 96.
-    /// `b[0..48]` is `c_0` serialized in `bls12_381_fq_format`.
-    /// `b[48..96]` is `c_1` serialized in `bls12_381_fq_format`.
+    /// A serialization scheme where a `BLS12_381_Fq2` element $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96.
+    /// `b[0..48]` is $c_0$ serialized in `bls12_381_fq_format`.
+    /// `b[48..96]` is $c_1$ serialized in `bls12_381_fq_format`.
     public fun bls12_381_fq2_format(): vector<u8> { x"02" }
 
-    /// An extension field of `BLS12_381_Fq2`, constructed as `Fq6=Fq2[v]/(v^3-u-1)`.
+    /// The finite field $F_{q^6}$ used in BLS12-381 curves.
+    /// It is an extension field of `BLS12_381_Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_Fq6 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq6` element in form `(c_0+c_1*v+c_2*v^2)` is represented by a byte array `b[]` of size 288.
-    /// `b[0..96]` is `c_0` serialized in `bls12_381_fq2_format`.
-    /// `b[96..192]` is `c_1` serialized in `bls12_381_fq2_format`.
-    /// `b[192..288]` is `c_2` serialized in `bls12_381_fq2_format`.
+    /// A serialization scheme where a `BLS12_381_Fq6` element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288.
+    /// `b[0..96]` is $c_0$ serialized in `bls12_381_fq2_format`.
+    /// `b[96..192]` is $c_1$ serialized in `bls12_381_fq2_format`.
+    /// `b[192..288]` is $c_2$ serialized in `bls12_381_fq2_format`.
     public fun bls12_381_fq6_format(): vector<u8> { x"03" }
 
-    /// An extension field of `BLS12_381_Fq6`, constructed as `Fq12=Fq6[w]/(w^2-v)`.
+    /// The finite field $F_{q^12}$ used in BLS12-381 curves.
+    /// It is an extension field of `BLS12_381_Fq6`, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct BLS12_381_Fq12 {}
 
-    /// A serialization scheme where a `BLS12_381_Fq12` element in form `(c_0+c_1*w)` is represented by a byte array `b[]` of size 576.
-    /// `b[0..288]` is `c_0` serialized in `bls12_381_fq6_format`.
-    /// `b[288..576]` is `c_1` serialized in `bls12_381_fq6_format`.
-    /// Also used in `ark_bls12_381::Fq12::deserialize()`.
+    /// A serialization scheme where a `BLS12_381_Fq12` element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576.
+    /// `b[0..288]` is $c_0$ serialized in `bls12_381_fq6_format`.
+    /// `b[288..576]` is $c_1$ serialized in `bls12_381_fq6_format`.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_fq12_format(): vector<u8> { x"04" }
 
-    /// A group constructed by the points on a curve `E(Fq)` and the point at inifinity, under the elliptic curve point addition.
-    /// `E(Fq)` is an elliptic curve `y^2=x^3+4` defined over `BLS12_381_Fq`.
-    /// The identity of `BLS12_381_G1_PARENT` is the point at infinity.
+    /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at inifinity,
+    /// under the elliptic curve point addition.
+    /// It contains the prime-order subgroup $G_1$ used in pairing.
+    /// The identity is the point at infinity.
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_G1_Parent {}
 
     /// A serialization scheme where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 96.
     /// `b[95] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
-    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`,
-    /// `[b[0], ..., b[47] & 0x3f]` is `x` serialized in `bls12_381_fq_format`, and
-    /// `[b[48], ..., b[95] & 0x3f]` is `y` serialized in `bls12_381_fq_format`.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_q)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `bls12_381_fq_format`, and
+    /// `[b[48], ..., b[95] & 0x3f]` is $y$ serialized in `bls12_381_fq_format`.
     public fun bls12_381_g1_parent_uncompressed_format(): vector<u8> { x"05" }
 
     /// A serialization scheme where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 48.
     /// `b[47] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
-    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq)`,
-    /// `[b[0], ..., b[47] & 0x3f]` is `x` serialized in `bls12_381_fq_format`, and
-    /// the positiveness flag `b_47 & 0x80` is 1 if and only if `y > -y` (as unsigned integers).
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(Fq)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `bls12_381_fq_format`, and
+    /// the positiveness flag `b_47 & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
     public fun bls12_381_g1_parent_compressed_format(): vector<u8> { x"0501" }
 
-    /// A subgroup of `BLS12_381_G1_Parent`.
-    /// It has a prime order `r` equal to `0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`.
+    /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// It is subgroup of `BLS12_381_G1_Parent`.
+    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
-    /// There exists a bilinear map from (`BLS12_381_G1`, `BLS12_381_G2`) to `BLS12_381_Gt`.
     struct BLS12_381_G1 {}
 
     /// Effectively `bls12_381_g1_parent_uncompressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_g1_uncompressed_format(): vector<u8> { x"06" }
 
     /// Effectively `bls12_381_g1_parent_compressed_format` but only applicable to `BLS12_381_G1` elements.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_g1_compressed_format(): vector<u8> { x"0601" }
 
 
-    /// A group constructed by the points on a curve `E(Fq2)` and the point at inifinity under the elliptic curve point addition.
-    /// `E(Fq2)` is an elliptic curve `y^2=x^3+4(u+1)` defined over `BLS12_381_Fq2`.
+    /// A group constructed by the points on a curve $E(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
+    /// $E(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
     /// The identity of `BLS12_381_G2` is the point at infinity.
     /// NOTE: currently information-only and no operations are implemented for this structure.
     struct BLS12_381_G2_Parent {}
@@ -113,46 +143,50 @@ module aptos_std::algebra {
     /// A serialization scheme where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 192.
     /// `b[191] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
-    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`,
-    /// `b[0..96]` is `x` serialized in `bls12_381_fq2_format`, and
-    /// `[b[96], ..., b[191] & 0x3f]` is `y` serialized in `bls12_381_fq2_format`.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
+    /// `b[0..96]` is $x$ serialized in `bls12_381_fq2_format`, and
+    /// `[b[96], ..., b[191] & 0x3f]` is $y$ serialized in `bls12_381_fq2_format`.
     public fun bls12_381_g2_parent_uncompressed_format(): vector<u8> { x"07" }
 
     /// A serialization scheme where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 96.
     /// `b[95] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
-    /// The infinity flag is 0 if and only if the element is a point `(x,y)` on curve `E(Fq2)`,
-    /// `[b[0], ..., b[95] & 0x3f]` is `x` serialized in `bls12_381_fq2_format`, and
-    /// the positiveness flag `b[95] & 0x80` is 1 if and only if `y > -y` (`y` and `-y` treated as unsigned integers).
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
+    /// `[b[0], ..., b[95] & 0x3f]` is $x$ serialized in `bls12_381_fq2_format`, and
+    /// the positiveness flag `b[95] & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
     public fun bls12_381_g2_parent_compressed_format(): vector<u8> { x"0701" }
 
-    /// A subgroup of `BLS12_381_G2_Parent`.
-    /// It has a prime order `r` equal to `0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`.
+    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// It is a subgroup of `BLS12_381_G2_Parent`.
+    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
-    /// There exists a pairing from (`BLS12_381_G1`, `BLS12_381_G2`) to `BLS12_381_Gt`.
     struct BLS12_381_G2 {}
 
     /// Effectively `bls12_381_g2_parent_uncompressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_g2_uncompressed_format(): vector<u8> { x"08" }
 
     /// Effectively `bls12_381_g2_parent_compressed_format` but only applicable to `BLS12_381_G2` elements.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_g2_compressed_format(): vector<u8> { x"0801" }
 
-    /// A multiplicative subgroup of `BLS12_381_Fq12`.
-    /// It has a prime order `r` equal to `0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`.
+    /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow \G_t$.
+    /// It is a multiplicative subgroup of `BLS12_381_Fq12`.
+    /// It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
     /// (so `BLS12_381_Fr` is the scalar field).
     /// The identity of `BLS12_381_Gt` is 1.
-    /// There exists a bilinear map from (`BLS12_381_G1`, `BLS12_381_G2`) to `BLS12_381_Gt`.
     struct BLS12_381_Gt {}
 
     /// Effectively `bls12_381_fq12_format()` but only applicable to `BLS12_381_Gt` elements.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_gt_format(): vector<u8> { x"09" }
 
-    /// A finite field that shares the same prime order `r` with groups `BLS12_381_G1`, `BLS12_381_G2` and `BLS12_381_Gt`
-    /// (so can be used as their scalar fields).
+    /// The finite field $F_r$ that can be used as the scalar fields
+    /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct BLS12_381_Fr {}
 
     /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using little-endian byte order.
+    /// NOTE: the same scheme is also used in other crates, e.g. `ark-bls12-381-0.3.0`.
     public fun bls12_381_fr_lendian_format(): vector<u8> { x"0a" }
 
     /// A serialization scheme where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using big-endian byte order.
@@ -298,33 +332,6 @@ module aptos_std::algebra {
         field_is_zero_internal<S>(x.handle)
     }
 
-    /// Get the identity of a group `G`.
-    public fun group_identity<G>(): Element<G> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        abort_unless_type_enabled_for_basic_operation<G>();
-        Element<G> {
-            handle: group_identity_internal<G>()
-        }
-    }
-
-    /// Get the fixed generator of a cyclic group `G`.
-    public fun group_generator<G>(): Element<G> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        abort_unless_type_enabled_for_basic_operation<G>();
-        Element<G> {
-            handle: group_generator_internal<G>()
-        }
-    }
-
-    /// Compute `-P` for an element `P` of a group `G`.
-    public fun group_neg<G>(element_p: &Element<G>): Element<G> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        abort_unless_type_enabled_for_basic_operation<G>();
-        Element<G> {
-            handle: group_neg_internal<G>(element_p.handle)
-        }
-    }
-
     /// Compute `P + Q` for elements `P` and `Q` of a group `G`.
     public fun group_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -343,6 +350,33 @@ module aptos_std::algebra {
         }
     }
 
+    /// Get the fixed generator of a cyclic group `G`.
+    public fun group_generator<G>(): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_enabled_for_basic_operation<G>();
+        Element<G> {
+            handle: group_generator_internal<G>()
+        }
+    }
+
+    /// Get the identity of a group `G`.
+    public fun group_identity<G>(): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_enabled_for_basic_operation<G>();
+        Element<G> {
+            handle: group_identity_internal<G>()
+        }
+    }
+
+    /// Compute `-P` for an element `P` of a group `G`.
+    public fun group_neg<G>(element_p: &Element<G>): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_enabled_for_basic_operation<G>();
+        Element<G> {
+            handle: group_neg_internal<G>(element_p.handle)
+        }
+    }
+
     /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
     public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -350,6 +384,16 @@ module aptos_std::algebra {
         Element<G> {
             handle: group_scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
         }
+    }
+
+    /// Compute `P - Q` for elements `P` and `Q` of a group `G`.
+    public fun group_sub<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_enabled_for_basic_operation<G>();
+        Element<G> {
+            handle: group_sub_internal<G>(element_p.handle, element_q.handle)
+        }
+
     }
 
     /// Try deserializing a byte array to an element of an algebraic structure `S` using a given `scheme`.
@@ -377,6 +421,11 @@ module aptos_std::algebra {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         group_order_internal<G>()
+    }
+
+    /// Check if an element `x` is the identity of its group `G`.
+    public fun group_is_identity<G>(element_x: &Element<G>): bool {
+        group_is_identity_internal<G>(element_x.handle)
     }
 
     /// Cast an element of a structure `S` to a parent structure `L`.
@@ -417,8 +466,8 @@ module aptos_std::algebra {
     // Native functions begin.
 
     native fun deserialize_internal<G>(scheme_id: vector<u8>, bytes: &vector<u8>): (bool, u64);
-    native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
-    native fun from_u64_internal<S>(value: u64): u64;
+    native fun downcast_internal<L,S>(handle: u64): (bool, u64);
+    native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_div_internal<F>(handle_1: u64, handle_2: u64): (bool, u64);
     native fun field_inv_internal<F>(handle: u64): (bool, u64);
@@ -430,19 +479,21 @@ module aptos_std::algebra {
     native fun field_sqr_internal<G>(handle: u64): u64;
     native fun field_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun field_zero_internal<S>(): u64;
+    native fun from_u64_internal<S>(value: u64): u64;
     native fun group_add_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
-    native fun group_identity_internal<G>(): u64;
-    native fun group_order_internal<G>(): vector<u8>;
-    native fun group_generator_internal<G>(): u64;
-    native fun group_scalar_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
     native fun group_double_internal<G>(element_handle: u64): u64;
+    native fun group_generator_internal<G>(): u64;
+    native fun group_identity_internal<G>(): u64;
+    native fun group_is_identity_internal<G>(handle: u64): bool;
     native fun group_neg_internal<G>(handle: u64): u64;
-    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
-    native fun upcast_internal<S,L>(handle: u64): u64;
-    native fun downcast_internal<L,S>(handle: u64): (bool, u64);
+    native fun group_order_internal<G>(): vector<u8>;
+    native fun group_scalar_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
+    native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
+    native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
+    native fun upcast_internal<S,L>(handle: u64): u64;
 
     // Native functions end.
 
@@ -517,10 +568,12 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // Special elements.
+        // Special elements and checks.
         let val_0 = field_zero<BLS12_381_Fr>();
-        assert!(field_is_zero(&val_0), 1);
         let val_1 = field_one<BLS12_381_Fr>();
+        assert!(field_is_zero(&val_0), 1);
+        assert!(!field_is_zero(&val_1), 1);
+        assert!(!field_is_one(&val_0), 1);
         assert!(field_is_one(&val_1), 1);
 
         // Serialization/deserialization.
@@ -582,10 +635,12 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // Special elements.
+        // Special elements and checks.
         let val_0 = field_zero<BLS12_381_Fq12>();
-        assert!(field_is_zero(&val_0), 1);
         let val_1 = field_one<BLS12_381_Fq12>();
+        assert!(field_is_zero(&val_0), 1);
+        assert!(!field_is_zero(&val_1), 1);
+        assert!(!field_is_one(&val_0), 1);
         assert!(field_is_one(&val_1), 1);
 
         // Serialization/deserialization.
@@ -652,17 +707,20 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // Group info.
+        // Special constants and checks.
         assert!(BLS12_381_R == group_order<BLS12_381_G1>(), 1);
+        let point_at_infinity = group_identity<BLS12_381_G1>();
+        let generator = group_generator<BLS12_381_G1>();
+        assert!(group_is_identity(&point_at_infinity), 1);
+        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        let point_g = group_generator<BLS12_381_G1>();
-        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_g), 1);
-        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_g), 1);
-        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
-        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
-        assert!(eq(&point_g, &point_g_from_comp), 1);
-        assert!(eq(&point_g, &point_g_from_uncomp), 1);
+        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &generator), 1);
+        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &generator), 1);
+        let generator_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
+        let generator_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(eq(&generator, &generator_from_comp), 1);
+        assert!(eq(&generator, &generator_from_uncomp), 1);
 
         // Deserialization: byte array of correct size but the value is not a member.
         assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
@@ -670,13 +728,12 @@ module aptos_std::algebra {
         // Deserialization: byte array of wrong size.
         assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
-        let inf = group_identity<BLS12_381_G1>();
-        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &inf), 1);
-        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &inf), 1);
+        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_at_infinity), 1);
+        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_at_infinity), 1);
         let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_INF_SERIALIZED_UNCOMP));
         let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_INF_SERIALIZED_COMP));
-        assert!(eq(&inf, &inf_from_comp), 1);
-        assert!(eq(&inf, &inf_from_uncomp), 1);
+        assert!(eq(&point_at_infinity, &inf_from_comp), 1);
+        assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
 
         let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
         let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
@@ -699,15 +756,15 @@ module aptos_std::algebra {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
+        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_7g_calc), 1);
         assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_7g_calc), 1);
 
         // Doubling.
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-        let point_double_g = group_double(&point_g);
+        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_double_g = group_double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
         // Negation.
@@ -717,10 +774,13 @@ module aptos_std::algebra {
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let point_9g = group_scalar_mul(&point_g, &scalar_9);
-        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_9g = group_scalar_mul(&generator, &scalar_9);
+        let point_2g = group_scalar_mul(&generator, &scalar_2);
         let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
+
+        // Subtraction.
+        assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
     }
 
     #[test_only]
@@ -745,24 +805,26 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // Group info.
+        // Special constants and checks.
         assert!(BLS12_381_R == group_order<BLS12_381_G2>(), 1);
+        let point_at_infinity = group_identity<BLS12_381_G2>();
+        let generator = group_generator<BLS12_381_G2>();
+        assert!(group_is_identity(&point_at_infinity), 1);
+        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        let point_g = group_generator<BLS12_381_G2>();
-        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_g), 1);
-        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_g), 1);
-        let point_g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
-        let point_g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
-        assert!(eq(&point_g, &point_g_from_comp), 1);
-        assert!(eq(&point_g, &point_g_from_uncomp), 1);
-        let inf = group_identity<BLS12_381_G2>();
-        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &inf), 1);
-        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &inf), 1);
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &generator), 1);
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &generator), 1);
+        let generator_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
+        let generator_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
+        assert!(eq(&generator, &generator_from_comp), 1);
+        assert!(eq(&generator, &generator_from_uncomp), 1);
+        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_at_infinity), 1);
+        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_at_infinity), 1);
         let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_INF_SERIALIZED_UNCOMP));
         let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_INF_SERIALIZED_COMP));
-        assert!(eq(&inf, &inf_from_comp), 1);
-        assert!(eq(&inf, &inf_from_uncomp), 1);
+        assert!(eq(&point_at_infinity, &inf_from_comp), 1);
+        assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
         let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
         let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
@@ -784,15 +846,15 @@ module aptos_std::algebra {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let point_7g_calc = group_scalar_mul(&point_g, &scalar_7);
+        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_7g_calc), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_7g_calc), 1);
 
         // Doubling.
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let point_2g = group_scalar_mul(&point_g, &scalar_2);
-        let point_double_g = group_double(&point_g);
+        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_double_g = group_double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
         // Negation.
@@ -802,10 +864,13 @@ module aptos_std::algebra {
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let point_9g = group_scalar_mul(&point_g, &scalar_9);
-        let point_2g = group_scalar_mul(&point_g, &scalar_2);
+        let point_9g = group_scalar_mul(&generator, &scalar_9);
+        let point_2g = group_scalar_mul(&generator, &scalar_2);
         let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
+
+        // Subtraction.
+        assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
     }
 
     #[test_only]
@@ -822,15 +887,17 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // Group info.
+        // Special constants and checks.
         assert!(BLS12_381_R == group_order<BLS12_381_Gt>(), 1);
+        let identity = group_identity<BLS12_381_Gt>();
+        let generator = group_generator<BLS12_381_Gt>();
+        assert!(group_is_identity(&identity), 1);
+        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        let generator = group_generator<BLS12_381_Gt>();
         assert!(BLS12_381_GT_GENERATOR_SERIALIZED == serialize(bls12_381_gt_format(), &generator), 1);
         let generator_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_SERIALIZED));
         assert!(eq(&generator, &generator_from_deser), 1);
-        let identity = group_identity<BLS12_381_Gt>();
         assert!(BLS12_381_FQ12_ONE_SERIALIZED == serialize(bls12_381_gt_format(), &identity), 1);
         let identity_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_FQ12_ONE_SERIALIZED));
         assert!(eq(&identity, &identity_from_deser), 1);
@@ -860,6 +927,9 @@ module aptos_std::algebra {
         let element_2g = group_scalar_mul(&generator, &scalar_2);
         let element_2g_calc = group_add(&element_minus_7g_calc, &element_9g);
         assert!(eq(&element_2g, &element_2g_calc), 1);
+
+        // Subtraction.
+        assert!(eq(&element_9g, &group_sub(&element_2g, &element_minus_7g_calc)), 1);
 
         // Upcasting to BLS12_381_Fq12.
         assert!(eq(&field_one<BLS12_381_Fq12>(), &upcast<BLS12_381_Gt, BLS12_381_Fq12>(&identity)), 1);
