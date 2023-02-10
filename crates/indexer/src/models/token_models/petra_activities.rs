@@ -34,9 +34,6 @@ impl PetraActivity {
             let version = user_txn.info.version.0 as i64;
             let mut addresses = HashSet::new();
 
-            // Add the transaction sender.
-            addresses.insert(user_txn.request.sender.to_string());
-
             // Add addresses in coin_activities.
             for coin_activity in coin_activities.iter() {
                 addresses.insert(coin_activity.event_account_address.clone());
