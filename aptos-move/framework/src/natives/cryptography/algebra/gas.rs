@@ -6,14 +6,6 @@ use crate::natives::cryptography::algebra::{BLS12_381_FQ12_FORMAT, BLS12_381_FR_
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub blst_g1_msm_base: InternalGasPerArg,
-    pub blst_g1_msm_per_pair: InternalGasPerArg,
-    pub blst_g2_msm_base: InternalGasPerArg,
-    pub blst_g2_msm_per_pair: InternalGasPerArg,
-    pub blst_g1_proj_to_affine: InternalGasPerArg,
-    pub blst_g1_affine_ser: InternalGasPerArg,
-    pub blst_g2_proj_to_affine: InternalGasPerArg,
-    pub blst_g2_affine_ser: InternalGasPerArg,
     pub ark_bls12_381_fr_add: InternalGasPerArg,
     pub ark_bls12_381_fr_deser: InternalGasPerArg,
     pub ark_bls12_381_fr_div: InternalGasPerArg,

@@ -34,7 +34,7 @@ pub mod status {
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
-    pub groups: cryptography::algebra::gas::GasParameters,
+    pub algebra: cryptography::algebra::gas::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
@@ -71,14 +71,7 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            groups: cryptography::algebra::gas::GasParameters {
-                blst_g1_msm_base: 0.into(),
-                blst_g1_msm_per_pair: 0.into(),
-                blst_g2_msm_base: 0.into(),
-                blst_g2_msm_per_pair: 0.into(),
-                blst_g1_proj_to_affine: 0.into(),
-                blst_g1_affine_ser: 0.into(),
-                blst_g2_proj_to_affine: 0.into(),
+            algebra: cryptography::algebra::gas::GasParameters {
                 ark_bls12_381_fr_serialize: 0.into(),
                 ark_bls12_381_fr_deser: 0.into(),
                 ark_bls12_381_fr_from_u128: 0.into(),
@@ -145,7 +138,6 @@ impl GasParameters {
                 ark_bls12_381_fq12_square: 0.into(),
                 ark_bls12_381_g1_proj_double: 0.into(),
                 ark_bls12_381_g2_proj_double: 0.into(),
-                blst_g2_affine_ser: 0.into(),
                 ark_bls12_381_g2_affine_eq: 0.into(),
                 ark_bls12_381_fq12_div: 0.into(),
                 ark_bls12_381_fq12_add: 0.into(),
@@ -295,7 +287,7 @@ pub fn all_natives(
         "create_signer",
         create_signer::make_all(gas_params.account.create_signer.clone())
     );
-    add_natives_from_module!("algebra", cryptography::algebra::make_all(gas_params.groups.clone()));
+    add_natives_from_module!("algebra", cryptography::algebra::make_all(gas_params.algebra.clone()));
     add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
     add_natives_from_module!(
         "genesis",
