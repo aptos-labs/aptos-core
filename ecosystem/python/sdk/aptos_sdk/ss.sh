@@ -34,6 +34,9 @@ elif test $1 = m; then
     # Remove Ace and Dee to create 1-of-2 multisig.
     python amee.py m r Third Protocol -m tmp/new_protocol.multisig -t 1 \
         -s 0 3 -n tmp/third_protocol.multisig
+    # Change threshold to create 1-of-2 multisig.
+    python amee.py m t Fourth Protocol -m tmp/third_protocol.multisig -t 2 \
+        -n tmp/fourth_protocol.multisig
     rm -rf tmp # Clear temp dir.
 
 fi

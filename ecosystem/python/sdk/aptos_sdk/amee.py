@@ -130,7 +130,7 @@ def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
     References
     ----------
     https://cryptography.io/en/latest/fernet
-    https://stackoverflow.com/questions/2490334
+    https://stackoverflow.com/a/55147077 (See "Fernet with password")
     """
     key_derivation_function = PBKDF2HMAC(
         algorithm=hashes.SHA256(), length=32, salt=salt, iterations=480_000
@@ -172,8 +172,8 @@ def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def metafile_incorporate(args):
-    """Incorporate single-signer keyfiles to multisig metadata file."""
-    metafile_merge_keyfiles(
+    """Incorporate single-signer keyfiles to multisig metafile."""
+    metafile_check_update(
         metafile_json={"n_signatories": 0, "signatories": []},
         name_tokens=args.name,
         threshold=args.threshold,
@@ -183,8 +183,8 @@ def metafile_incorporate(args):
 
 
 def metafile_append(args):
-    """Append signatory/signatories to a multisig metadata file."""
-    metafile_merge_keyfiles(
+    """Append signatory/signatories to a multisig metafile."""
+    metafile_check_update(
         metafile_json=json.load(args.metafile),
         name_tokens=args.name,
         threshold=args.threshold,
@@ -216,27 +216,39 @@ def metafile_remove(args):
         del metafile_json["signatories"][index]
     # Decrement signatory count.
     metafile_json["n_signatories"] -= len(args.signatories)
-    metafile_merge_keyfiles(  # Check and write data to disk.
+    metafile_check_update(  # Check and write data to disk.
         metafile_json=metafile_json,
         name_tokens=args.name,
         threshold=args.threshold,
-        keyfiles=[],
+        keyfiles=None,
         outfile=args.new_metafile,
     )
 
 
-def metafile_merge_keyfiles(
+def metafile_threshold(args):
+    """Update threshold for a multisig metafile."""
+    metafile_json = json.load(args.metafile)  # Load metafile JSON.
+    assert (  # Assert that threshold update is specified.
+        metafile_json["threshold"] != args.threshold
+    ), "No threshold update specified."
+    metafile_check_update(  # Check and write data to disk.
+        metafile_json=metafile_json,
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=None,
+        outfile=args.new_metafile,
+    )
+
+
+def metafile_check_update(
     metafile_json: Dict[Any, Any],
     name_tokens: List[str],
     threshold: int,
-    keyfiles: List[TextIOWrapper],
+    keyfiles: Option[List[TextIOWrapper]],
     outfile: Path,
 ):
-    """Append data from keyfiles to the end of a multisig metafile."""
-    # Get new number of signatories on multisig.
-    n_signatories = metafile_json["n_signatories"] + len(keyfiles)
-    # Check number of signatories and threshold.
-    check_signatories_threshold(n_signatories, threshold)
+    """Check multisig metafile data and update fields as needed for
+    inputs, including optional keyfiles for signatories to append."""
     # Get signatories list.
     signatories = metafile_json["signatories"]
     # Get signatory names list.
@@ -245,29 +257,35 @@ def metafile_merge_keyfiles(
         PublicKey(VerifyKey(prefixed_hex_to_bytes(signatory["public_key"])))
         for signatory in signatories
     ]
-    for keyfile in keyfiles:  # Loop over keyfiles.
-        signatory = json.load(keyfile)  # Load signatory data.
-        signatory_name = signatory["signatory"]  # Get signatory name.
-        assert (  # Assert signatory name not reused.
-            not signatory_name in signatory_names
-        ), f"{signatory_name} already in multisig."
-        signatory_names.append(signatory_name)  # Append name.
-        # Get signatory's public key as bytes.
-        public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
-        # Append public key to list of public keys.
-        public_keys.append(PublicKey(VerifyKey(public_key_bytes)))
-        # Append signatory public data to list of signatories.
-        signatories.append(get_public_signatory_fields(signatory))
+    if keyfiles is not None:  # If keyfiles to append:
+        for keyfile in keyfiles:  # Loop over keyfiles.
+            signatory = json.load(keyfile)  # Load signatory data.
+            # Get signatory name.
+            signatory_name = signatory["signatory"]
+            assert (  # Assert signatory name not reused.
+                not signatory_name in signatory_names
+            ), f"{signatory_name} already in multisig."
+            signatory_names.append(signatory_name)  # Append name.
+            # Get signatory's public key as bytes.
+            public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
+            # Append public key to list of public keys.
+            public_keys.append(PublicKey(VerifyKey(public_key_bytes)))
+            # Append signatory public data to list of signatories.
+            signatories.append(get_public_signatory_fields(signatory))
+    # Get new number of signatories on multisig.
+    n_signatories = len(signatories)
+    # Check number of signatories and threshold.
+    check_signatories_threshold(n_signatories, threshold)
     # Initialize multisig public key.
     multisig_public_key = MultiEd25519PublicKey(public_keys, threshold)
     # Get public key as prefixed hex.
     public_key_hex = bytes_to_prefixed_hex(multisig_public_key.to_bytes())
     # Get authentication key as prefixed hex.
     auth_key_hex = bytes_to_prefixed_hex(multisig_public_key.auth_key())
-    write_json_file(  # Write JSON to multisig metadata outfile.
+    write_json_file(  # Write JSON to multisig metafile outfile.
         path=get_file_path(outfile, name_tokens, "multisig"),
         data={
-            "filetype": "Multisig metadata file",
+            "filetype": "Multisig metafile",
             "multisig_name": check_name(name_tokens),
             "address": None,
             "threshold": threshold,
@@ -371,7 +389,7 @@ def keyfile_fund(args):
     # Print command to run.
     print(f"Running aptos CLI command: {command}")
     # Run command.
-    subprocess.run(command.split(), stdout=subprocess.PIPE)
+    subprocess.run(command.split(), stdout=subprocess.PIPE, check=True)
     balance = RestClient(NETWORK_URLS["devnet"]).account_balance(
         AccountAddress(prefixed_hex_to_bytes(address))
     )  # Check balance.
@@ -384,7 +402,7 @@ def keyfile_verify(args):
     # Load JSON data and try getting private key bytes.
     data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is not None:  # If able to decrypt private key:
-        # Print keyfile metadata.
+        # Print keyfile info.
         print(f'Keyfile password verified for {data["signatory"]}')
         print(f'Public key:         {data["public_key"]}')
         print(f'Authentication key: {data["authentication_key"]}')
@@ -416,7 +434,7 @@ def get_sequence_number(address: bytes, network: str) -> int:
 def rotate_challenge_propose(args):
     """Propose a rotation proof challenge, storing an output file.
 
-    Accepts either a single-signer keyfile or multisig metadata file for
+    Accepts either a single-signer keyfile or multisig metafile for
     originating account. If single-signer, assumes authentication key is
     account address."""
     name = check_name(args.name)  # Get name for the rotation.
@@ -427,7 +445,7 @@ def rotate_challenge_propose(args):
         # Address is authentication key.
         originator_address = originator_data["authentication_key"]
     else:  # If multisig originator:
-        # Address is that indicated in metadata file.
+        # Address is that indicated in metafile.
         originator_address = originator_data["address"]
     sequence_number = get_sequence_number(
         prefixed_hex_to_bytes(originator_address), args.network
@@ -494,8 +512,9 @@ def rotate_challenge_sign(args):
 
 
 def metafile_to_multisig_public_key(path: Path):
-    """Get multisig public key instance from metadata file at path."""
-    with open(path) as metafile:  # With metadata file open:
+    """Get multisig public key instance from metafile at path."""
+    # With metafile open:
+    with open(path, encoding='utf-8') as metafile:
         data = json.load(metafile)  # Load JSON data.
     keys = []  # Init empty public keys list.
     for signatory in data["signatories"]:  # Loop over signatories:
@@ -578,13 +597,13 @@ def rotate_execute_single(args):
     )  # Get signed transaction.
     # Assert successful transaction.
     assert_successful_transaction(client, signed_transaction)
-    # Update multisig metadata file address.
+    # Update multisig metafile address.
     update_multisig_address(args.metafile, proposal["originator"])
 
 
 def update_multisig_address(path: Path, address_prefixed_hex: str):
-    """Update the address for a multisig metadata file."""
-    print("Updating address in multisig metadata file.")
+    """Update the address for a multisig metafile."""
+    print("Updating address in multisig metafile.")
     # With multisig metafile open:
     with open(path, "r", encoding="utf-8") as metafile:
         data = json.load(metafile)  # Load JSON data from metafile.
@@ -714,8 +733,8 @@ parser_keyfile_fund.add_argument(
 parser_metafile = subparsers.add_parser(
     name="metafile",
     aliases=["m"],
-    description="Assorted multisig metadata file operations.",
-    help="Multisig metadata file operations.",
+    description="Assorted multisig metafile operations.",
+    help="Multisig metafile operations.",
 )
 subparsers_metafile = parser_metafile.add_subparsers(required=True)
 
@@ -723,7 +742,7 @@ subparsers_metafile = parser_metafile.add_subparsers(required=True)
 parser_metafile_append = subparsers_metafile.add_parser(
     name="append",
     aliases=["a"],
-    description="Append a signatory or signatories to multisig metadata file.",
+    description="Append a signatory or signatories to multisig metafile.",
     help="Append signer(s) to a multisig.",
 )
 parser_metafile_append.set_defaults(func=metafile_append)
@@ -738,7 +757,7 @@ parser_metafile_append.add_argument(
     "-m",
     "--metafile",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to desired multisig metadata file to add to.",
+    help="Relative path to desired multisig metafile to add to.",
     required=True,
 )
 parser_metafile_append.add_argument(
@@ -761,7 +780,7 @@ parser_metafile_append.add_argument(
     "-n",
     "--new-metafile",
     type=Path,
-    help="Custom relative path to new multisig metadata file.",
+    help="Custom relative path to new multisig metafile.",
 )
 
 # Metafile incorporate subcommand parser.
@@ -769,7 +788,7 @@ parser_metafile_incorporate = subparsers_metafile.add_parser(
     name="incorporate",
     aliases=["i"],
     description="""Incorporate multiple single-signer keyfiles into a multisig
-        metadata file.""",
+        metafile.""",
     help="Incorporate single signers into a multisig.",
 )
 parser_metafile_incorporate.set_defaults(func=metafile_incorporate)
@@ -800,14 +819,14 @@ parser_metafile_incorporate.add_argument(
     "-m",
     "--metafile",
     type=Path,
-    help="Custom relative path to desired multisig metadata file.",
+    help="Custom relative path to desired multisig metafile.",
 )
 
 # Metafile remove subcommand parser.
 parser_metafile_remove = subparsers_metafile.add_parser(
     name="remove",
     aliases=["r"],
-    description="Remove signatory or signatories from multisig metadata file.",
+    description="Remove signatory or signatories from multisig metafile.",
     help="Remove signer(s) from a multisig.",
 )
 parser_metafile_remove.set_defaults(func=metafile_remove)
@@ -822,7 +841,7 @@ parser_metafile_remove.add_argument(
     "-m",
     "--metafile",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to desired multisig metadata file to add to.",
+    help="Relative path to desired multisig metafile to add to.",
     required=True,
 )
 parser_metafile_remove.add_argument(
@@ -846,7 +865,43 @@ parser_metafile_remove.add_argument(
     "-n",
     "--new-metafile",
     type=Path,
-    help="Custom relative path to new multisig metadata file.",
+    help="Custom relative path to new multisig metafile.",
+)
+
+# Metafile threshold subcommand parser.
+parser_metafile_threshold = subparsers_metafile.add_parser(
+    name="threshold",
+    aliases=["t"],
+    description="Change signer threshold for multisig metafile.",
+    help="Change multisig threshold.",
+)
+parser_metafile_threshold.set_defaults(func=metafile_threshold)
+parser_metafile_threshold.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""The name of the new multisig entity. For example 'Aptos' or 'The
+        Aptos Foundation'.""",
+)
+parser_metafile_threshold.add_argument(
+    "-m",
+    "--metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metafile to add to.",
+    required=True,
+)
+parser_metafile_threshold.add_argument(
+    "-t",
+    "--threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+    required=True,
+)
+parser_metafile_threshold.add_argument(
+    "-n",
+    "--new-metafile",
+    type=Path,
+    help="Custom relative path to new multisig metafile.",
 )
 
 # Rotate subcommand parser.
@@ -880,14 +935,14 @@ parser_rotate_challenge_propose.set_defaults(func=rotate_challenge_propose)
 parser_rotate_challenge_propose.add_argument(
     "originator",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Either single-signer keyfile or multisig metadata relative file
-        path for originating account. If a single-signer keyfile, assumes that
-        account has not yet had its authentication key rotated.""",
+    help="""Relative file path for either single-signer keyfile or multisig
+        metafile for originating account. If a single-signer keyfile, assumes
+        that account has not yet had its authentication key rotated.""",
 )
 parser_rotate_challenge_propose.add_argument(
     "target",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Multisig metadata relative file path for account to rotate to.""",
+    help="""Multisig metafile relative file path for account to rotate to.""",
 )
 parser_rotate_challenge_propose.add_argument(
     "name",
@@ -954,9 +1009,9 @@ parser_rotate_execute_single = subparsers_rotate_execute.add_parser(
     name="single",
     aliases=["s"],
     description="""Rotate the authentication key of a single-signer account to
-        the authentication key of a multisig account. Assumes account has not
-        yet had its authentication key rotated. Requires single-signer password
-        approval.""",
+        the authentication key of a multisig account. Assumes single-signer
+        account address is identical to its authentication key. Requires
+        single-signer password approval.""",
     help="""Rotate single-signer account to multisig account.""",
     parents=[network_parser],
 )
@@ -969,7 +1024,7 @@ parser_rotate_execute_single.add_argument(
 parser_rotate_execute_single.add_argument(
     "metafile",
     type=Path,
-    help="""Relative path to metadata file for multisig to rotate to.""",
+    help="""Relative path to metafile for multisig to rotate to.""",
 )
 parser_rotate_execute_single.add_argument(
     "signatures",
