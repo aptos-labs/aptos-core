@@ -17,6 +17,8 @@ generates:
       typesPath: ./operations
     plugins:
       - typescript-graphql-request
+      - add:
+          content: "/* eslint-disable */"
     config:
       documentMode: string
       documentVariableSuffix: ""

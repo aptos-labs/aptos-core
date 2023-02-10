@@ -1,7 +1,8 @@
-import * as Types from "./operations";
+/* eslint-disable */
+import * as Types from './operations';
 
-import { GraphQLClient } from "graphql-request";
-import * as Dom from "graphql-request/dist/types.dom";
+import { GraphQLClient } from 'graphql-request';
+import * as Dom from 'graphql-request/dist/types.dom';
 export const TokenDataFieldsFragmentDoc = `
     fragment TokenDataFields on current_token_datas {
   creator_address
@@ -67,44 +68,19 @@ export const GetTokenActivities = `
 }
     `;
 
-export type SdkFunctionWrapper = <T>(
-  action: (requestHeaders?: Record<string, string>) => Promise<T>,
-  operationName: string,
-  operationType?: string,
-) => Promise<T>;
+export type SdkFunctionWrapper = <T>(action: (requestHeaders?:Record<string, string>) => Promise<T>, operationName: string, operationType?: string) => Promise<T>;
+
 
 const defaultWrapper: SdkFunctionWrapper = (action, _operationName, _operationType) => action();
 
 export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
-    getAccountCurrentTokens(
-      variables: Types.GetAccountCurrentTokensQueryVariables,
-      requestHeaders?: Dom.RequestInit["headers"],
-    ): Promise<Types.GetAccountCurrentTokensQuery> {
-      return withWrapper(
-        (wrappedRequestHeaders) =>
-          client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {
-            ...requestHeaders,
-            ...wrappedRequestHeaders,
-          }),
-        "getAccountCurrentTokens",
-        "query",
-      );
+    getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
     },
-    getTokenActivities(
-      variables: Types.GetTokenActivitiesQueryVariables,
-      requestHeaders?: Dom.RequestInit["headers"],
-    ): Promise<Types.GetTokenActivitiesQuery> {
-      return withWrapper(
-        (wrappedRequestHeaders) =>
-          client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {
-            ...requestHeaders,
-            ...wrappedRequestHeaders,
-          }),
-        "getTokenActivities",
-        "query",
-      );
-    },
+    getTokenActivities(variables: Types.GetTokenActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivities', 'query');
+    }
   };
 }
 export type Sdk = ReturnType<typeof getSdk>;

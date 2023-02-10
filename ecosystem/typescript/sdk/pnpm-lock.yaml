@@ -1,6 +1,7 @@
 lockfileVersion: 5.4
 
 specifiers:
+  '@graphql-codegen/add': ^4.0.0
   '@graphql-codegen/cli': ^2.13.5
   '@graphql-codegen/import-types-preset': ^2.2.3
   '@graphql-codegen/typescript': ^2.7.3
@@ -41,6 +42,7 @@ dependencies:
   tweetnacl: 1.0.3
 
 devDependencies:
+  '@graphql-codegen/add': 4.0.0_graphql@16.6.0
   '@graphql-codegen/cli': 2.16.5_za2aozsjcrllrsiclf5lajw72u
   '@graphql-codegen/import-types-preset': 2.2.6_graphql@16.6.0
   '@graphql-codegen/typescript': 2.8.8_graphql@16.6.0
@@ -948,6 +950,16 @@ packages:
       tslib: 2.4.1
     dev: true
 
+  /@graphql-codegen/add/4.0.0_graphql@16.6.0:
+    resolution: {integrity: sha512-AxuDFdDi4Hx1fVVSkSo9O0i/kGEidjXw3gqSfx6H+dSeC/gcjpsVZyCyvXERVXpTNXYobVIJtTV3UaSzGNZMSw==}
+    peerDependencies:
+      graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
+    dependencies:
+      '@graphql-codegen/plugin-helpers': 4.0.0_graphql@16.6.0
+      graphql: 16.6.0
+      tslib: 2.4.1
+    dev: true
+
   /@graphql-codegen/cli/2.16.5_za2aozsjcrllrsiclf5lajw72u:
     resolution: {integrity: sha512-XYPIp+q7fB0xAGSAoRykiTe4oY80VU+z+dw5nuv4mLY0+pv7+pa2C6Nwhdw7a65lXOhFviBApWCCZeqd54SMnA==}
     hasBin: true
@@ -1047,6 +1059,20 @@ packages:
 
   /@graphql-codegen/plugin-helpers/3.1.2_graphql@16.6.0:
     resolution: {integrity: sha512-emOQiHyIliVOIjKVKdsI5MXj312zmRDwmHpyUTZMjfpvxq/UVAHUJIVdVf+lnjjrI+LXBTgMlTWTgHQfmICxjg==}
+    peerDependencies:
+      graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
+    dependencies:
+      '@graphql-tools/utils': 9.2.0_graphql@16.6.0
+      change-case-all: 1.0.15
+      common-tags: 1.8.2
+      graphql: 16.6.0
+      import-from: 4.0.0
+      lodash: 4.17.21
+      tslib: 2.4.1
+    dev: true
+
+  /@graphql-codegen/plugin-helpers/4.0.0_graphql@16.6.0:
+    resolution: {integrity: sha512-vgNGTanT36hC4RAC/LAThMEjDvnu3WCyx6MtKZcPUtfCWFxbUAr88+OarGl1LAEiOef0agIREC7tIBXCqjKkJA==}
     peerDependencies:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
     dependencies:
