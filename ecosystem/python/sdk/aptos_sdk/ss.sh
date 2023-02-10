@@ -12,7 +12,7 @@ if test $1 = r; then
         -m tmp/protocol.multisig
     # Propose challenge to convert to a multisig.
     python amee.py r c p tmp/ace.keyfile tmp/protocol.multisig Rotate -f \
-        -o tmp/convert.challenge_proposal
+        -o tmp/convert.challenge_proposal -e 2023-12-24
     # Have Ace sign challenge.
     python amee.py r c s tmp/convert.challenge_proposal tmp/ace.keyfile \
         Ace convert -o tmp/ace_convert.challenge_signature
@@ -22,9 +22,10 @@ if test $1 = r; then
     # Increase threshold to two signatures.
     python amee.py m t Increased -m tmp/protocol.multisig -t 2 \
         -n tmp/increased.multisig
-    # Propose challenge.
+    # Propose challenge for increased threshold.
     python amee.py r c p tmp/protocol.multisig tmp/increased.multisig \
-        Increase threshold challenge -o tmp/increase.challenge_proposal
+        Increase threshold challenge -o tmp/increase.challenge_proposal \
+        -e 2023-12-24
     # Have Ace sign challenge.
     python amee.py r c s tmp/increase.challenge_proposal tmp/ace.keyfile \
         Ace increase -o tmp/ace_increase.challenge_signature
@@ -36,12 +37,15 @@ if test $1 = r; then
         -f tmp/ace_increase.challenge_signature \
         -t tmp/ace_increase.challenge_signature \
             tmp/bob_increase.challenge_signature \
-        -o tmp/increase_threshold.rotation_transaction_proposal \
-        -e 2023-02-25T20:12:26+02:00
-    # Sign rotation transaction proposal.
+        -o tmp/increase_threshold.rotation_transaction_proposal
+    # Have Ace sign rotation transaction proposal.
     python amee.py r t s tmp/increase_threshold.rotation_transaction_proposal \
         tmp/ace.keyfile Ace transaction \
         -o tmp/ace_transaction_signature.rotation_transaction_signature
+    # Have Bob sign rotation transaction proposal.
+    python amee.py r t s tmp/increase_threshold.rotation_transaction_proposal \
+        tmp/Bob.keyfile Bob transaction \
+        -o tmp/bob_transaction_signature.rotation_transaction_signature
     rm -rf tmp # Clear temp dir.
 
 # Mutate metafile.

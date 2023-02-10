@@ -6,7 +6,7 @@ import getpass
 import json
 import secrets
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, List
@@ -468,6 +468,8 @@ def rotate_challenge_propose(args):
             "originator": originator_address,
             "current_auth_key": originator_data["authentication_key"],
             "new_public_key": target_data["public_key"],
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
         },
         check_if_exists=True,
     )
@@ -597,8 +599,6 @@ def rotate_execute_single(args):
     ).to_bytes()
     # Get REST client for network.
     client = RestClient(NETWORK_URLS[args.network])
-    # Get standard time-to-live time delta.
-    time_to_live = timedelta(seconds=client.client_config.expiration_ttl)
     raw_transaction = construct_raw_rotation_transaction(
         from_scheme=Authenticator.ED25519,
         from_public_key_bytes=from_public_key_bytes,
@@ -608,8 +608,8 @@ def rotate_execute_single(args):
         cap_update_table=cap_update_table,
         sender_bytes=prefixed_hex_to_bytes(proposal["originator"]),
         sequence_number=proposal["sequence_number"],
-        expiry=datetime.now() + time_to_live,
-        chain_id=client.chain_id,
+        expiry=datetime.fromisoformat(proposal["expiry"]),
+        chain_id=proposal["chain_id"],
     )  # Construct raw rotation transaction.
     authenticator = Authenticator(
         Ed25519Authenticator(
@@ -675,8 +675,6 @@ def rotate_transaction_propose(args):
             "challenge_proposal": challenge_proposal,
             "challenge_from_signatures": challenge_from_signatures,
             "challenge_to_signatures": challenge_to_signatures,
-            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
-            "expiry": args.expiry.isoformat(),
         },
         check_if_exists=True,
     )
@@ -776,8 +774,8 @@ def rotate_transaction_sign(args):
         cap_update_table=cap_update_table,
         sender_bytes=prefixed_hex_to_bytes(challenge_proposal["originator"]),
         sequence_number=challenge_proposal["sequence_number"],
-        expiry=datetime.fromisoformat(proposal_data["expiry"]),
-        chain_id=proposal_data["chain_id"],
+        expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
+        chain_id=challenge_proposal["chain_id"],
     )  # Construct raw rotation transaction.
     # Sign raw transaction.
     signature = account.sign(raw_transaction.keyed())
@@ -1162,6 +1160,13 @@ parser_rotate_challenge_propose.add_argument(
     help="If authentication key to rotate to is for single signer.",
 )
 parser_rotate_challenge_propose.add_argument(
+    "-e",
+    "--expiry",
+    required=True,
+    help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.fromisoformat,
+)
+parser_rotate_challenge_propose.add_argument(
     "-o",
     "--outfile",
     type=Path,
@@ -1258,7 +1263,6 @@ parser_rotate_transaction_propose = subparsers_rotate_transaction.add_parser(
     description="""Propose an authentication key rotation from a multisig
         account originator.""",
     help="Propose authentication key rotation for multisig account.",
-    parents=[network_parser],
 )
 parser_rotate_transaction_propose.set_defaults(func=rotate_transaction_propose)
 parser_rotate_transaction_propose.add_argument(
@@ -1287,13 +1291,6 @@ parser_rotate_transaction_propose.add_argument(
         signatories at to account. Can be a for a single signer account or for
         a multisig account.""",
     required=True,
-)
-parser_rotate_transaction_propose.add_argument(
-    "-e",
-    "--expiry",
-    required=True,
-    help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
-    type=datetime.fromisoformat,
 )
 parser_rotate_transaction_propose.add_argument(
     "-o",
