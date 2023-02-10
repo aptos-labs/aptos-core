@@ -5,7 +5,7 @@ use crate::models::coin_models::coin_activities::CoinActivity;
 use crate::models::token_models::token_activities::TokenActivity;
 use crate::schema::petra_activities;
 use crate::util::standardize_address;
-use aptos_api_types::{Transaction as APITransaction, WriteSetChange as APIWriteSetChange};
+use aptos_api_types::Transaction as APITransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -33,33 +33,32 @@ impl PetraActivity {
         if let APITransaction::UserTransaction(user_txn) = transaction {
             let version = user_txn.info.version.0 as i64;
             let mut addresses = HashSet::new();
-            let coin_activities_json =
-                serde_json::to_value(coin_activities).unwrap_or(EMPTY_JSON_ARRAY);
-            let token_activities_json =
-                serde_json::to_value(token_activities).unwrap_or(EMPTY_JSON_ARRAY);
 
             // Add the transaction sender.
             addresses.insert(user_txn.request.sender.to_string());
 
-            // Add any other accounts referenced in the writeset.
-            for wsc in user_txn.info.changes.iter() {
-                match wsc {
-                    APIWriteSetChange::WriteResource(write_resource) => {
-                        addresses.insert(write_resource.address.to_string());
-                    },
-                    APIWriteSetChange::WriteTableItem(write_table_item) => {
-                        if let Some(decoded_table_data) = &write_table_item.data {
-                            if decoded_table_data.key_type == "address" {
-                                // The string is surrounded by quotes ("0x1").
-                                let address_json = decoded_table_data.key.to_string();
-                                let address = &address_json[1..address_json.len() - 1];
-                                addresses.insert(address.into());
-                            }
-                        }
-                    },
-                    _ => {},
+            // Add addresses in coin_activities.
+            for coin_activity in coin_activities.iter() {
+                addresses.insert(coin_activity.event_account_address.clone());
+                addresses.insert(coin_activity.owner_address.clone());
+            }
+
+            // Add addresses in token_activities.
+            for token_activity in token_activities.iter() {
+                addresses.insert(token_activity.event_account_address.clone());
+                addresses.insert(token_activity.creator_address.clone());
+                if let Some(from_address) = token_activity.from_address.clone() {
+                    addresses.insert(from_address);
+                }
+                if let Some(to_address) = token_activity.to_address.clone() {
+                    addresses.insert(to_address);
                 }
             }
+
+            let coin_activities_json =
+                serde_json::to_value(coin_activities).unwrap_or(EMPTY_JSON_ARRAY);
+            let token_activities_json =
+                serde_json::to_value(token_activities).unwrap_or(EMPTY_JSON_ARRAY);
 
             for address in addresses.iter() {
                 petra_activities.push(Self {
