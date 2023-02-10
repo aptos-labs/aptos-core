@@ -2,11 +2,11 @@
 
 import argparse
 import base64
-import datetime
 import getpass
 import json
 import secrets
 import subprocess
+from datetime import datetime, timedelta
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,7 +15,7 @@ from typing import Tuple
 
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
-from aptos_sdk.authenticator import Authenticator
+from aptos_sdk.authenticator import Authenticator, Ed25519Authenticator
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import ClientConfig, RestClient
 from aptos_sdk.ed25519 import (MultiEd25519PublicKey, MultiEd25519Signature,
@@ -582,41 +582,42 @@ def rotate_execute_single(args):
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return without rotating.
-    # Create Aptos-style account for single-signer account.
+    # Create Aptos-style account for single signer.
     account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
     # Get public key bytes for account.
     from_public_key_bytes = prefixed_hex_to_bytes(keyfile_data["public_key"])
     signature_map, proposal = index_rotation_challenge_signatures(
         args.signatures
     )  # Index signatures into signature map, extract rotation proposal.
-    # Get bytes of public key to rotate to.
-    to_public_key_bytes = prefixed_hex_to_bytes(proposal["new_public_key"])
     # Get rotation challenge BCS.
     rotation_challenge_bcs = get_rotation_challenge_bcs(proposal)
-    # Get capability to rotate key from single-signer.
-    cap_rotate_key = account.sign(rotation_challenge_bcs).data()
     # Get capability to update address mapping for multisig account.
     cap_update_table = MultiEd25519Signature(
         metafile_to_multisig_public_key(args.metafile), signature_map
     ).to_bytes()
-    payload = EntryFunction.natural(  # Create payload.
-        module="0x1::account",
-        function="rotate_authentication_key",
-        ty_args=[],
-        args=[
-            TransactionArgument(Authenticator.ED25519, Serializer.u8),
-            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(Authenticator.MULTI_ED25519, Serializer.u8),
-            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
-            TransactionArgument(cap_update_table, Serializer.to_bytes),
-        ],
-    )
     # Get REST client for network.
     client = RestClient(NETWORK_URLS[args.network])
-    signed_transaction = client.create_bcs_signed_transaction(
-        account, TransactionPayload(payload)
-    )  # Get signed transaction.
+    # Get standard time-to-live time delta.
+    time_to_live = timedelta(seconds=client.client_config.expiration_ttl)
+    raw_transaction = construct_raw_rotation_transaction(
+        from_scheme=Authenticator.ED25519,
+        from_public_key_bytes=from_public_key_bytes,
+        to_scheme=Authenticator.MULTI_ED25519,
+        to_public_key_bytes=prefixed_hex_to_bytes(proposal["new_public_key"]),
+        cap_rotate_key=account.sign(rotation_challenge_bcs).data(),
+        cap_update_table=cap_update_table,
+        sender_bytes=prefixed_hex_to_bytes(proposal["originator"]),
+        sequence_number=proposal["sequence_number"],
+        expiry=datetime.now() + time_to_live,
+        chain_id=client.chain_id,
+    )  # Construct raw rotation transaction.
+    authenticator = Authenticator(
+        Ed25519Authenticator(
+            account.public_key(), account.sign(raw_transaction.keyed())
+        )
+    )  # Get authenticator for signed transaction.
+    # Get signed transaction.
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
     # Assert successful transaction.
     assert_successful_transaction(client, signed_transaction)
     # Update multisig metafile address.
@@ -695,6 +696,43 @@ def signature_json_to_map(
     ]
 
 
+def construct_raw_rotation_transaction(
+    from_scheme: int,
+    from_public_key_bytes: bytes,
+    to_scheme: int,
+    to_public_key_bytes: bytes,
+    cap_rotate_key: bytes,
+    cap_update_table: bytes,
+    sender_bytes: bytes,
+    sequence_number: int,
+    expiry: datetime,
+    chain_id: int,
+) -> RawTransaction:
+    """Return a raw authentication key rotation transaction."""
+    payload = EntryFunction.natural(
+        module="0x1::account",
+        function="rotate_authentication_key",
+        ty_args=[],
+        args=[
+            TransactionArgument(from_scheme, Serializer.u8),
+            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(to_scheme, Serializer.u8),
+            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
+            TransactionArgument(cap_update_table, Serializer.to_bytes),
+        ],
+    )  # Construct entry function payload.
+    return RawTransaction(  # Return raw transaction.
+        sender=AccountAddress(sender_bytes),
+        sequence_number=sequence_number,
+        payload=TransactionPayload(payload),
+        max_gas_amount=ClientConfig.max_gas_amount,
+        gas_unit_price=ClientConfig.gas_unit_price,
+        expiration_timestamps_secs=int(expiry.timestamp()),
+        chain_id=chain_id,
+    )
+
+
 def rotate_transaction_sign(args):
     """Sign an authentication key rotation transaction from a multisig
     account."""
@@ -703,6 +741,8 @@ def rotate_transaction_sign(args):
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return.
+    # Create Aptos-style account for single signer.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
     # Get rotation proof challenge proposal.
     challenge_proposal = proposal_data["challenge_proposal"]
     from_public_key_bytes = prefixed_hex_to_bytes(
@@ -727,34 +767,18 @@ def rotate_transaction_sign(args):
             MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
             signature_json_to_map(proposal_data["challenge_to_signatures"]),
         ).to_bytes()  # Get table update capability signature.
-    payload = EntryFunction.natural(
-        module="0x1::account",
-        function="rotate_authentication_key",
-        ty_args=[],
-        args=[
-            TransactionArgument(Authenticator.MULTI_ED25519, Serializer.u8),
-            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(to_scheme, Serializer.u8),
-            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
-            TransactionArgument(cap_update_table, Serializer.to_bytes),
-        ],
-    )  # Construct entry function payload.
-    # Get account address bytes of transaction sender.
-    sender_bytes = prefixed_hex_to_bytes(challenge_proposal["originator"])
-    # Get expiry datetime.
-    expiry = datetime.datetime.fromisoformat(proposal_data["expiry"])
-    raw_transaction = RawTransaction(
-        sender=AccountAddress(sender_bytes),
+    raw_transaction = construct_raw_rotation_transaction(
+        from_scheme=Authenticator.MULTI_ED25519,
+        from_public_key_bytes=from_public_key_bytes,
+        to_scheme=to_scheme,
+        to_public_key_bytes=to_public_key_bytes,
+        cap_rotate_key=cap_rotate_key,
+        cap_update_table=cap_update_table,
+        sender_bytes=prefixed_hex_to_bytes(challenge_proposal["originator"]),
         sequence_number=challenge_proposal["sequence_number"],
-        payload=TransactionPayload(payload),
-        max_gas_amount=ClientConfig.max_gas_amount,
-        gas_unit_price=ClientConfig.gas_unit_price,
-        expiration_timestamps_secs=int(expiry.timestamp()),
+        expiry=datetime.fromisoformat(proposal_data["expiry"]),
         chain_id=proposal_data["chain_id"],
-    )
-    # Create Aptos-style account.
-    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    )  # Construct raw rotation transaction.
     # Sign raw transaction.
     signature = account.sign(raw_transaction.keyed())
     write_json_file(  # Write JSON to signature file.
@@ -1269,7 +1293,7 @@ parser_rotate_transaction_propose.add_argument(
     "--expiry",
     required=True,
     help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
-    type=datetime.datetime.fromisoformat,
+    type=datetime.fromisoformat,
 )
 parser_rotate_transaction_propose.add_argument(
     "-o",
