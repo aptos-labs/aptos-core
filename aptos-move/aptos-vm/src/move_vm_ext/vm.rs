@@ -24,7 +24,6 @@ use std::ops::Deref;
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Features,
 }
 
 impl MoveVmExt {
@@ -61,7 +60,6 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
-            features,
         })
     }
 
@@ -79,7 +77,7 @@ impl MoveVmExt {
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new(self.features.clone()));
+        extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {

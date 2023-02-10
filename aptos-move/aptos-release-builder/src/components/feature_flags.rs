@@ -26,6 +26,8 @@ pub enum FeatureFlag {
     MultiEd25519PkValidateV2Natives,
     Blake2b256Native,
     ResourceGroups,
+    GenericAlgebraicStructuresBasicOperations,
+    Bls12381Structures,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -124,6 +126,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
+            FeatureFlag::GenericAlgebraicStructuresBasicOperations => {
+                AptosFeatureFlag::GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS
+            },
+            FeatureFlag::Bls12381Structures => AptosFeatureFlag::BLS12_381_STRUCTURES,
         }
     }
 }
@@ -147,6 +153,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
+            AptosFeatureFlag::GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS => {
+                FeatureFlag::GenericAlgebraicStructuresBasicOperations
+            },
+            AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
         }
     }
 }

@@ -4,22 +4,11 @@
 #[macro_use]
 extern crate criterion;
 
-use std::cmp::min;
 use std::ops::MulAssign;
 use blst::{blst_p1, blst_p1_add, blst_p1_affine, blst_p1_mult, blst_p2, blst_p2_affine};
-use aptos_crypto::{
-    bls12381,
-    bls12381::ProofOfPossession,
-    test_utils::{random_keypairs, random_subset, KeyPair},
-    traits::{Signature, SigningKey, Uniform},
-    PrivateKey,
-};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use criterion::{
-    measurement::Measurement, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    PlotConfiguration, Throughput,
-};
-use rand::{distributions, rngs::ThreadRng, thread_rng, Rng};
+use criterion::{Criterion, Throughput};
+use rand::{distributions, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-use std::any::{Any, TypeId};
-use std::collections::{HashMap, VecDeque};
+use std::any::Any;
+use std::collections::VecDeque;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
@@ -11,10 +11,9 @@ use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
-use better_any::{Tid, TidAble, type_id};
-use itertools::Itertools;
+use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
+use move_core_types::gas_algebra::{InternalGas, NumArgs};
 use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::loaded_data::runtime_types::Type;
@@ -25,10 +24,7 @@ use move_vm_types::values::VectorRef;
 
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
-use serde::de::Unexpected::Str;
 use smallvec::smallvec;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use crate::natives::cryptography::algebra::abort_codes::NOT_IMPLEMENTED;
 use crate::natives::cryptography::algebra::gas::GasParameters;
 use crate::natives::util::make_native_from_func;
 #[cfg(feature = "testing")]
@@ -38,43 +34,36 @@ pub mod gas;
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
-    BLS12_381_Fq12,
-    BLS12_381_G1,
-    BLS12_381_G2,
-    BLS12_381_Gt,
-    BLS12_381_Fr,
+    BLS12381Fq12,
+    BLS12381G1,
+    BLS12381G2,
+    BLS12381Gt,
+    BLS12381Fr,
 }
 
 impl Structure {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
         match type_tag.to_string().as_str() {
-            "0x1::algebra::BLS12_381_Fr" => Some(Structure::BLS12_381_Fr),
-            "0x1::algebra::BLS12_381_Fq12" => Some(Structure::BLS12_381_Fq12),
-            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12_381_G1),
-            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12_381_G2),
-            "0x1::algebra::BLS12_381_Gt" => Some(Structure::BLS12_381_Gt),
+            "0x1::algebra::BLS12_381_Fr" => Some(Structure::BLS12381Fr),
+            "0x1::algebra::BLS12_381_Fq12" => Some(Structure::BLS12381Fq12),
+            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12381G1),
+            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12381G2),
+            "0x1::algebra::BLS12_381_Gt" => Some(Structure::BLS12381Gt),
             _ => None
         }
     }
 }
 
-pub mod abort_codes {
-    pub const NOT_IMPLEMENTED: u64 = 0x0c0000;
-    pub const NUM_ELEMENTS_SHOULD_MATCH_NUM_SCALARS: u64 = 4;
-    pub const NUM_G1_ELEMENTS_SHOULD_MATCH_NUM_G2_ELEMENTS: u64 = 5;
-}
-
 #[derive(Tid)]
+#[derive(Default)]
 pub struct AlgebraContext {
-    features: Features,
     objs: Vec<Rc<dyn Any>>,
 }
 
 impl AlgebraContext {
-    pub fn new(features: Features) -> Self {
+    pub fn new() -> Self {
         Self {
             objs: Vec::new(),
-            features,
         }
     }
 }
@@ -101,17 +90,9 @@ macro_rules! get_obj_pointer {
     }}
 }
 
-static BLS12_381_FQ_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("01").unwrap());
-static BLS12_381_FQ_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0101").unwrap());
-static BLS12_381_FQ2_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("02").unwrap());
-static BLS12_381_FQ6_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("03").unwrap());
 static BLS12_381_FQ12_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("04").unwrap());
-static BLS12_381_G1_PARENT_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("05").unwrap());
-static BLS12_381_G1_PARENT_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0501").unwrap());
 static BLS12_381_G1_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("06").unwrap());
 static BLS12_381_G1_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0601").unwrap());
-static BLS12_381_G2_PARENT_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("07").unwrap());
-static BLS12_381_G2_PARENT_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0701").unwrap());
 static BLS12_381_G2_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("08").unwrap());
 static BLS12_381_G2_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("0801").unwrap());
 static BLS12_381_GT_FORMAT: Lazy<Vec<u8>> = Lazy::new(||hex::decode("09").unwrap());
@@ -153,37 +134,37 @@ fn serialize_internal(
     let scheme = pop_arg!(args, Vec<u8>);
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match (structure_opt, scheme) {
-        (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_Fr, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
+        (Some(Structure::BLS12381Fr), scheme) if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
+            let (cost, buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12381Fr, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_Fr, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
+        (Some(Structure::BLS12381Fr), scheme) if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
+            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12381Fr, handle, scheme.as_slice(), ark_bls12_381::Fr, serialize_uncompressed);
             buf.reverse();
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_Fq12), scheme) if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_Fq12, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
+        (Some(Structure::BLS12381Fq12), scheme) if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
+            let (cost, buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12381Fq12, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize_uncompressed);
+        (Some(Structure::BLS12381G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
+            let (cost, buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12381G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize);
+        (Some(Structure::BLS12381G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
+            let (cost, buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12381G1, handle, scheme.as_slice(), ark_bls12_381::G1Projective, serialize);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize_uncompressed);
+        (Some(Structure::BLS12381G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
+            let (cost, buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12381G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12_381_G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize);
+        (Some(Structure::BLS12381G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
+            let (cost, buf) = ark_ec_point_serialize_internal!(gas_params, context, Structure::BLS12381G2, handle, scheme.as_slice(), ark_bls12_381::G2Projective, serialize);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
-        (Some(Structure::BLS12_381_Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
-            let (cost, mut buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12_381_Gt, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
+        (Some(Structure::BLS12381Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
+            let (cost, buf) = ark_serialize_internal!(gas_params, context, Structure::BLS12381Gt, handle, scheme.as_slice(), ark_bls12_381::Fq12, serialize_uncompressed);
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         }
         _ => unreachable!()
@@ -244,52 +225,52 @@ fn deserialize_internal(
     let bytes = bytes_ref.as_slice();
     let scheme = pop_arg!(args, Vec<u8>);
     match (structure,scheme) {
-        (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381Fr), scheme) if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
             if bytes.len() != 32 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
         }
-        (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381Fr), scheme) if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
             if bytes.len() != 32 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
             let mut lendian: Vec<u8> = bytes.to_vec();
             lendian.reverse();
             let bytes = lendian.as_slice();
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
         }
-        (Some(Structure::BLS12_381_Fq12), scheme) if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381Fq12), scheme) if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
             if bytes.len() != 576 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fq12, scheme.as_slice(), ark_bls12_381::Fq12, deserialize_uncompressed)
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381Fq12, scheme.as_slice(), ark_bls12_381::Fq12, deserialize_uncompressed)
         }
-        (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
             if bytes.len() != 96 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize_uncompressed)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize_uncompressed)
         }
-        (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
             if bytes.len() != 48 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize)
         }
-        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
             if bytes.len() != 192 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize_uncompressed)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize_uncompressed)
         }
-        (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
             if bytes.len() != 96 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
             }
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize)
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12381G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize)
         }
-        (Some(Structure::BLS12_381_Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
+        (Some(Structure::BLS12381Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
             if bytes.len() != 576 {
                 return Ok(NativeResult::ok(InternalGas::zero(), smallvec![ Value::bool(false), Value::u64(0)]));
             }
@@ -298,19 +279,19 @@ fn deserialize_internal(
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_obj!( context , element );
                         Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                            gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
                             smallvec![Value::bool(true), Value::u64(handle as u64)],
                         ))
                     } else {
                         Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                            gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
                             smallvec![Value::bool(false), Value::u64(0)],
                         ))
                     }
                 }
                 _ => {
                     Ok(NativeResult::ok(
-                        gas_params.deserialize(Structure::BLS12_381_Gt, scheme.as_slice()),
+                        gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
                         smallvec![Value::bool(false), Value::u64(0)],
                     ))
                 }
@@ -340,10 +321,10 @@ fn from_u64_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            from_u64_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            from_u64_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            from_u64_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -373,10 +354,10 @@ fn field_add_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_add_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_add_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_add_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -406,10 +387,10 @@ fn field_sub_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_sub_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -439,10 +420,10 @@ fn field_mul_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_mul_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -479,10 +460,10 @@ fn field_div_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_div_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_div_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_div_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_div_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -509,10 +490,10 @@ fn field_neg_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_neg_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_neg_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_neg_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -547,10 +528,10 @@ fn field_inv_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_inv_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -576,10 +557,10 @@ fn field_sqr_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_sqr_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -599,13 +580,13 @@ fn field_zero_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_zero_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -625,13 +606,13 @@ fn field_one_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
+    mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_one_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_one_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -656,10 +637,10 @@ fn field_is_one_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_is_one_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -684,10 +665,10 @@ fn field_is_zero_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_field_is_zero_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -715,16 +696,16 @@ fn eq_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
-            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fr, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
-            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Fq12, ark_bls12_381::Fq12),
-        Some(Structure::BLS12_381_G1) =>
-            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) =>
-            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
-        Some(Structure::BLS12_381_Gt) =>
-            ark_eq_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381Fr) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12381Fr, ark_bls12_381::Fr),
+        Some(Structure::BLS12381Fq12) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12381Fq12, ark_bls12_381::Fq12),
+        Some(Structure::BLS12381G1) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12381G1, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12381G2) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12381G2, ark_bls12_381::G2Projective),
+        Some(Structure::BLS12381Gt) =>
+            ark_eq_internal!(gas_params, context, args, Structure::BLS12381Gt, ark_bls12_381::Fq12),
         _ => unreachable!()
     }
 }
@@ -748,12 +729,12 @@ fn group_identity_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) =>
-            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, zero),
-        Some(Structure::BLS12_381_G2) =>
-            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, zero),
-        Some(Structure::BLS12_381_Gt) =>
-            ark_group_identity_internal!(gas_params, context, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, one),
+        Some(Structure::BLS12381G1) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12381G1, ark_bls12_381::G1Projective, zero),
+        Some(Structure::BLS12381G2) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12381G2, ark_bls12_381::G2Projective, zero),
+        Some(Structure::BLS12381Gt) =>
+            ark_group_identity_internal!(gas_params, context, Structure::BLS12381Gt, ark_bls12_381::Fq12, one),
         _ => unreachable!()
     }
 }
@@ -790,15 +771,15 @@ fn group_generator_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) =>
-            ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G1, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) =>
-            ark_group_generator_internal!(gas_params, context, Structure::BLS12_381_G2, ark_bls12_381::G2Projective),
-        Some(Structure::BLS12_381_Gt) => {
-            let element = BLS12381_GT_GENERATOR.clone();
+        Some(Structure::BLS12381G1) =>
+            ark_group_generator_internal!(gas_params, context, Structure::BLS12381G1, ark_bls12_381::G1Projective),
+        Some(Structure::BLS12381G2) =>
+            ark_group_generator_internal!(gas_params, context, Structure::BLS12381G2, ark_bls12_381::G2Projective),
+        Some(Structure::BLS12381Gt) => {
+            let element = BLS12381_GT_GENERATOR.add(ark_bls12_381::Fq12::zero());
             let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
-                gas_params.group_generator(Structure::BLS12_381_Gt),
+                gas_params.group_generator(Structure::BLS12381Gt),
                 smallvec![Value::u64(handle as u64)],
             ))
         }
@@ -814,7 +795,7 @@ fn group_order_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) | Some(Structure::BLS12_381_G2) | Some(Structure::BLS12_381_Gt) => {
+        Some(Structure::BLS12381G1) | Some(Structure::BLS12381G2) | Some(Structure::BLS12381Gt) => {
             Ok(NativeResult::ok(
                 InternalGas::zero(),
                 smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())],
@@ -843,17 +824,17 @@ fn insecure_random_element_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_Fr) =>
+        Some(Structure::BLS12381Fr) =>
             ark_insecure_random_element_internal!(context, ark_bls12_381::Fr),
-        Some(Structure::BLS12_381_Fq12) =>
+        Some(Structure::BLS12381Fq12) =>
             ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12),
-        Some(Structure::BLS12_381_G1) =>
+        Some(Structure::BLS12381G1) =>
             ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective),
-        Some(Structure::BLS12_381_G2) =>
+        Some(Structure::BLS12381G2) =>
             ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective),
-        Some(Structure::BLS12_381_Gt) => {
+        Some(Structure::BLS12381Gt) => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
-            let element = BLS12381_GT_GENERATOR.clone().pow(k.into_repr());
+            let element = BLS12381_GT_GENERATOR.pow(k.into_repr());
             let handle = store_obj!(context, element);
             Ok(NativeResult::ok(
                 InternalGas::zero(),
@@ -889,12 +870,12 @@ fn group_add_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) =>
-            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, add),
-        Some(Structure::BLS12_381_G2) =>
-            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, add),
-        Some(Structure::BLS12_381_Gt) =>
-            ark_group_add_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, mul),
+        Some(Structure::BLS12381G1) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12381G1, ark_bls12_381::G1Projective, add),
+        Some(Structure::BLS12381G2) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12381G2, ark_bls12_381::G2Projective, add),
+        Some(Structure::BLS12381Gt) =>
+            ark_group_add_internal!(gas_params, context, args, Structure::BLS12381Gt, ark_bls12_381::Fq12, mul),
         _ => unreachable!()
     }
 }
@@ -926,12 +907,12 @@ fn group_scalar_mul_internal(
     let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (group_opt, scalar_field_opt) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_Fr)) =>
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G1, Structure::BLS12_381_Fr, ark_bls12_381::G1Projective, ark_bls12_381::Fr, mul),
-        (Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Fr)) =>
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_G2, Structure::BLS12_381_Fr, ark_bls12_381::G2Projective, ark_bls12_381::Fr, mul),
-        (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fr)) =>
-            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12_381_Gt, Structure::BLS12_381_Fr, ark_bls12_381::Fq12, ark_bls12_381::Fr, pow),
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12381G1, Structure::BLS12_381_Fr, ark_bls12_381::G1Projective, ark_bls12_381::Fr, mul),
+        (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12381G2, Structure::BLS12_381_Fr, ark_bls12_381::G2Projective, ark_bls12_381::Fr, mul),
+        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) =>
+            ark_group_scalar_mul_internal!(gas_params, context, args, Structure::BLS12381Gt, Structure::BLS12_381_Fr, ark_bls12_381::Fq12, ark_bls12_381::Fr, pow),
         _ => unreachable!()
     }
 }
@@ -958,12 +939,12 @@ fn group_double_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) =>
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, double),
-        Some(Structure::BLS12_381_G2) =>
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, double),
-        Some(Structure::BLS12_381_Gt) =>
-            ark_group_double_internal!(gas_params, context, args, Structure::BLS12_381_Gt, ark_bls12_381::Fq12, square),
+        Some(Structure::BLS12381G1) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12381G1, ark_bls12_381::G1Projective, double),
+        Some(Structure::BLS12381G2) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12381G2, ark_bls12_381::G2Projective, double),
+        Some(Structure::BLS12381Gt) =>
+            ark_group_double_internal!(gas_params, context, args, Structure::BLS12381Gt, ark_bls12_381::Fq12, square),
         _ => unreachable!()
     }
 }
@@ -990,18 +971,18 @@ fn group_neg_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12_381_G1) =>
-            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G1, ark_bls12_381::G1Projective, neg),
-        Some(Structure::BLS12_381_G2) =>
-            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12_381_G2, ark_bls12_381::G2Projective, neg),
-        Some(Structure::BLS12_381_Gt) => {
+        Some(Structure::BLS12381G1) =>
+            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12381G1, ark_bls12_381::G1Projective, neg),
+        Some(Structure::BLS12381G2) =>
+            ark_group_neg_internal!(gas_params, context, args, Structure::BLS12381G2, ark_bls12_381::G2Projective, neg),
+        Some(Structure::BLS12381Gt) => {
             let handle = pop_arg!( args , u64 ) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
             let new_element = element.inverse().unwrap();
             let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.group_neg(Structure::BLS12_381_Gt),
+                gas_params.group_neg(Structure::BLS12381Gt),
                 smallvec![ Value :: u64 ( new_handle as u64 ) ],
             ))
         }
@@ -1020,7 +1001,7 @@ fn pairing_internal(
     let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     match (g1_opt, g2_opt, gt_opt) {
-        (Some(Structure::BLS12_381_G1), Some(Structure::BLS12_381_G2), Some(Structure::BLS12_381_Gt)) => {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
             let g2_element_handle = pop_arg!(args, u64) as usize;
             let g1_element_handle = pop_arg!(args, u64) as usize;
             let g1_element_ptr = get_obj_pointer!(context, g1_element_handle);
@@ -1032,7 +1013,7 @@ fn pairing_internal(
             let new_element = ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine);
             let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
-                gas_params.pairing(Structure::BLS12_381_G1, Structure::BLS12_381_G2, Structure::BLS12_381_Gt),
+                gas_params.pairing(Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt),
                 smallvec![Value::u64(new_handle as u64)],
             ))
         }
@@ -1051,10 +1032,10 @@ fn upcast_internal(
     let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let handle = pop_arg!(args, u64);
     match (child_opt, parent_opt) {
-        (Some(Structure::BLS12_381_Gt), Some(Structure::BLS12_381_Fq12)) => {
+        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
             Ok(NativeResult::ok(
                 InternalGas::zero(),
-                smallvec![Value::u64(handle as u64)],
+                smallvec![Value::u64(handle)],
             ))
         }
         _ => unreachable!()
@@ -1071,7 +1052,7 @@ fn downcast_internal(
     let parent_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let child_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (parent_opt, child_opt) {
-        (Some(Structure::BLS12_381_Fq12), Some(Structure::BLS12_381_Gt)) => {
+        (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
             let handle = pop_arg!(args, u64) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
@@ -1194,7 +1175,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "upcast_internal",
-            make_native_from_func(gas_params.clone(), upcast_internal),
+            make_native_from_func(gas_params, upcast_internal),
         ),
     ]);
 

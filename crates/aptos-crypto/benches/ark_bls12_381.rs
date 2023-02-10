@@ -4,27 +4,14 @@
 #[macro_use]
 extern crate criterion;
 
-use blst::blst_p1;
-use aptos_crypto::{
-    bls12381,
-    bls12381::ProofOfPossession,
-    test_utils::{random_keypairs, random_subset, KeyPair},
-    traits::{Signature, SigningKey, Uniform},
-    PrivateKey,
-};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use criterion::{
-    measurement::Measurement, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    PlotConfiguration, Throughput,
-};
-use rand::{distributions, rngs::ThreadRng, thread_rng, Rng};
+use criterion::Criterion;
 use serde::{Deserialize, Serialize};
 use ark_std::test_rng;
 use ark_ec::AffineCurve;
-use ark_ec::group::Group;
 use ark_ec::PairingEngine;
 use ark_ec::ProjectiveCurve;
-use ark_ff::{Field, One, UniformRand, Zero};
+use ark_ff::{BigInteger256, Field, One, UniformRand, Zero};
 use ark_ff::PrimeField;
 use std::ops::{Add, Mul, Neg};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
@@ -32,13 +19,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
-
-fn random_bytes(len: usize) -> Vec<u8> {
-    thread_rng().sample_iter(&distributions::Alphanumeric)
-        .take(len)
-        .map(|c|c as u8)
-        .collect()
-}
 
 fn rand_g1_affine() -> G1Affine {
     let k = Fr::rand(&mut test_rng());
@@ -125,7 +105,9 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let k_1 = Fr::rand(&mut test_rng());
-                let k_2 = k_1.clone();
+                let mut buf = Vec::new();
+                k_1.serialize_uncompressed(&mut buf).unwrap();
+                let k_2 = Fr::deserialize_uncompressed(buf.as_slice()).unwrap();
                 (k_1, k_2)
             },
             |(k_1, k_2)| {
@@ -256,17 +238,6 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("fq12_clone", move |b| {
-        b.iter_with_setup(
-            || {
-                Fq12::rand(&mut test_rng())
-            },
-            |e| {
-                let _e_another = e.clone();
-            }
-        )
-    });
-
     group.bench_function("fq12_deserialize", move |b| {
         b.iter_with_setup(
             || {
@@ -296,7 +267,9 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let e_1 = Fq12::rand(&mut test_rng());
-                let e_2 = e_1.clone();
+                let mut buf = Vec::new();
+                e_1.serialize_uncompressed(&mut buf).unwrap();
+                let e_2 = Fq12::deserialize_uncompressed(buf.as_slice()).unwrap();
                 (e_1, e_2)
             },
             |(e_1, e_2)| {
@@ -425,7 +398,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p1 = rand_g1_affine();
-                let p2 = p1.clone();
+                let p2 = p1.mul(BigInteger256::from(1)).into_affine();
                 (p1, p2)
             },
             |(p1, p2)| {
@@ -546,7 +519,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = G1Projective::rand(&mut test_rng());
-                let q = p.clone();
+                let q = p.mul(BigInteger256::from(1));
                 (p, q)
             },
             |(p, q)| {
@@ -673,7 +646,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p1 = rand_g2_affine();
-                let p2 = p1.clone();
+                let p2 = p1.mul(BigInteger256::from(1)).into_affine();
                 (p1, p2)
             },
             |(p1, p2)| {
@@ -794,7 +767,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = G2Projective::rand(&mut test_rng());
-                let q = p.clone();
+                let q = p.mul(BigInteger256::from(1));
                 (p, q)
             },
             |(p, q)| {
@@ -887,7 +860,7 @@ fn bench_group(c: &mut Criterion) {
                     ||{
                         let inputs: Vec<(ark_ec::models::bls12::g1::G1Prepared<ark_bls12_381::Parameters>, ark_ec::models::bls12::g2::G2Prepared<ark_bls12_381::Parameters>)> = (0
                             ..num_pairs)
-                            .map(|i| {
+                            .map(|_i| {
                                 let p1 = ark_bls12_381::G1Affine::prime_subgroup_generator()
                                     .mul(Fr::rand(&mut test_rng()))
                                     .into_affine();

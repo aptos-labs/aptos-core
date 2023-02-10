@@ -19,7 +19,6 @@ use {
     move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 #[cfg(feature = "testing")]
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
@@ -94,8 +93,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeTransactionContext::new(vec![1], ChainId::test().id())); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
-    let mut features = Features::default();
-    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
-    features.enable(FeatureFlag::GENERIC_ALGEBRAIC_BASIC_OPERATIONS);
-    exts.add(AlgebraContext::new(features));
+    exts.add(AlgebraContext::new());
 }
