@@ -75,7 +75,6 @@
 -  [Function `field_mul_internal`](#0x1_algebra_field_mul_internal)
 -  [Function `field_neg_internal`](#0x1_algebra_field_neg_internal)
 -  [Function `field_one_internal`](#0x1_algebra_field_one_internal)
--  [Function `field_pow_internal`](#0x1_algebra_field_pow_internal)
 -  [Function `field_sqr_internal`](#0x1_algebra_field_sqr_internal)
 -  [Function `field_sub_internal`](#0x1_algebra_field_sub_internal)
 -  [Function `field_zero_internal`](#0x1_algebra_field_zero_internal)
@@ -1661,7 +1660,7 @@ Deserializate a byte array to an element of an algebraic structure <code>S</code
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize">deserialize</a>&lt;S&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
     <a href="algebra.md#0x1_algebra_abort_if_generic_algebra_basic_operations_disabled">abort_if_generic_algebra_basic_operations_disabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_serialization_scheme_enabled">abort_unless_type_serialization_scheme_enabled</a>&lt;S&gt;(scheme_id);
-    <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S&gt;(scheme_id, *bytes);
+    <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S&gt;(scheme_id, bytes);
     <b>if</b> (succeeded) {
         some(<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle })
     } <b>else</b> {
@@ -1959,7 +1958,7 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;G&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;G&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
 </code></pre>
 
 
@@ -1968,7 +1967,7 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;G&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;G&gt;(scheme_id: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
 </code></pre>
 
 
@@ -2189,28 +2188,6 @@ Try casting an element of a structure <code>L</code> to a sub structure <code>S<
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_one_internal">field_one_internal</a>&lt;S&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_pow_internal"></a>
-
-## Function `field_pow_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_pow_internal">field_pow_internal</a>&lt;F&gt;(handle: u64, e: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_pow_internal">field_pow_internal</a>&lt;F&gt;(handle: u64, e: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 

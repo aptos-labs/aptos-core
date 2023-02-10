@@ -321,7 +321,7 @@ module aptos_std::algebra {
     public fun deserialize<S>(scheme_id: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
         abort_if_generic_algebra_basic_operations_disabled();
         abort_unless_type_serialization_scheme_enabled<S>(scheme_id);
-        let (succeeded, handle) = deserialize_internal<S>(scheme_id, *bytes);
+        let (succeeded, handle) = deserialize_internal<S>(scheme_id, bytes);
         if (succeeded) {
             some(Element<S> { handle })
         } else {
@@ -419,7 +419,7 @@ module aptos_std::algebra {
     }
 
     // Native functions.
-    native fun deserialize_internal<G>(scheme_id: vector<u8>, bytes: vector<u8>): (bool, u64);
+    native fun deserialize_internal<G>(scheme_id: vector<u8>, bytes: &vector<u8>): (bool, u64);
     native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
     native fun from_u64_internal<S>(value: u64): u64;
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
@@ -430,7 +430,6 @@ module aptos_std::algebra {
     native fun field_mul_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_neg_internal<F>(handle: u64): u64;
     native fun field_one_internal<S>(): u64;
-    native fun field_pow_internal<F>(handle: u64, e: vector<u8>): u64;
     native fun field_sqr_internal<G>(handle: u64): u64;
     native fun field_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun field_zero_internal<S>(): u64;

@@ -12,6 +12,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble, type_id};
+use itertools::Itertools;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, NumArgs, NumBytes};
 use move_core_types::language_storage::TypeTag;
@@ -20,6 +21,8 @@ use move_vm_types::loaded_data::runtime_types::Type;
 use move_vm_types::natives::function::NativeResult;
 use move_vm_types::pop_arg;
 use move_vm_types::values::Value;
+use move_vm_types::values::VectorRef;
+
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
 use serde::de::Unexpected::Str;
@@ -190,14 +193,8 @@ fn serialize_internal(
 }
 
 macro_rules! ark_deserialize_internal {
-    ($gas_params:expr, $context:expr, $bytes:ident, $structure:expr, $scheme:expr, $expected_length:expr, $typ:ty, $deser_func:ident) => {{
-        if $bytes.len() != $expected_length {
-            return Ok(NativeResult::ok(
-                $gas_params.deserialize($structure, $scheme),
-                smallvec![Value::bool(false), Value::u64(0)],
-            ));
-        }
-        match <$typ>::$deser_func($bytes.as_slice()) {
+    ($gas_params:expr, $context:expr, $bytes:expr, $structure:expr, $scheme:expr, $typ:ty, $deser_func:ident) => {{
+        match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let handle = store_obj!($context, element);
                 Ok(NativeResult::ok(
@@ -216,14 +213,8 @@ macro_rules! ark_deserialize_internal {
 }
 
 macro_rules! ark_ec_point_deserialize_internal {
-    ($gas_params:expr, $context:expr, $bytes:ident, $structure:expr, $scheme:expr, $expected_length:expr, $typ:ty, $deser_func:ident) => {{
-        if $bytes.len() != $expected_length {
-            return Ok(NativeResult::ok(
-                $gas_params.deserialize($structure, $scheme),
-                smallvec![Value::bool(false), Value::u64(0)],
-            ));
-        }
-        match <$typ>::$deser_func($bytes.as_slice()) {
+    ($gas_params:expr, $context:expr, $bytes:expr, $structure:expr, $scheme:expr, $typ:ty, $deser_func:ident) => {{
+        match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = element.into_projective();
                 let handle = store_obj!($context, element_proj);
@@ -250,39 +241,61 @@ fn deserialize_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     let structure = structure_from_ty_arg!(context, &ty_args[0]);
-    let mut bytes = pop_arg!(args, Vec<u8>);
+    let vector_ref = pop_arg!(args, VectorRef);
+    let bytes_ref = vector_ref.as_bytes_ref();
+    let bytes = bytes_ref.as_slice();
     let scheme = pop_arg!(args, Vec<u8>);
     match (structure,scheme) {
         (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() => {
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), 32, ark_bls12_381::Fr, deserialize_uncompressed)
+            if bytes.len() != 32 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
         }
         (Some(Structure::BLS12_381_Fr), scheme) if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
-            bytes.reverse();
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), 32, ark_bls12_381::Fr, deserialize_uncompressed)
+            if bytes.len() != 32 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            let mut lendian: Vec<u8> = bytes.to_vec();
+            lendian.reverse();
+            let bytes = lendian.as_slice();
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fr, scheme.as_slice(), ark_bls12_381::Fr, deserialize_uncompressed)
         }
         (Some(Structure::BLS12_381_Fq12), scheme) if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() => {
-            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fq12, scheme.as_slice(), 576, ark_bls12_381::Fq12, deserialize_uncompressed)
+            if bytes.len() != 576 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_Fq12, scheme.as_slice(), ark_bls12_381::Fq12, deserialize_uncompressed)
         }
         (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), 96, ark_bls12_381::G1Affine, deserialize_uncompressed)
+            if bytes.len() != 96 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize_uncompressed)
         }
         (Some(Structure::BLS12_381_G1), scheme) if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), 48, ark_bls12_381::G1Affine, deserialize)
+            if bytes.len() != 48 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G1, scheme.as_slice(), ark_bls12_381::G1Affine, deserialize)
         }
         (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), 192, ark_bls12_381::G2Affine, deserialize_uncompressed)
+            if bytes.len() != 192 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize_uncompressed)
         }
         (Some(Structure::BLS12_381_G2), scheme) if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
-            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), 96, ark_bls12_381::G2Affine, deserialize)
+            if bytes.len() != 96 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![Value::bool(false), Value::u64(0)]));
+            }
+            ark_ec_point_deserialize_internal!(gas_params, context, bytes, Structure::BLS12_381_G2, scheme.as_slice(), ark_bls12_381::G2Affine, deserialize)
         }
         (Some(Structure::BLS12_381_Gt), scheme) if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() => {
             if bytes.len() != 576 {
-                return Ok(NativeResult::ok(
-                    gas_params.deserialize(Structure::BLS12_381_Gt, (scheme.as_slice())),
-                    smallvec![ Value :: bool ( false ) , Value :: u64 ( 0 ) ],
-                ));
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![ Value::bool(false), Value::u64(0)]));
             }
-            match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes.as_slice()) {
+            match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_obj!( context , element );
