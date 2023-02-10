@@ -1,9 +1,34 @@
+/// Module `algebra` provides structs/functions for doing arithmetic and other common operations
+/// on algebraic structures (mostly groups and fields) that are widely used in cryptographic systems.
+///
+/// Different from existing modules like `ristretto255.move`, the functions here are generic.
+/// Typically, each function represent an operation defined for ANY group/field
+/// and require 1 (or 2+) marker type(s) which represents the actual structure(s) to work with.
+/// See the test cases in `algebra.move` for more examples.
+///
+/// The generic APIs should allow Move developers to build generic cryptographic schemes on top of them
+/// and use the schemes with different underlying algebraic structures by simply changing some type parameters.
+/// E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
+///
+/// Currently supported structures include:
+/// - BLS12-381 structures,
+///   - (groups) BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt,
+///   - (fields) BLS12_381_Fq12, BLS12_381_Fr.
+///
+/// Currently supported operations include:
+/// - serialization/deserialization,
+/// - group/field metadata,
+/// - group/field basic arithmetic,
+/// - pairing,
+/// - upcasting/downcasting.
+///
+/// Note: in `algebra.move` additive group notions are used.
 module aptos_std::algebra {
     use std::option::{Option, some, none};
     use aptos_std::type_info::type_of;
-    use std::features::bls12_381_structures_enabled;
+    use std::features::{bls12_381_structures_enabled, generic_algebra_basic_operations_enabled};
 
-    /// A finite field used BLS12-381 curves.
+    /// A finite field used in BLS12-381 curves.
     /// It has a prime order `q=0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`.
     struct BLS12_381_Fq {}
 
@@ -135,7 +160,7 @@ module aptos_std::algebra {
     /// Compute a pre-compiled pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
     /// Return an element in the target group `Gt`.
     public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_triplet_enabled_for_pairing<G1,G2,Gt>();
         Element<Gt> {
             handle: pairing_internal<G1,G2,Gt>(element_1.handle, element_2.handle)
@@ -144,14 +169,14 @@ module aptos_std::algebra {
 
     /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
     public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         eq_internal<S>(x.handle, y.handle)
     }
 
     /// Convert a u64 to an element of an algebraic structure `S`.
     public fun from_u64<S>(value: u64): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: from_u64_internal<S>(value)
@@ -160,7 +185,7 @@ module aptos_std::algebra {
 
     /// Return the additive identity of a field `S`.
     public fun field_zero<S>(): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_zero_internal<S>()
@@ -169,7 +194,7 @@ module aptos_std::algebra {
 
     /// Return the multiplicative identity of a field `S`.
     public fun field_one<S>(): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_one_internal<S>()
@@ -178,7 +203,7 @@ module aptos_std::algebra {
 
     /// Compute `-x` for an element `x` of a field `S`.
     public fun field_neg<S>(x: &Element<S>): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_neg_internal<S>(x.handle)
@@ -187,7 +212,7 @@ module aptos_std::algebra {
 
     /// Compute `x + y` for elements `x` and `y` of a field `S`.
     public fun field_add<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_add_internal<S>(x.handle, y.handle)
@@ -196,7 +221,7 @@ module aptos_std::algebra {
 
     /// Compute `x - y` for elements `x` and `y` of a field `S`.
     public fun field_sub<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_sub_internal<S>(x.handle, y.handle)
@@ -205,7 +230,7 @@ module aptos_std::algebra {
 
     /// Compute `x * y` for elements `x` and `y` of a field `S`.
     public fun field_mul<S>(x: &Element<S>, y: &Element<S>): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_mul_internal<S>(x.handle, y.handle)
@@ -215,7 +240,7 @@ module aptos_std::algebra {
     /// Compute `x / y` for elements `x` and `y` of a field `S`.
     /// Return none if y is the additive identity of field `S`.
     public fun field_div<S>(x: &Element<S>, y: &Element<S>): Option<Element<S>> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         let (succ, handle) = field_div_internal<S>(x.handle, y.handle);
         if (succ) {
@@ -228,7 +253,7 @@ module aptos_std::algebra {
     /// Compute `x^2` for an element `x` of a field `S`.
     ///
     public fun field_sqr<S>(x: &Element<S>): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: field_sqr_internal<S>(x.handle)
@@ -238,7 +263,7 @@ module aptos_std::algebra {
     /// Compute `x^(-1)` for an element `x` of a field `S`.
     /// Return none if `x` is the additive identity of field `S`.
     public fun field_inv<S>(x: &Element<S>): Option<Element<S>> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         let (succeeded, handle) = field_inv_internal<S>(x.handle);
         if (succeeded) {
@@ -251,21 +276,21 @@ module aptos_std::algebra {
 
     /// Check if an element `x` is the multiplicative identity of field `S`.
     public fun field_is_one<S>(x: &Element<S>): bool {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         field_is_one_internal<S>(x.handle)
     }
 
     /// Check if an element `x` is the aditive identity of field `S`.
     public fun field_is_zero<S>(x: &Element<S>): bool {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         field_is_zero_internal<S>(x.handle)
     }
 
     /// Get the identity of a group `G`.
     public fun group_identity<G>(): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         Element<G> {
             handle: group_identity_internal<G>()
@@ -274,7 +299,7 @@ module aptos_std::algebra {
 
     /// Get the fixed generator of a cyclic group `G`.
     public fun group_generator<G>(): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         Element<G> {
             handle: group_generator_internal<G>()
@@ -283,7 +308,7 @@ module aptos_std::algebra {
 
     /// Compute `-P` for an element `P` of a group `G`.
     public fun group_neg<G>(element_p: &Element<G>): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         Element<G> {
             handle: group_neg_internal<G>(element_p.handle)
@@ -292,7 +317,7 @@ module aptos_std::algebra {
 
     /// Compute `P + Q` for elements `P` and `Q` of a group `G`.
     public fun group_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         Element<G> {
             handle: group_add_internal<G>(element_p.handle, element_q.handle)
@@ -301,7 +326,7 @@ module aptos_std::algebra {
 
     /// Compute `2*P` for an element `P` of a group `G`.
     public fun group_double<G>(element_p: &Element<G>): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         Element<G> {
             handle: group_double_internal<G>(element_p.handle)
@@ -310,18 +335,18 @@ module aptos_std::algebra {
 
     /// Compute `k*p`, where `p` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
     public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_pair_enabled_for_group_scalar_mul<G,S>();
         Element<G> {
             handle: group_scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
         }
     }
 
-    /// Deserializate a byte array to an element of an algebraic structure `S` with a given scheme.
-    public fun deserialize<S>(scheme_id: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
-        abort_if_generic_algebra_basic_operations_disabled();
-        abort_unless_type_serialization_scheme_enabled<S>(scheme_id);
-        let (succeeded, handle) = deserialize_internal<S>(scheme_id, bytes);
+    /// Deserializate a byte array to an element of an algebraic structure `S` using a given `scheme`.
+    public fun deserialize<S>(scheme: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
+        abort_unless_generic_algebra_basic_operations_enabled();
+        abort_unless_type_serialization_scheme_enabled<S>(scheme);
+        let (succeeded, handle) = deserialize_internal<S>(scheme, bytes);
         if (succeeded) {
             some(Element<S> { handle })
         } else {
@@ -329,23 +354,23 @@ module aptos_std::algebra {
         }
     }
 
-    /// Serialize an element of an algebraic structure `S` to a byte array with a given scheme.
-    public fun serialize<S>(scheme_id: vector<u8>, element: &Element<S>): vector<u8> {
-        abort_if_generic_algebra_basic_operations_disabled();
-        abort_unless_type_serialization_scheme_enabled<S>(scheme_id);
-        serialize_internal<S>(scheme_id, element.handle)
+    /// Serialize an element of an algebraic structure `S` to a byte array using a given `scheme`.
+    public fun serialize<S>(scheme: vector<u8>, element: &Element<S>): vector<u8> {
+        abort_unless_generic_algebra_basic_operations_enabled();
+        abort_unless_type_serialization_scheme_enabled<S>(scheme);
+        serialize_internal<S>(scheme, element.handle)
     }
 
     /// Get the order of group `G`, little-endian encoded as a byte array.
     public fun group_order<G>(): vector<u8> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<G>();
         group_order_internal<G>()
     }
 
     /// Cast an element of a structure `S` to a parent structure `L`.
     public fun upcast<S,L>(element: &Element<S>): Element<L> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_pair_enabled_for_upcast<S,L>();
         Element<L> {
             handle: upcast_internal<S,L>(element.handle)
@@ -354,7 +379,7 @@ module aptos_std::algebra {
 
     /// Try casting an element of a structure `L` to a sub structure `S`.
     public fun downcast<L,S>(element: &Element<L>): Option<Element<S>> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_pair_enabled_for_upcast<S,L>();
         let (succ, new_handle) = downcast_internal<L,S>(element.handle);
         if (succ) {
@@ -367,17 +392,16 @@ module aptos_std::algebra {
     #[test_only]
     /// Generate a random element of an algebraic structure `S`.
     public fun insecure_random_element<S>(): Element<S> {
-        abort_if_generic_algebra_basic_operations_disabled();
+        abort_unless_generic_algebra_basic_operations_enabled();
         abort_unless_type_enabled_for_basic_operation<S>();
         Element<S> {
             handle: insecure_random_element_internal<S>()
         }
     }
 
-    fun abort_if_generic_algebra_basic_operations_disabled() {
-        if (!std::features::generic_algebra_basic_operations_enabled()) {
-            abort(std::error::not_implemented(0))
-        }
+    fun abort_unless_generic_algebra_basic_operations_enabled() {
+        if (generic_algebra_basic_operations_enabled()) return;
+        abort(std::error::not_implemented(0))
     }
 
     fun abort_unless_type_enabled_for_basic_operation<S>() {
@@ -783,7 +807,7 @@ module aptos_std::algebra {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        // pairing(a*P,b*Q) == (a*b)*pairing(P,Q).
+        // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
         let element_p = insecure_random_element<BLS12_381_G1>();
         let element_q = insecure_random_element<BLS12_381_G2>();
         let a = insecure_random_element<BLS12_381_Fr>();
