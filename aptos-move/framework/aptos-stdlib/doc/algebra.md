@@ -157,6 +157,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 
 The finite field $F_q$ used in BLS12-381 curves.
 It has a prime order $q$ equal to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
+
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
@@ -187,6 +188,7 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 The finite field $F_{q^2}$ used in BLS12-381 curves.
 It is an extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code>, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
+
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
@@ -217,6 +219,7 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 The finite field $F_{q^6}$ used in BLS12-381 curves.
 It is an extension field of <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code>, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
+
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
@@ -278,6 +281,7 @@ A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and
 under the elliptic curve point addition.
 It contains the prime-order subgroup $G_1$ used in pairing.
 The identity is the point at infinity.
+
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
@@ -340,6 +344,7 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 A group constructed by the points on a curve $E(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
 $E(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
 The identity of <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
+
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
@@ -490,6 +495,8 @@ This struct represents an element of an algebraic structure <code>S</code>.
 
 A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using little-endian byte order.
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_format">bls12_381_fq_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -512,6 +519,8 @@ A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_F
 ## Function `bls12_381_fq_bendian_format`
 
 A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq">BLS12_381_Fq</a></code> element is represented by a byte array <code>b[]</code> of size 48 using big-endian byte order.
+
+NOTE: currently information-only, not implemented.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq_bendian_format">bls12_381_fq_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -537,6 +546,8 @@ A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_F
 A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq2">BLS12_381_Fq2</a></code> element $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96.
 <code>b[0..48]</code> is $c_0$ serialized in <code>bls12_381_fq_format</code>.
 <code>b[48..96]</code> is $c_1$ serialized in <code>bls12_381_fq_format</code>.
+
+NOTE: currently information-only, not implemented.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq2_format">bls12_381_fq2_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -564,6 +575,8 @@ A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_F
 <code>b[96..192]</code> is $c_1$ serialized in <code>bls12_381_fq2_format</code>.
 <code>b[192..288]</code> is $c_2$ serialized in <code>bls12_381_fq2_format</code>.
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_fq6_format">bls12_381_fq6_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -588,6 +601,7 @@ A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_F
 A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fq12">BLS12_381_Fq12</a></code> element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
 <code>b[0..288]</code> is $c_0$ serialized in <code>bls12_381_fq6_format</code>.
 <code>b[288..576]</code> is $c_1$ serialized in <code>bls12_381_fq6_format</code>.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -618,6 +632,8 @@ The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E
 <code>[b[0], ..., b[47] & 0x3f]</code> is $x$ serialized in <code>bls12_381_fq_format</code>, and
 <code>[b[48], ..., b[95] & 0x3f]</code> is $y$ serialized in <code>bls12_381_fq_format</code>.
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_uncompressed_format">bls12_381_g1_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -646,6 +662,8 @@ The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E
 <code>[b[0], ..., b[47] & 0x3f]</code> is $x$ serialized in <code>bls12_381_fq_format</code>, and
 the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g1_parent_compressed_format">bls12_381_g1_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -668,6 +686,7 @@ the positiveness flag <code>b_47 & 0x80</code> is 1 if and only if $y > -y$ ($y$
 ## Function `bls12_381_g1_uncompressed_format`
 
 Effectively <code>bls12_381_g1_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -692,6 +711,7 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 ## Function `bls12_381_g1_compressed_format`
 
 Effectively <code>bls12_381_g1_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -722,6 +742,8 @@ The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E
 <code>b[0..96]</code> is $x$ serialized in <code>bls12_381_fq2_format</code>, and
 <code>[b[96], ..., b[191] & 0x3f]</code> is $y$ serialized in <code>bls12_381_fq2_format</code>.
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_uncompressed_format">bls12_381_g2_parent_uncompressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -750,6 +772,8 @@ The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E
 <code>[b[0], ..., b[95] & 0x3f]</code> is $x$ serialized in <code>bls12_381_fq2_format</code>, and
 the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
 
+NOTE: currently information-only, not implemented.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_bls12_381_g2_parent_compressed_format">bls12_381_g2_parent_compressed_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
@@ -772,6 +796,7 @@ the positiveness flag <code>b[95] & 0x80</code> is 1 if and only if $y > -y$ ($y
 ## Function `bls12_381_g2_uncompressed_format`
 
 Effectively <code>bls12_381_g2_parent_uncompressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -796,6 +821,7 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 ## Function `bls12_381_g2_compressed_format`
 
 Effectively <code>bls12_381_g2_parent_compressed_format</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -820,6 +846,7 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 ## Function `bls12_381_gt_format`
 
 Effectively <code><a href="algebra.md#0x1_algebra_bls12_381_fq12_format">bls12_381_fq12_format</a>()</code> but only applicable to <code><a href="algebra.md#0x1_algebra_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
@@ -844,6 +871,7 @@ NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3
 ## Function `bls12_381_fr_lendian_format`
 
 A serialization scheme where a <code><a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a></code> element is represented by a byte array <code>b[]</code> of size 32 using little-endian byte order.
+
 NOTE: the same scheme is also used in other crates, e.g. <code>ark-bls12-381-0.3.0</code>.
 
 
