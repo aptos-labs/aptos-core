@@ -67,13 +67,13 @@ def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
 
 
 def get_file_path(
-    optional_path: Option[Path], tokens: List[str], extension: str
+    optional_path: Option[Path], name_tokens: List[str], extension: str
 ) -> Path:
     """If no path provided, generate one from tokens and extension."""
     if optional_path is not None:  # If optional path provided:
         return optional_path  # Use it as the path.
     # Otherwise return a new path from tokens and extension.
-    return Path("_".join(tokens).casefold() + "." + extension)
+    return Path("_".join(name_tokens).casefold() + "." + extension)
 
 
 def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
@@ -434,19 +434,23 @@ def get_sequence_number(address: bytes, network: str) -> int:
 def rotate_challenge_propose(args):
     """Propose a rotation proof challenge, storing an output file.
 
-    Accepts either a single-signer keyfile or multisig metafile for
-    originating account. If single-signer, assumes authentication key is
-    account address."""
-    name = check_name(args.name)  # Get name for the rotation.
+    Accepts either a single-signer keyfile or multisig metafile for both
+    originating and target accounts. If single-signer, assumes account
+    address is identical to authentication key."""
     # Load originator data.
     originator_data = json.load(args.originator)
     target_data = json.load(args.target)  # Load target data.
-    if args.single_originator:  # If a single-signer originator:
-        # Address is authentication key.
+    if args.from_single:  # If a single-signer originator:
+        # Address is assumed to be authentication key.
         originator_address = originator_data["authentication_key"]
     else:  # If multisig originator:
         # Address is that indicated in metafile.
         originator_address = originator_data["address"]
+    if args.to_single:  # If a single-signer target:
+        assert target_data["authentication_key"] == originator_address, (
+            "Authentication key of single-signer target account must match "
+            "originating address."
+        )  # Assert authentication key identical to from address.
     sequence_number = get_sequence_number(
         prefixed_hex_to_bytes(originator_address), args.network
     )  # Get originating account sequence number.
@@ -454,7 +458,10 @@ def rotate_challenge_propose(args):
         path=get_file_path(args.outfile, args.name, "challenge_proposal"),
         data={
             "filetype": "Rotation proof challenge proposal",
-            "description": name,
+            "description": check_name(args.name),
+            "from_public_key": originator_data["public_key"],
+            "from_is_single_signer": args.from_single,
+            "to_is_single_signer": args.to_single,
             "sequence_number": sequence_number,
             "originator": originator_address,
             "current_auth_key": originator_data["authentication_key"],
@@ -514,7 +521,7 @@ def rotate_challenge_sign(args):
 def metafile_to_multisig_public_key(path: Path):
     """Get multisig public key instance from metafile at path."""
     # With metafile open:
-    with open(path, encoding='utf-8') as metafile:
+    with open(path, encoding="utf-8") as metafile:
         data = json.load(metafile)  # Load JSON data.
     keys = []  # Init empty public keys list.
     for signatory in data["signatories"]:  # Loop over signatories:
@@ -537,8 +544,39 @@ def assert_successful_transaction(
     print(f"Transaction successful: {tx_hash}")
 
 
+def index_rotation_challenge_signatures(
+    signature_files: List[TextIOWrapper],
+) -> Tuple[List[Tuple[PublicKey, Signature]], Dict[str, Any]]:
+    """Index a list of rotation proof challenge signatures into a
+    multisig signature map, extracting the rotation challenge proposal."""
+    # Initialize signature map for multisig signature.
+    signature_map = []
+    proposal = None  # Initialize proposal.
+    for file in signature_files:  # Loop over signature files:
+        signature_data = json.load(file)  # Load data for file.
+        if proposal is None:  # If challenge proposal undefined:
+            # Initialize it to that from first signature file.
+            proposal = signature_data["challenge_proposal"]
+        else:  # If challenge proposal already defined:
+            assert (  # Assert it is same across all signature files.
+                signature_data["challenge_proposal"] == proposal
+            ), "Signature proposal mismatch."
+        # Get public key hex for signatory.
+        public_key_hex = signature_data["signatory"]["public_key"]
+        # Get public key class instance.
+        pubkey = PublicKey(VerifyKey(prefixed_hex_to_bytes(public_key_hex)))
+        # Get signature.
+        sig = Signature(prefixed_hex_to_bytes(signature_data["signature"]))
+        # Append public key and signature to signatures map.
+        signature_map.append((pubkey, sig))
+    # Return signature map and rotation proof challenge proposal.
+    return signature_map, proposal
+
+
 def rotate_execute_single(args):
-    """Rotate single-signer account to multisig account."""
+    """Rotate authentication key for single-signer account.
+
+    Only supports rotation to a multisig account."""
     # Check password, get keyfile data and optional private key bytes.
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
@@ -547,26 +585,9 @@ def rotate_execute_single(args):
     account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
     # Get public key bytes for account.
     from_public_key_bytes = prefixed_hex_to_bytes(keyfile_data["public_key"])
-    # Initialize signature map for multisig signature.
-    signature_map = []
-    proposal = None  # Initialize proposal.
-    for signature in args.signatures:  # Loop over signature files:
-        signature_data = json.load(signature)  # Load data for file.
-        if proposal is None:  # If challenge proposal undefined:
-            # Initialize it to that from first signature file.
-            proposal = signature_data["challenge_proposal"]
-        else:  # If challenge proposal already defined:
-            assert (  # Assert it is the same across all signature files.
-                signature_data["challenge_proposal"] == proposal
-            ), "Signature proposal mismatch."
-        # Get public key hex.
-        public_key_hex = signature_data["signatory"]["public_key"]
-        # Get public key class instance.
-        pubkey = PublicKey(VerifyKey(prefixed_hex_to_bytes(public_key_hex)))
-        # Get signature.
-        sig = Signature(prefixed_hex_to_bytes(signature_data["signature"]))
-        # Append public key and signature to signatures map.
-        signature_map.append((pubkey, sig))
+    signature_map, proposal = index_rotation_challenge_signatures(
+        args.signatures
+    )  # Index signatures into signature map, extract rotation proposal.
     # Get bytes of public key to rotate to.
     to_public_key_bytes = prefixed_hex_to_bytes(proposal["new_public_key"])
     # Get rotation challenge BCS.
@@ -599,6 +620,75 @@ def rotate_execute_single(args):
     assert_successful_transaction(client, signed_transaction)
     # Update multisig metafile address.
     update_multisig_address(args.metafile, proposal["originator"])
+
+
+def extract_challenge_proposal_data(
+    signature_files: List[TextIOWrapper],
+    proposal: Option[Dict[str, Any]],
+    signatures_manifest=List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Extract from signature files challenge proposal data and append
+    to ongoing signatures manifest."""
+    for file in signature_files:  # Loop over signature files.
+        signature_data = json.load(file)  # Load data for file.
+        if proposal is None:  # If challenge proposal undefined:
+            # Initialize it to that from first signature file.
+            proposal = signature_data["challenge_proposal"]
+        else:  # If challenge proposal already defined:
+            assert (  # Assert it is same across all signature files.
+                signature_data["challenge_proposal"] == proposal
+            ), "Signature proposal mismatch."
+        signatures_manifest.append(
+            {  # Append signature data.
+                "signatory": signature_data["signatory"],
+                "signature": signature_data["signature"],
+            }
+        )
+    return proposal  # Return proposal.
+
+
+def rotate_transaction_propose(args):
+    """Propose authentication key rotation transaction from multisig."""
+    # Initialize empty from and to signatures for challenge proposal.
+    challenge_from_signatures, challenge_to_signatures = [], []
+    proposal = extract_challenge_proposal_data(
+        signature_files=args.from_signatures,
+        proposal=None,
+        signatures_manifest=challenge_from_signatures,
+    )  # Extract from challenge proposal signatures.
+    proposal = extract_challenge_proposal_data(
+        signature_files=args.to_signatures,
+        proposal=None,
+        signatures_manifest=challenge_to_signatures,
+    )  # Extract to challenge proposal signatures.
+    write_json_file(  # Write JSON to transaction proposal file.
+        path=get_file_path(
+            optional_path=args.outfile,
+            name_tokens=proposal["description"].split(),
+            extension="rotation_transaction_proposal",
+        ),
+        data={
+            "filetype": "Rotation transaction proposal",
+            "description": check_name(args.name),
+            "challenge_proposal": proposal,
+            "challenge_from_signatures": challenge_from_signatures,
+            "challenge_to_signatures": challenge_to_signatures,
+        },
+        check_if_exists=True,
+    )
+
+
+def signature_map_to_hex(
+    signature_map: List[Tuple[PublicKey, Signature]]
+) -> List[Tuple[str, str]]:
+    """Convert a class-based signature map to a prefixed hex version."""
+    return [
+        (
+            bytes_to_prefixed_hex(entry[0].key.encode()),
+            bytes_to_prefixed_hex(entry[1].data()),
+        )
+        for entry in signature_map
+    ]
 
 
 def update_multisig_address(path: Path, address_prefixed_hex: str):
@@ -937,12 +1027,14 @@ parser_rotate_challenge_propose.add_argument(
     type=argparse.FileType("r", encoding="utf-8"),
     help="""Relative file path for either single-signer keyfile or multisig
         metafile for originating account. If a single-signer keyfile, assumes
-        that account has not yet had its authentication key rotated.""",
+        account address is identical to its authentication key.""",
 )
 parser_rotate_challenge_propose.add_argument(
     "target",
     type=argparse.FileType("r", encoding="utf-8"),
-    help="""Multisig metafile relative file path for account to rotate to.""",
+    help="""Relative file path for either single-signer keyfile or multisig
+        metafile for target account. If a single-signer keyfile, assumes
+        account address is identical to its authentication key.""",
 )
 parser_rotate_challenge_propose.add_argument(
     "name",
@@ -951,10 +1043,16 @@ parser_rotate_challenge_propose.add_argument(
     help="""Description for rotation. For example 'Setup' or 'Add signer'.""",
 )
 parser_rotate_challenge_propose.add_argument(
-    "-s",
-    "--single-originator",
+    "-f",
+    "--from-single",
     action="store_true",
     help="""If originator is a single signer.""",
+)
+parser_rotate_challenge_propose.add_argument(
+    "-t",
+    "--to-single",
+    action="store_true",
+    help="""If authentication key to rotate to is for single signer.""",
 )
 parser_rotate_challenge_propose.add_argument(
     "-o",
@@ -982,16 +1080,16 @@ parser_rotate_challenge_sign.add_argument(
     help="""Single-signer keyfile for signing challenge proposal.""",
 )
 parser_rotate_challenge_sign.add_argument(
-    "-o",
-    "--outfile",
-    type=Path,
-    help="""Relative path to rotation proof challenge signature outfile.""",
-)
-parser_rotate_challenge_sign.add_argument(
     "name",
     type=str,
     nargs="+",
     help="""Description for rotation signature.""",
+)
+parser_rotate_challenge_sign.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="""Relative path to rotation proof challenge signature outfile.""",
 )
 
 # Rotate execute subcommand parser.
@@ -1033,6 +1131,60 @@ parser_rotate_execute_single.add_argument(
     type=argparse.FileType("r", encoding="utf-8"),
     help="""Relative paths to rotation proof challenge signature files from
         threshold number of signatories.""",
+)
+
+# Rotate transaction subcommand parser.
+parser_rotate_transaction = subparsers_rotate.add_parser(
+    name="transaction",
+    aliases=["t"],
+    description="""Authentication key rotation transaction operations for when
+        originating account is a multisig.""",
+    help="Authentication key rotation prep for multisig originator.",
+)
+tmp = parser_rotate_transaction.add_subparsers(required=True)
+subparsers_rotate_transaction = tmp  # Temp variable for line breaking.
+
+# Rotate transaction propose subcommand parser.
+parser_rotate_transaction_propose = subparsers_rotate_transaction.add_parser(
+    name="propose",
+    aliases=["p"],
+    description="""Propose an authentication key rotation from a multisig
+        account originator.""",
+    help="""Rotate authentication key for multisig account.""",
+)
+parser_rotate_transaction_propose.set_defaults(func=rotate_transaction_propose)
+parser_rotate_transaction_propose.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="""Description for rotation signature.""",
+)
+parser_rotate_transaction_propose.add_argument(
+    "-f",
+    "--from-signatures",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to rotation proof challenge signatures for multisig
+        signatories at from account.""",
+    required=True,
+)
+parser_rotate_transaction_propose.add_argument(
+    "-t",
+    "--to-signatures",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to rotation proof challenge signatures for requisite
+        signatories at to account. Can be a for a single signer account or for
+        a multisig account.""",
+    required=True,
+)
+parser_rotate_transaction_propose.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="""Relative path to rotation transaction proposal outfile.""",
 )
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
