@@ -631,6 +631,16 @@ define_hasher! {
 }
 
 define_hasher! {
+    /// The hasher used as a placeholder.
+    (
+        DummyHasher,
+        DUMMY_HASHER,
+        DUMMY_SEED,
+        b"Dummy"
+    )
+}
+
+define_hasher! {
     /// The hasher used only for testing. It doesn't have a salt.
     (TestOnlyHasher, TEST_ONLY_HASHER, TEST_ONLY_SEED, b"")
 }

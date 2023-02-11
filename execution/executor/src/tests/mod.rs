@@ -449,9 +449,9 @@ fn apply_transaction_by_writeset(
 fn test_deleted_key_from_state_store() {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let dummy_state_key1 = StateKey::Raw(String::from("test_key1").into_bytes());
+    let dummy_state_key1 = StateKey::raw(String::from("test_key1").into_bytes());
     let dummy_value1 = 10u64.to_le_bytes().to_vec();
-    let dummy_state_key2 = StateKey::Raw(String::from("test_key2").into_bytes());
+    let dummy_state_key2 = StateKey::raw(String::from("test_key2").into_bytes());
     let dummy_value2 = 20u64.to_le_bytes().to_vec();
     // Create test transaction, event and transaction output
     let transaction1 = create_test_transaction(0);

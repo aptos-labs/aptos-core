@@ -233,7 +233,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_state_value(&StateKey::AccessPath(access_path.clone()))
+        .get_state_value(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -243,7 +243,7 @@ fn read_state_value_from_storage(
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view
-        .get_state_value(&StateKey::AccessPath(access_path.clone()))
+        .get_state_value(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 
@@ -265,11 +265,11 @@ fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
     let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
     write_set.insert((
-        StateKey::AccessPath(validator_set_ap),
+        StateKey::access_path(validator_set_ap),
         WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
     write_set.insert((
-        StateKey::AccessPath(AccessPath::new(
+        StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
@@ -283,11 +283,11 @@ fn gen_genesis_writeset() -> WriteSet {
 fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.insert((
-        StateKey::AccessPath(balance_ap(sender)),
+        StateKey::access_path(balance_ap(sender)),
         WriteOp::Modification(balance.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(seqnum_ap(sender)),
+        StateKey::access_path(seqnum_ap(sender)),
         WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
@@ -302,15 +302,15 @@ fn gen_payment_writeset(
 ) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.insert((
-        StateKey::AccessPath(balance_ap(sender)),
+        StateKey::access_path(balance_ap(sender)),
         WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(seqnum_ap(sender)),
+        StateKey::access_path(seqnum_ap(sender)),
         WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(balance_ap(recipient)),
+        StateKey::access_path(balance_ap(recipient)),
         WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
     ));
     write_set

@@ -55,11 +55,11 @@ fn test_mock_vm_different_senders() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::AccessPath(balance_ap(sender)),
+                    StateKey::access_path(balance_ap(sender)),
                     WriteOp::Modification(amount.to_le_bytes().to_vec())
                 ),
                 (
-                    StateKey::AccessPath(seqnum_ap(sender)),
+                    StateKey::access_path(seqnum_ap(sender)),
                     WriteOp::Modification(1u64.to_le_bytes().to_vec())
                 ),
             ]
@@ -90,11 +90,11 @@ fn test_mock_vm_same_sender() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::AccessPath(balance_ap(sender)),
+                    StateKey::access_path(balance_ap(sender)),
                     WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
                 ),
                 (
-                    StateKey::AccessPath(seqnum_ap(sender)),
+                    StateKey::access_path(seqnum_ap(sender)),
                     WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
                 ),
             ]
@@ -128,15 +128,15 @@ fn test_mock_vm_payment() {
             .collect::<BTreeMap<_, _>>(),
         [
             (
-                StateKey::AccessPath(balance_ap(gen_address(0))),
+                StateKey::access_path(balance_ap(gen_address(0))),
                 WriteOp::Modification(50u64.to_le_bytes().to_vec())
             ),
             (
-                StateKey::AccessPath(seqnum_ap(gen_address(0))),
+                StateKey::access_path(seqnum_ap(gen_address(0))),
                 WriteOp::Modification(2u64.to_le_bytes().to_vec())
             ),
             (
-                StateKey::AccessPath(balance_ap(gen_address(1))),
+                StateKey::access_path(balance_ap(gen_address(1))),
                 WriteOp::Modification(150u64.to_le_bytes().to_vec())
             ),
         ]

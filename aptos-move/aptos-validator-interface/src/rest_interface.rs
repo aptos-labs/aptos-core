@@ -9,7 +9,10 @@ use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     account_state::AccountState,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
     transaction::{Transaction, TransactionInfo, Version},
 };
 use std::collections::BTreeMap;
@@ -47,8 +50,8 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        match state_key {
-            StateKey::AccessPath(path) => match path.get_path() {
+        match state_key.inner() {
+            StateKeyInner::AccessPath(path) => match path.get_path() {
                 Path::Code(module_id) => Ok(Some(StateValue::new(
                     self.0
                         .get_account_module_bcs_at_version(
@@ -72,14 +75,14 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                     .ok()
                     .map(|inner| StateValue::new(inner.into_inner()))),
             },
-            StateKey::TableItem { handle, key } => Ok(Some(StateValue::new(
+            StateKeyInner::TableItem { handle, key } => Ok(Some(StateValue::new(
                 self.0
                     .get_raw_table_item(handle.0, key, version)
                     .await
                     .map_err(|err| anyhow!("Failed to get account states: {:?}", err))?
                     .into_inner(),
             ))),
-            StateKey::Raw(_) => bail!("Unexpected key type"),
+            StateKeyInner::Raw(_) => bail!("Unexpected key type"),
         }
     }
 

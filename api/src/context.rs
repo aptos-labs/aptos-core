@@ -34,7 +34,11 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_key_prefix::StateKeyPrefix,
+        state_value::StateValue,
+    },
     transaction::{SignedTransaction, Transaction, TransactionWithProof, Version},
 };
 use aptos_vm::{
@@ -287,8 +291,8 @@ impl Context {
         // * Get next_key as the first struct_tag not included
         let mut resource_iter = account_iter
             .filter_map(|res| match res {
-                Ok((k, v)) => match k {
-                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
                                 Some(Ok((struct_tag, v.into_bytes())))
@@ -340,7 +344,7 @@ impl Context {
             .collect();
 
         let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
-            StateKey::AccessPath(AccessPath::new(
+            StateKey::access_path(AccessPath::new(
                 address,
                 AccessPath::resource_path_vec(struct_tag),
             ))
@@ -362,8 +366,8 @@ impl Context {
         )?;
         let mut module_iter = account_iter
             .filter_map(|res| match res {
-                Ok((k, v)) => match k {
-                    StateKey::AccessPath(AccessPath { address: _, path }) => {
+                Ok((k, v)) => match k.inner() {
+                    StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
                             Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
@@ -383,7 +387,7 @@ impl Context {
             .take(limit as usize)
             .collect::<Result<_>>()?;
         let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
-            StateKey::AccessPath(AccessPath::new(
+            StateKey::access_path(AccessPath::new(
                 address,
                 AccessPath::code_path_vec(module_id),
             ))
