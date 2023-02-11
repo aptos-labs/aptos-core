@@ -27,7 +27,6 @@ if test $1 = r; then
         tmp/initial.multisig \
         2030-01-01 \
         Initial \
-        --from-single \
         --outfile tmp/initial.challenge_proposal
     # Have Ace sign challenge proposal.
     python amee.py rotate challenge sign \
@@ -89,7 +88,6 @@ if test $1 = r; then
         tmp/ace.keyfile \
         2030-01-01 \
         Return \
-        --to-single \
         --outfile tmp/return.challenge_proposal
     # Have Ace sign challenge proposal.
     python amee.py rotate challenge sign \

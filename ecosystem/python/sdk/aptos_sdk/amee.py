@@ -443,13 +443,17 @@ def rotate_challenge_propose(args):
     # Load originator data.
     originator_data = json.load(args.originator)
     target_data = json.load(args.target)  # Load target data.
-    if args.from_single:  # If a single-signer originator:
+    # Check if originator is single-signer.
+    from_is_single = originator_data["filetype"] == "Keyfile"
+    # Check if target is single-signer.
+    to_is_single = target_data["filetype"] == "Keyfile"
+    if from_is_single:  # If a single-signer originator:
         # Address is assumed to be authentication key.
         originator_address = originator_data["authentication_key"]
     else:  # If multisig originator:
         # Address is that indicated in metafile.
         originator_address = originator_data["address"]
-    if args.to_single:  # If a single-signer target:
+    if to_is_single:  # If a single-signer target:
         assert target_data["authentication_key"] == originator_address, (
             "Authentication key of single-signer target account must match "
             "originating address."
@@ -463,8 +467,8 @@ def rotate_challenge_propose(args):
             "filetype": "Rotation proof challenge proposal",
             "description": check_name(args.name),
             "from_public_key": originator_data["public_key"],
-            "from_is_single_signer": args.from_single,
-            "to_is_single_signer": args.to_single,
+            "from_is_single_signer": from_is_single,
+            "to_is_single_signer": to_is_single,
             "sequence_number": sequence_number,
             "originator": originator_address,
             "current_auth_key": originator_data["authentication_key"],
@@ -1181,18 +1185,6 @@ parser_rotate_challenge_propose.add_argument(
     type=str,
     nargs="+",
     help="Description for rotation. For example 'Setup' or 'Add signer'.",
-)
-parser_rotate_challenge_propose.add_argument(
-    "-f",
-    "--from-single",
-    action="store_true",
-    help="If originator is a single signer.",
-)
-parser_rotate_challenge_propose.add_argument(
-    "-t",
-    "--to-single",
-    action="store_true",
-    help="If authentication key to rotate to is for single signer.",
 )
 parser_rotate_challenge_propose.add_argument(
     "-o",
