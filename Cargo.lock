@@ -2130,9 +2130,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-api-types",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-genesis",
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
@@ -2147,10 +2149,12 @@ dependencies = [
  "move-core-types",
  "move-model",
  "serde 1.0.149",
+ "serde_json",
  "serde_yaml 0.8.26",
  "tempfile",
  "tokio",
  "url",
+ "walkdir",
 ]
 
 [[package]]
@@ -9748,6 +9752,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -279,7 +279,7 @@ pub struct SubmitProposal {
     #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
-    #[clap(long, default_value = "false")]
+    #[clap(long)]
     pub(crate) is_multi_step: bool,
 
     #[clap(flatten)]

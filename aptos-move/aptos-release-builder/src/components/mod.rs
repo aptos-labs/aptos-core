@@ -3,7 +3,7 @@
 
 use self::framework::FrameworkReleaseConfig;
 use crate::components::feature_flags::Features;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
@@ -276,6 +276,45 @@ impl ReleaseConfig {
 
     pub fn parse(serialized: &str) -> Result<Self> {
         serde_yaml::from_str(serialized).map_err(|e| anyhow!("Failed to parse the config: {:?}", e))
+    }
+
+    // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
+    pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
+        let client = Client::new(endpoint);
+        if let Some(features) = &self.feature_flags {
+            let on_chain_features = block_on(async {
+                client
+                    .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
+                        CORE_CODE_ADDRESS,
+                        "0x1::features::Features",
+                    )
+                    .await
+            })?;
+            if features.has_modified(on_chain_features.inner()) {
+                bail!(
+                    "Feature mismatch: Got {:?}, expected {:?}",
+                    on_chain_features.inner(),
+                    features
+                );
+            }
+        }
+        let client_opt = Some(client);
+        if let Some(config) = &self.consensus_config {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Consensus config mismatch: Expected {:?}", config);
+            }
+        }
+        if let Some(config) = &self.gas_schedule {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Gas schedule config mismatch: Expected {:?}", config);
+            }
+        }
+        if let Some(config) = &self.version {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Version mismatch: Expected {:?}", config);
+            }
+        }
+        Ok(())
     }
 }
 

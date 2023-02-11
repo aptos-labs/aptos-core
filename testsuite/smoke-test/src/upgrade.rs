@@ -282,3 +282,78 @@ async fn test_upgrade_flow_multi_step() {
 
     check_create_mint_transfer(&mut env).await;
 }
+
+// This test is intentionally disabled because it's taking ~500s to execute right now.
+// The main reason is that compilation of scripts takes a bit too long, as the Move compiler will need
+// to repeatedly compile all the aptos framework pacakges as dependency
+//
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_release_validate_tool_multi_step() {
+    let (mut env, _, _) = SwarmBuilder::new_local(1)
+        .with_init_config(Arc::new(|_, _, genesis_stake_amount| {
+            // make sure we have quorum
+            *genesis_stake_amount = 2000000000000000;
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.allow_new_validators = true;
+            genesis_config.voting_duration_secs = 30;
+            genesis_config.voting_power_increase_limit = 50;
+            genesis_config.epoch_duration_secs = 4;
+        }))
+        .build_with_cli(2)
+        .await;
+    let config = aptos_release_builder::ReleaseConfig {
+        is_multi_step: true,
+        ..Default::default()
+    };
+
+    let root_key = TempPath::new();
+    root_key.create_as_file().unwrap();
+    let mut root_key_path = root_key.path().to_path_buf();
+    root_key_path.set_extension("key");
+
+    std::fs::write(
+        root_key_path.as_path(),
+        bcs::to_bytes(&env.chain_info().root_account().private_key()).unwrap(),
+    )
+    .unwrap();
+
+    let network_config = aptos_release_builder::validate::NetworkConfig {
+        endpoint: url::Url::parse(&env.chain_info().rest_api_url).unwrap(),
+        root_key_path,
+        validator_account: env.validators().last().unwrap().peer_id(),
+        validator_key: env
+            .validators()
+            .last()
+            .unwrap()
+            .account_private_key()
+            .as_ref()
+            .unwrap()
+            .private_key(),
+    };
+
+    aptos_release_builder::validate::validate_config(config, network_config)
+        .await
+        .unwrap();
+
+    let root_account = env.aptos_public_info().root_account().address();
+    // Test the module publishing workflow
+    *env.aptos_public_info().root_account().sequence_number_mut() = env
+        .aptos_public_info()
+        .client()
+        .get_account(root_account)
+        .await
+        .unwrap()
+        .inner()
+        .sequence_number;
+
+    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let base_path_v1 = base_dir.join("src/aptos/package_publish_modules_v1/");
+
+    move_test_helpers::publish_package(&mut env.aptos_public_info(), base_path_v1)
+        .await
+        .unwrap();
+
+    check_create_mint_transfer(&mut env).await;
+}
