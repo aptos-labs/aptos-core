@@ -6,12 +6,12 @@ if test $1 = r; then
     python amee.py keyfile generate \
         Ace \
         --vanity-prefix 0xace \
-        --keyfile tmp/ace.keyfile
+        --outfile tmp/ace.keyfile
     # Generate Bob keyfile.
     python amee.py keyfile generate \
         Bob \
         --vanity-prefix 0xb0b \
-        --keyfile tmp/bob.keyfile
+        --outfile tmp/bob.keyfile
     python amee.py keyfile fund tmp/ace.keyfile # Fund Ace.
     # Incorporate into 1-of-2 multisig.
     python amee.py metafile incorporate \
@@ -20,7 +20,7 @@ if test $1 = r; then
         --keyfiles \
             tmp/ace.keyfile \
             tmp/bob.keyfile \
-        --metafile tmp/initial.multisig
+        --outfile tmp/initial.multisig
     # Propose rotation challenge for rotating to multisig.
     python amee.py rotate challenge propose \
         tmp/ace.keyfile \
@@ -45,7 +45,7 @@ if test $1 = r; then
         tmp/initial.multisig \
         2 \
         Increased \
-        --new-metafile tmp/increased.multisig
+        --outfile tmp/increased.multisig
     # Propose rotation challenge for increasing threshold.
     python amee.py rotate challenge propose \
         tmp/initial.multisig \
@@ -139,12 +139,12 @@ elif test $1 = m; then
     python amee.py keyfile generate \
         Ace \
         --vanity-prefix 0xace \
-        --keyfile tmp/ace.keyfile
+        --outfile tmp/ace.keyfile
     # Generate Bob keyfile.
     python amee.py keyfile generate \
         Bob \
         --vanity-prefix 0xb0b \
-        --keyfile tmp/bob.keyfile
+        --outfile tmp/bob.keyfile
     # Incorporate into 1-of-2 multisig.
     python amee.py metafile incorporate \
         1 \
@@ -152,17 +152,17 @@ elif test $1 = m; then
         --keyfiles \
             tmp/ace.keyfile \
             tmp/bob.keyfile \
-        --metafile tmp/initial.multisig
+        --outfile tmp/initial.multisig
     # Generate Ace keyfile.
     python amee.py keyfile generate \
         Cad \
         --vanity-prefix 0xcad \
-        --keyfile tmp/cad.keyfile
+        --outfile tmp/cad.keyfile
     # Generate Dee keyfile.
     python amee.py keyfile generate \
         Dee \
         --vanity-prefix 0xdee \
-        --keyfile tmp/dee.keyfile
+        --outfile tmp/dee.keyfile
     # Append Cad and Dee to create 3-of-4 multisig.
     python amee.py metafile append \
         tmp/initial.multisig \
@@ -171,20 +171,20 @@ elif test $1 = m; then
         --keyfiles \
             tmp/cad.keyfile \
             tmp/dee.keyfile \
-        --new-metafile tmp/increased.multisig
+        --outfile tmp/increased.multisig
     # Remove Ace and Dee to create 1-of-2 multisig.
     python amee.py metafile remove \
         tmp/increased.multisig \
         1 \
         Removed \
         --signatories 0 3 \
-        --new-metafile tmp/removed.multisig
+        --outfile tmp/removed.multisig
     # Change threshold to create 2-of-2 multisig.
     python amee.py metafile threshold \
         tmp/removed.multisig \
         2 \
         Changed \
-        --new-metafil tmp/changed.multisig
+        --outfile tmp/changed.multisig
     rm -rf tmp # Clear temp dir.
 
 fi

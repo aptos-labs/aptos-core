@@ -181,7 +181,7 @@ def metafile_incorporate(args):
         name_tokens=args.name,
         threshold=args.threshold,
         keyfiles=args.keyfiles,
-        outfile=args.metafile,
+        outfile=args.outfile,
     )
 
 
@@ -192,7 +192,7 @@ def metafile_append(args):
         name_tokens=args.name,
         threshold=args.threshold,
         keyfiles=args.keyfiles,
-        outfile=args.new_metafile,
+        outfile=args.outfile,
     )
 
 
@@ -224,7 +224,7 @@ def metafile_remove(args):
         name_tokens=args.name,
         threshold=args.threshold,
         keyfiles=None,
-        outfile=args.new_metafile,
+        outfile=args.outfile,
     )
 
 
@@ -239,7 +239,7 @@ def metafile_threshold(args):
         name_tokens=args.name,
         threshold=args.threshold,
         keyfiles=None,
-        outfile=args.new_metafile,
+        outfile=args.outfile,
     )
 
 
@@ -367,7 +367,7 @@ def keyfile_generate(args):
     # Get encrypted private key hex.
     key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
     write_json_file(  # Write JSON to keyfile.
-        path=get_file_path(args.keyfile, args.signatory, "keyfile"),
+        path=get_file_path(args.outfile, args.signatory, "keyfile"),
         data={
             "filetype": "Keyfile",
             "signatory": signatory,
@@ -925,7 +925,7 @@ parser_keyfile_generate.add_argument(
         or 'The Aptos Foundation'.""",
 )
 parser_keyfile_generate.add_argument(
-    "-k", "--keyfile", type=Path, help="Relative path to desired keyfile."
+    "-o", "--outfile", type=Path, help="Relative path to desired keyfile."
 )
 exclusive_group = parser_keyfile_generate.add_mutually_exclusive_group()
 exclusive_group.add_argument(
@@ -1012,8 +1012,8 @@ parser_metafile_append.add_argument(
     required=True,
 )
 parser_metafile_append.add_argument(
-    "-n",
-    "--new-metafile",
+    "-o",
+    "--outfile",
     type=Path,
     help="Custom relative path to new multisig metafile.",
 )
@@ -1049,8 +1049,8 @@ parser_metafile_incorporate.add_argument(
     required=True,
 )
 parser_metafile_incorporate.add_argument(
-    "-m",
-    "--metafile",
+    "-o",
+    "--outfile",
     type=Path,
     help="Custom relative path to desired multisig metafile.",
 )
@@ -1091,8 +1091,8 @@ parser_metafile_remove.add_argument(
     required=True,
 )
 parser_metafile_remove.add_argument(
-    "-n",
-    "--new-metafile",
+    "-o",
+    "--outfile",
     type=Path,
     help="Custom relative path to new multisig metafile.",
 )
@@ -1123,8 +1123,8 @@ parser_metafile_threshold.add_argument(
         Aptos Foundation'.""",
 )
 parser_metafile_threshold.add_argument(
-    "-n",
-    "--new-metafile",
+    "-o",
+    "--outfile",
     type=Path,
     help="Custom relative path to new multisig metafile.",
 )
