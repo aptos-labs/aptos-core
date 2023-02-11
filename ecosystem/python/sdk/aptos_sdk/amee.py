@@ -11,11 +11,12 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, List
 from typing import Optional as Option
-from typing import Tuple
+from typing import Tuple, Union
 
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
-from aptos_sdk.authenticator import Authenticator, Ed25519Authenticator
+from aptos_sdk.authenticator import (Authenticator, Ed25519Authenticator,
+                                     MultiEd25519Authenticator)
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import ClientConfig, RestClient
 from aptos_sdk.ed25519 import (MultiEd25519PublicKey, MultiEd25519Signature,
@@ -536,33 +537,22 @@ def metafile_to_multisig_public_key(path: Path):
     return MultiEd25519PublicKey(keys, data["threshold"])
 
 
-def assert_successful_transaction(
-    client: RestClient, signed_transaction: SignedTransaction
-):
-    """Submit a signed BCS transaction, asserting that it succeeds."""
-    # Submit transaction, storing its hash.
-    tx_hash = client.submit_bcs_transaction(signed_transaction)
-    # Wait for transaction to succeed (asserts success).
-    client.wait_for_transaction(tx_hash)
-    print(f"Transaction successful: {tx_hash}")
-
-
-def index_rotation_challenge_signatures(
-    signature_files: List[TextIOWrapper],
+def index_proposal_signatures(
+    signature_files: List[TextIOWrapper], proposal_type: str
 ) -> Tuple[List[Tuple[PublicKey, Signature]], Dict[str, Any]]:
-    """Index a list of rotation proof challenge signatures into a
-    multisig signature map, extracting the rotation challenge proposal."""
+    """Index a list of proposal signatures into a multisig signature
+    map, extracting the proposal."""
     # Initialize signature map for multisig signature.
     signature_map = []
     proposal = None  # Initialize proposal.
     for file in signature_files:  # Loop over signature files:
         signature_data = json.load(file)  # Load data for file.
-        if proposal is None:  # If challenge proposal undefined:
+        if proposal is None:  # If proposal undefined:
             # Initialize it to that from first signature file.
-            proposal = signature_data["challenge_proposal"]
-        else:  # If challenge proposal already defined:
+            proposal = signature_data[proposal_type]
+        else:  # If proposal already defined:
             assert (  # Assert it is same across all signature files.
-                signature_data["challenge_proposal"] == proposal
+                signature_data[proposal_type] == proposal
             ), "Signature proposal mismatch."
         # Get public key hex for signatory.
         public_key_hex = signature_data["signatory"]["public_key"]
@@ -572,7 +562,7 @@ def index_rotation_challenge_signatures(
         sig = Signature(prefixed_hex_to_bytes(signature_data["signature"]))
         # Append public key and signature to signatures map.
         signature_map.append((pubkey, sig))
-    # Return signature map and rotation proof challenge proposal.
+    # Return signature map and proposal.
     return signature_map, proposal
 
 
@@ -588,17 +578,15 @@ def rotate_execute_single(args):
     account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
     # Get public key bytes for account.
     from_public_key_bytes = prefixed_hex_to_bytes(keyfile_data["public_key"])
-    signature_map, proposal = index_rotation_challenge_signatures(
-        args.signatures
-    )  # Index signatures into signature map, extract rotation proposal.
+    signature_map, proposal = index_proposal_signatures(
+        args.signatures, "challenge_proposal"
+    )  # Index signatures into signature map, extract challenge proposal.
     # Get rotation challenge BCS.
     rotation_challenge_bcs = get_rotation_challenge_bcs(proposal)
     # Get capability to update address mapping for multisig account.
     cap_update_table = MultiEd25519Signature(
         metafile_to_multisig_public_key(args.metafile), signature_map
     ).to_bytes()
-    # Get REST client for network.
-    client = RestClient(NETWORK_URLS[args.network])
     raw_transaction = construct_raw_rotation_transaction(
         from_scheme=Authenticator.ED25519,
         from_public_key_bytes=from_public_key_bytes,
@@ -611,17 +599,107 @@ def rotate_execute_single(args):
         expiry=datetime.fromisoformat(proposal["expiry"]),
         chain_id=proposal["chain_id"],
     )  # Construct raw rotation transaction.
-    authenticator = Authenticator(
-        Ed25519Authenticator(
-            account.public_key(), account.sign(raw_transaction.keyed())
-        )
-    )  # Get authenticator for signed transaction.
-    # Get signed transaction.
-    signed_transaction = SignedTransaction(raw_transaction, authenticator)
-    # Assert successful transaction.
-    assert_successful_transaction(client, signed_transaction)
+    assert_successful_transaction(  # Assert transaction succeeds.
+        network=args.network,
+        public_key=account.public_key(),
+        signature=account.sign(raw_transaction.keyed()),
+        raw_transaction=raw_transaction,
+    )
     # Update multisig metafile address.
     update_multisig_address(args.metafile, proposal["originator"])
+
+
+def assert_successful_transaction(
+    network: str,
+    public_key: Union[PublicKey, MultiEd25519PublicKey],
+    signature: Union[Signature, MultiEd25519Signature],
+    raw_transaction: RawTransaction,
+):
+    """Submit a signed BCS transaction, asserting that it succeeds."""
+    # Get REST client for network.
+    client = RestClient(NETWORK_URLS[network])
+    auth_inner = (
+        Ed25519Authenticator
+        if isinstance(public_key, PublicKey)
+        else MultiEd25519Authenticator
+    )  # Get inner authenticator structure.
+    # Get authenticator.
+    authenticator = Authenticator(auth_inner(public_key, signature))
+    # Get signed transaction.
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
+    # Submit transaction, storing its hash.
+    tx_hash = client.submit_bcs_transaction(signed_transaction)
+    # Wait for transaction to succeed (asserts success).
+    client.wait_for_transaction(tx_hash)
+    print(f"Transaction successful: {tx_hash}")
+
+
+def rotate_execute_multisig(args):
+    """Rotate authentication key for a multisig account.
+
+    Only supports rotation to a single-signer account if the account has
+    as its authentication key the multisig account address."""
+    signature_map, proposal = index_proposal_signatures(
+        args.signatures, "transaction_proposal"
+    )  # Index signatures into signature map, transaction proposal.
+    # Get a raw transaction to sign from the transaction proposal.
+    raw_transaction = get_multisig_rotation_tx(proposal)
+    # Get multisig public key for from account.
+    public_key = metafile_to_multisig_public_key(args.metafile)
+    assert_successful_transaction(  # Assert transaction succeeds.
+        network=args.network,
+        public_key=public_key,
+        signature=MultiEd25519Signature(public_key, signature_map),
+        raw_transaction=raw_transaction,
+    )
+    # Update multisig metafile address.
+    update_multisig_address(args.metafile, None)
+    # If just rotated to a multisig account:
+    if not proposal["challenge_proposal"]["to_is_single_signer"]:
+        update_multisig_address(
+            args.to_metafile, proposal["challenge_proposal"]["originator"]
+        )  # Update metafile address for account just rotated to.
+
+
+def get_multisig_rotation_tx(proposal: Dict[str, Any]) -> RawTransaction:
+    """Index a multisig authentication key rotation transaction proposal
+    into a RawTransaction"""
+    # Get rotation proof challenge proposal.
+    challenge_proposal = proposal["challenge_proposal"]
+    from_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["from_public_key"]
+    )  # Get from public key bytes.
+    cap_rotate_key = MultiEd25519Signature(
+        MultiEd25519PublicKey.from_bytes(from_public_key_bytes),
+        signature_json_to_map(proposal["challenge_from_signatures"]),
+    ).to_bytes()  # Get key rotation capability signature.
+    to_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["new_public_key"]
+    )  # Get public key bytes for to account.
+    # If account to rotate to is a single signer:
+    if challenge_proposal["to_is_single_signer"]:
+        to_scheme = Authenticator.ED25519  # Scheme is single-signer.
+        cap_update_table = prefixed_hex_to_bytes(
+            proposal["challenge_to_signatures"][0]["signature"]
+        )  # Update table capability signature is only one provided.
+    else:  # If account to rotate to is a multisig:
+        to_scheme = Authenticator.MULTI_ED25519  # Scheme is multisig.
+        cap_update_table = MultiEd25519Signature(
+            MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
+            signature_json_to_map(proposal["challenge_to_signatures"]),
+        ).to_bytes()  # Get table update capability signature.
+    return construct_raw_rotation_transaction(
+        from_scheme=Authenticator.MULTI_ED25519,
+        from_public_key_bytes=from_public_key_bytes,
+        to_scheme=to_scheme,
+        to_public_key_bytes=to_public_key_bytes,
+        cap_rotate_key=cap_rotate_key,
+        cap_update_table=cap_update_table,
+        sender_bytes=prefixed_hex_to_bytes(challenge_proposal["originator"]),
+        sequence_number=challenge_proposal["sequence_number"],
+        expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
+        chain_id=challenge_proposal["chain_id"],
+    )  # Construct raw rotation transaction.
 
 
 def extract_challenge_proposal_data(
@@ -734,49 +812,15 @@ def construct_raw_rotation_transaction(
 def rotate_transaction_sign(args):
     """Sign an authentication key rotation transaction from a multisig
     account."""
-    proposal_data = json.load(args.proposal)  # Load proposal data.
+    proposal = json.load(args.proposal)  # Load proposal data.
     # Check password, get keyfile data and optional private key bytes.
     keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return.
     # Create Aptos-style account for single signer.
     account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
-    # Get rotation proof challenge proposal.
-    challenge_proposal = proposal_data["challenge_proposal"]
-    from_public_key_bytes = prefixed_hex_to_bytes(
-        challenge_proposal["from_public_key"]
-    )  # Get from public key bytes.
-    cap_rotate_key = MultiEd25519Signature(
-        MultiEd25519PublicKey.from_bytes(from_public_key_bytes),
-        signature_json_to_map(proposal_data["challenge_from_signatures"]),
-    ).to_bytes()  # Get key rotation capability signature.
-    to_public_key_bytes = prefixed_hex_to_bytes(
-        challenge_proposal["new_public_key"]
-    )  # Get public key bytes for to account.
-    # If account to rotate to is a single signer:
-    if challenge_proposal["to_is_single_signer"]:
-        to_scheme = Authenticator.ED25519  # Scheme is single-signer.
-        cap_update_table = prefixed_hex_to_bytes(
-            proposal_data["challenge_to_signatures"][0]["signature"]
-        )  # Update table capability signature is only one provided.
-    else:  # If account to rotate to is a multisig:
-        to_scheme = Authenticator.MULTI_ED25519  # Scheme is multisig.
-        cap_update_table = MultiEd25519Signature(
-            MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
-            signature_json_to_map(proposal_data["challenge_to_signatures"]),
-        ).to_bytes()  # Get table update capability signature.
-    raw_transaction = construct_raw_rotation_transaction(
-        from_scheme=Authenticator.MULTI_ED25519,
-        from_public_key_bytes=from_public_key_bytes,
-        to_scheme=to_scheme,
-        to_public_key_bytes=to_public_key_bytes,
-        cap_rotate_key=cap_rotate_key,
-        cap_update_table=cap_update_table,
-        sender_bytes=prefixed_hex_to_bytes(challenge_proposal["originator"]),
-        sequence_number=challenge_proposal["sequence_number"],
-        expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
-        chain_id=challenge_proposal["chain_id"],
-    )  # Construct raw rotation transaction.
+    # Get a raw transaction to sign from the transaction proposal.
+    raw_transaction = get_multisig_rotation_tx(proposal)
     # Sign raw transaction.
     signature = account.sign(raw_transaction.keyed())
     write_json_file(  # Write JSON to signature file.
@@ -788,7 +832,7 @@ def rotate_transaction_sign(args):
         data={
             "filetype": "Rotation transaction signature",
             "description": check_name(args.name),
-            "transaction_proposal": proposal_data,
+            "transaction_proposal": proposal,
             "signatory": get_public_signatory_fields(keyfile_data),
             "signature": bytes_to_prefixed_hex(signature.signature),
         },
@@ -942,25 +986,21 @@ parser_metafile_append = subparsers_metafile.add_parser(
 )
 parser_metafile_append.set_defaults(func=metafile_append)
 parser_metafile_append.add_argument(
+    "metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metafile to add to.",
+)
+parser_metafile_append.add_argument(
+    "threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+)
+parser_metafile_append.add_argument(
     "name",
     type=str,
     nargs="+",
     help="""The name of the new multisig entity. For example 'Aptos' or 'The
         Aptos Foundation'.""",
-)
-parser_metafile_append.add_argument(
-    "-m",
-    "--metafile",
-    type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to desired multisig metafile to add to.",
-    required=True,
-)
-parser_metafile_append.add_argument(
-    "-t",
-    "--threshold",
-    type=int,
-    help="The number of single signers required to approve a transaction.",
-    required=True,
 )
 parser_metafile_append.add_argument(
     "-k",
@@ -988,18 +1028,16 @@ parser_metafile_incorporate = subparsers_metafile.add_parser(
 )
 parser_metafile_incorporate.set_defaults(func=metafile_incorporate)
 parser_metafile_incorporate.add_argument(
+    "threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+)
+parser_metafile_incorporate.add_argument(
     "name",
     type=str,
     nargs="+",
     help="""The name of the multisig entity. For example 'Aptos' or 'The Aptos
         Foundation'.""",
-)
-parser_metafile_incorporate.add_argument(
-    "-t",
-    "--threshold",
-    type=int,
-    help="The number of single signers required to approve a transaction.",
-    required=True,
 )
 parser_metafile_incorporate.add_argument(
     "-k",
@@ -1026,25 +1064,21 @@ parser_metafile_remove = subparsers_metafile.add_parser(
 )
 parser_metafile_remove.set_defaults(func=metafile_remove)
 parser_metafile_remove.add_argument(
+    "metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metafile to remove from.",
+)
+parser_metafile_remove.add_argument(
+    "threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+)
+parser_metafile_remove.add_argument(
     "name",
     type=str,
     nargs="+",
     help="""The name of the new multisig entity. For example 'Aptos' or 'The
         Aptos Foundation'.""",
-)
-parser_metafile_remove.add_argument(
-    "-m",
-    "--metafile",
-    type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to desired multisig metafile to add to.",
-    required=True,
-)
-parser_metafile_remove.add_argument(
-    "-t",
-    "--threshold",
-    type=int,
-    help="The number of single signers required to approve a transaction.",
-    required=True,
 )
 parser_metafile_remove.add_argument(
     "-s",
@@ -1072,25 +1106,21 @@ parser_metafile_threshold = subparsers_metafile.add_parser(
 )
 parser_metafile_threshold.set_defaults(func=metafile_threshold)
 parser_metafile_threshold.add_argument(
+    "metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to desired multisig metafile to modify threshold for.",
+)
+parser_metafile_threshold.add_argument(
+    "threshold",
+    type=int,
+    help="The number of single signers required to approve a transaction.",
+)
+parser_metafile_threshold.add_argument(
     "name",
     type=str,
     nargs="+",
     help="""The name of the new multisig entity. For example 'Aptos' or 'The
         Aptos Foundation'.""",
-)
-parser_metafile_threshold.add_argument(
-    "-m",
-    "--metafile",
-    type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to desired multisig metafile to add to.",
-    required=True,
-)
-parser_metafile_threshold.add_argument(
-    "-t",
-    "--threshold",
-    type=int,
-    help="The number of single signers required to approve a transaction.",
-    required=True,
 )
 parser_metafile_threshold.add_argument(
     "-n",
@@ -1142,6 +1172,11 @@ parser_rotate_challenge_propose.add_argument(
         account address is identical to its authentication key.""",
 )
 parser_rotate_challenge_propose.add_argument(
+    "expiry",
+    help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.fromisoformat,
+)
+parser_rotate_challenge_propose.add_argument(
     "name",
     type=str,
     nargs="+",
@@ -1158,13 +1193,6 @@ parser_rotate_challenge_propose.add_argument(
     "--to-single",
     action="store_true",
     help="If authentication key to rotate to is for single signer.",
-)
-parser_rotate_challenge_propose.add_argument(
-    "-e",
-    "--expiry",
-    required=True,
-    help="Transaction expiry, in ISO 8601 format. For example '2023-02-15'.",
-    type=datetime.fromisoformat,
 )
 parser_rotate_challenge_propose.add_argument(
     "-o",
@@ -1229,7 +1257,7 @@ parser_rotate_execute_single.set_defaults(func=rotate_execute_single)
 parser_rotate_execute_single.add_argument(
     "keyfile",
     type=Path,
-    help="Single-signer keyfile for account to convert.",
+    help="Single-signer keyfile for account to rotate.",
 )
 parser_rotate_execute_single.add_argument(
     "metafile",
@@ -1243,6 +1271,41 @@ parser_rotate_execute_single.add_argument(
     type=argparse.FileType("r", encoding="utf-8"),
     help="""Relative paths to rotation proof challenge signature files from
         threshold number of signatories.""",
+)
+
+# Rotate execute multisig subcommand parser.
+parser_rotate_execute_multisig = subparsers_rotate_execute.add_parser(
+    name="multisig",
+    aliases=["m"],
+    description="""Rotate the authentication key of a multisig account to the
+        authentication key of either a multisig account or a single-signer
+        account. If rotating to a single-signer account, requires that account
+        address is identical to single-signer authentication key.""",
+    help="Rotate multisig account.",
+    parents=[network_parser],
+)
+parser_rotate_execute_multisig.set_defaults(func=rotate_execute_multisig)
+parser_rotate_execute_multisig.add_argument(
+    "metafile",
+    type=Path,
+    help="Multisig metafile for account undergoing rotation.",
+)
+parser_rotate_execute_multisig.add_argument(
+    "-s",
+    "--signatures",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to rotation transaction signatures for at least
+        threshold number of multisig signatories.""",
+    required=True,
+)
+parser_rotate_execute_multisig.add_argument(
+    "-t",
+    "--to-metafile",
+    type=Path,
+    help="""Relative path to multisig metafile for multisig account having new
+        authentication key, if rotating to a multisig account.""",
 )
 
 # Rotate transaction subcommand parser.
