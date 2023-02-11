@@ -6,7 +6,10 @@ generates:
     plugins:
       - typescript
       - add:
-          content: "/* eslint-disable */"
+          content:
+            - "/* istanbul ignore file */"
+            - "/* tslint:disable */ "
+            - "/* eslint-disable */"
   src/indexer/generated/operations.ts:
     preset: import-types-preset
     presetConfig:
@@ -14,7 +17,10 @@ generates:
     plugins:
       - typescript-operations
       - add:
-          content: "/* eslint-disable */"
+          content:
+            - "/* istanbul ignore file */"
+            - "/* tslint:disable */ "
+            - "/* eslint-disable */"
   src/indexer/generated/queries.ts:
     preset: import-types-preset
     presetConfig:
@@ -22,7 +28,10 @@ generates:
     plugins:
       - typescript-graphql-request
       - add:
-          content: "/* eslint-disable */"
+          content:
+            - "/* istanbul ignore file */"
+            - "/* tslint:disable */ "
+            - "/* eslint-disable */"
     config:
       documentMode: string
       documentVariableSuffix: ""
