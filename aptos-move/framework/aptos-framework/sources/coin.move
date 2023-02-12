@@ -809,6 +809,25 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1)]
+    public fun test_merge_and_return_zero_coin(
+        source: signer,
+    ) acquires CoinInfo {
+        account::create_account_for_test(signer::address_of(&source));
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
+        let coin_a = mint<FakeMoney>(100, &mint_cap);
+        let coin_b = mint<FakeMoney>(200, &mint_cap);
+        let zero_coin = merge_and_return_zero_coin(&mut coin_b, coin_a);
+        destroy_zero(zero_coin);
+        assert!(value(&coin_b) == 300, 0);
+
+        move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(source = @0x1)]
     public entry fun test_extract(
         source: signer,
     ) acquires CoinInfo, CoinStore {
