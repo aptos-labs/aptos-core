@@ -819,6 +819,7 @@ module aptos_framework::coin {
         let zero_coin = merge_and_return_zero_coin(&mut coin_b, coin_a);
         destroy_zero(zero_coin);
         assert!(value(&coin_b) == 300, 0);
+        burn(coin_b, &burn_cap);
 
         move_to(&source, FakeMoneyCapabilities {
             burn_cap,
