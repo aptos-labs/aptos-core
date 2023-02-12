@@ -215,7 +215,7 @@ spec aptos_framework::coin {
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
     }
 
-    spec merge_and_return_zero_coin<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) : Coin<CoinType> {
+    spec merge_and_return_zero_coin<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: &mut Coin<CoinType>) {
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
         ensures source_coin.value == 0;
     }
