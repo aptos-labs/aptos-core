@@ -281,7 +281,7 @@ module aptos_framework::coin {
         _cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo {
         let Coin { value: amount } = coin;
-        assert!(amount > 0, error::invalid_argument(EZERO_COIN_AMOUNT));
+        if (amount == 0) return ();
 
         let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
         if (option::is_some(maybe_supply)) {
@@ -747,6 +747,22 @@ module aptos_framework::coin {
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
         deposit(source_addr, coins_minted);
         transfer<FakeMoney>(&source, destination_addr, 50);
+
+        move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(source = @0x1)]
+    public fun test_burn_zero(
+        source: signer,
+    ) acquires CoinInfo {
+        account::create_account_for_test(signer::address_of(&source));
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
+
+        burn(zero<FakeMoney>(), &burn_cap);
 
         move_to(&source, FakeMoneyCapabilities {
             burn_cap,

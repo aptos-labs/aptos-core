@@ -83,7 +83,6 @@ spec aptos_framework::coin {
         let addr =  type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         include ExistCoinInfo<CoinType>;
-        aborts_if coin.value == 0;
     }
 
     spec burn_from<CoinType>(
