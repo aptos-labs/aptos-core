@@ -473,13 +473,12 @@ module aptos_framework::coin {
     /// Same as be merge function but it return zero source coin for gas fee optimize reason if
     /// you got a situation that you need merge Coin<CoinType> then you also need zero value Coin<CoinType>,
     /// for example to feed zero coin to an Uniswap V2 type AMM DEX for doing a swap action.
-    public fun merge_and_return_zero_coin<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) : Coin<CoinType> {
+    public fun merge_and_return_zero_coin<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: &mut Coin<CoinType>) {
         spec {
             assume dst_coin.value + source_coin.value <= MAX_U64;
         };
         dst_coin.value = dst_coin.value + source_coin.value;
         source_coin.value = 0;
-        source_coin
     }
 
     /// Mint new `Coin` with capability.
@@ -816,8 +815,8 @@ module aptos_framework::coin {
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
         let coin_a = mint<FakeMoney>(100, &mint_cap);
         let coin_b = mint<FakeMoney>(200, &mint_cap);
-        let zero_coin = merge_and_return_zero_coin(&mut coin_b, coin_a);
-        destroy_zero(zero_coin);
+        merge_and_return_zero_coin(&mut coin_b, &mut coin_a);
+        destroy_zero(coin_a);
         assert!(value(&coin_b) == 300, 0);
         burn(coin_b, &burn_cap);
 
