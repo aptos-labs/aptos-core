@@ -43,7 +43,7 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: ./.github/actions/docker-setup
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -118,7 +118,7 @@ jobs:
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
 
       # Confirm the Rust API client examples pass.
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: cargo run -p aptos-rest-client --example account -- --api-url http://127.0.01:8080
 
       # Test and build.

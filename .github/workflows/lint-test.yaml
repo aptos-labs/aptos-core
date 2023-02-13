@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: python3 scripts/check-cryptohasher-symbols.py
@@ -93,7 +93,7 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: pre-commit/action@v3.0.0
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -136,7 +136,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: taiki-e/install-action@v1.5.6
@@ -148,7 +148,7 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -178,7 +178,7 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: taiki-e/install-action@v1.5.6
@@ -205,7 +205,7 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/rust-setup
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --features check-vm-features -p aptos-node

@@ -12,7 +12,7 @@ on:
 jobs:
   # Run a faster chaos forge to quickly surface correctness failures
   run-release-blocking-forge:
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       # Run for 5 hours unless its on a pr
