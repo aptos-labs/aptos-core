@@ -308,10 +308,20 @@ impl ProofQueue {
                 }
             }
             if *expiration < current_time && !excluded_proofs.contains(digest) {
-                num_expired_but_not_committed += 1;
-                if expiration.round() < current_time.round() {
-                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                        .observe((current_time.round() - expiration.round()) as f64);
+                match self
+                    .digest_proof
+                    .get(&digest)
+                    .expect("Entry for unexpired digest must exist")
+                {
+                    Some(_) => {
+                        // non-committed proof that is expired
+                        num_expired_but_not_committed += 1;
+                        if expiration.round() < current_time.round() {
+                            counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                                .observe((current_time.round() - expiration.round()) as f64);
+                        }
+                    },
+                    None => {}, // Proof was already committed
                 }
             }
         }
