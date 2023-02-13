@@ -253,14 +253,21 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt + StateView>(
+    fn success_transaction_cleanup<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
-        user_txn_change_set_ext: ChangeSetExt,
+        user_txn_session: SessionExt<SS>,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+        let user_txn_change_set_ext = user_txn_session
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
+        // Charge gas for write set
+        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
+        // TODO(Gas): Charge for aggregator writes
+
         let storage_with_changes =
             DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
         // TODO: at this point we know that delta application failed
@@ -395,21 +402,7 @@ impl AptosVM {
                 new_published_modules_loaded,
             )?;
 
-            let change_set_ext = session
-                .finish(&mut (), gas_meter.change_set_configs())
-                .map_err(|e| e.into_vm_status())?;
-
-            // Charge gas for write set
-            gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
-            // TODO(Gas): Charge for aggregator writes
-
-            self.success_transaction_cleanup(
-                storage,
-                change_set_ext,
-                gas_meter,
-                txn_data,
-                log_context,
-            )
+            self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
         }
     }
 
@@ -564,15 +557,7 @@ impl AptosVM {
             new_published_modules_loaded,
         )?;
 
-        let change_set_ext = session
-            .finish(&mut (), gas_meter.change_set_configs())
-            .map_err(|e| e.into_vm_status())?;
-
-        // Charge gas for write set
-        gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
-        // TODO(Gas): Charge for aggregator writes
-
-        self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
+        self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
