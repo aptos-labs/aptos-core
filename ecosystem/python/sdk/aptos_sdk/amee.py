@@ -380,11 +380,49 @@ def keyfile_generate(args):
     )
 
 
+def get_github_zip_archive_url(user: str, project: str, commit: str) -> str:
+    """Return GitHub URL of a repository zip archive."""
+    return f"https://github.com/{user}/{project}/archive/{commit}.zip"
+
+
+def publish_propose(args):
+    """Propose the publication of a Move package hosted on GitHub."""
+    # Load publisher data.
+    publisher_data = json.load(args.metafile)
+    # Get publisher account address.
+    publisher_address = publisher_data["address"]
+    assert publisher_address is not None, "Need an address to publish from."
+    sequence_number = get_sequence_number(
+        prefixed_hex_to_bytes(publisher_address), args.network
+    )  # Get originating account sequence number.
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "publication_proposal"),
+        data={
+            "filetype": "Publication proposal",
+            "description": check_name(args.name),
+            "github_user": args.user,
+            "github_project": args.project,
+            "commit": args.commit,
+            "manifest_path": args.manifest,
+            "multisig": publisher_data,
+            "sequence_number": sequence_number,
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
+        },
+        check_if_exists=True,
+    )
+
+
 def keyfile_fund(args):
     """Fund account linked to keyfile using devnet faucet, assuming
     account address matches authentication key."""
     data = json.load(args.keyfile)  # Load JSON data from keyfile.
     address = data["authentication_key"]  # Get address.
+    fund_address_from_faucet(address)  # Fund from faucet.
+
+
+def fund_address_from_faucet(address: str):
+    """Fund an account address using devnet faucet."""
     command = (  # Construct aptos CLI command.
         f"aptos account fund-with-faucet --account {address} "
         f"--faucet-url {FAUCET_URL} --url {NETWORK_URLS['devnet']}"
@@ -396,7 +434,23 @@ def keyfile_fund(args):
     balance = RestClient(NETWORK_URLS["devnet"]).account_balance(
         AccountAddress(prefixed_hex_to_bytes(address))
     )  # Check balance.
+    assert balance != 0, "Funding failed."
     print(f"New balance: {balance}")  # Print user feedback.
+
+
+def metafile_fund(args):
+    """Fund account at multisig address using devnet faucet, defaulting
+    to authentication key for address."""
+    with open(args.metafile, encoding="utf-8") as metafile:
+        data = json.load(metafile)  # Load JSON data from metafile.
+    address = data["address"]  # Get multisig address.
+    auth_key = data["authentication_key"]  # Get its authentication key.
+    # Determine the address to fund.
+    address_to_fund = auth_key if address is None else address
+    fund_address_from_faucet(address_to_fund)  # Fund from faucet.
+    if address is None:  # If no address listed before funding:
+        # Update multisig metafile address to authentication key.
+        update_multisig_address(args.metafile, auth_key)
 
 
 def keyfile_verify(args):
@@ -1022,6 +1076,20 @@ parser_metafile_append.add_argument(
     help="Custom relative path to new multisig metafile.",
 )
 
+# Metafile fund subcommand parser.
+parser_metafile_fund = subparsers_metafile.add_parser(
+    name="fund",
+    aliases=["f"],
+    description="Fund a multisig account.",
+    help="Fund multisig account.",
+)
+parser_metafile_fund.set_defaults(func=metafile_fund)
+parser_metafile_fund.add_argument(
+    "metafile",
+    type=Path,
+    help="Relative path to metafile.",
+)
+
 # Metafile incorporate subcommand parser.
 parser_metafile_incorporate = subparsers_metafile.add_parser(
     name="incorporate",
@@ -1131,6 +1199,67 @@ parser_metafile_threshold.add_argument(
     "--outfile",
     type=Path,
     help="Custom relative path to new multisig metafile.",
+)
+
+# Publish subcommand parser.
+parser_publish = subparsers.add_parser(
+    name="publish",
+    aliases=["p"],
+    description="Assorted Move package publication operations.",
+    help="Move package publication.",
+)
+subparsers_publish = parser_publish.add_subparsers(required=True)
+
+# Publish propose subcommand parser.
+parser_publish_propose = subparsers_publish.add_parser(
+    name="propose",
+    aliases=["p"],
+    description="Propose a Move package publication, from a GitHub project.",
+    help="Publish a Move package.",
+    parents=[network_parser],
+)
+parser_publish_propose.set_defaults(func=publish_propose)
+parser_publish_propose.add_argument(
+    "metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to multisig metafile for account to publish under.",
+)
+parser_publish_propose.add_argument(
+    "user",
+    type=str,
+    help="GitHub username for package to publish.",
+)
+parser_publish_propose.add_argument(
+    "project",
+    type=str,
+    help="GitHub project name for package to publish.",
+)
+parser_publish_propose.add_argument(
+    "commit",
+    type=str,
+    help="Commit hash to download, abridged or full.",
+)
+parser_publish_propose.add_argument(
+    "manifest",
+    type=str,
+    help="Relative path Move.toml for package.",
+)
+parser_publish_propose.add_argument(
+    "expiry",
+    help="Publication expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.fromisoformat,
+)
+parser_publish_propose.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="Description for proposal. For example 'Genesis' or 'Upgrade'.",
+)
+parser_publish_propose.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="Relative path to publication proposal outfile.",
 )
 
 # Rotate subcommand parser.

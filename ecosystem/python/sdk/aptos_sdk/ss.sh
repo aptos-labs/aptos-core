@@ -7,11 +7,11 @@ if test $1 = r; then
         Ace \
         --vanity-prefix 0xace \
         --outfile tmp/ace.keyfile
-    # Generate Bob keyfile.
+    # Generate Bee keyfile.
     python amee.py keyfile generate \
-        Bob \
-        --vanity-prefix 0xb0b \
-        --outfile tmp/bob.keyfile
+        Bee \
+        --vanity-prefix 0xbee \
+        --outfile tmp/bee.keyfile
     python amee.py keyfile fund tmp/ace.keyfile # Fund Ace.
     # Incorporate into 1-of-2 multisig.
     python amee.py metafile incorporate \
@@ -19,7 +19,7 @@ if test $1 = r; then
         Initial \
         --keyfiles \
             tmp/ace.keyfile \
-            tmp/bob.keyfile \
+            tmp/bee.keyfile \
         --outfile tmp/initial.multisig
     # Propose rotation challenge for rotating to multisig.
     python amee.py rotate challenge propose \
@@ -58,29 +58,29 @@ if test $1 = r; then
         tmp/ace.keyfile \
         Ace increase \
         --outfile tmp/ace_increase.challenge_signature
-    # Have Bob sign challenge proposal.
+    # Have Bee sign challenge proposal.
     python amee.py rotate challenge sign \
         tmp/increase.challenge_proposal \
-        tmp/bob.keyfile \
-        Bob increase \
-        --outfile tmp/bob_increase.challenge_signature
+        tmp/bee.keyfile \
+        Bee increase \
+        --outfile tmp/bee_increase.challenge_signature
     # Propose rotation transaction.
     python amee.py rotate transaction propose \
         Increase transaction \
         --from-signatures tmp/ace_increase.challenge_signature \
         --to-signatures tmp/ace_increase.challenge_signature \
-            tmp/bob_increase.challenge_signature \
+            tmp/bee_increase.challenge_signature \
         --outfile tmp/increase.rotation_transaction_proposal
-    # Have Bob only sign rotation transaction proposal (1-of-2).
+    # Have Bee only sign rotation transaction proposal (1-of-2).
     python amee.py rotate transaction sign \
         tmp/increase.rotation_transaction_proposal \
-        tmp/bob.keyfile \
-        Bob increase \
-        --outfile tmp/bob_increase.rotation_transaction_signature
+        tmp/bee.keyfile \
+        Bee increase \
+        --outfile tmp/bee_increase.rotation_transaction_signature
     # Submit rotation transaction.
     python amee.py rotate execute multisig \
         tmp/initial.multisig \
-        --signatures tmp/bob_increase.rotation_transaction_signature \
+        --signatures tmp/bee_increase.rotation_transaction_signature \
         --to-metafile tmp/increased.multisig
     # Propose rotation challenge for rotating back to Ace.
     python amee.py rotate challenge propose \
@@ -95,18 +95,18 @@ if test $1 = r; then
         tmp/ace.keyfile \
         Ace return \
         --outfile tmp/ace_return.challenge_signature
-    # Have Bob sign challenge proposal.
+    # Have Bee sign challenge proposal.
     python amee.py rotate challenge sign \
         tmp/return.challenge_proposal \
-        tmp/bob.keyfile \
-        Bob return \
-        --outfile tmp/bob_return.challenge_signature
+        tmp/bee.keyfile \
+        Bee return \
+        --outfile tmp/bee_return.challenge_signature
     # Propose rotation transaction.
     python amee.py rotate transaction propose \
         Return \
         --from-signatures \
             tmp/ace_return.challenge_signature \
-            tmp/bob_return.challenge_signature \
+            tmp/bee_return.challenge_signature \
         --to-signatures tmp/ace_return.challenge_signature \
         --outfile tmp/return.rotation_transaction_proposal
     # Have Ace sign rotation transaction proposal.
@@ -115,18 +115,18 @@ if test $1 = r; then
         tmp/ace.keyfile \
         Ace return \
         --outfile tmp/ace_return.rotation_transaction_signature
-    # Have Bob sign rotation transaction proposal.
+    # Have Bee sign rotation transaction proposal.
     python amee.py rotate transaction sign \
         tmp/return.rotation_transaction_proposal \
-        tmp/bob.keyfile \
-        Bob return \
-        --outfile tmp/bob_return.rotation_transaction_signature
+        tmp/bee.keyfile \
+        Bee return \
+        --outfile tmp/bee_return.rotation_transaction_signature
     # Submit rotation transaction.
     python amee.py rotate execute multisig \
         tmp/increased.multisig \
         --signatures \
             tmp/ace_return.rotation_transaction_signature \
-            tmp/bob_return.rotation_transaction_signature
+            tmp/bee_return.rotation_transaction_signature
     rm -rf tmp # Clear temp dir.
 
 # Mutate metafile.
@@ -138,18 +138,18 @@ elif test $1 = m; then
         Ace \
         --vanity-prefix 0xace \
         --outfile tmp/ace.keyfile
-    # Generate Bob keyfile.
+    # Generate Bee keyfile.
     python amee.py keyfile generate \
-        Bob \
-        --vanity-prefix 0xb0b \
-        --outfile tmp/bob.keyfile
+        Bee \
+        --vanity-prefix 0xbee \
+        --outfile tmp/bee.keyfile
     # Incorporate into 1-of-2 multisig.
     python amee.py metafile incorporate \
         1 \
         Initial \
         --keyfiles \
             tmp/ace.keyfile \
-            tmp/bob.keyfile \
+            tmp/bee.keyfile \
         --outfile tmp/initial.multisig
     # Generate Ace keyfile.
     python amee.py keyfile generate \
@@ -183,6 +183,42 @@ elif test $1 = m; then
         2 \
         Changed \
         --outfile tmp/changed.multisig
+    rm -rf tmp # Clear temp dir.
+
+# Publish and upgrade.
+elif test $1 = p; then
+    rm -rf tmp # Clear temp dir.
+    mkdir tmp # Make temp dir.
+    # Generate Ace keyfile.
+    python amee.py keyfile generate \
+        Ace \
+        --vanity-prefix 0xace \
+        --outfile tmp/ace.keyfile
+    # Generate Bee keyfile.
+    python amee.py keyfile generate \
+        Bee \
+        --vanity-prefix 0xbee \
+        --outfile tmp/bee.keyfile
+    # Incorporate into 1-of-2 multisig.
+    python amee.py metafile incorporate \
+        1 \
+        Protocol \
+        --keyfiles \
+            tmp/ace.keyfile \
+            tmp/bee.keyfile \
+        --outfile tmp/protocol.multisig
+    # Fund multisig.
+    python amee.py metafile fund tmp/protocol.multisig
+    # Propose publication.
+    python amee.py publish propose \
+        tmp/protocol.multisig \
+        alnoki \
+        aptos-core \
+        1b84c283e4 \
+        aptos-move/move-examples/upgrade_and_govern/v2_0_0/Move.toml \
+        2030-12-31 \
+        Genesis \
+        --outfile tmp/genesis.publication_proposal
     rm -rf tmp # Clear temp dir.
 
 fi
