@@ -81,7 +81,7 @@ jobs:
   run-forge-three-region:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -93,7 +93,7 @@ jobs:
   run-forge-three-region-different-node-speed:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -106,7 +106,7 @@ jobs:
   run-forge-consensus-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -118,7 +118,7 @@ jobs:
   run-forge-account-creation-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -130,7 +130,7 @@ jobs:
   run-forge-fullnode-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -142,7 +142,7 @@ jobs:
   run-forge-state-sync-failures-catching-up-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
@@ -155,7 +155,7 @@ jobs:
   run-forge-state-sync-perf-fullnode-apply-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}

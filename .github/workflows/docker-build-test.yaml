@@ -186,7 +186,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -208,7 +208,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -226,7 +226,7 @@ jobs:
       [rust-images-consensus-only-perf-test, determine-docker-build-metadata]
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
