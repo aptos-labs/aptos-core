@@ -13,8 +13,9 @@ use crate::{
 use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    Gas, NativeGasParameters, StorageGasParameters,
+    AbstractValueSizeGasParameters, AptosGasMeter, AptosGasParameters, ChangeSetConfigs,
+    FromOnChainGasSchedule, Gas, NativeGasParameters, StorageDepositChargeSchedule,
+    StorageGasParameters,
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
@@ -31,6 +32,7 @@ use aptos_types::{
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
+    identifier::Identifier,
     language_storage::ModuleId,
     move_resource::MoveStructType,
     resolver::ResourceResolver,
@@ -422,6 +424,33 @@ impl AptosVMImpl {
             .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
     }
 
+    pub(crate) fn run_storage_deposit_charges<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        gas_meter: &mut AptosGasMeter,
+        schedule: &StorageDepositChargeSchedule,
+    ) -> Result<(), VMStatus> {
+        fail_point!("move_adapter::run_storage_deposit_charges", |_| {
+            Err(VMStatus::Error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            ))
+        });
+
+        session
+            .execute_function_bypass_visibility(
+                &ModuleId::new(
+                    CORE_CODE_ADDRESS,
+                    Identifier::new("storage_deposit").unwrap(),
+                ),
+                &Identifier::new("charges_and_refunds").unwrap(),
+                vec![],
+                vec![bcs::to_bytes(schedule).expect("Failed to serialize charge schedule.")],
+                gas_meter,
+            )
+            .map(|_return_vals| ())
+            .map_err(|err| VMStatus::Error(err.major_status()))
+    }
+
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
@@ -445,10 +474,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &transaction_validation.module_id(),
                 &transaction_validation.user_epilogue_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
                 vec![],
                 serialize_values(&vec![
-                    MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
@@ -575,7 +602,10 @@ impl<'a> AptosVMInternals<'a> {
     }
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
+pub(crate) fn get_transaction_output_no_storage_deposit_charge<
+    A: AccessPathCache,
+    S: MoveResolverExt,
+>(
     ap_cache: &mut A,
     session: SessionExt<S>,
     gas_left: Gas,

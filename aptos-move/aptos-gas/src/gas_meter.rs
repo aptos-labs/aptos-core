@@ -8,14 +8,18 @@ use crate::{
     algebra::{AbstractValueSize, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
-    transaction::{ChangeSetConfigs, TransactionGasParameters},
+    transaction::{ChangeSetConfigs, StorageDepositChargeSchedule, TransactionGasParameters},
     StorageGasParameters,
 };
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
+    account_config::CORE_CODE_ADDRESS,
+    on_chain_config::CurrentTimeMicroseconds,
+    state_store::state_key::StateKey,
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
+    account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
     language_storage::ModuleId,
     vm_status::StatusCode,
@@ -780,5 +784,36 @@ impl AptosGasMeter {
     ) -> VMResult<()> {
         let cost = self.storage_gas_params.pricing.calculate_write_set_gas(ops);
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn apply_storage_deposit_charges(
+        &mut self,
+        write_set: &mut WriteSetMut,
+        txn_sender: AccountAddress,
+        current_timestamp: Option<&CurrentTimeMicroseconds>,
+    ) -> VMResult<StorageDepositChargeSchedule> {
+        self.storage_gas_params
+            .pricing
+            .apply_storage_deposit_charges(write_set, txn_sender, current_timestamp)
+    }
+
+    pub fn should_affect_storage_deposit(&self, write_set: &WriteSet) -> bool {
+        use WriteOp::*;
+
+        for (_key, op) in write_set {
+            match op {
+                Creation(_) | CreationWithMetadata { .. } | Deletion => {},
+                DeletionWithMetadata { .. } => return true,
+                Modification(data) | ModificationWithMetadata { data, .. } => {
+                    if NumBytes::new(data.len() as u64)
+                        > self.storage_gas_params.pricing.free_write_bytes_quota()
+                    {
+                        return true;
+                    }
+                },
+            }
+        }
+
+        false
     }
 }

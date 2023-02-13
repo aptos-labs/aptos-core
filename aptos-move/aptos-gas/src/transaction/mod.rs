@@ -15,7 +15,9 @@ use move_core_types::gas_algebra::{
 
 mod storage;
 
-pub use storage::{ChangeSetConfigs, StorageGasParameters};
+pub use storage::{
+    ChangeSetConfigs, StorageDepositChargeSchedule, StorageDepositEntry, StorageGasParameters,
+};
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,

@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{contract_event::ContractEvent, write_set::WriteSet};
+use crate::{
+    contract_event::ContractEvent,
+    write_set::{WriteSet, WriteSetMut},
+};
 use move_core_types::vm_status::VMStatus;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +45,10 @@ impl ChangeSet {
 
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
+    }
+
+    pub fn write_set_mut(&mut self) -> &mut WriteSetMut {
+        self.write_set.as_mut()
     }
 
     pub fn events(&self) -> &[ContractEvent] {

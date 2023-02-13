@@ -5,7 +5,9 @@ use crate::{
     adapter_common::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    aptos_vm_impl::{
+        get_transaction_output_no_storage_deposit_charge, AptosVMImpl, AptosVMInternals,
+    },
     block_executor::BlockAptosVM,
     counters::*,
     data_cache::{AsMoveResolver, IntoMoveResolver},
@@ -235,7 +237,7 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let txn_output = get_transaction_output(
+                let txn_output = get_transaction_output_no_storage_deposit_charge(
                     &mut (),
                     session,
                     gas_meter.balance(),
@@ -244,6 +246,12 @@ impl AptosVM {
                     gas_meter.change_set_configs(),
                 )
                 .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                if gas_meter.should_affect_storage_deposit(txn_output.txn_output().write_set()) {
+                    error!(
+                        *log_context,
+                        "Failure epilogue should not yield storage deposit changes, but ignored.",
+                    )
+                }
                 (error_code, txn_output)
             },
             TransactionStatus::Discard(status) => {
@@ -261,12 +269,15 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let user_txn_change_set_ext = user_txn_session
-            .finish(&mut (), gas_meter.change_set_configs())
+        let (mut user_txn_change_set_ext, current_timestamp) = user_txn_session
+            .finish_with_current_timestamp(&mut (), gas_meter.change_set_configs())
             .map_err(|e| e.into_vm_status())?;
-        // Charge gas for write set
-        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
-        // TODO(Gas): Charge for aggregator writes
+
+        let storage_deposit_charge_schedule = gas_meter.apply_storage_deposit_charges(
+            user_txn_change_set_ext.write_set_mut(),
+            txn_data.sender,
+            current_timestamp.as_ref(),
+        )?;
 
         let storage_with_changes =
             DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
@@ -291,6 +302,16 @@ impl AptosVM {
 
         let resolver = self.0.new_move_resolver(&storage_with_changes);
         let mut session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
+        // transfer storage deposit charges
+        self.0.run_storage_deposit_charges(
+            &mut session,
+            gas_meter,
+            &storage_deposit_charge_schedule,
+        )?;
+
+        // Charge gas for write set
+        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
+        // TODO(Gas): Charge for aggregator writes
 
         self.0
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
@@ -298,12 +319,19 @@ impl AptosVM {
         let epilogue_change_set_ext = session
             .finish(&mut (), gas_meter.change_set_configs())
             .map_err(|e| e.into_vm_status())?;
+
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
         let (write_set, events) = change_set.into_inner();
+        if gas_meter.should_affect_storage_deposit(&write_set) {
+            error!(
+                *log_context,
+                "Success epilogue should not yield storage deposit changes, but ignored.",
+            )
+        }
 
         let gas_used = txn_data
             .max_gas_amount()
@@ -940,7 +968,7 @@ impl AptosVM {
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = get_transaction_output(
+        let output = get_transaction_output_no_storage_deposit_charge(
             &mut (),
             session,
             0.into(),

@@ -55,6 +55,10 @@ impl ChangeSetExt {
         self.change_set.write_set()
     }
 
+    pub fn write_set_mut(&mut self) -> &mut WriteSetMut {
+        self.change_set.write_set_mut()
+    }
+
     pub fn into_inner(self) -> (DeltaChangeSet, ChangeSet) {
         (self.delta_change_set, self.change_set)
     }

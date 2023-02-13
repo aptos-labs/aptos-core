@@ -31,7 +31,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub enum StateValueMetadata {
     V0 {
         payer: AccountAddress,
-        deposit: u128,
+        deposit: u64,
         creation_time_usecs: u64,
     },
 }
@@ -39,13 +39,40 @@ pub enum StateValueMetadata {
 impl StateValueMetadata {
     pub fn new(
         payer: AccountAddress,
-        deposit: u128,
+        deposit: u64,
         creation_time_usecs: &CurrentTimeMicroseconds,
     ) -> Self {
         Self::V0 {
             payer,
             deposit,
             creation_time_usecs: creation_time_usecs.microseconds,
+        }
+    }
+
+    pub fn payer(&self) -> AccountAddress {
+        match self {
+            StateValueMetadata::V0 { payer, .. } => *payer,
+        }
+    }
+
+    pub fn deposit(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit,
+        }
+    }
+
+    pub fn set_deposit(&mut self, amount: u64) {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit = amount,
+        }
+    }
+
+    pub fn creation_time_usecs(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 {
+                creation_time_usecs,
+                ..
+            } => *creation_time_usecs,
         }
     }
 }

@@ -243,6 +243,14 @@ impl WriteSet {
     }
 }
 
+impl AsMut<WriteSetMut> for WriteSet {
+    fn as_mut(&mut self) -> &mut WriteSetMut {
+        match self {
+            Self::V0(write_set) => &mut write_set.0,
+        }
+    }
+}
+
 impl Deref for WriteSet {
     type Target = WriteSetV0;
 
