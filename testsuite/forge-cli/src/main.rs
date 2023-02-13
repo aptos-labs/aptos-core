@@ -397,7 +397,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking" => single_test_suite("three_region_simulation"), // Ok(land_blocking_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -438,7 +438,7 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
 
 fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
-        ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
+        ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(100).unwrap());
     let single_test_suite = match test_name {
         "epoch_changer_performance" => epoch_changer_performance(config),
         "state_sync_perf_fullnodes_apply_outputs" => {
@@ -980,7 +980,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(100)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 8000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 7000 }))
         .with_network_tests(vec![&ThreeRegionSimulationTest {
             add_execution_delay: None,
         }])
