@@ -31,7 +31,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
     paths:
       - ".github/workflows/docker-build-test.yaml"
-      - ".github/workflows/run-forge.yaml"
+      - ".github/workflows/workflow-run-forge.yaml"
       - ".github/workflows/docker-rust-build.yaml"
       - ".github/workflows/sdk-release.yaml"
       - ".github/workflows/lint-test.yaml"
@@ -186,7 +186,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: ./.github/workflows/run-forge.yaml
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -208,7 +208,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: ./.github/workflows/run-forge.yaml
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -226,7 +226,7 @@ jobs:
       [rust-images-consensus-only-perf-test, determine-docker-build-metadata]
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: ./.github/workflows/run-forge.yaml
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}

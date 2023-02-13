@@ -677,14 +677,16 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                         "aws sts get-caller-identity",
                         RunResult(0, b'{"Account": "123456789012"}'),
                     ),
+                    (
+                        # NOTE: with multi-cloud support, we set the kubeconfig to ensure auth before continuing
+                        # See changes in: https://github.com/aptos-labs/aptos-core/pull/6166
+                        "aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1",
+                        RunResult(0, b""),
+                    ),
                     ("git rev-parse HEAD~0", RunResult(0, b"banana")),
                     (
                         "aws ecr describe-images --repository-name aptos/validator --im"
                         "age-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1",
                         RunResult(0, b""),
                     ),
                     (

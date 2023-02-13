@@ -1,4 +1,4 @@
-name: Run Forge
+name: "*run Forge reusable workflow"
 
 on:
   # this is called from within the build-images.yaml workflow since we depend on the images having been built before
@@ -35,6 +35,11 @@ on:
         type: boolean
         default: false
         description: Whether to post the test results comment to Slack
+      COMMENT_ON_PR:
+        required: false
+        type: boolean
+        default: true
+        description: Whether to post the test results comment to the PR
       TIMEOUT_MINUTES:
         required: false
         type: number
@@ -81,6 +86,7 @@ env:
   FORGE_ENABLE_PERFORMANCE: ${{ inputs.FORGE_ENABLE_PERFORMANCE }}
   COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
+  COMMENT_ON_PR: ${{ inputs.COMMENT_ON_PR }}
 
 jobs:
   forge:
@@ -104,7 +110,7 @@ jobs:
           FORGE_RUNNER_MODE: pre-forge
         run: testsuite/run_forge.sh
       - name: Post pre-Forge comment
-        if: github.event.number != null
+        if: env.COMMENT_ON_PR == 'true' && github.event.number != null
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}
@@ -117,7 +123,7 @@ jobs:
         run: testsuite/run_forge.sh
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
-        if: github.event.number != null && !cancelled()
+        if: env.COMMENT_ON_PR == 'true' && github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}
@@ -133,7 +139,7 @@ jobs:
           # For posting a rich message using Block Kit
           payload: |
             {
-              "text": "${{ ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
+              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

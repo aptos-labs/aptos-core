@@ -43,22 +43,15 @@ jobs:
         with:
           ref: ${{ env.GIT_SHA }}
 
-      - uses: ./.github/actions/gar-auth
+      - uses: ./.github/actions/docker-setup
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-
-      - name: Login to ECR
-        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
-        with:
-          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - uses: ./.github/actions/docker-buildx-setup
-
-      - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
 
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
