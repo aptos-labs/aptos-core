@@ -1,0 +1,20 @@
+# A simple composite action that checks if the calling repository is aptos-core
+# There are some actions that should only be run on aptos-core, e.g. publishing or some expensive cron-jobs
+
+outputs:
+  is-aptos-core:
+    description: "Whether the calling repository is aptos-core"
+    value: ${{ steps.determine-repo.outputs.is-aptos-core }}
+runs:
+  using: composite
+  steps:
+    - name: Determine the calling repo
+      id: determine-repo
+      shell: bash
+      run: |
+        if [[ "${{ github.repository }}" == "aptos-labs/aptos-core" ]]; then
+          echo "is-aptos-core=true" >> $GITHUB_OUTPUT
+        else
+          echo "is-aptos-core=false" >> $GITHUB_OUTPUT
+        fi
+        echo "Calling repo: ${{ github.repository }}"
