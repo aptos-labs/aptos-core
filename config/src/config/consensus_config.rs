@@ -49,12 +49,12 @@ pub struct ChainHealthBackoffValues {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_sending_block_txns: 5000,
+            max_sending_block_txns: 4000,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 1 * 1024 * 1024, // 1 MB
             max_receiving_block_txns: 10000,
-            max_receiving_block_bytes: 30 * 1024 * 1024, // 3MB
+            max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -65,7 +65,7 @@ impl Default for ConsensusConfig {
             round_timeout_backoff_max_exponent: 6,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
-            channel_size: 30, // hard-coded
+            channel_size: 100, // hard-coded
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,
