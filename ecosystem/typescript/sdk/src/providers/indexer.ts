@@ -34,20 +34,16 @@ export class IndexerClient {
    *
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
-  private async queryIndexer(graphqlQuery: GraphqlQuery): Promise<any> {
-    try {
-      const { data } = await axios({
-        url: this.endpoint,
-        method: "post",
-        data: graphqlQuery,
-      });
-      if (data.errors) {
-        return data.errors;
-      }
-      return data.data;
-    } catch (error) {
-      return error;
+  private async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
+    const { data } = await axios({
+      url: this.endpoint,
+      method: "post",
+      data: graphqlQuery,
+    });
+    if (data.errors) {
+      throw new Error(`Indexer data error ${data.errors}`);
     }
+    return data.data;
   }
 
   /**
@@ -62,7 +58,7 @@ export class IndexerClient {
       variables: { address: ownerAddress, offset: options?.offset, limit: options?.limit },
     };
 
-    return this.queryIndexer(graphqlQuery);
+    return this.queryIndexer<GetAccountCurrentTokensQuery>(graphqlQuery);
   }
 
   /**

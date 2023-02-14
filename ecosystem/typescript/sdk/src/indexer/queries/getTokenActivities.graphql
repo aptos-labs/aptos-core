@@ -9,8 +9,6 @@ query getTokenActivities($idHash: String!) {
     to_address
     transaction_version
     transaction_timestamp
-    coin_amount
-    coin_type
     property_version
     transfer_type
     event_sequence_number
