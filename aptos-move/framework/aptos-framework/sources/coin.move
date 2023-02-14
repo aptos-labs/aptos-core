@@ -522,6 +522,25 @@ module aptos_framework::coin {
         coin.value
     }
 
+    /// Suppose a situation: you borrowed a struct with mut,
+    /// Now you couldn't use &mut Coin to get coin value,
+    /// That if you dont want to reborrowing as immutable reference. 
+    /// This function to resolve your problem, and for the gas optimize.
+    /// Before:
+    /// ```
+    /// let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr).coin;
+    /// let value = coin::value_mut(&coin_mut);
+    /// let new_coin = coin::extract(&mut coin_mut, value - 100000000);
+    /// ```
+    /// After:
+    /// ```
+    /// let coin_mut = &mut borrow_global_mut<StructName<CoinType>>(my_addr).coin;
+    /// let new_coin = coin::extract(coin_mut, coin::value_mut(coin_mut) - 100000000);
+    /// ```
+    public fun value_mut<CoinType>(coin: &mut Coin<CoinType>): u64 {
+        coin.value
+    }
+
     /// Withdraw specifed `amount` of coin `CoinType` from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
@@ -577,6 +596,11 @@ module aptos_framework::coin {
         burn_cap: BurnCapability<FakeMoney>,
         freeze_cap: FreezeCapability<FakeMoney>,
         mint_cap: MintCapability<FakeMoney>,
+    }
+
+    #[test_only]
+    struct DemoStruct<phantom CoinType> has key {
+        coin: Coin<CoinType>
     }
 
     #[test_only]
@@ -821,6 +845,71 @@ module aptos_framework::coin {
             mint_cap,
         });
     }
+
+    #[test(source = @0x1, alice = @0x2, bob = @0x3, carol = @0x4, dave = @0x5)]
+    public entry fun test_extract_with_value_mut(
+        source: signer,
+        alice: &signer,
+        bob: &signer,
+        carol: &signer,
+        dave: &signer,
+    ) acquires CoinInfo, CoinStore, DemoStruct {
+        let source_addr = signer::address_of(&source);
+        account::create_account_for_test(source_addr);
+        let alice_addr = signer::address_of(alice);
+        account::create_account_for_test(alice_addr);
+        let bob_addr = signer::address_of(bob);
+        account::create_account_for_test(bob_addr);
+        let carol_addr = signer::address_of(carol);
+        account::create_account_for_test(carol_addr);
+        let dave_addr = signer::address_of(dave);
+        account::create_account_for_test(dave_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
+        {
+            move_to(&source,
+                DemoStruct<FakeMoney> {
+                    coin: mint<FakeMoney>(2000, &mint_cap),
+                }
+            );
+        };
+        register<FakeMoney>(&source);
+        register<FakeMoney>(alice);
+        register<FakeMoney>(bob);
+        register<FakeMoney>(carol);
+        register<FakeMoney>(dave);
+        let demo_struct_mut = &mut borrow_global_mut<DemoStruct<FakeMoney>>(source_addr).coin;
+        {
+            deposit(alice_addr, extract(demo_struct_mut, 25));
+            assert!(value_mut(demo_struct_mut) == 1975, 0);
+            deposit(bob_addr, extract(demo_struct_mut, 25));
+            assert!(value_mut(demo_struct_mut) == 1950, 1);
+            deposit(carol_addr, extract(demo_struct_mut, 25));
+            assert!(value_mut(demo_struct_mut) == 1925, 2);
+            deposit(dave_addr, extract(demo_struct_mut, 25));
+            assert!(value_mut(demo_struct_mut) == 1900, 3);
+
+        };
+
+        // Invalid usage of reference as function argument. Cannot transfer a mutable reference that is being borrowed
+        //deposit(source_addr, extract(demo_struct_mut, value_mut(demo_struct_mut) / 2));
+        
+        let value = value_mut(demo_struct_mut);
+        deposit(source_addr, extract(demo_struct_mut, value / 2));
+
+        assert!(balance<FakeMoney>(source_addr) == 950, 4);
+        assert!(balance<FakeMoney>(alice_addr) == 25, 5);
+        assert!(balance<FakeMoney>(bob_addr) == 25, 6);
+        assert!(balance<FakeMoney>(carol_addr) == 25, 7);
+        assert!(balance<FakeMoney>(dave_addr) == 25, 8);
+        assert!(value_mut(demo_struct_mut) == 950, 9);
+
+        move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
 
     #[test(source = @0x1)]
     public fun test_is_coin_initialized(source: signer) {
