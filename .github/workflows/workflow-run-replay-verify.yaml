@@ -99,10 +99,12 @@ jobs:
         shell: bash
         run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
 
-      - name: Run module-verify in parallel
+      - name: Run replay-verify in parallel
         shell: bash
-        run: testsuite/module_verify.py
+        run: testsuite/replay_verify.py
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
+          HISTORY_START: ${{ inputs.HISTORY_START }}
+          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
           BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
