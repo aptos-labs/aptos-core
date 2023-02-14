@@ -227,9 +227,7 @@ elif test $1 = p; then
         Genesis \
         --outfile tmp/genesis.publication_signature
     # Execute publication.
-    python amee.py publish execute \
-        tmp/protocol.multisig \
-        tmp/genesis.publication_signature
+    python amee.py publish execute tmp/genesis.publication_signature
     # Propose upgrade.
     python amee.py publish propose \
         tmp/protocol.multisig \
@@ -248,9 +246,7 @@ elif test $1 = p; then
         Genesis \
         --outfile tmp/upgrade.publication_signature
     # Execute upgrade publication.
-    python amee.py publish execute \
-        tmp/protocol.multisig \
-        tmp/upgrade.publication_signature
+    python amee.py publish execute tmp/upgrade.publication_signature
 
     rm -rf tmp # Clear temp dir.
 

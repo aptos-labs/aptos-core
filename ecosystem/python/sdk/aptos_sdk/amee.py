@@ -394,7 +394,6 @@ def publish_execute(args):
     execute_transaction_from_signatures(
         signature_files=args.signatures,
         proposal_indexer_func=get_publication_transaction,
-        metafile=args.metafile,
         network=args.network,
     )
 
@@ -402,25 +401,41 @@ def publish_execute(args):
 def execute_transaction_from_signatures(
     signature_files: Option[List[TextIOWrapper]],
     proposal_indexer_func: Callable[[Dict[str, Any]], RawTransaction],
-    metafile: Path,
     network: str,
+    is_rotation_transaction=False,
 ) -> Dict[str, Any]:
     """Execute multisig transaction indicated by proposal signature
-    files, returning proposal."""
+    files, returning proposal.
+
+    If transaction is a rotation transaction, transaction does not
+    contain an embedded multisig metafile. Hence in this case the
+    multisig public key is extracted from the challenge proposal.
+
+    Otherwise, the public key of the multisig account is found in the
+    multisig metafile embedded in the transaction proposal.
+    """
     signature_map, proposal = index_proposal_signatures(
         signature_files, "transaction_proposal"
     )  # Index signatures into signature map, transaction proposal.
+    if is_rotation_transaction:  # If rotation transaction:
+        # Public key is in challenge proposal.
+        public_key_hex = proposal["challenge_proposal"]["from_public_key"]
+    else:  # If not rotation transaction:
+        # Public key is in embedded multisig metafile.
+        public_key_hex = proposal["multisig"]["public_key"]
+    # Get public key bytes.
+    public_key_bytes = prefixed_hex_to_bytes(public_key_hex)
+    # Get public key class instance.
+    public_key = MultiEd25519PublicKey.from_bytes(public_key_bytes)
     # Get a raw transaction to sign from the transaction proposal.
     raw_transaction = proposal_indexer_func(proposal)
-    # Get multisig public key for account executing transaction.
-    public_key = metafile_to_multisig_public_key(metafile)
     assert_successful_transaction(  # Assert transaction succeeds.
         network=network,
         raw_transaction=raw_transaction,
         public_key=public_key,
         signature=MultiEd25519Signature(public_key, signature_map),
     )
-    return proposal
+    return proposal  # Return proposal from signature files.
 
 
 def publish_propose(args):
@@ -708,7 +723,7 @@ def rotate_challenge_sign(args):
     )
 
 
-def metafile_to_multisig_public_key(path: Path):
+def metafile_to_multisig_public_key(path: Path) -> MultiEd25519PublicKey:
     """Get multisig public key instance from metafile at path."""
     # With metafile open:
     with open(path, encoding="utf-8") as metafile:
@@ -828,8 +843,8 @@ def rotate_execute_multisig(args):
     proposal = execute_transaction_from_signatures(
         signature_files=args.signatures,
         proposal_indexer_func=get_rotation_transaction,
-        metafile=args.metafile,
         network=args.network,
+        is_rotation_transaction=True,
     )  # Execute rotation transaction from signatures, storing proposal.
     # Update multisig metafile address for from account.
     update_multisig_address(args.metafile, None)
@@ -1375,11 +1390,6 @@ parser_publish_execute = subparsers_publish.add_parser(
     parents=[network_parser],
 )
 parser_publish_execute.set_defaults(func=publish_execute)
-parser_publish_execute.add_argument(
-    "metafile",
-    type=Path,
-    help="Multisig metafile for account to publish from.",
-)
 parser_publish_execute.add_argument(
     "signatures",
     action="extend",
