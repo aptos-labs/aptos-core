@@ -44,15 +44,16 @@ def main():
     shutil.copytree("metadata-cache", "local/metadata-cache")
     subprocess.run(
         [
-            "target/release/replay-verify",
+            "target/release/aptos-db-tool",
+            "replay-verify",
             "--validate-modules",
             "--concurrent-downloads=16",
             "--replay-concurrency-level=4",
             "--metadata-cache-dir=./local/metadata-cache",
             "--target-db-dir=./local/db",
             f"--start-version={LATEST_VERSION}",
-            "command-adapter",
-            f"--config={BACKUP_CONFIG_TEMPLATE_PATH}",
+            "--command-adapter-config",
+            f"{BACKUP_CONFIG_TEMPLATE_PATH}",
         ]
     )
 

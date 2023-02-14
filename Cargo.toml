@@ -203,6 +203,7 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/state-sync-v2/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
+aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executor = { path = "execution/executor" }

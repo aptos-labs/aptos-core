@@ -29,11 +29,7 @@ def local_setup():
             "build",
             "--release",
             "-p",
-            "aptos-backup-cli",
-            "--bin",
-            "replay-verify",
-            "--bin",
-            "db-backup",
+            "aptos-db-tool",
         ],
         check=True,
     )

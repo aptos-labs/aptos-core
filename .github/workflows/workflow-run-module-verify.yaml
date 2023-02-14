@@ -54,7 +54,7 @@ jobs:
 
       - name: Build CLI binaries in release mode
         shell: bash
-        run: cargo build --release -p aptos-backup-cli --bin replay-verify --bin db-backup
+        run: cargo build --release -p aptos-db-tool
 
       - name: Run module-verify in parallel
         shell: bash

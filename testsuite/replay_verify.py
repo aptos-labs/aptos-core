@@ -13,7 +13,7 @@ from typing import Tuple
 from verify_core.common import clear_artifacts, query_backup_latest_version
 
 # This script runs the replay-verify from the root of aptos-core
-# It assumes the aptos-backup-cli, replay-verify, and db-backup binaries are already built with the release profile
+# It assumes the aptos-db-tool binary is already built with the release profile
 
 
 def replay_verify_partition(
@@ -67,8 +67,7 @@ def replay_verify_partition(
             "--end-version",
             str(end),
             "--lazy-quit",
-            "command-adapter",
-            "--config",
+            "--command-adapter-config",
             backup_config_template_path,
         ],
         stdout=subprocess.PIPE,

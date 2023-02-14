@@ -137,6 +137,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
+ "aptos-db-tool",
  "aptos-faucet",
  "aptos-framework",
  "aptos-gas",
