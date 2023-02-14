@@ -21,6 +21,8 @@ on:
   pull_request:
     paths:
       - ".github/workflows/replay-verify.yaml"
+  schedule:
+    - cron: "0 19 * * *" # the main branch cadence
 
 # cancel redundant builds
 concurrency:
