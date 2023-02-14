@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { Uint128, Uint16, Uint32, Uint64, Uint8, Uint256 } from "./types";
