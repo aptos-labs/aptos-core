@@ -226,6 +226,31 @@ elif test $1 = p; then
         tmp/ace.keyfile \
         Genesis \
         --outfile tmp/genesis.publication_signature
+    # Execute publication.
+    python amee.py publish execute \
+        tmp/protocol.multisig \
+        tmp/genesis.publication_signature
+    # Propose upgrade.
+    python amee.py publish propose \
+        tmp/protocol.multisig \
+        alnoki \
+        aptos-core \
+        1b84c283e4 \
+        aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
+        upgrade_and_govern \
+        2030-12-31 \
+        Upgrade \
+        --outfile tmp/upgrade.publication_proposal
+    # Sign upgrade publication.
+    python amee.py publish sign \
+        tmp/upgrade.publication_proposal \
+        tmp/ace.keyfile \
+        Genesis \
+        --outfile tmp/upgrade.publication_signature
+    # Execute upgrade publication.
+    python amee.py publish execute \
+        tmp/protocol.multisig \
+        tmp/upgrade.publication_signature
 
     rm -rf tmp # Clear temp dir.
 

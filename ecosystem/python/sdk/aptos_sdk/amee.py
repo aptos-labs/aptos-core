@@ -10,7 +10,7 @@ from datetime import datetime
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 from typing import Optional as Option
 from typing import Tuple, Union
 from zipfile import ZipFile
@@ -389,6 +389,40 @@ def get_github_zip_archive_url(user: str, project: str, commit: str) -> str:
     return f"https://github.com/{user}/{project}/archive/{commit}.zip"
 
 
+def publish_execute(args):
+    """Publish a Move package from a multisig account."""
+    execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_publication_transaction,
+        metafile=args.metafile,
+        network=args.network,
+    )
+
+
+def execute_transaction_from_signatures(
+    signature_files: Option[List[TextIOWrapper]],
+    proposal_indexer_func: Callable[[Dict[str, Any]], RawTransaction],
+    metafile: Path,
+    network: str,
+) -> Dict[str, Any]:
+    """Execute multisig transaction indicated by proposal signature
+    files, returning proposal."""
+    signature_map, proposal = index_proposal_signatures(
+        signature_files, "transaction_proposal"
+    )  # Index signatures into signature map, transaction proposal.
+    # Get a raw transaction to sign from the transaction proposal.
+    raw_transaction = proposal_indexer_func(proposal)
+    # Get multisig public key for account executing transaction.
+    public_key = metafile_to_multisig_public_key(metafile)
+    assert_successful_transaction(  # Assert transaction succeeds.
+        network=network,
+        raw_transaction=raw_transaction,
+        public_key=public_key,
+        signature=MultiEd25519Signature(public_key, signature_map),
+    )
+    return proposal
+
+
 def publish_propose(args):
     """Propose the publication of a Move package hosted on GitHub."""
     # Load publisher data.
@@ -753,9 +787,9 @@ def rotate_execute_single(args):
     )  # Construct raw rotation transaction.
     assert_successful_transaction(  # Assert transaction succeeds.
         network=args.network,
+        raw_transaction=raw_transaction,
         public_key=account.public_key(),
         signature=account.sign(raw_transaction.keyed()),
-        raw_transaction=raw_transaction,
     )
     # Update multisig metafile address.
     update_multisig_address(args.metafile, proposal["originator"])
@@ -763,9 +797,9 @@ def rotate_execute_single(args):
 
 def assert_successful_transaction(
     network: str,
+    raw_transaction: RawTransaction,
     public_key: Union[PublicKey, MultiEd25519PublicKey],
     signature: Union[Signature, MultiEd25519Signature],
-    raw_transaction: RawTransaction,
 ):
     """Submit a signed BCS transaction, asserting that it succeeds."""
     # Get REST client for network.
@@ -791,20 +825,13 @@ def rotate_execute_multisig(args):
 
     Only supports rotation to a single-signer account if the account has
     as its authentication key the multisig account address."""
-    signature_map, proposal = index_proposal_signatures(
-        args.signatures, "transaction_proposal"
-    )  # Index signatures into signature map, transaction proposal.
-    # Get a raw transaction to sign from the transaction proposal.
-    raw_transaction = get_rotation_transaction(proposal)
-    # Get multisig public key for from account.
-    public_key = metafile_to_multisig_public_key(args.metafile)
-    assert_successful_transaction(  # Assert transaction succeeds.
+    proposal = execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_rotation_transaction,
+        metafile=args.metafile,
         network=args.network,
-        public_key=public_key,
-        signature=MultiEd25519Signature(public_key, signature_map),
-        raw_transaction=raw_transaction,
-    )
-    # Update multisig metafile address.
+    )  # Execute rotation transaction from signatures, storing proposal.
+    # Update multisig metafile address for from account.
     update_multisig_address(args.metafile, None)
     # If just rotated to a multisig account:
     if not proposal["challenge_proposal"]["to_is_single_signer"]:
@@ -1339,12 +1366,35 @@ parser_publish = subparsers.add_parser(
 )
 subparsers_publish = parser_publish.add_subparsers(required=True)
 
+# Publish execute subcommand parser.
+parser_publish_execute = subparsers_publish.add_parser(
+    name="execute",
+    aliases=["e"],
+    description="Execute package publication from proposal signatures.",
+    help="Publish a Move package.",
+    parents=[network_parser],
+)
+parser_publish_execute.set_defaults(func=publish_execute)
+parser_publish_execute.add_argument(
+    "metafile",
+    type=Path,
+    help="Multisig metafile for account to publish from.",
+)
+parser_publish_execute.add_argument(
+    "signatures",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to publication transaction signatures for at least
+        threshold number of multisig signatories.""",
+)
+
 # Publish propose subcommand parser.
 parser_publish_propose = subparsers_publish.add_parser(
     name="propose",
     aliases=["p"],
     description="Propose a Move package publication, from a GitHub project.",
-    help="Publish a Move package.",
+    help="Propose a Move package publication.",
     parents=[network_parser],
 )
 parser_publish_propose.set_defaults(func=publish_propose)
