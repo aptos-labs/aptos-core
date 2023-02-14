@@ -97,7 +97,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Get Started",
+            label: "Start",
             position: "left",
             items: [
               {
@@ -129,7 +129,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Build Apps",
+            label: "Apps",
             position: "left",
             items: [
               {
@@ -166,7 +166,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Learn Move",
+            label: "Move",
             position: "left",
             items: [
               {
@@ -208,7 +208,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Create Tokens",
+            label: "Tokens",
             position: "left",
             items: [
               {
@@ -245,7 +245,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Run Nodes",
+            label: "Nodes",
             position: "left",
             items: [
               {
