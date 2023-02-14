@@ -9,7 +9,6 @@ use lru::LruCache;
 
 const NUM_SHARDS: usize = 256;
 
-#[derive(Debug)]
 pub(crate) struct LruNodeCache {
     shards: [Mutex<LruCache<NibblePath, (Version, Node)>>; NUM_SHARDS],
 }

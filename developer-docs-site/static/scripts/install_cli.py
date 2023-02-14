@@ -42,7 +42,7 @@ TEST_COMMAND = f"{SCRIPT} info"
 
 X86_64 = ["x86_64", "amd64"]
 SUPPORTED_ARCHITECTURES = {
-    "macos": X86_64 + ["arm"],
+    "macos": X86_64 + ["arm", "arm64", "aarch64"],
     "linux": X86_64,
     "windows": X86_64,
 }
@@ -204,7 +204,11 @@ class InstallationError(RuntimeError):
 
 
 class Installer:
-    METADATA_URL = "https://api.github.com/repos/aptos-labs/aptos-core/releases/latest"
+    # The API returns the newest items first. Accordingly we expect the CLI release to
+    # be in the last 100 releases (the max for a single page).
+    METADATA_URL = (
+        "https://api.github.com/repos/aptos-labs/aptos-core/releases?per_page=100"
+    )
 
     def __init__(
         self,
@@ -218,6 +222,7 @@ class Installer:
         self._accept_all = accept_all
 
         self._bin_dir = None
+        self._release_info = None
         self._latest_release_info = None
 
     @property
@@ -231,12 +236,18 @@ class Installer:
         return self.bin_dir.joinpath(SCRIPT)
 
     @property
+    def release_info(self):
+        if not self._release_info:
+            self._release_info = json.loads(self._get(self.METADATA_URL).decode())
+        return self._release_info
+
+    @property
     def latest_release_info(self):
-        if not self._latest_release_info:
-            self._latest_release_info = json.loads(
-                self._get(self.METADATA_URL).decode()
-            )
-        return self._latest_release_info
+        # Iterate through the releases and find the latest CLI release.
+        for release in self.release_info:
+            if release["tag_name"].startswith("aptos-cli-"):
+                return release
+        raise RuntimeError("Failed to find latest CLI release")
 
     def run(self) -> int:
         try:

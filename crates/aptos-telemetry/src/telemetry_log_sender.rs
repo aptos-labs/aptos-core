@@ -98,11 +98,15 @@ mod tests {
     };
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
+    use reqwest::Url;
 
     #[tokio::test]
     async fn test_add_to_batch() {
-        let telemetry_sender =
-            TelemetrySender::new("test".to_string(), ChainId::test(), &NodeConfig::default());
+        let telemetry_sender = TelemetrySender::new(
+            Url::parse("https://telemetry.svc").expect("unable to parse url"),
+            ChainId::test(),
+            &NodeConfig::default(),
+        );
         let mut sender = TelemetryLogSender::new(telemetry_sender);
 
         for _i in 0..2 {

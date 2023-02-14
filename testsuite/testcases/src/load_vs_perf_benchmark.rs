@@ -254,7 +254,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 "actual dur"
             );
             for result in &results {
-                let rate = result.stats.rate(result.actual_duration);
+                let rate = result.stats.rate();
                 println!(
                     "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
                     result.name,

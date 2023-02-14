@@ -4,7 +4,9 @@
 mod aptos_debug_natives;
 mod manifest;
 pub mod package_hooks;
+
 pub use package_hooks::*;
+
 pub mod stored_package;
 mod transactional_tests_runner;
 
@@ -24,12 +26,13 @@ use crate::{
     move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     CliCommand, CliResult,
 };
+use aptos_crypto::HashValue;
 use aptos_framework::{
     docgen::DocgenOptions, natives::code::UpgradePolicy, prover::ProverOptions, BuildOptions,
     BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -69,6 +72,7 @@ use transactional_tests_runner::TransactionalTestOpts;
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
+    CompileScript(CompileScript),
     Init(InitPackage),
     Publish(PublishPackage),
     Download(DownloadPackage),
@@ -82,12 +86,14 @@ pub enum MoveTool {
     Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    View(ViewFunction),
 }
 
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
+            MoveTool::CompileScript(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
@@ -103,13 +109,14 @@ impl MoveTool {
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::View(tool) => tool.execute_serialized().await,
         }
     }
 }
 
 const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
 
-fn set_bytecode_version(version: Option<u32>) {
+pub(crate) fn set_bytecode_version(version: Option<u32>) {
     // Note: this is a bit of a hack to get the compiler emit bytecode with the right
     //       version. In the future, we should add an option to the Move package system
     //       that would allow us to configure this directly instead of relying on
@@ -311,6 +318,76 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 }
 
+/// Compiles a Move script into bytecode
+///
+/// Compiles a script into bytecode and provides a hash of the bytecode.
+/// This can then be run with `aptos move run-script`
+#[derive(Parser)]
+pub struct CompileScript {
+    #[clap(long, parse(from_os_str))]
+    pub output_file: Option<PathBuf>,
+    #[clap(flatten)]
+    pub move_options: MovePackageDir,
+}
+
+#[async_trait]
+impl CliCommand<CompileScriptOutput> for CompileScript {
+    fn command_name(&self) -> &'static str {
+        "CompileScript"
+    }
+
+    async fn execute(self) -> CliTypedResult<CompileScriptOutput> {
+        let (bytecode, script_hash) = self.compile_script().await?;
+        let script_location = self.output_file.unwrap_or_else(|| {
+            self.move_options
+                .get_package_path()
+                .unwrap()
+                .join("script.mv")
+        });
+        write_to_file(script_location.as_path(), "Script", bytecode.as_slice())?;
+        Ok(CompileScriptOutput {
+            script_location,
+            script_hash,
+        })
+    }
+}
+
+impl CompileScript {
+    async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        set_bytecode_version(self.move_options.bytecode_version);
+        let build_options = BuildOptions {
+            install_dir: self.move_options.output_dir.clone(),
+            ..IncludedArtifacts::None.build_options(
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version_or_detault(),
+            )
+        };
+        let package_dir = self.move_options.get_package_path()?;
+        let pack = BuiltPackage::build(package_dir, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+
+        let scripts_count = pack.script_count();
+        if scripts_count != 1 {
+            return Err(CliError::UnexpectedError(format!(
+                "Only one script can be prepared a time. Make sure one and only one script file \
+                is included in the Move package. Found {} scripts.",
+                scripts_count
+            )));
+        }
+
+        let bytecode = pack.extract_script_code().pop().unwrap();
+        let script_hash = HashValue::sha3_256_of(bytecode.as_slice());
+        Ok((bytecode, script_hash))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct CompileScriptOutput {
+    pub script_location: PathBuf,
+    pub script_hash: HashValue,
+}
+
 /// Runs Move unit tests for a package
 ///
 /// This will run Move unit tests against a package with debug mode
@@ -322,7 +399,7 @@ pub struct TestPackage {
     pub filter: Option<String>,
 
     /// A boolean value to skip warnings.
-    #[clap(long, short = 'w')]
+    #[clap(long)]
     pub ignore_compile_warnings: bool,
 
     #[clap(flatten)]
@@ -1028,6 +1105,58 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 }
 
+/// Run a Move function
+#[derive(Parser)]
+pub struct ViewFunction {
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
+    #[clap(long)]
+    pub(crate) function_id: MemberId,
+
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
+    fn command_name(&self) -> &'static str {
+        "RunViewFunction"
+    }
+
+    async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
+        let mut args: Vec<serde_json::Value> = vec![];
+        for arg in self.args {
+            args.push(arg.to_json()?);
+        }
+
+        let view_request = ViewRequest {
+            function: EntryFunctionId {
+                module: self.function_id.module_id.into(),
+                name: self.function_id.member_id.into(),
+            },
+            type_arguments: self.type_args,
+            arguments: args,
+        };
+
+        self.txn_options.view(view_request).await
+    }
+}
+
 /// Run a Move script
 #[derive(Parser)]
 pub struct RunScript {
@@ -1322,6 +1451,71 @@ impl ArgWithType {
             _ty: FunctionArgType::Raw,
             arg,
         }
+    }
+
+    pub fn to_json(&self) -> CliTypedResult<serde_json::Value> {
+        match self._ty.clone() {
+            FunctionArgType::Address => {
+                serde_json::to_value(bcs::from_bytes::<AccountAddress>(&self.arg)?)
+            },
+            FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
+            FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+            FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U64 => {
+                serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U128 => {
+                serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U256 => {
+                serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+            },
+            FunctionArgType::Raw => serde_json::to_value(&self.arg),
+            FunctionArgType::HexArray => {
+                serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+            },
+            FunctionArgType::Vector(inner) => match inner.deref() {
+                FunctionArgType::Address => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<AccountAddress>>(&self.arg)?)
+                },
+                FunctionArgType::Bool => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<bool>>(&self.arg)?)
+                },
+                FunctionArgType::Hex => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+                },
+                FunctionArgType::String => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<String>>(&self.arg)?)
+                },
+                FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+                FunctionArgType::U16 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u16>>(&self.arg)?)
+                },
+                FunctionArgType::U32 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u32>>(&self.arg)?)
+                },
+                FunctionArgType::U64 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u64>>(&self.arg)?)
+                },
+                FunctionArgType::U128 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u128>>(&self.arg)?)
+                },
+                FunctionArgType::U256 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<U256>>(&self.arg)?)
+                },
+                FunctionArgType::Raw | FunctionArgType::HexArray | FunctionArgType::Vector(_) => {
+                    return Err(CliError::UnexpectedError(
+                        "Nested vectors not supported".to_string(),
+                    ));
+                },
+            },
+        }
+        .map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
+        })
     }
 }
 

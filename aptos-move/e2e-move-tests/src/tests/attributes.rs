@@ -257,6 +257,6 @@ fn build_package_and_insert_attribute(
 // We need this because we cannot produce a KnownAttribute directly.
 #[derive(Serialize)]
 pub struct FakeKnownAttribute {
-    kind: u16,
+    kind: u8,
     args: Vec<String>,
 }

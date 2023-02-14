@@ -156,6 +156,11 @@ const config = {
                 label: "Integrate with Wallets",
                 docId: "concepts/wallet-adapter-concept",
               },
+              {
+                type: "doc",
+                label: "Build E2E Dapp on Aptos",
+                docId: "tutorials/build-e2e-dapp/index",
+              },
             ],
           },
           {
@@ -261,6 +266,11 @@ const config = {
                 label: "Run a FullNode",
                 type: "doc",
                 docId: "nodes/full-node/index",
+              },
+              {
+                label: "Run an Indexer",
+                type: "doc",
+                docId: "nodes/indexer-fullnode",
               },
               {
                 label: "Monitor a Node",

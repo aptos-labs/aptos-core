@@ -1,11 +1,11 @@
 ---
-title: "Aptos Indexer Fullnode"
+title: "Run an Indexer"
 slug: "indexer-fullnode"
 ---
 
-# Aptos Indexer Fullnode
+# Run an Aptos Indexer
 
-This document describes how to run an indexer fullnode on the Aptos network. See the [Indexing](/guides/indexing.md) guide that describes the indexing concept and provides the available options for the indexing service on the Aptos blockchain.
+This document describes how to operate an indexer fullnode on the Aptos network. To understand and ingest the indexer data in your app, see [Use the Aptos Indexer](../guides/indexing.md).
 
 :::danger On macOS with Apple silicon only
 The below installation steps are verified only on macOS with Apple silicon. They might require minor tweaking when running on other builds.

@@ -73,7 +73,6 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Debug)]
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
@@ -81,7 +80,6 @@ pub(crate) struct StateDb {
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
-#[derive(Debug)]
 pub(crate) struct StateStore {
     pub(crate) state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
@@ -290,6 +288,7 @@ impl StateStore {
                 &state_db,
                 buffered_state_target_items,
                 hack_for_tests,
+                /*check_max_versions_after_snapshot=*/ true,
             )
             .expect("buffered state creation failed."),
         );
@@ -300,10 +299,41 @@ impl StateStore {
         }
     }
 
+    #[cfg(feature = "db-debugger")]
+    pub fn catch_up_state_merkle_db(
+        ledger_db: Arc<DB>,
+        state_merkle_db: DB,
+    ) -> Result<Option<Version>> {
+        use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+
+        let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
+        let state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
+        );
+        let epoch_snapshot_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
+        );
+        let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
+        let state_db = Arc::new(StateDb {
+            ledger_db,
+            state_merkle_db,
+            state_pruner,
+            epoch_snapshot_pruner,
+        });
+        let buffered_state = Self::create_buffered_state_from_latest_snapshot(
+            &state_db, 0, /*hack_for_tests=*/ false,
+            /*check_max_versions_after_snapshot=*/ false,
+        )?;
+        Ok(buffered_state.current_state().base_version)
+    }
+
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        check_max_versions_after_snapshot: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
         let num_transactions = ledger_store
@@ -353,12 +383,14 @@ impl StateStore {
 
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
-            ensure!(
-                num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
-                "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
-                snapshot_next_version,
-                num_transactions,
-            );
+            if check_max_versions_after_snapshot {
+                ensure!(
+                    num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
+                    "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
+                    snapshot_next_version,
+                    num_transactions,
+                );
+            }
             let latest_snapshot_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
                 state_db.clone(),
@@ -409,6 +441,7 @@ impl StateStore {
             &self.state_db,
             self.buffered_state_target_items,
             false,
+            true,
         )
         .expect("buffered state creation failed.");
     }

@@ -57,8 +57,8 @@ mod tests {
     fn test_state_key_prefix() {
         let address1 = AccountAddress::new([12u8; AccountAddress::LENGTH]);
         let address2 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-        let key1 = StateKey::AccessPath(AccessPath::new(address1, b"state_key".to_vec()));
-        let key2 = StateKey::AccessPath(AccessPath::new(address2, b"state_key".to_vec()));
+        let key1 = StateKey::access_path(AccessPath::new(address1, b"state_key".to_vec()));
+        let key2 = StateKey::access_path(AccessPath::new(address2, b"state_key".to_vec()));
 
         let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
         let account2_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address2.to_vec());

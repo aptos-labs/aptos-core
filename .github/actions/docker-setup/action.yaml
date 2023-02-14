@@ -1,0 +1,78 @@
+name: "Docker build setup"
+description: |
+  Runs an opinionated and unified docker build setup action. It does the following:
+  * Logs in to docker image registries (AWS ECR and GCP GAR)
+  * Setup for buildx and other dependencies (crane)
+  * Sets git credentials for private builds
+inputs:
+  # GCP auth
+  GCP_WORKLOAD_IDENTITY_PROVIDER:
+    required: true
+    description: "GCP Workload Identity provider"
+  GCP_SERVICE_ACCOUNT_EMAIL:
+    required: true
+    description: "GCP service account email"
+  GCP_DOCKER_ARTIFACT_REPO:
+    required: true
+    description: "GCP GAR repo to authenticate to"
+  # AWS auth
+  AWS_ACCESS_KEY_ID:
+    required: true
+    description: "AWS access key id"
+  AWS_SECRET_ACCESS_KEY:
+    required: true
+    description: "AWS secret access key"
+  AWS_DOCKER_ARTIFACT_REPO:
+    required: true
+    description: "AWS ECR repo to authenticate to"
+  # Optional git auth
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: setup docker context for buildx
+      id: buildx-context
+      shell: bash
+      run: docker context create builders
+
+    - name: setup docker buildx
+      uses: docker/setup-buildx-action@15c905b16b06416d2086efa066dd8e3a35cc7f98 # pin v2.4.0
+      with:
+        endpoint: builders
+        version: v0.10.1
+
+    - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
+
+    - id: auth
+      name: "Authenticate to Google Cloud"
+      uses: "google-github-actions/auth@dac4e13deb3640f22e3ffe758fd3f95e6e89f712" # pin@v0
+      with:
+        create_credentials_file: false
+        token_format: "access_token"
+        access_token_lifetime: 5400 # setting this to 1.5h since sometimes docker builds (special performance builds etc.) take that long. Default is 1h.
+        workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+    - name: Login to Google Artifact Registry
+      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+      with:
+        registry: us-west1-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Login to ECR
+      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+      with:
+        registry: ${{ inputs.AWS_DOCKER_ARTIFACT_REPO }}
+        username: ${{ inputs.AWS_ACCESS_KEY_ID }}
+        password: ${{ inputs.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Setup git credentials
+      if: inputs.GIT_CREDENTIALS != ''
+      shell: bash
+      run: |
+        git config --global credential.helper store
+        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials

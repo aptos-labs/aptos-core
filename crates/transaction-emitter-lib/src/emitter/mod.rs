@@ -27,7 +27,7 @@ use aptos_sdk::{
 };
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, seq::IteratorRandom};
+use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -41,8 +41,9 @@ use std::{
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
 // Max is 100k TPS for a full day.
-const MAX_TXNS: u64 = 100_000_000_000;
-const MINT_GAS_FEE_MULTIPLIER: u64 = 10;
+const MAX_TXNS: u64 = 10_000_000_000;
+
+const MAX_RETRIES: usize = 6;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -51,7 +52,7 @@ const MINT_GAS_FEE_MULTIPLIER: u64 = 10;
 // This retry policy means an operation will take 8 seconds at most.
 pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
     RetryPolicy::exponential(Duration::from_millis(125))
-        .with_max_retries(6)
+        .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
 
@@ -157,7 +158,7 @@ impl EmitJobMode {
     }
 }
 
-/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn,
+/// total coins consumed are less than 2 * max_txns * expected_gas_per_txn * gas_price,
 /// which is by default 100000000000 * 100000, but can be overriden.
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
@@ -165,8 +166,10 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     gas_price: u64,
+    max_gas_per_txn: u64,
     reuse_accounts: bool,
     mint_to_root: bool,
+    init_gas_price_multiplier: u64,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
 
@@ -188,8 +191,10 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             reuse_accounts: false,
             mint_to_root: false,
+            init_gas_price_multiplier: 10,
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             txn_expiration_time_secs: 60,
             max_transactions_per_account: 20,
@@ -213,6 +218,16 @@ impl EmitJobRequest {
 
     pub fn gas_price(mut self, gas_price: u64) -> Self {
         self.gas_price = gas_price;
+        self
+    }
+
+    pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
+        self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_gas_price_multiplier(mut self, init_gas_price_multiplier: u64) -> Self {
+        self.init_gas_price_multiplier = init_gas_price_multiplier;
         self
     }
 
@@ -406,15 +421,35 @@ pub struct EmitJob {
     workers: Vec<Worker>,
     stop: Arc<AtomicBool>,
     stats: Arc<DynamicStatsTracking>,
+    phase_starts: Vec<Instant>,
 }
 
 impl EmitJob {
-    pub fn start_next_phase(&self) {
-        self.stats.start_next_phase();
+    pub fn start_next_phase(&mut self) {
+        let cur_phase = self.stats.start_next_phase();
+
+        assert!(self.phase_starts.len() == cur_phase);
+        self.phase_starts.push(Instant::now());
     }
 
     pub fn get_cur_phase(&self) -> usize {
         self.stats.get_cur_phase()
+    }
+
+    pub async fn stop_and_accumulate(self) -> Vec<TxnStats> {
+        self.stop.store(true, Ordering::Relaxed);
+        for worker in self.workers {
+            let _accounts = worker
+                .join_handle
+                .await
+                .expect("TxnEmitter worker thread failed");
+        }
+
+        self.stats.accumulate(&self.phase_starts)
+    }
+
+    pub fn accumulate(&self) -> Vec<TxnStats> {
+        self.stats.accumulate(&self.phase_starts)
     }
 }
 
@@ -461,17 +496,24 @@ impl TxnEmitter {
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
-            .with_gas_unit_price(req.gas_price);
-
+            .with_gas_unit_price(req.gas_price)
+            .with_max_gas_amount(req.max_gas_per_txn);
+        let init_txn_factory = txn_factory
+            .clone()
+            .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier);
+        let seed = self.rng.gen();
+        info!(
+            "AccountMinter Seed (can be passed in to reuse accounts): {:?}",
+            seed
+        );
         let mut account_minter = AccountMinter::new(
             root_account,
-            txn_factory
-                .clone()
-                .with_gas_unit_price(req.gas_price * MINT_GAS_FEE_MULTIPLIER),
-            StdRng::from_rng(self.rng.clone()).unwrap(),
+            init_txn_factory.clone(),
+            StdRng::from_seed(seed),
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
+            max_retries: MAX_RETRIES,
         };
         let mut all_accounts = account_minter
             .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
@@ -486,6 +528,7 @@ impl TxnEmitter {
             &mut all_accounts,
             &txn_executor,
             &txn_factory,
+            &init_txn_factory,
             stats.clone(),
         )
         .await;
@@ -542,27 +585,21 @@ impl TxnEmitter {
             }
         }
         info!("Tx emitter workers started");
+
         Ok(EmitJob {
             workers,
             stop,
             stats,
+            phase_starts: vec![Instant::now()],
         })
     }
 
     pub async fn stop_job(self, job: EmitJob) -> Vec<TxnStats> {
-        job.stop.store(true, Ordering::Relaxed);
-        for worker in job.workers {
-            let _accounts = worker
-                .join_handle
-                .await
-                .expect("TxnEmitter worker thread failed");
-        }
-
-        job.stats.accumulate()
+        job.stop_and_accumulate().await
     }
 
     pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
-        job.stats.accumulate()
+        job.accumulate()
     }
 
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
@@ -580,7 +617,7 @@ impl TxnEmitter {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate(window));
+            info!("phase {}: {}", cur_phase, delta.rate());
         }
     }
 
@@ -593,7 +630,7 @@ impl TxnEmitter {
     ) -> Result<TxnStats> {
         let phases = emit_job_request.transaction_mix_per_phase.len();
 
-        let job = self
+        let mut job = self
             .start_job(source_account, emit_job_request, phases)
             .await?;
         info!(

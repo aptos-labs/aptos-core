@@ -129,10 +129,11 @@ impl LocalNode {
 
         // We print out the commands and PIDs for debugging of local swarms
         info!(
-            "Started node {} (PID: {}) with command: {:?}",
+            "Started node {} (PID: {}) with command: {:?}, log_path: {:?}",
             self.name,
             process.id(),
-            node_command
+            node_command,
+            self.log_path(),
         );
 
         // We print out the API endpoints of each node for local debugging

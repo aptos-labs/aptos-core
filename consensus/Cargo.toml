@@ -20,10 +20,12 @@ aptos-config = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-fallible = { workspace = true }
+aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
@@ -43,6 +45,9 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
+chrono = { workspace = true }
+claims = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
@@ -58,6 +63,7 @@ serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-metrics = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["fuzzing"] }

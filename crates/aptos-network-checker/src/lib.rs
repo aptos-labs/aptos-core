@@ -3,3 +3,5 @@
 
 pub mod args;
 pub mod check_endpoint;
+
+pub use check_endpoint::check_endpoint;

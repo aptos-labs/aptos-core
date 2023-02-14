@@ -100,11 +100,15 @@ spec aptos_framework::coin {
 
     /// `account_addr` is not frozen.
     spec deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
+        modifies global<CoinInfo<CoinType>>(account_addr);
+        ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
+    }
+    spec schema DepositAbortsIf<CoinType> {
+        account_addr: address;
+        coin: Coin<CoinType>;
         let coin_store = global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         aborts_if coin_store.frozen;
-        modifies global<CoinInfo<CoinType>>(account_addr);
-        ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
 
     /// The value of `zero_coin` must be 0.
@@ -257,17 +261,24 @@ spec aptos_framework::coin {
         account: &signer,
         amount: u64,
     ): Coin<CoinType> {
+        include WithdrawAbortsIf<CoinType>;
+        modifies global<CoinStore<CoinType>>(account_addr);
+        let account_addr = signer::address_of(account);
+        let coin_store = global<CoinStore<CoinType>>(account_addr);
+        let balance = coin_store.coin.value;
+        let post coin_post = global<CoinStore<CoinType>>(account_addr).coin.value;
+        ensures coin_post == balance - amount;
+        ensures result == Coin<CoinType>{value: amount};
+    }
+    spec schema WithdrawAbortsIf<CoinType> {
+        account: &signer;
+        amount: u64;
         let account_addr = signer::address_of(account);
         let coin_store = global<CoinStore<CoinType>>(account_addr);
         let balance = coin_store.coin.value;
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
-
-        modifies global<CoinStore<CoinType>>(account_addr);
-        let post coin_post = global<CoinStore<CoinType>>(account_addr).coin.value;
-        ensures coin_post == balance - amount;
-        ensures result == Coin<CoinType>{value: amount};
     }
 
     spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {

@@ -3,5 +3,6 @@
 
 pub mod components;
 mod utils;
+pub mod validate;
 
 pub use components::ReleaseConfig;

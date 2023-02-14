@@ -1,0 +1,23 @@
+# This workflow runs a public fullnode using the `testnet` branch,
+# connects the public fullnode to `testnet` and synchronizes the
+# node using fast syncing to verify that nothing has been broken.
+
+name: "fullnode-fast-testnet-stable"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
+  pull_request:
+    paths:
+      - ".github/workflows/fullnode-fast-testnet-stable.yaml"
+
+jobs:
+  fullnode-fast-testnet-stable:
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-fast-testnet-stable
+      BRANCH: testnet
+      NETWORK: testnet
+      BOOTSTRAPPING_MODE: DownloadLatestStates
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactions

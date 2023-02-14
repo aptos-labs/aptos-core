@@ -21,6 +21,7 @@ use crate::{
 };
 use aptos_db::AptosDB;
 use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
@@ -153,7 +154,7 @@ fn test_end_to_end_impl(d: TestData) {
             global_restore_opt,
             store,
             None, /* epoch_history */
-            vec![],
+            VerifyExecutionMode::verify_all(),
         )
         .run(),
     )
@@ -199,7 +200,7 @@ proptest! {
 
     #[test]
     #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
-    fn test_end_to_end(d in test_data_strategy()) {
+    fn test_end_to_end(d in test_data_strategy().no_shrink()) {
         test_end_to_end_impl(d)
     }
 }

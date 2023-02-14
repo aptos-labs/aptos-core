@@ -19,7 +19,7 @@ The following packages are pre-installed with Cloud Shell. **Make sure to review
 
 However, if you are running the installation from your laptop or another machine, you need to install:
 
-* Terraform 1.1.7: https://www.terraform.io/downloads.html
+* Terraform 1.3.6: https://www.terraform.io/downloads.html
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
 
@@ -103,7 +103,7 @@ Example content for `main.tf`:
 
   ```rust
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.6"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/fullnode"

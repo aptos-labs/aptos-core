@@ -16,7 +16,7 @@ use futures::stream::poll_fn;
 use once_cell::sync::Lazy;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
@@ -47,8 +47,14 @@ pub struct MetadataCacheOpt {
 }
 
 impl MetadataCacheOpt {
-    // in cache we save things other than the cached files.
+    // in case we save things other than the cached files.
     const SUB_DIR: &'static str = "cache";
+
+    pub fn new(dir: Option<impl AsRef<Path>>) -> Self {
+        Self {
+            dir: dir.map(|dir| dir.as_ref().to_path_buf()),
+        }
+    }
 
     fn cache_dir(&self) -> PathBuf {
         self.dir

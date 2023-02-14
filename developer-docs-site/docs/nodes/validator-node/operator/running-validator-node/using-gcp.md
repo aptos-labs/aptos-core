@@ -20,7 +20,7 @@ This guide assumes you already have a Google Cloud Platform (GCP) account setup,
 Make sure the following are setup for your environment:
   - **GCP account**: hhttps://cloud.google.com/
   - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-  - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+  - **Terraform 1.3.6**: https://www.terraform.io/downloads.html
   - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
   - **Google Cloud CLI**: https://cloud.google.com/sdk/docs/install-sdk
 
@@ -65,7 +65,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
   ```
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.6"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/aptos-node"

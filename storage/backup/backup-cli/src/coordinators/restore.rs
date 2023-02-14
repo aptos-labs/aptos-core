@@ -16,6 +16,7 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions},
 };
 use anyhow::{anyhow, bail, Result};
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -187,7 +188,7 @@ impl RestoreCoordinator {
             txn_manifests,
             None,
             epoch_history,
-            vec![],
+            VerifyExecutionMode::NoVerify,
         )
         .run()
         .await?;

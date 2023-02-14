@@ -129,6 +129,21 @@ const sidebars = {
       collapsed: true,
       items: ["guides/wallet-adapter-for-dapp", "guides/wallet-adapter-for-wallets"],
     },
+    {
+      type: "category",
+      label: "Build E2E Dapp with Aptos",
+      link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
+      collapsible: true,
+      collapsed: true,
+      items: [
+        "tutorials/build-e2e-dapp/create-a-smart-contract",
+        "tutorials/build-e2e-dapp/set-up-react-app",
+        "tutorials/build-e2e-dapp/add-wallet-support",
+        "tutorials/build-e2e-dapp/fetch-data-from-chain",
+        "tutorials/build-e2e-dapp/submit-data-to-chain",
+        "tutorials/build-e2e-dapp/handle-tasks",
+      ],
+    },
   ],
   moveSidebar: [
     {
@@ -287,12 +302,12 @@ const sidebars = {
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",
         "nodes/full-node/run-a-fullnode-on-gcp",
-        "nodes/indexer-fullnode",
       ],
     },
+    "nodes/indexer-fullnode",
     {
       type: "category",
-      label: "Monitor a Node",
+      label: "Monitor Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/measure/index" },
@@ -305,7 +320,7 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Configure a Node",
+      label: "Configure Nodes",
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "nodes/identity-and-configuration" },

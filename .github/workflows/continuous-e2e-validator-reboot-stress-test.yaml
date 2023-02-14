@@ -11,7 +11,7 @@ on:
 
 jobs:
   run-forge-validator-reboot-stress-test:
-    uses: ./.github/workflows/run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-validator-reboot-stress

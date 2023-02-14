@@ -16,7 +16,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::{Transaction, Version},
+    transaction::{Transaction, TransactionInfo, Version},
 };
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
@@ -43,7 +43,7 @@ pub trait AptosValidatorInterface: Sync {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<Vec<Transaction>>;
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)>;
 
     async fn get_latest_version(&self) -> Result<Version>;
 
