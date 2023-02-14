@@ -22,7 +22,7 @@ on:
     paths:
       - ".github/workflows/replay-verify.yaml"
   schedule:
-    - cron: "0 20 * * *" # the main branch cadence
+    - cron: "0 8,20 * * *"
 
 # cancel redundant builds
 concurrency:
