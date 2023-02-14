@@ -5,33 +5,18 @@ generates:
   src/indexer/generated/types.ts:
     plugins:
       - typescript
-      - add:
-          content:
-            - "/* istanbul ignore file */"
-            - "/* tslint:disable */ "
-            - "/* eslint-disable */"
   src/indexer/generated/operations.ts:
     preset: import-types-preset
     presetConfig:
       typesPath: ./types
     plugins:
       - typescript-operations
-      - add:
-          content:
-            - "/* istanbul ignore file */"
-            - "/* tslint:disable */ "
-            - "/* eslint-disable */"
   src/indexer/generated/queries.ts:
     preset: import-types-preset
     presetConfig:
       typesPath: ./operations
     plugins:
       - typescript-graphql-request
-      - add:
-          content:
-            - "/* istanbul ignore file */"
-            - "/* tslint:disable */ "
-            - "/* eslint-disable */"
     config:
       documentMode: string
       documentVariableSuffix: ""

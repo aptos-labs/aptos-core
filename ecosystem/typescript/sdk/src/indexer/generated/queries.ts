@@ -1,6 +1,3 @@
-/* istanbul ignore file */
-/* tslint:disable */ 
-/* eslint-disable */
 import * as Types from './operations';
 
 import { GraphQLClient } from 'graphql-request';

@@ -55,38 +55,29 @@ export class Provider {
 
 export interface Provider extends AptosClient, IndexerClient {}
 
-/*
+/**
 In TypeScript, we can’t inherit or extend from more than one class,
 Mixins helps us to get around that by creating a partial classes 
 that we can combine to form a single class that contains all the methods and properties from the partial classes.
-https://www.typescriptlang.org/docs/handbook/mixins.html#alternative-pattern
+{@link https://www.typescriptlang.org/docs/handbook/mixins.html#alternative-pattern}
 
 Here, we combine AptosClient and IndexerClient classes into one Provider class that holds all 
 methods and properties from both classes.
 */
-applyMixins(Provider, [AptosClient, IndexerClient]);
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function applyMixins(derivedCtor: any, constructors: any[]) {
-  Object.getOwnPropertyNames(AptosClient.prototype).forEach((propertyName) => {
-    const propertyDescriptor = Object.getOwnPropertyDescriptor(AptosClient.prototype, propertyName);
+function applyMixin(targetClass: any, baseClass: any, baseClassProp: string) {
+  Object.getOwnPropertyNames(baseClass.prototype).forEach((propertyName) => {
+    const propertyDescriptor = Object.getOwnPropertyDescriptor(baseClass.prototype, propertyName);
     if (!propertyDescriptor) return;
     // eslint-disable-next-line func-names
     propertyDescriptor.value = function (...args: any) {
-      return (this as any).aptosClient[propertyName](...args);
+      return (this as any)[baseClassProp][propertyName](...args);
     };
-    Object.defineProperty(Provider.prototype, propertyName, propertyDescriptor);
-  });
-
-  Object.getOwnPropertyNames(IndexerClient.prototype).forEach((propertyName) => {
-    const propertyDescriptor = Object.getOwnPropertyDescriptor(IndexerClient.prototype, propertyName);
-    if (!propertyDescriptor) return;
-    // eslint-disable-next-line func-names
-    propertyDescriptor.value = function (...args: any) {
-      return (this as any).indexerClient[propertyName](...args);
-    };
-    Object.defineProperty(Provider.prototype, propertyName, propertyDescriptor);
+    Object.defineProperty(targetClass.prototype, propertyName, propertyDescriptor);
   });
 }
+
+applyMixin(Provider, AptosClient, "aptosClient");
+applyMixin(Provider, IndexerClient, "indexerClient");
 
 // use exhaustive type predicates
 function isCustomEndpoints(network: CustomEndpoints): network is CustomEndpoints {
