@@ -53,7 +53,7 @@ impl Default for QuorumStoreConfig {
             mempool_txn_pull_max_count: 200,
             mempool_txn_pull_max_bytes: 1000000,
             // QS will be backpressured if the remaining local batches is more than this number
-            back_pressure_local_batch_num: 2,
+            back_pressure_local_batch_num: 10,
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
             num_workers_for_remote_fragments: 10,
         }

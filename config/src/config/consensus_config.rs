@@ -52,9 +52,9 @@ impl Default for ConsensusConfig {
             max_sending_block_txns: 5000,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
-            max_sending_block_bytes: 1 * 1024 * 1024, // 1 MB
+            max_sending_block_bytes: 50 * 1024 * 1024, // 1 MB
             max_receiving_block_txns: 10000,
-            max_receiving_block_bytes: 30 * 1024 * 1024, // 3MB
+            max_receiving_block_bytes: 50 * 1024 * 1024, // 3MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
