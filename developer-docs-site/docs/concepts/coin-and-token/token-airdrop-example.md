@@ -7,11 +7,11 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Airdrop Aptos Tokens
 
-We support different ways of transferring tokens in the [Aptos token standard](./aptos-token.md#token-transfer). To airdrop to a list of addresses, we can use the two-step process of token transfer since it doesn't require the receiver to opt-in to direct transfer.
+We support [different ways](./aptos-token.md#token-transfer) of transferring tokens in the Aptos token standard. In this example, we use the two-step process to airdrop to a list of addresses since this method doesn't require the receiver to opt-in to direct transfer.
 
 The two-steps are:
 
-1. Offering the token to an account.
+1. The app offering the token to an account.
 2. The receiver claiming this token.
 
 After minting a token or using existing tokens from TokenStore, we can directly offer the token to a receiver address from a whitelist.
