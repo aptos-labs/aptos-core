@@ -296,6 +296,10 @@ module aptos_framework::object {
     /// Transfer to the destination address using a LinearTransferRef.
     public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore {
         let object = borrow_global_mut<ObjectCore>(ref.self);
+        assert!(
+            object.owner == ref.owner,
+            error::permission_denied(ENOT_OBJECT_OWNER),
+        );
         event::emit_event(
             &mut object.transfer_events,
             TransferEvent {
@@ -441,9 +445,9 @@ module aptos_framework::object {
     struct Weapon has key { }
 
     #[test_only]
-    public fun create_hero(creator: &signer): Object<Hero> acquires ObjectCore {
-        let hero_creator_ref = create_named_object(creator, b"hero");
-        let hero_signer = generate_signer(&hero_creator_ref);
+    public fun create_hero(creator: &signer): (ConstructorRef, Object<Hero>) acquires ObjectCore {
+        let hero_constructor_ref = create_named_object(creator, b"hero");
+        let hero_signer = generate_signer(&hero_constructor_ref);
         let guid_for_equip_events = create_guid(&hero_signer);
         move_to(
             &hero_signer,
@@ -453,15 +457,17 @@ module aptos_framework::object {
             },
         );
 
-        object_from_constructor_ref<Hero>(&hero_creator_ref)
+        let hero = object_from_constructor_ref<Hero>(&hero_constructor_ref);
+        (hero_constructor_ref, hero)
     }
 
     #[test_only]
-    public fun create_weapon(creator: &signer): Object<Weapon> {
-        let weapon_creator_ref = create_named_object(creator, b"weapon");
-        let weapon_signer = generate_signer(&weapon_creator_ref);
+    public fun create_weapon(creator: &signer): (ConstructorRef, Object<Weapon>) {
+        let weapon_constructor_ref = create_named_object(creator, b"weapon");
+        let weapon_signer = generate_signer(&weapon_constructor_ref);
         move_to(&weapon_signer, Weapon { });
-        object_from_constructor_ref<Weapon>(&weapon_creator_ref)
+        let weapon = object_from_constructor_ref<Weapon>(&weapon_constructor_ref);
+        (weapon_constructor_ref, weapon)
     }
 
     #[test_only]
@@ -496,10 +502,32 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     fun test_object(creator: &signer) acquires Hero, ObjectCore {
-        let hero = create_hero(creator);
-        let weapon = create_weapon(creator);
+        let (_, hero) = create_hero(creator);
+        let (_, weapon) = create_weapon(creator);
 
         hero_equip(creator, hero, weapon);
         hero_unequip(creator, hero, weapon);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_linear_transfer(creator: &signer) acquires ObjectCore {
+        let (hero_constructor, hero) = create_hero(creator);
+        let transfer_ref = generate_transfer_ref(&hero_constructor);
+        let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
+        transfer_with_ref(linear_transfer_ref, @0x456);
+        assert!(owner(hero) == @0x456, 0);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
+    fun test_bad_linear_transfer(creator: &signer) acquires ObjectCore {
+        let (hero_constructor, hero) = create_hero(creator);
+        let transfer_ref = generate_transfer_ref(&hero_constructor);
+        let linear_transfer_ref_good = generate_linear_transfer_ref(&transfer_ref);
+        // This will contain the address of the creator
+        let linear_transfer_ref_bad = generate_linear_transfer_ref(&transfer_ref);
+        transfer_with_ref(linear_transfer_ref_good, @0x456);
+        assert!(owner(hero) == @0x456, 0);
+        transfer_with_ref(linear_transfer_ref_bad, @0x789);
     }
 }
