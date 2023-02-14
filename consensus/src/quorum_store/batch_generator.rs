@@ -261,7 +261,7 @@ impl BatchGenerator {
 
             tokio::select! {
                 _ = interval.tick() => {
-                    if self.qs_back_pressure || self.block_store.back_pressure() {
+                    if self.qs_back_pressure {
                         counters::QS_BACKPRESSURE.set(1);
                         // quorum store needs to be back pressured
                         // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
