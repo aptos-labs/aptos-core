@@ -241,6 +241,11 @@ const config = {
                 label: "Mint NFTs with the Mint Tool",
                 docId: "concepts/coin-and-token/nft-minting-tool",
               },
+              {
+                type: "doc",
+                label: "Airdrop Aptos Tokens",
+                docId: "concepts/coin-and-token/airdrop-aptos-tokens",
+              },
             ],
           },
           {

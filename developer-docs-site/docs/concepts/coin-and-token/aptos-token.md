@@ -7,8 +7,8 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Aptos Token
 
-:::tip Aptos token tutorial
-Also see the tutorial [Your First NFT](/tutorials/your-first-nft.md).
+:::tip Aptos Token standards compared
+Also see the [comparison of Aptos Token standards](./aptos-token-overview.md).
 :::
 
 

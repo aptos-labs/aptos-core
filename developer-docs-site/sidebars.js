@@ -119,7 +119,7 @@ const sidebars = {
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
-      items: ["tutorials/first-transaction", "tutorials/first-dapp", "tutorials/first-coin"],
+      items: ["tutorials/first-transaction", "tutorials/first-dapp", "tutorials/first-coin", "concepts/coin-and-token/propertymap-offchain",],
     },
     {
       type: "category",
@@ -191,6 +191,7 @@ const sidebars = {
         "guides/move-guides/mint-nft-cli",
         "concepts/coin-and-token/onchain-data",
         "concepts/coin-and-token/nft-minting-tool",
+        "concepts/coin-and-token/airdrop-aptos-tokens",
       ],
     },
   ],
