@@ -529,13 +529,14 @@ module aptos_framework::coin {
     /// Before:
     /// ```
     /// let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr).coin;
-    /// let value = coin::value_mut(&coin_mut);
-    /// let new_coin = coin::extract(&mut coin_mut, value - 100000000);
+    /// let value_now = coin::value_mut(&coin_mut);
+    /// let new_coin = coin::extract(&mut coin_mut, value_now - 100000000);
     /// ```
     /// After:
     /// ```
     /// let coin_mut = &mut borrow_global_mut<StructName<CoinType>>(my_addr).coin;
-    /// let new_coin = coin::extract(coin_mut, coin::value_mut(coin_mut) - 100000000);
+    /// let value_now = coin::value_mut(coin_mut);
+    /// let new_coin = coin::extract(coin_mut, value_now - 100000000);
     /// ```
     public fun value_mut<CoinType>(coin: &mut Coin<CoinType>): u64 {
         coin.value
@@ -892,7 +893,7 @@ module aptos_framework::coin {
 
         // Invalid usage of reference as function argument. Cannot transfer a mutable reference that is being borrowed
         //deposit(source_addr, extract(demo_struct_mut, value_mut(demo_struct_mut) / 2));
-        
+
         let value = value_mut(demo_struct_mut);
         deposit(source_addr, extract(demo_struct_mut, value / 2));
 
