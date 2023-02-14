@@ -5,7 +5,7 @@ import { FaucetClient } from "../../providers/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../token_client";
 import { API_TOKEN, longTestTimeout } from "../../utils/test_helper.test";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../../utils";
+import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 
 describe("Indexer", () => {
   const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
@@ -47,29 +47,35 @@ describe("Indexer", () => {
     );
   }, longTestTimeout);
 
-  it(
-    "gets account NFTs",
-    async () => {
-      const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
-      expect(accountNFTs.current_token_ownerships).toHaveLength(1);
-      expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
-      expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
-      expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
-    },
-    longTestTimeout,
-  );
+  describe("get data", () => {
+    jest.retryTimes(5);
+    beforeEach(async () => {
+      await sleep(1000);
+    });
+    it(
+      "gets account NFTs",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        expect(accountNFTs.current_token_ownerships).toHaveLength(1);
+        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
+        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
+        expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
+      },
+      longTestTimeout,
+    );
 
-  it(
-    "gets token activities",
-    async () => {
-      const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
-      const tokenActivity = await indexerClient.getTokenActivities(
-        accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
-      );
-      expect(tokenActivity.token_activities).toHaveLength(2);
-      expect(tokenActivity.token_activities[0]).toHaveProperty("from_address");
-      expect(tokenActivity.token_activities[0]).toHaveProperty("to_address");
-    },
-    longTestTimeout,
-  );
+    it(
+      "gets token activities",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenActivity = await indexerClient.getTokenActivities(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+        );
+        expect(tokenActivity.token_activities).toHaveLength(2);
+        expect(tokenActivity.token_activities[0]).toHaveProperty("from_address");
+        expect(tokenActivity.token_activities[0]).toHaveProperty("to_address");
+      },
+      longTestTimeout,
+    );
+  });
 });
