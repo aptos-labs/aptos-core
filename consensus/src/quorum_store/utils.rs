@@ -325,7 +325,7 @@ impl ProofQueue {
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
             }
-            size = size - 1;
+            size -= 1;
         }
         counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
         counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);

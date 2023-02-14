@@ -412,7 +412,7 @@ where
     type Output = Output<K, V>;
     type Txn = Transaction<K, V>;
 
-    fn init(_argument: Self::Argument) -> Self {
+    fn init(_argument: Self::Argument, _thread_id: usize) -> Self {
         Self::new()
     }
 
@@ -422,6 +422,7 @@ where
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
+        _thread_id: usize,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             Transaction::Write {

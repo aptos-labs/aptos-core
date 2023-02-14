@@ -687,7 +687,7 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            onchain_config.back_pressure_limit(),
+            onchain_consensus_config.back_pressure_limit(),
             payload_manager.clone(),
         ));
 
