@@ -1,9 +1,11 @@
 ---
-title: "Fetch Data from Chain"
+title: "4. Fetch Data from Chain"
 id: "fetch-data-from-chain"
 ---
 
-# Fetch Data from Chain
+# 4. Fetch Data from Chain
+
+In the fourth chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will be learning to fetch data from chain.
 
 Our UI logic relies on whether the connected account has created a todo list. If the account has created a todo list, our app should display that list; if not, the app should display a button offering the option to create a new list.
 
@@ -12,6 +14,7 @@ For that, we first need to check if the connected account has a `TodoList` resou
 To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
 
 To get started:
+
 1. Stop the local server if running.
 2. In the `client` directory, run: `npm i aptos@1.6.0`
 3. In the `App.tsx` file, import the `AptosClient` class like so:
@@ -83,7 +86,7 @@ const fetchList = async () => {
   try {
     const TodoListResource = await client.getAccountResource(
       account.address,
-      `${moduleAddress}::main::TodoList`
+      `${moduleAddress}::todolist::TodoList`
     );
     setAccountHasList(true);
   } catch (e: any) {
@@ -99,7 +102,7 @@ The `client.getAccountResource()`expects an *account address* that holds the res
 - account address - is the current connected account (we are getting it from the wallet account object)
 - Move struct type string syntax:
   - The account address who holds the move module = our profile account address (You might want to change the `moduleAddress` const to be your own account address)
-  - The module name the resource lives in = `main`
+  - The module name the resource lives in = `todolist`
   - The resource name = `TodoList`
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
@@ -136,4 +139,4 @@ We now have an **Add new list** button that appears only if the account doesn’
 
 Start the local server with `npm start`. You should see the **Add new list** button.
 
-Next, let’s understand how to create a new list by [submitting data to chain](./5-submit-data-to-chain.md).
+Next, let’s understand how to create a new list by [submitting data to chain](./5-submit-data-to-chain.md) in chapter 5.

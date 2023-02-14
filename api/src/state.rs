@@ -301,7 +301,7 @@ impl StateApi {
     ) -> BasicResultWith404<MoveModuleBytecode> {
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
-        let state_key = StateKey::AccessPath(access_path);
+        let state_key = StateKey::access_path(access_path);
         let (ledger_info, ledger_version, state_view) =
             self.preprocess_request(ledger_version.map(|inner| inner.0))?;
         let bytes = state_view

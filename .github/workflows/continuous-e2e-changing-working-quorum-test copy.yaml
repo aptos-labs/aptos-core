@@ -13,7 +13,7 @@ jobs:
   ### Please remember to use different namespace for different tests
   # Performance test in an optimal setting
   run-forge-changing-working-quorum-test:
-    uses: ./.github/workflows/run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-changing-working-quorum-test

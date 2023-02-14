@@ -247,7 +247,7 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
+        let state_key = StateKey::access_path(AccessPath::resource_access_path(
             self.address.into(),
             AccountResource::struct_tag(),
         ));
@@ -474,7 +474,7 @@ impl Account {
         &self,
         struct_tag: &StructTag,
     ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(
+        let state_key = StateKey::access_path(AccessPath::resource_access_path(
             self.address.into(),
             struct_tag.clone(),
         ));

@@ -15,6 +15,12 @@ pub fn generate_gas_upgrade_proposal(
 
     let writer = CodeWriter::new(Loc::default());
 
+    emitln!(
+        writer,
+        "// source commit hash: {}\n",
+        git_version::git_version!()
+    );
+
     emitln!(writer, "// Gas schedule upgrade proposal\n");
 
     emitln!(

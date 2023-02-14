@@ -46,14 +46,16 @@ static FAKE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
 
 // Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
 // genesis directly if necessary.
-static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| StateKey::TableItem {
-    handle: "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
-        .parse()
-        .unwrap(),
-    key: vec![
-        6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189, 245,
-        246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
-    ],
+static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
+    StateKey::table_item(
+        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+            .parse()
+            .unwrap(),
+        vec![
+            6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
+            245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
+        ],
+    )
 });
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -125,7 +127,7 @@ impl FakeExecutor {
         name: &str,
         type_params: Vec<TypeTag>,
     ) -> StateKey {
-        StateKey::AccessPath(AccessPath::new(
+        StateKey::access_path(AccessPath::new(
             address,
             AccessPath::resource_path_vec(Self::new_struct_tag(
                 resource_address,

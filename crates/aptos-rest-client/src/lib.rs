@@ -22,10 +22,10 @@ pub use aptos_api_types::{
 };
 use aptos_api_types::{
     deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE},
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
     AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
     TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent,
+    VersionedEvent, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -304,6 +304,28 @@ impl Client {
         assert_eq!(response.inner().block_height, response.state().block_height);
 
         Ok(response)
+    }
+
+    pub async fn view(
+        &self,
+        request: &ViewRequest,
+        version: Option<u64>,
+    ) -> AptosResult<Response<Vec<serde_json::Value>>> {
+        let request = serde_json::to_string(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, JSON)
+            .body(request)
+            .send()
+            .await?;
+
+        self.json(response).await
     }
 
     pub async fn simulate(

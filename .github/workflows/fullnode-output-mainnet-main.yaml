@@ -1,0 +1,23 @@
+# This workflow runs a public fullnode using the `main` branch,
+# connects the public fullnode to `mainnet` and synchronizes the
+# node using output syncing to verify that nothing has been broken.
+
+name: "fullnode-output-mainnet-main"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
+  pull_request:
+    paths:
+      - ".github/workflows/fullnode-output-mainnet-main.yaml"
+
+jobs:
+  fullnode-output-mainnet-main:
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-output-mainnet-main
+      BRANCH: main
+      NETWORK: mainnet
+      BOOTSTRAPPING_MODE: ApplyTransactionOutputsFromGenesis
+      CONTINUOUS_SYNCING_MODE: ApplyTransactionOutputs

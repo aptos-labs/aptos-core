@@ -8,7 +8,6 @@ use aptos_logger::{Level, Logger};
 use aptos_transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 use clap::{Parser, Subcommand};
 use diag::diag;
-use std::time::Duration;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -56,10 +55,7 @@ pub async fn main() -> Result<()> {
                 .await
                 .context("Emit transactions failed")?;
             println!("Total stats: {}", stats);
-            println!(
-                "Average rate: {}",
-                stats.rate(Duration::from_secs(args.emit_args.duration))
-            );
+            println!("Average rate: {}", stats.rate());
             Ok(())
         },
         TxnEmitterCommand::Diag(args) => {

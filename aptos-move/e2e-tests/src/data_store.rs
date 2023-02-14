@@ -93,7 +93,7 @@ impl FakeDataStore {
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
         let access_path = AccessPath::from(module_id);
-        self.set(StateKey::AccessPath(access_path), blob);
+        self.set(StateKey::access_path(access_path), blob);
     }
 
     /// Yields a reference to the internal data structure of the global state

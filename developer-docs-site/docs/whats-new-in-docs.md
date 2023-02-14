@@ -7,16 +7,20 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 31 January 2023
+
+- Improved the new script for installing the Aptos CLI to [always fetch the latest version and seamlessly apply updates](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md#update).
+
 ## 30 January 2023
 
-- Released [Aptos Node v1.2.3](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.3) to mainnet with enhancements to state synchronization and features added for use of the Move programming language, including:
+- Released [Aptos Node v1.2.4](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.4) to testnet with enhancements to state synchronization and features added for use of the Move programming language, including:
   * New integer types (u16, u32, u256)
   * [View functions](guides/aptos-apis.md#reading-state-with-the-view-function) to evaluate transactions before execution
   * Compile-time checks for transaction arguments
   * Various updates to smart contracts
   * Several Aptos Improvement Proposals (AIPs)
 
-  See the [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for many more details.
+  See the [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for many more details. This release will be available on mainnet soon.
 
 - Created an entirely new tutorial that covers [building an end-to-end todo list dapp](tutorials/build-e2e-dapp/index.md), starting from the smart contract side through the front-end side and use of a wallet to interact with the two.
 

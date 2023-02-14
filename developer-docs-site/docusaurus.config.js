@@ -37,6 +37,7 @@ const config = {
           remarkPlugins: [codeInjector, math],
           path: "docs",
           rehypePlugins: [katex],
+          showLastUpdateTime: true,
         },
         sitemap: {
           changefreq: "daily",
@@ -266,6 +267,11 @@ const config = {
                 label: "Run a FullNode",
                 type: "doc",
                 docId: "nodes/full-node/index",
+              },
+              {
+                label: "Run an Indexer",
+                type: "doc",
+                docId: "nodes/indexer-fullnode",
               },
               {
                 label: "Monitor a Node",

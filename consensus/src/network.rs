@@ -7,7 +7,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, Fragment},
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -70,6 +70,8 @@ pub struct NetworkReceivers {
 
 #[async_trait::async_trait]
 pub(crate) trait QuorumStoreSender {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
@@ -302,6 +304,12 @@ impl NetworkSender {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
+    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch_request", |_| ());
+        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        self.send(msg, recipients).await
+    }
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         fail_point!("consensus::send_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(batch));

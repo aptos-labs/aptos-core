@@ -1,8 +1,8 @@
+Using cluster: forge-big-1 in cloud: AWS
 Using the following image tags:
 	forge:  banana
 	swarm:  banana
 	swarm upgrade (if applicable):  banana
-Using cluster: forge-big-1
 === Start temp-pre-comment ===
 ### Forge is running suite `banana-test` on `banana`
 * [Grafana dashboard (auto-refresh)](https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global&var-namespace=forge-perry-1659078000&var-metrics_source=All&var-chain_name=forge-big-1&refresh=10s&from=now-15m&to=now)

@@ -291,6 +291,16 @@ module std::option {
         }
     }
 
+    /// Maps the content of an option without destroying the original option.
+    public inline fun map_ref<Element, OtherElement>(
+        o: &Option<Element>, f: |&Element|OtherElement): Option<OtherElement> {
+        if (is_some(o)) {
+            some(f(borrow(o)))
+        } else {
+            none()
+        }
+    }
+
     /// Filters the content of an option
     public inline fun filter<Element:drop>(o: Option<Element>, f: |&Element|bool): Option<Element> {
         if (is_some(&o) && f(borrow(&o))) {

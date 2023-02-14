@@ -1,11 +1,13 @@
 ---
-title: "Create a Smart Contract"
+title: "1. Create a Smart Contract"
 id: "create-a-smart-contract"
 ---
 
-# Create a Smart Contract
+# 1. Create a Smart Contract
 
-If you haven’t done it, [install the Aptos CLI](../../cli-tools/aptos-cli-tool/index.md). Make sure you use CLI version 1.0.4 or later as this what we use in this tutorial.
+This is the first chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md). If you haven’t done it, review that introduction, and ensure your environment meets the [prerequisites](../../cli-tools/aptos-cli-tool/index.md) listed there.
+
+Now that you are all set up and at your terminal:
 
 1.  `cd` into the `my-first-dapp` root directory, and create a new `move` directory.
 2.  `cd` into the new `move` directory and run: `aptos move init --name my_todo_list`
@@ -56,20 +58,20 @@ As mentioned, our `sources` directory holds our `.move` module files; so let’s
 
 ```toml
 [addresses]
-myaddr='<default-profile-account-address>'
+todolist_addr='<default-profile-account-address>'
 ```
 
 If the default profile account address is `cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018`, your `Move.toml` file should look like:
 
 ```toml
 [addresses]
-myaddr='cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018'
+todolist_addr='cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018'
 ```
 
-4. Create a new `main.move` file within the `sources` directory and add the following to that file:
+4. Create a new `todolist.move` file within the `sources` directory and add the following to that file:
 
 ```rust
-module myaddr::main {
+module todolist_addr::todolist {
 
 }
 ```
@@ -83,7 +85,7 @@ module <account-address>::<module-name> {
 }
 ```
 
-In our module, the `account-address` is `myaddr` (a variable we just declared on the `Move.toml` file in the previous step that holds an `address`), and the `module-name` is `main` (a random name we selected).
+In our module, the `account-address` is `todolist_addr` (a variable we just declared on the `Move.toml` file in the previous step that holds an `address`), and the `module-name` is `todolist` (a random name we selected).
 :::
 
 ### Our contract logic
@@ -112,7 +114,7 @@ And also create a `Task` struct that holds:
 - content - the task content.
 - completed - a boolean that marks whether that task is completed or not.
 
-On the `main.move` file, update the content in the module with:
+On the `todolist.move` file, update the content in the module with:
 
 ```rust
 ...
@@ -184,7 +186,7 @@ INCLUDING DEPENDENCY MoveStdlib
 BUILDING myTodolist
 {
 "Result": [
-    "cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::main"
+    "cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::todolist"
   ]
 }
 ```
@@ -421,7 +423,7 @@ INCLUDING DEPENDENCY MoveStdlib
 BUILDING myTodolist
 {
 "Result": [
-    "cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::main"
+    "cbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::todolist"
   ]
 }
 ```
@@ -461,7 +463,7 @@ Update the test function to be:
 ```rust
 #[test(admin = @0x123)]
 public entry fun test_flow(admin: signer) acquires TodoList {
-  // creates an admin @myaddr account for test
+  // creates an admin @todolist_addr account for test
   account::create_account_for_test(signer::address_of(&admin));
   // initialize contract with admin account
   create_list(&admin);
@@ -517,7 +519,7 @@ use std::string::{Self, String}; // already have it, need to modify
 
 ```rust
 Running Move unit tests
-[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::main::test_flow
+[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::todolist::test_flow
 Test result: OK. Total tests: 1; passed: 1; failed: 0
 {
   "Result": "Success"
@@ -530,7 +532,7 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 #[test(admin = @0x123)]
 #[expected_failure(abort_code = E_NOT_INITIALIZED)]
 public entry fun account_can_not_update_task(admin: signer) acquires TodoList {
-  // creates an admin @myaddr account for test
+  // creates an admin @todolist_addr account for test
   account::create_account_for_test(signer::address_of(&admin));
   // account can not toggle task as no list was created
   complete_task(&admin, 2);
@@ -545,8 +547,8 @@ The test also uses a special annotation `#[expected_failure]` that, as the name 
 
 ```rust
 Running Move unit tests
-[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::main::account_can_not_update_task
-[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::main::test_flow
+[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::todolist::account_can_not_update_task
+[ PASS    ] 0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018::todolist::test_flow
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 {
   "Result": "Success"
@@ -599,4 +601,4 @@ use std::string; // add this
 
 6. You can now head to the [Aptos Explorer](https://explorer.aptoslabs.com/), change the dropdown on the top right to the _Devnet_ network and look for that `transaction_hash` value - this will show you the transaction details.
 
-Now let's [set up a React app](./2-set-up-react-app.md).
+Now let's [set up a React app](./2-set-up-react-app.md) in chapter 2.

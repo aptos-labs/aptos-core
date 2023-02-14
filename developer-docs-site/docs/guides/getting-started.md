@@ -12,7 +12,7 @@ To kickstart your journey in the Aptos ecosystem, set up your environment as nee
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
 
-Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
+Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) and [papers](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/papers) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub while continuing your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
 
 ## Use supported operating systems
 
@@ -59,7 +59,7 @@ The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves al
 
 ## Install the Aptos CLI
 
-[Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
+[Install the Aptos CLI](../cli-tools/aptos-cli-tool/index.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
 This tool will help you compile, test, and publish contracts as well as run contracts directly on the blockchain.
 
 ## Clone the Aptos-core repo
@@ -152,42 +152,34 @@ Windows.  All dependencies must be manually installed.
 
 ## Check out release branch
 
-Optionally, check out a release branch to install an Aptos node:
+Optionally, check out a release branch to install an Aptos node. We suggest you check out `devnet` for your first development. See [Choose a network](./system-integrators-guide.md#choose-a-network) for an explanation of their differences. 
 
-    We suggest you check out `devnet` for your first development.
-
-    <Tabs groupId="network">
+<Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
-
-    Check out the `devnet` branch using:
 
     ```
     git checkout --track origin/devnet
     ```
-    </TabItem>
+</TabItem>
     <TabItem value="testnet" label="Testnet" default>
-
-    Check out the `testnet` branch using:
 
     ```
     git checkout --track origin/testnet
     ```
-    </TabItem>
-    <TabItem value="mainnet" label="Mainnet">
-
-    Check out the `mainnet` branch using:
+</TabItem>
+<TabItem value="mainnet" label="Mainnet">
 
     ```
     git checkout --track origin/mainnet
     ```
-    </TabItem>
-    </Tabs>
+</TabItem>
+</Tabs>
 
 Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
 
 ## Create and fund test accounts
 
-Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`).
+Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`). For more options and details, see [Create and Fund Aptos Accounts](./get-test-funds.md).
 
 ## Understand the Aptos Token Standard
 

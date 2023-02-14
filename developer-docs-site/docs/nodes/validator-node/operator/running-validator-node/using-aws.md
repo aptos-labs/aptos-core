@@ -22,7 +22,7 @@ Make sure you complete these prerequisite steps before you proceed:
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
    - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-   - **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+   - **Terraform 1.3.6**: https://www.terraform.io/downloads.html
    - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
    - **AWS CLI**: https://aws.amazon.com/cli/
 
@@ -69,7 +69,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
     ```
     terraform {
-      required_version = "~> 1.2.0"
+      required_version = "~> 1.3.6"
       backend "s3" {
         bucket = "terraform.aptos-node"
         key    = "state/aptos-node"

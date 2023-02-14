@@ -542,6 +542,13 @@ module std::vector_tests {
     }
 
     #[test]
+    fun test_map_ref() {
+        let v = vector[1, 2, 3];
+        let s = V::map_ref(&v, |x| *x + 1);
+        assert!(s == vector[2, 3, 4] , 0)
+    }
+
+    #[test]
     fun test_filter() {
         let v = vector[1, 2, 3];
         let s = V::filter(v, |x| *x % 2 == 0);

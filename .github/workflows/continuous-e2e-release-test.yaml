@@ -8,15 +8,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 9 * * *"
-  pull_request:
-    paths:
-      - ".github/workflows/run-forge.yaml"
-      - ".github/workflows/continuous-e2e-release-test.yaml"
 
 jobs:
   # Run a faster chaos forge to quickly surface correctness failures
   run-release-blocking-forge:
-    uses: ./.github/workflows/run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       # Run for 5 hours unless its on a pr

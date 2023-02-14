@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 futures = { workspace = true }
 

@@ -1,13 +1,15 @@
 ---
-title: "Handle Tasks"
+title: "6. Handle Tasks"
 id: "handle-tasks"
 ---
 
-# Handle Tasks
+# 6. Handle Tasks
+
+In the sixth and final chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md), you will add functionality to the app so the user interface is able to handle cases where an account has created a list.
 
 We have covered how to [fetch data](./4-fetch-data-from-chain.md) (an account’s todo list) from chain and how to [submit a transaction](./5-submit-data-to-chain.md) (new todo list) to chain using Wallet.
 
-Let’s continue building our app by implementing fetch tasks and adding a task function.
+Let’s finish building our app by implementing fetch tasks and adding a task function.
 
 ## Fetch tasks
 
@@ -35,7 +37,7 @@ const fetchList = async () => {
   try {
     const TodoListResource = await client.getAccountResource(
       account?.address,
-      `${moduleAddress}::main::TodoList`
+      `${moduleAddress}::todolist::TodoList`
     );
     setAccountHasList(true);
 		// tasks table handle
@@ -48,7 +50,7 @@ const fetchList = async () => {
     while (counter <= taskCounter) {
       const tableItem = {
         key_type: "u64",
-        value_type: `${moduleAddress}::main::Task`,
+        value_type: `${moduleAddress}::todolist::Task`,
         key: `${counter}`,
       };
       const task = await client.getTableItem(tableHandle, tableItem);
@@ -82,7 +84,7 @@ let counter = 1;
 while (counter <= taskCounter) {
   const tableItem = {
     key_type: "u64",
-    value_type: `${moduleAddress}::main::Task`,
+    value_type: `${moduleAddress}::todolist::Task`,
     key: `${counter}`,
   };
   const task = await client.getTableItem(tableHandle, tableItem);
@@ -109,7 +111,7 @@ So the object we built is:
 ```js
 {
   key_type: "u64",
-  value_type:`${moduleAddress}::main::Task`,
+  value_type:`${moduleAddress}::todolist::Task`,
   key: `${taskCounter}`,
 }
 ```
@@ -117,7 +119,7 @@ So the object we built is:
 Where `key_type` is the table `key` type, `key` is the key value we are looking for, and the `value_type` is the table `value` which is a `Task` struct. The Task struct uses the same format from our previous resource query:
 
 - The account address who holds that module = our profile account address
-- The module name the resource lives in = `main`
+- The module name the resource lives in = `todolist`
 - The struct name = `Task`
 
 The last thing we want to do is display the tasks we just fetched.
@@ -278,7 +280,7 @@ const onTaskAdded = async () => {
     // build a transaction payload to be submited
     const payload = {
       type: "entry_function_payload",
-      function: `${moduleAddress}::main::create_task`,
+      function: `${moduleAddress}::todolist::create_task`,
       type_arguments: [],
       arguments: [newTask],
     };
@@ -327,7 +329,7 @@ Then we build our transaction payload to be submitted to chain:
 ```js
 const payload = {
   type: "entry_function_payload",
-  function: `${moduleAddress}::main::create_task`,
+  function: `${moduleAddress}::todolist::create_task`,
   type_arguments: [],
   arguments: [newTask],
 };
@@ -370,7 +372,7 @@ const onCheckboxChange = async (
     const payload = {
       type: "entry_function_payload",
       function:
-        `${moduleAddress}::main::complete_task`,
+        `${moduleAddress}::todolist::complete_task`,
       type_arguments: [],
       arguments: [taskId],
     };

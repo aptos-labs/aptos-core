@@ -1,0 +1,24 @@
+# This workflow runs a public fullnode using the `main` branch,
+# connects the public fullnode to `devnet` and synchronizes the
+# node using execution or output syncing to verify that nothing
+# has been broken.
+
+name: "fullnode-intelligent-devnet-main"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
+  pull_request:
+    paths:
+      - ".github/workflows/fullnode-intelligent-devnet-main.yaml"
+
+jobs:
+  fullnode-intelligent-devnet-main:
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-intelligent-devnet-main
+      BRANCH: main
+      NETWORK: devnet
+      BOOTSTRAPPING_MODE: ExecuteOrApplyFromGenesis
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactionsOrApplyOutputs

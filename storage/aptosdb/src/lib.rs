@@ -37,6 +37,10 @@ mod aptosdb_test;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::buffered_state::BufferedState;
+
+#[cfg(feature = "db-debugger")]
+pub mod db_debugger;
+
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_options::{
@@ -51,7 +55,7 @@ use crate::{
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
     pruner::{
-        ledger_pruner_manager::LedgerPrunerManager,
+        db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
         pruner_utils, state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
     },
@@ -112,6 +116,7 @@ use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
+    fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
     sync::{mpsc, Arc},
@@ -242,7 +247,6 @@ impl Drop for RocksdbPropertyReporter {
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
-#[derive(Debug)]
 pub struct AptosDB {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
@@ -325,10 +329,36 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
+        let (ledger_db, state_merkle_db, kv_db) =
+            Self::open_dbs(db_root_path.as_ref(), rocksdb_configs, readonly)?;
+
+        let mut myself = Self::new_with_dbs(
+            ledger_db,
+            state_merkle_db,
+            kv_db,
+            pruner_config,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            readonly,
+        );
+
+        if !readonly && enable_indexer {
+            myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
+        }
+
+        Ok(myself)
+    }
+
+    pub fn open_dbs<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        rocksdb_configs: RocksdbConfigs,
+        readonly: bool,
+    ) -> Result<(DB, DB, Option<DB>)> {
+        let instant = Instant::now();
+
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let kv_db_path = db_root_path.as_ref().join(KV_DB_NAME);
-        let instant = Instant::now();
 
         let (ledger_db, state_merkle_db, kv_db) = if readonly {
             (
@@ -382,20 +412,6 @@ impl AptosDB {
             )
         };
 
-        let mut myself = Self::new_with_dbs(
-            ledger_db,
-            state_merkle_db,
-            kv_db,
-            pruner_config,
-            buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
-            readonly,
-        );
-
-        if !readonly && enable_indexer {
-            myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
-        }
-
         if rocksdb_configs.use_kv_db {
             info!(kv_db_path = kv_db_path, "Opened K/V DB.",);
         }
@@ -405,7 +421,8 @@ impl AptosDB {
             time_ms = %instant.elapsed().as_millis(),
             "Opened AptosDB (LedgerDB + StateMerkleDB).",
         );
-        Ok(myself)
+
+        Ok((ledger_db, state_merkle_db, kv_db))
     }
 
     fn open_indexer(
@@ -695,17 +712,40 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
         let start = Instant::now();
-        let ledger_db_path = path.as_ref().join(LEDGER_DB_NAME);
-        let state_merkle_db_path = path.as_ref().join(STATE_MERKLE_DB_NAME);
-        std::fs::remove_dir_all(&ledger_db_path).unwrap_or(());
-        std::fs::remove_dir_all(&state_merkle_db_path).unwrap_or(());
-        self.ledger_db.create_checkpoint(&ledger_db_path)?;
-        self.state_merkle_db
-            .create_checkpoint(&state_merkle_db_path)?;
+        let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
+        let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
+        let state_merkle_db_path = db_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_merkle_cp_path = cp_path.as_ref().join(STATE_MERKLE_DB_NAME);
+
+        std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
+        std::fs::remove_dir_all(&state_merkle_cp_path).unwrap_or(());
+
+        // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
+        // https://github.com/facebook/rocksdb/issues/11167
+        {
+            let ledger_db = aptos_schemadb::DB::open(
+                ledger_db_path,
+                LEDGER_DB_NAME,
+                ledger_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            ledger_db.create_checkpoint(ledger_cp_path)?;
+        }
+        {
+            let state_merkle_db = aptos_schemadb::DB::open(
+                state_merkle_db_path,
+                STATE_MERKLE_DB_NAME,
+                state_merkle_db_column_families(),
+                &aptos_schemadb::Options::default(),
+            )?;
+            state_merkle_db.create_checkpoint(state_merkle_cp_path)?;
+        }
+
         info!(
-            path = path.as_ref(),
+            db_path = db_path.as_ref(),
+            cp_path = cp_path.as_ref(),
             time_ms = %start.elapsed().as_millis(),
             "Made AptosDB checkpoint."
         );
@@ -1893,17 +1933,48 @@ impl DbWriter for AptosDB {
             )?;
 
             // Delete the genesis transaction
-            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut batch)?;
             LedgerPruner::prune_genesis(
                 self.ledger_db.clone(),
                 self.state_store.clone(),
                 &mut batch,
             )?;
 
+            self.ledger_pruner
+                .pruner()
+                .save_min_readable_version(version, &batch)?;
+
+            let mut state_merkle_batch = SchemaBatch::new();
+            StateMerklePruner::prune_genesis(
+                self.state_merkle_db.clone(),
+                &mut state_merkle_batch,
+            )?;
+
+            self.state_store
+                .state_pruner
+                .pruner()
+                .save_min_readable_version(version, &state_merkle_batch)?;
+            self.state_store
+                .epoch_snapshot_pruner
+                .pruner()
+                .save_min_readable_version(version, &state_merkle_batch)?;
+
             // Apply the change set writes to the database (atomically) and update in-memory state
             self.ledger_db.clone().write_schemas(batch)?;
+            self.state_merkle_db
+                .clone()
+                .write_schemas(state_merkle_batch)?;
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
+
+            self.ledger_pruner.pruner().record_progress(version);
+            self.state_store
+                .state_pruner
+                .pruner()
+                .record_progress(version);
+            self.state_store
+                .epoch_snapshot_pruner
+                .pruner()
+                .record_progress(version);
 
             Ok(())
         })
@@ -1965,4 +2036,10 @@ where
         .observe(timer.elapsed().as_secs_f64());
 
     res
+}
+
+impl Debug for AptosDB {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("{AptosDB}")
+    }
 }

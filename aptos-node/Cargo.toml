@@ -33,6 +33,7 @@ aptos-executor-types = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
+aptos-indexer-grpc-fullnode = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }
@@ -40,6 +41,7 @@ aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
 aptos-network-builder = { workspace = true }
+aptos-node-identity = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-state-sync-driver = { workspace = true }

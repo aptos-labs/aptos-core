@@ -109,7 +109,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 
     pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
         self.0
-            .get_state_value(&StateKey::AccessPath(access_path))
+            .get_state_value(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }

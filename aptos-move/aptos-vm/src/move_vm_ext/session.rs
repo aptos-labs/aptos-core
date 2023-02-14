@@ -325,7 +325,7 @@ impl SessionOutput {
                     },
                     Modify(blob) => WriteOp::Modification(blob),
                 };
-                write_set_mut.insert((StateKey::AccessPath(ap), op))
+                write_set_mut.insert((StateKey::access_path(ap), op))
             }
 
             for (name, blob_op) in modules {
@@ -336,7 +336,7 @@ impl SessionOutput {
                     Modify(blob) => WriteOp::Modification(blob),
                 };
 
-                write_set_mut.insert((StateKey::AccessPath(ap), op))
+                write_set_mut.insert((StateKey::access_path(ap), op))
             }
         }
 
@@ -355,7 +355,7 @@ impl SessionOutput {
                     },
                     Modify(blob) => WriteOp::Modification(blob),
                 };
-                write_set_mut.insert((StateKey::AccessPath(ap), op))
+                write_set_mut.insert((StateKey::access_path(ap), op))
             }
         }
 

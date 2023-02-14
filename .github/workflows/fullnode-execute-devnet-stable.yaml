@@ -1,0 +1,23 @@
+# This workflow runs a public fullnode using the `devnet` branch,
+# connects the public fullnode to `devnet` and synchronizes the
+# node using execution syncing to verify that nothing has been broken.
+
+name: "fullnode-execute-devnet-stable"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
+  pull_request:
+    paths:
+      - ".github/workflows/fullnode-execute-devnet-stable.yaml"
+
+jobs:
+  fullnode-execute-devnet-stable:
+    uses: ./.github/workflows/run-fullnode-sync.yaml
+    secrets: inherit
+    with:
+      TEST_NAME: fullnode-execute-devnet-stable
+      BRANCH: devnet
+      NETWORK: devnet
+      BOOTSTRAPPING_MODE: ExecuteTransactionsFromGenesis
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactions
