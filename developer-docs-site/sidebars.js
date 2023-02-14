@@ -119,7 +119,12 @@ const sidebars = {
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
-      items: ["tutorials/first-transaction", "tutorials/first-dapp", "tutorials/first-coin", "concepts/coin-and-token/propertymap-offchain",],
+      items: [
+        "tutorials/first-transaction",
+        "tutorials/first-dapp",
+        "tutorials/first-coin",
+        "concepts/coin-and-token/propertymap-offchain",
+      ],
     },
     {
       type: "category",
