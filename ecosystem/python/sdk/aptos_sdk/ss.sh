@@ -215,10 +215,18 @@ elif test $1 = p; then
         alnoki \
         aptos-core \
         1b84c283e4 \
-        aptos-move/move-examples/upgrade_and_govern/v2_0_0/Move.toml \
+        aptos-move/move-examples/upgrade_and_govern/v1_0_0/Move.toml \
+        upgrade_and_govern \
         2030-12-31 \
         Genesis \
         --outfile tmp/genesis.publication_proposal
+    # Sign publication.
+    python amee.py publish sign \
+        tmp/genesis.publication_proposal \
+        tmp/ace.keyfile \
+        Genesis \
+        --outfile tmp/genesis.publication_signature
+
     rm -rf tmp # Clear temp dir.
 
 fi

@@ -7,12 +7,16 @@ import json
 import secrets
 import subprocess
 from datetime import datetime
-from io import TextIOWrapper
+from io import BytesIO, TextIOWrapper
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List
 from typing import Optional as Option
 from typing import Tuple, Union
+from zipfile import ZipFile
 
+import requests
+import toml
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.authenticator import (Authenticator, Ed25519Authenticator,
@@ -404,12 +408,102 @@ def publish_propose(args):
             "github_project": args.project,
             "commit": args.commit,
             "manifest_path": args.manifest,
+            "named_address": args.named_address,
             "multisig": publisher_data,
             "sequence_number": sequence_number,
             "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
             "expiry": args.expiry.isoformat(),
         },
         check_if_exists=True,
+    )
+
+
+def publish_sign(args):
+    """Sign a package publication proposal."""
+    proposal = json.load(args.proposal)  # Load proposal data.
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_publication_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Publication signature",
+    )
+
+
+def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
+    """Convert a multisig publication transaction proposal to a raw
+    transaction."""
+    zip_url = get_github_zip_archive_url(
+        user=proposal["github_user"],
+        project=proposal["github_project"],
+        commit=proposal["commit"],
+    )  # Get URL for ZIP archive of project.
+    # Get temporary directory.
+    with TemporaryDirectory() as temp_dir:
+        # Request to download Git ZIP archive.
+        response = requests.get(url=zip_url, stream=True)
+        # Assert successful response.
+        assert response.ok, f"Repo download failure: {response.text}"
+        # Print ZIP file extraction notice.
+        print(f"Extracting {zip_url} to temporary directory {temp_dir}.")
+        # Extract ZIP file contents to temp dir.
+        ZipFile(BytesIO(response.content)).extractall(path=temp_dir)
+        # Get unzipped project directory, the only element in temp dir.
+        project_dir = Path(list(Path(temp_dir).glob("*"))[0])
+        # Get manifest path.
+        manifest_path = project_dir / Path(proposal["manifest_path"])
+        # With manifest file open:
+        with open(manifest_path, mode="r", encoding="utf-8") as manifest:
+            manifest_data = toml.load(manifest)  # Load manifest data.
+            # Get package name from manifest.
+            package_name = manifest_data["package"]["name"]
+        # Get publisher address.
+        publisher_address = proposal["multisig"]["address"]
+        # Get named address for build command.
+        named_address = proposal["named_address"]
+        command = (  # Get apto CLI build command.
+            f"aptos move compile --save-metadata "
+            f"--package-dir {manifest_path.parent} "
+            f"--named-addresses {named_address}={publisher_address}"
+        )
+        # Print aptos CLI build command to run.
+        print(f"Running aptos CLI command: {command}\n")
+        # Run aptos CLI build command.
+        subprocess.run(command.split(), stdout=subprocess.PIPE)
+        # Get path for package build files.
+        build_path = manifest_path.parent / Path("build") / Path(package_name)
+        # Open package metadata build file:
+        with open(build_path / Path("package-metadata.bcs"), "rb") as file:
+            package_metadata = file.read()  # Read in contents.
+        modules = []  # Initialize empty module bytecode list.
+        bytecode_files = [  # Get bytecode file paths.
+            child
+            for child in (build_path / Path("bytecode_modules")).iterdir()
+            if child.is_file()
+        ]
+        # Loop over package module bytecode files:
+        for file in bytecode_files:
+            with open(file, "rb") as module:  # With file open:
+                modules.append(module.read())  # Append bytecode.
+    payload = EntryFunction.natural(  # Construct payload.
+        module="0x1::code",
+        function="publish_package_txn",
+        ty_args=[],
+        args=[
+            TransactionArgument(package_metadata, Serializer.to_bytes),
+            TransactionArgument(
+                modules,
+                Serializer.sequence_serializer(Serializer.to_bytes),
+            ),
+        ],
+    )
+    return construct_raw_transaction(  # Return raw transaction.
+        sender_prefixed_hex=proposal["multisig"]["address"],
+        sequence_number=proposal["sequence_number"],
+        payload=payload,
+        expiry=datetime.fromisoformat(proposal["expiry"]),
+        chain_id=proposal["chain_id"],
     )
 
 
@@ -652,7 +746,7 @@ def rotate_execute_single(args):
         to_public_key_bytes=prefixed_hex_to_bytes(proposal["new_public_key"]),
         cap_rotate_key=account.sign(rotation_challenge_bcs).data(),
         cap_update_table=cap_update_table,
-        sender_bytes=prefixed_hex_to_bytes(proposal["originator"]),
+        sender_prefixed_hex=proposal["originator"],
         sequence_number=proposal["sequence_number"],
         expiry=datetime.fromisoformat(proposal["expiry"]),
         chain_id=proposal["chain_id"],
@@ -701,7 +795,7 @@ def rotate_execute_multisig(args):
         args.signatures, "transaction_proposal"
     )  # Index signatures into signature map, transaction proposal.
     # Get a raw transaction to sign from the transaction proposal.
-    raw_transaction = get_multisig_rotation_tx(proposal)
+    raw_transaction = get_rotation_transaction(proposal)
     # Get multisig public key for from account.
     public_key = metafile_to_multisig_public_key(args.metafile)
     assert_successful_transaction(  # Assert transaction succeeds.
@@ -719,9 +813,9 @@ def rotate_execute_multisig(args):
         )  # Update metafile address for account just rotated to.
 
 
-def get_multisig_rotation_tx(proposal: Dict[str, Any]) -> RawTransaction:
-    """Index a multisig authentication key rotation transaction proposal
-    into a RawTransaction"""
+def get_rotation_transaction(proposal: Dict[str, Any]) -> RawTransaction:
+    """Convert a multisig authentication key rotation transaction to a
+    raw transaction"""
     # Get rotation proof challenge proposal.
     challenge_proposal = proposal["challenge_proposal"]
     from_public_key_bytes = prefixed_hex_to_bytes(
@@ -753,7 +847,7 @@ def get_multisig_rotation_tx(proposal: Dict[str, Any]) -> RawTransaction:
         to_public_key_bytes=to_public_key_bytes,
         cap_rotate_key=cap_rotate_key,
         cap_update_table=cap_update_table,
-        sender_bytes=prefixed_hex_to_bytes(challenge_proposal["originator"]),
+        sender_prefixed_hex=challenge_proposal["originator"],
         sequence_number=challenge_proposal["sequence_number"],
         expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
         chain_id=challenge_proposal["chain_id"],
@@ -830,6 +924,26 @@ def signature_json_to_map(
     ]
 
 
+def construct_raw_transaction(
+    sender_prefixed_hex: str,
+    sequence_number: int,
+    payload: Dict[str, Any],
+    expiry: datetime,
+    chain_id: int,
+) -> RawTransaction:
+    """Return a raw transaction for given payload and metadata, using
+    default gas config values."""
+    return RawTransaction(  # Return raw transaction.
+        sender=AccountAddress(prefixed_hex_to_bytes(sender_prefixed_hex)),
+        sequence_number=sequence_number,
+        payload=TransactionPayload(payload),
+        max_gas_amount=ClientConfig.max_gas_amount,
+        gas_unit_price=ClientConfig.gas_unit_price,
+        expiration_timestamps_secs=int(expiry.timestamp()),
+        chain_id=chain_id,
+    )
+
+
 def construct_raw_rotation_transaction(
     from_scheme: int,
     from_public_key_bytes: bytes,
@@ -837,7 +951,7 @@ def construct_raw_rotation_transaction(
     to_public_key_bytes: bytes,
     cap_rotate_key: bytes,
     cap_update_table: bytes,
-    sender_bytes: bytes,
+    sender_prefixed_hex: str,
     sequence_number: int,
     expiry: datetime,
     chain_id: int,
@@ -856,14 +970,46 @@ def construct_raw_rotation_transaction(
             TransactionArgument(cap_update_table, Serializer.to_bytes),
         ],
     )  # Construct entry function payload.
-    return RawTransaction(  # Return raw transaction.
-        sender=AccountAddress(sender_bytes),
+    return construct_raw_transaction(  # Return raw transaction.
+        sender_prefixed_hex=sender_prefixed_hex,
         sequence_number=sequence_number,
-        payload=TransactionPayload(payload),
-        max_gas_amount=ClientConfig.max_gas_amount,
-        gas_unit_price=ClientConfig.gas_unit_price,
-        expiration_timestamps_secs=int(expiry.timestamp()),
+        payload=payload,
+        expiry=expiry,
         chain_id=chain_id,
+    )
+
+
+def sign_raw_transaction(
+    keyfile: Path,
+    raw_transaction: RawTransaction,
+    optional_outfile_path: Option[Path],
+    name_tokens: List[str],
+    proposal: Dict[str, Any],
+    filetype: str,
+):
+    """Sign a raw transaction and store in an outfile."""
+    # Check password, get keyfile data and optional private key bytes.
+    keyfile_data, private_key_bytes = check_keyfile_password(keyfile)
+    if private_key_bytes is None:  # If can't decrypt private key:
+        return  # Return.
+    # Create Aptos-style account for single signer.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    # Sign raw transaction.
+    signature = account.sign(raw_transaction.keyed())
+    write_json_file(  # Write JSON to signature file.
+        path=get_file_path(
+            optional_path=optional_outfile_path,
+            name_tokens=name_tokens,
+            extension="_".join(filetype.split()).casefold(),
+        ),
+        data={
+            "filetype": filetype,
+            "description": check_name(name_tokens),
+            "transaction_proposal": proposal,
+            "signatory": get_public_signatory_fields(keyfile_data),
+            "signature": bytes_to_prefixed_hex(signature.signature),
+        },
+        check_if_exists=True,
     )
 
 
@@ -871,30 +1017,13 @@ def rotate_transaction_sign(args):
     """Sign an authentication key rotation transaction from a multisig
     account."""
     proposal = json.load(args.proposal)  # Load proposal data.
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
-    if private_key_bytes is None:  # If can't decrypt private key:
-        return  # Return.
-    # Create Aptos-style account for single signer.
-    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
-    # Get a raw transaction to sign from the transaction proposal.
-    raw_transaction = get_multisig_rotation_tx(proposal)
-    # Sign raw transaction.
-    signature = account.sign(raw_transaction.keyed())
-    write_json_file(  # Write JSON to signature file.
-        path=get_file_path(
-            optional_path=args.outfile,
-            name_tokens=args.name,
-            extension="rotation_transaction_signature",
-        ),
-        data={
-            "filetype": "Rotation transaction signature",
-            "description": check_name(args.name),
-            "transaction_proposal": proposal,
-            "signatory": get_public_signatory_fields(keyfile_data),
-            "signature": bytes_to_prefixed_hex(signature.signature),
-        },
-        check_if_exists=True,
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_rotation_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Rotation transaction signature",
     )
 
 
@@ -1245,6 +1374,12 @@ parser_publish_propose.add_argument(
     help="Relative path Move.toml for package.",
 )
 parser_publish_propose.add_argument(
+    "named_address",
+    metavar="named-address",
+    type=str,
+    help="Named address of publisher in Move.toml. For example 'protocol'.",
+)
+parser_publish_propose.add_argument(
     "expiry",
     help="Publication expiry, in ISO 8601 format. For example '2023-02-15'.",
     type=datetime.fromisoformat,
@@ -1260,6 +1395,37 @@ parser_publish_propose.add_argument(
     "--outfile",
     type=Path,
     help="Relative path to publication proposal outfile.",
+)
+
+# Publish sign subcommand parser.
+parser_publish_sign = subparsers_publish.add_parser(
+    name="sign",
+    aliases=["s"],
+    description="Sign a package publication transaction.",
+    help="Package publication transaction signing.",
+)
+parser_publish_sign.set_defaults(func=publish_sign)
+parser_publish_sign.add_argument(
+    "proposal",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Publication transaction proposal file.",
+)
+parser_publish_sign.add_argument(
+    "keyfile",
+    type=Path,
+    help="Relative path to single-signer keyfile for signing proposal.",
+)
+parser_publish_sign.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="Description for transaction signature.",
+)
+parser_publish_sign.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="Relative path to publication transaction signature outfile.",
 )
 
 # Rotate subcommand parser.
