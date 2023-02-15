@@ -126,7 +126,7 @@ impl Default for StorageServiceConfig {
             max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 2000,
-            max_transaction_output_chunk_size: 1000,
+            max_transaction_output_chunk_size: 2000,
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -165,7 +165,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 10,
             max_concurrent_state_requests: 6,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
