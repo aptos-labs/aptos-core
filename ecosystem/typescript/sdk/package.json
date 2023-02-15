@@ -29,7 +29,8 @@
     "cov:clean": "rm -rf coverage",
     "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "scripts/checked_publish.sh",
-    "generate-ts-docs": "scripts/generate_ts_docs.sh"
+    "generate-ts-docs": "scripts/generate_ts_docs.sh",
+    "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml"
   },
   "repository": {
     "type": "git",
@@ -53,6 +54,11 @@
     "tweetnacl": "1.0.3"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^2.13.5",
+    "@graphql-codegen/import-types-preset": "^2.2.3",
+    "@graphql-codegen/typescript": "^2.7.3",
+    "@graphql-codegen/typescript-graphql-request": "^4.5.8",
+    "@graphql-codegen/typescript-operations": "^2.5.3",
     "@types/jest": "28.1.8",
     "@types/node": "18.6.2",
     "@typescript-eslint/eslint-plugin": "5.36.2",
@@ -63,6 +69,8 @@
     "eslint-config-airbnb-typescript": "17.0.0",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-import": "2.26.0",
+    "graphql": "^16.5.0",
+    "graphql-request": "^5.1.0",
     "jest": "28.1.3",
     "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
     "prettier": "2.6.2",

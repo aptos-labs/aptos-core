@@ -4,7 +4,7 @@
 /* eslint-disable max-len */
 
 import { AptosAccount } from "./aptos_account";
-import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
+import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";

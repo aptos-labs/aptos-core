@@ -24,7 +24,7 @@ on:
       TXNS_TO_SKIP:
         required: false
         type: string
-        description: The number of transactions to skip. If not specified, it will use the default number of transactions to skip.
+        description: The list of transaction versions to skip. If not specified, it will use the default list.
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -64,7 +64,7 @@ on:
       TXNS_TO_SKIP:
         required: false
         type: string
-        description: The number of transactions to skip. If not specified, it will use the default number of transactions to skip.
+        description: The list of transaction versions to skip. If not specified, it will use the default list.
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string

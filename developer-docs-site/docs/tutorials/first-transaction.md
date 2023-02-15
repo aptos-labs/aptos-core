@@ -328,7 +328,7 @@ Behind the scenes, the `transfer` function generates a transaction payload and h
 
 Within the client, <code>generateSignSubmitTransaction</code> is doing this:
 ```ts
-:!: static/sdks/typescript/src/aptos_client.ts generateSignSubmitTransactionInner
+:!: static/sdks/typescript/src/providers/aptos_client.ts generateSignSubmitTransactionInner
 ```
 
 Breaking the above down into pieces:
