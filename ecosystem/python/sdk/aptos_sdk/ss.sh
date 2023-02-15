@@ -214,7 +214,7 @@ elif test $1 = p; then
         tmp/protocol.multisig \
         alnoki \
         aptos-core \
-        1b84c283e4 \
+        1c26076f5f \
         aptos-move/move-examples/upgrade_and_govern/v1_0_0/Move.toml \
         upgrade_and_govern \
         2030-12-31 \
@@ -233,7 +233,7 @@ elif test $1 = p; then
         tmp/protocol.multisig \
         alnoki \
         aptos-core \
-        1b84c283e4 \
+        1c26076f5f \
         aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
         upgrade_and_govern \
         2030-12-31 \
@@ -247,7 +247,71 @@ elif test $1 = p; then
         --outfile tmp/upgrade.publication_signature
     # Execute upgrade publication.
     python amee.py publish execute tmp/upgrade.publication_signature
+    rm -rf tmp # Clear temp dir.
 
+# Invoke script.
+elif test $1 = s; then
+    rm -rf tmp # Clear temp dir.
+    mkdir tmp # Make temp dir.
+    # Generate Ace keyfile.
+    python amee.py keyfile generate \
+        Ace \
+        --vanity-prefix 0xace \
+        --outfile tmp/ace.keyfile
+    # Generate Bee keyfile.
+    python amee.py keyfile generate \
+        Bee \
+        --vanity-prefix 0xbee \
+        --outfile tmp/bee.keyfile
+    # Incorporate into 1-of-2 multisig.
+    python amee.py metafile incorporate \
+        1 \
+        Protocol \
+        --keyfiles \
+            tmp/ace.keyfile \
+            tmp/bee.keyfile \
+        --outfile tmp/protocol.multisig
+    # Fund multisig.
+    python amee.py metafile fund tmp/protocol.multisig
+    # Propose publication.
+    python amee.py publish propose \
+        tmp/protocol.multisig \
+        alnoki \
+        aptos-core \
+        1c26076f5f \
+        aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
+        upgrade_and_govern \
+        2030-12-31 \
+        Genesis \
+        --outfile tmp/genesis.publication_proposal
+    # Sign publication.
+    python amee.py publish sign \
+        tmp/genesis.publication_proposal \
+        tmp/ace.keyfile \
+        Genesis \
+        --outfile tmp/genesis.publication_signature
+    # Execute publication.
+    python amee.py publish execute tmp/genesis.publication_signature
+    # Propose script invocation.
+    python amee.py script propose \
+        tmp/protocol.multisig \
+        alnoki \
+        aptos-core \
+        1c26076f5f \
+        aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
+        upgrade_and_govern \
+        set_only \
+        2030-12-31 \
+        Invoke \
+        --outfile tmp/invoke.script_proposal
+    # Sign invocation proposal.
+    python amee.py script sign \
+        tmp/invoke.script_proposal \
+        tmp/ace.keyfile \
+        Invoke \
+        --outfile tmp/invoke.script_signature
+    # Execute invocation.
+    python amee.py script execute tmp/invoke.script_signature
     rm -rf tmp # Clear temp dir.
 
 fi

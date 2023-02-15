@@ -26,7 +26,7 @@ from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import ClientConfig, RestClient
 from aptos_sdk.ed25519 import (MultiEd25519PublicKey, MultiEd25519Signature,
                                PublicKey, Signature)
-from aptos_sdk.transactions import (EntryFunction, RawTransaction,
+from aptos_sdk.transactions import (EntryFunction, RawTransaction, Script,
                                     SignedTransaction, TransactionArgument,
                                     TransactionPayload)
 from cryptography.exceptions import InvalidSignature
@@ -399,6 +399,15 @@ def publish_execute(args):
     )
 
 
+def script_execute(args):
+    """Invoke a Move script from a multisig account."""
+    execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_script_transaction,
+        network=args.network,
+    )
+
+
 def execute_transaction_from_signatures(
     signature_files: Option[List[TextIOWrapper]],
     proposal_indexer_func: Callable[[Dict[str, Any]], RawTransaction],
@@ -468,6 +477,36 @@ def publish_propose(args):
     )
 
 
+def script_propose(args):
+    """Propose the invocation of a Move script hosted on GitHub."""
+    # Load caller data.
+    caller_data = json.load(args.metafile)
+    # Get caller account address.
+    caller_address = caller_data["address"]
+    assert caller_address is not None, "Need an address to call from."
+    sequence_number = get_sequence_number(
+        prefixed_hex_to_bytes(caller_address), args.network
+    )  # Get calling account sequence number.
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "script_proposal"),
+        data={
+            "filetype": "Script proposal",
+            "description": check_name(args.name),
+            "github_user": args.user,
+            "github_project": args.project,
+            "commit": args.commit,
+            "manifest_path": args.manifest,
+            "named_address": args.named_address,
+            "script_name": args.script_name,
+            "multisig": caller_data,
+            "sequence_number": sequence_number,
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
+        },
+        check_if_exists=True,
+    )
+
+
 def publish_sign(args):
     """Sign a package publication proposal."""
     proposal = json.load(args.proposal)  # Load proposal data.
@@ -478,6 +517,19 @@ def publish_sign(args):
         name_tokens=args.name,
         proposal=proposal,
         filetype="Publication signature",
+    )
+
+
+def script_sign(args):
+    """Sign a script invocation proposal."""
+    proposal = json.load(args.proposal)  # Load proposal data.
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_script_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Script signature",
     )
 
 
@@ -527,6 +579,23 @@ def download_and_compile(proposal: Dict[str, Any]):
         yield build_path  # Yield build path.
 
 
+def get_proposal_transaction(
+    payload: Union[EntryFunction, Script],
+    proposal: Dict[str, Any],
+) -> RawTransaction:
+    """Return raw transaction for a payload derived from a transaction
+    proposal.
+
+    Does not support rotation transaction proposals."""
+    return construct_raw_transaction(  # Return raw transaction.
+        sender_prefixed_hex=proposal["multisig"]["address"],
+        sequence_number=proposal["sequence_number"],
+        payload=payload,
+        expiry=datetime.fromisoformat(proposal["expiry"]),
+        chain_id=proposal["chain_id"],
+    )
+
+
 def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
     """Convert a multisig publication transaction proposal to a raw
     transaction."""
@@ -555,13 +624,25 @@ def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
             ),
         ],
     )
-    return construct_raw_transaction(  # Return raw transaction.
-        sender_prefixed_hex=proposal["multisig"]["address"],
-        sequence_number=proposal["sequence_number"],
-        payload=payload,
-        expiry=datetime.fromisoformat(proposal["expiry"]),
-        chain_id=proposal["chain_id"],
-    )
+    # Return raw transaction for proposal payload.
+    return get_proposal_transaction(payload, proposal)
+
+
+def get_script_transaction(proposal: Dict[str, Any]) -> RawTransaction:
+    """Convert a script invocation transaction proposal to a raw
+    transaction."""
+    # Download and compile package from proposal, get build path:
+    with download_and_compile(proposal) as build_path:
+        script_path = build_path / Path(
+            f"bytecode_scripts/{proposal['script_name']}.mv"
+        )  # Get path of script bytecode.
+        # With script bytecode file open:
+        with open(script_path, "rb") as file:
+            script_code = file.read()  # Read in contents.
+    # Construct script payload.
+    payload = Script(code=script_code, ty_args=[], args=[])
+    # Return raw transaction for proposal payload.
+    return get_proposal_transaction(payload, proposal)
 
 
 def keyfile_fund(args):
@@ -1746,6 +1827,128 @@ parser_rotate_transaction_sign.add_argument(
     "--outfile",
     type=Path,
     help="Relative path to rotation transaction signature outfile.",
+)
+
+# Script subcommand parser.
+parser_script = subparsers.add_parser(
+    name="script",
+    aliases=["s"],
+    description="Assorted Move script operations.",
+    help="Move script invocation.",
+)
+subparsers_script = parser_script.add_subparsers(required=True)
+
+# Script execute subcommand parser.
+parser_script_execute = subparsers_script.add_parser(
+    name="execute",
+    aliases=["e"],
+    description="Execute script invocation from proposal signatures.",
+    help="Invoke a Move script.",
+    parents=[network_parser],
+)
+parser_script_execute.set_defaults(func=script_execute)
+parser_script_execute.add_argument(
+    "signatures",
+    action="extend",
+    nargs="+",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="""Relative paths to script transaction signatures for at least
+        threshold number of multisig signatories.""",
+)
+
+# Script propose subcommand parser.
+parser_script_propose = subparsers_script.add_parser(
+    name="propose",
+    aliases=["p"],
+    description="Propose a Move script invocation, from a GitHub project.",
+    help="Propose a Move script invocation.",
+    parents=[network_parser],
+)
+parser_script_propose.set_defaults(func=script_propose)
+parser_script_propose.add_argument(
+    "metafile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to multisig metafile for account to invoke from.",
+)
+parser_script_propose.add_argument(
+    "user",
+    type=str,
+    help="GitHub username for script to invoke.",
+)
+parser_script_propose.add_argument(
+    "project",
+    type=str,
+    help="GitHub project name for script to invoke.",
+)
+parser_script_propose.add_argument(
+    "commit",
+    type=str,
+    help="Commit hash to download, abridged or full.",
+)
+parser_script_propose.add_argument(
+    "manifest",
+    type=str,
+    help="Relative path Move.toml for package.",
+)
+parser_script_propose.add_argument(
+    "named_address",
+    metavar="named-address",
+    type=str,
+    help="Named address of signer in Move.toml. For example 'protocol'.",
+)
+parser_script_propose.add_argument(
+    "script_name",
+    metavar="script-name",
+    type=str,
+    help="Script function name. For example 'main' or 'governance_123'.",
+)
+parser_script_propose.add_argument(
+    "expiry",
+    help="Invocation expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.fromisoformat,
+)
+parser_script_propose.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="Description for proposal. For example 'Set volume limits'.",
+)
+parser_script_propose.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="Relative path to invocation proposal outfile.",
+)
+
+# Script sign subcommand parser.
+parser_script_sign = subparsers_script.add_parser(
+    name="sign",
+    aliases=["s"],
+    description="Sign a script invocation transaction.",
+    help="Script invocation transaction signing.",
+)
+parser_script_sign.set_defaults(func=script_sign)
+parser_script_sign.add_argument(
+    "proposal",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Script invocation transaction proposal file.",
+)
+parser_script_sign.add_argument(
+    "keyfile",
+    type=Path,
+    help="Relative path to single-signer keyfile for signing proposal.",
+)
+parser_script_sign.add_argument(
+    "name",
+    type=str,
+    nargs="+",
+    help="Description for transaction signature.",
+)
+parser_script_sign.add_argument(
+    "-o",
+    "--outfile",
+    type=Path,
+    help="Relative path to script invocation transaction signature outfile.",
 )
 
 
