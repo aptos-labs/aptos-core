@@ -24,9 +24,9 @@ def replay_verify_partition(
     latest_version: int,
     txns_to_skip: Tuple[int],
     backup_config_template_path: str,
-) -> int:
+) -> Tuple[int, int]:
     """
-    Run replay-verify for a partition of the backup, returning the CLI's return code
+    Run replay-verify for a partition of the backup, returning a tuple of the (partition number, return code)
 
     n: partition number
     N: total number of partitions
@@ -81,7 +81,7 @@ def replay_verify_partition(
     # set the returncode
     process.communicate()
 
-    return process
+    return (n, process.returncode)
 
 
 def main():
@@ -120,7 +120,7 @@ def main():
     PER_PARTITION = (LATEST_VERSION - HISTORY_START) // N
 
     with Pool(N) as p:
-        all_procs = p.starmap(
+        all_partitions = p.starmap(
             replay_verify_partition,
             [
                 (
@@ -139,10 +139,10 @@ def main():
     print("[main process] finished")
 
     err = False
-    for p in all_procs:
-        if p.returncode != 0:
+    for partition_num, return_code in all_partitions:
+        if return_code != 0:
             print("======== ERROR ========")
-            print(f"ERROR: partition failed (exit {p.returncode}): {p.args}")
+            print(f"ERROR: partition {partition_num} failed (exit {return_code})")
             err = True
 
     if err:
