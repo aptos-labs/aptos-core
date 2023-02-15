@@ -39,6 +39,7 @@ use crate::{
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
+    transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
@@ -59,8 +60,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, ProposerElectionType,
-        ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
+        ProposerElectionType, ValidatorSet,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -580,7 +581,8 @@ impl EpochManager {
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
-        onchain_config: OnChainConsensusConfig,
+        onchain_consensus_config: OnChainConsensusConfig,
+        onchain_execution_config: OnChainExecutionConfig,
     ) {
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
@@ -610,7 +612,8 @@ impl EpochManager {
             self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
 
         info!(epoch = epoch, "Create ProposerElection");
-        let proposer_election = self.create_proposer_election(&epoch_state, &onchain_config);
+        let proposer_election =
+            self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -650,19 +653,25 @@ impl EpochManager {
         };
 
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
+        let transaction_shuffler =
+            create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
 
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
-            self.config.quorum_store_create_empty_blocks_for_pending_ordering,
-            self.config.quorum_store_create_partial_blocks_before_poll_ends,
+            self.config
+                .quorum_store_create_empty_blocks_for_pending_ordering,
+            self.config
+                .quorum_store_create_partial_blocks_before_poll_ends,
         );
-
-        self.commit_state_computer
-            .new_epoch(&epoch_state, payload_manager.clone());
-        let state_computer = if onchain_config.decoupled_execution() {
+        self.commit_state_computer.new_epoch(
+            &epoch_state,
+            payload_manager.clone(),
+            transaction_shuffler,
+        );
+        let state_computer = if onchain_consensus_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),
                 epoch_state.verifier.clone(),
@@ -678,7 +687,7 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            onchain_config.back_pressure_limit(),
+            onchain_consensus_config.back_pressure_limit(),
             payload_manager.clone(),
         ));
 
@@ -694,7 +703,7 @@ impl EpochManager {
             self.time_service.clone(),
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
-            onchain_config.max_failed_authors_to_store(),
+            onchain_consensus_config.max_failed_authors_to_store(),
             chain_health_backoff_config,
             self.quorum_store_enabled,
         );
@@ -732,7 +741,7 @@ impl EpochManager {
             safety_rules_container,
             network_sender,
             self.storage.clone(),
-            onchain_config,
+            onchain_consensus_config,
             round_manager_tx,
             self.config.clone(),
         );
@@ -755,8 +764,9 @@ impl EpochManager {
             verifier: (&validator_set).into(),
         };
 
-        let onchain_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
-        if let Err(error) = &onchain_config {
+        let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+        if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
 
@@ -764,10 +774,16 @@ impl EpochManager {
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
-                let onchain_config = onchain_config.unwrap_or_default();
-                self.quorum_store_enabled = onchain_config.quorum_store_enabled();
-                self.start_round_manager(initial_data, epoch_state, onchain_config)
-                    .await
+                let consensus_config = onchain_consensus_config.unwrap_or_default();
+                let execution_config = onchain_execution_config.unwrap_or_default();
+                self.quorum_store_enabled = consensus_config.quorum_store_enabled();
+                self.start_round_manager(
+                    initial_data,
+                    epoch_state,
+                    consensus_config,
+                    execution_config,
+                )
+                .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await

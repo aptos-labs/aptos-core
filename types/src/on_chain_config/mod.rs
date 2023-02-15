@@ -22,6 +22,7 @@ mod aptos_features;
 mod aptos_version;
 mod chain_id;
 mod consensus_config;
+mod execution_config;
 mod gas_schedule;
 mod validator_set;
 
@@ -35,6 +36,7 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
         ProposerElectionType,
     },
+    execution_config::{ExecutionConfigV1, OnChainExecutionConfig, TransactionShufflerType},
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
@@ -69,6 +71,7 @@ pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
     ChainId::CONFIG_ID,
+    OnChainExecutionConfig::CONFIG_ID,
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]

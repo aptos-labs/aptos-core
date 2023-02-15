@@ -30,10 +30,7 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const REUSE_NUM: usize = 20;
 pub static REUSE_COUNTER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
