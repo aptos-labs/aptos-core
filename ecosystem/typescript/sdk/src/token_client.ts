@@ -325,7 +325,6 @@ export class TokenClient {
       [creator, collectionName, name, propertyVersion, amount],
     );
 
-    //const rawTxn = await this.aptosClient.generateRawTransaction(sender.address(), payload, extraArgs);
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
       TxnBuilderTypes.AccountAddress.fromHex(receiver.address()),
     ]);
