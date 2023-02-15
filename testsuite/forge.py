@@ -1197,6 +1197,9 @@ def test(
     config = ForgeConfig(S3ForgeConfigBackend(context, DEFAULT_CONFIG))
     config.init()
 
+    forge_enable_performance = "true"
+    forge_cluster_name = "aptos-forge-0"
+    cloud = "gcp"
     # XXX: manual override testing in CI
     # # for GCP
     # forge_cluster_name = "aptos-forge-0"
