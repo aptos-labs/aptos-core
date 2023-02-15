@@ -73,10 +73,8 @@ jobs:
 
       - name: Determine image tag
         id: determine-test-image-tag
-        run: |
-          LATEST_IMAGE_TAG=$(python3 testsuite/find_latest_image.py)
-          echo "Latest image tag: $LATEST_IMAGE_TAG"
-          echo "IMAGE_TAG=$LATEST_IMAGE_TAG" >> $GITHUB_OUTPUT
+        # forge relies on the default and failpoints variants
+        run: python3 testsuite/find_latest_image.py --variant failpoints
 
   run-forge-three-region:
     if: ${{ github.event_name != 'pull_request' }}

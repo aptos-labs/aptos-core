@@ -12,6 +12,8 @@ modules.  This dapp will let users publish and share snippets of text on the Apt
 For this tutorial, we will use the Move module [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain)
 described in [Your First Move Module](first-move-module.md) and focus on building the user interface around the module.
 
+For a more comprehensive view of this process, see [Build an End-to-End Dapp on Aptos](build-e2e-dapp/index.md).
+
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)

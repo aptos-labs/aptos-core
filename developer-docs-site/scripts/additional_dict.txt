@@ -12,6 +12,8 @@ APT's
 APTs
 AUTH
 AWS
+AIP
+AIPs
 Ait
 ApiExplorer
 Aptos
@@ -341,6 +343,7 @@ nonfungible
 npmjs
 octa
 octas
+offchain
 onwards
 orderbook
 overline
@@ -360,6 +363,8 @@ precompiled
 preconfigure
 programmability
 programmatically
+PropertyMap
+propertymap
 prover
 pvc
 quickstart

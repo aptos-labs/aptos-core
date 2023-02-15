@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module contains the official gas meter implementation, along with some top-level gas
@@ -27,6 +27,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V7
+//   - Native support for exists<T>
 // - V6
 //   - Added a new native function - blake2b_256.
 // - V5
@@ -47,7 +49,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 6;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 7;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! aptos_channel provides an mpsc channel which has two ends `aptos_channel::Receiver`

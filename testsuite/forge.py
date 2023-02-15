@@ -847,7 +847,7 @@ def find_recent_images_by_profile_or_features(
     num_images: int,
     enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
-) -> Generator[str, None, None]:
+) -> Sequence[str]:
     image_name = "aptos/validator"
     image_tag_prefix = ""
     if enable_failpoints and enable_performance_profile:
@@ -865,7 +865,7 @@ def find_recent_images_by_profile_or_features(
         git,
         num_images,
         image_name=image_name,
-        image_tag_prefix=image_tag_prefix,
+        image_tag_prefixes=[image_tag_prefix],
     )
 
 
@@ -874,26 +874,37 @@ def find_recent_images(
     git: Git,
     num_images: int,
     image_name: str,
-    image_tag_prefix: str = "",
+    image_tag_prefixes: Sequence[str] = [""],
     commit_threshold: int = 100,
-) -> Generator[str, None, None]:
+) -> Sequence[str]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
-    For images built with different features or profiles than the default release profile, the image searching logic
-    will be more complicated. We use a combination of image_tag prefixes and different image names to distinguish
+    Also optionally filter by images with the provided prefixes, such as those denoting specific build variants
+    (e.g. cargo profiles and feature flags enabled)
     """
 
-    i = 0
+    # implicitly add the empty prefix, which will get the default release build without a prefix
+    if len(image_tag_prefixes) == 0:
+        image_tag_prefixes.append("")
+
+    # the number of images we need to find is actually the number of unique images
+    # multiplied by the number of image tag prefixes (e.g. variants) we expect to find
+    num_images_with_variants = num_images * len(image_tag_prefixes)
+
+    ret = []
     for revision in git.last(commit_threshold):
-        image_tag = f"{image_tag_prefix}{revision}"
-        exists = image_exists(shell, image_name, image_tag)
-        if exists:
-            i += 1
-            yield image_tag
-        if i >= num_images:
-            break
-    if i < num_images:
-        raise Exception(f"Could not find {num_images} recent images")
+        ret = []  # reset the count each time we search all prefixes for a single commit
+        for prefix in image_tag_prefixes:
+            image_tag = f"{prefix}{revision}"
+            exists = image_exists(shell, image_name, image_tag)
+            if exists:
+                ret.append(image_tag)
+            if len(ret) >= num_images_with_variants:
+                return ret
+    if len(ret) < num_images_with_variants:
+        raise Exception(
+            f"Could not find {num_images} recent images with prefixes {image_tag_prefixes}"
+        )
 
 
 def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
@@ -1310,15 +1321,14 @@ def test(
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
-        default_latest_image = next(
-            find_recent_images_by_profile_or_features(
-                shell,
-                git,
-                1,
-                enable_failpoints=enable_failpoints,
-                enable_performance_profile=enable_performance_profile,
-            )
-        )
+        default_latest_image = find_recent_images_by_profile_or_features(
+            shell,
+            git,
+            1,
+            enable_failpoints=enable_failpoints,
+            enable_performance_profile=enable_performance_profile,
+        )[0]
+
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image

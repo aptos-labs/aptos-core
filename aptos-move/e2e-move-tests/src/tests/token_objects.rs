@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
@@ -28,7 +28,7 @@ struct MutabilityConfig {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
-struct Object {
+struct ObjectCore {
     guid_creation_num: u64,
     owner: AccountAddress,
     allow_ungated_transfer: bool,
@@ -68,11 +68,11 @@ fn test_basic_token() {
     );
     assert_success!(result);
 
-    let token_id = account_address::create_token_id(addr, "Hero Quest!", "Wukong");
+    let token_addr = account_address::create_token_address(addr, "Hero Quest!", "Wukong");
     let obj_tag = StructTag {
         address: AccountAddress::from_hex_literal("0x1").unwrap(),
         module: Identifier::new("object").unwrap(),
-        name: Identifier::new("Object").unwrap(),
+        name: Identifier::new("ObjectCore").unwrap(),
         type_params: vec![],
     };
     let token_obj_tag = StructTag {
@@ -89,16 +89,20 @@ fn test_basic_token() {
     };
 
     // Ensure that the group data can be read
-    let object_0: Object = h
-        .read_resource_from_resource_group(&token_id, obj_group_tag.clone(), obj_tag.clone())
+    let object_0: ObjectCore = h
+        .read_resource_from_resource_group(&token_addr, obj_group_tag.clone(), obj_tag.clone())
         .unwrap();
     let token_0: Token = h
-        .read_resource_from_resource_group(&token_id, obj_group_tag.clone(), token_obj_tag.clone())
+        .read_resource_from_resource_group(
+            &token_addr,
+            obj_group_tag.clone(),
+            token_obj_tag.clone(),
+        )
         .unwrap();
     // Ensure that the original resources cannot be read
-    assert!(h.read_resource_raw(&token_id, obj_tag.clone()).is_none());
+    assert!(h.read_resource_raw(&token_addr, obj_tag.clone()).is_none());
     assert!(h
-        .read_resource_raw(&token_id, token_obj_tag.clone())
+        .read_resource_raw(&token_addr, token_obj_tag.clone())
         .is_none());
 
     let result = h.run_entry_function(
@@ -114,11 +118,11 @@ fn test_basic_token() {
     assert_success!(result);
 
     // verify all the data remains in a group even when updating just a single resource
-    let object_1: Object = h
-        .read_resource_from_resource_group(&token_id, obj_group_tag.clone(), obj_tag)
+    let object_1: ObjectCore = h
+        .read_resource_from_resource_group(&token_addr, obj_group_tag.clone(), obj_tag)
         .unwrap();
     let mut token_1: Token = h
-        .read_resource_from_resource_group(&token_id, obj_group_tag, token_obj_tag)
+        .read_resource_from_resource_group(&token_addr, obj_group_tag, token_obj_tag)
         .unwrap();
     assert_eq!(object_0, object_1);
     assert_ne!(token_0, token_1);

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::config::{PeerRole, RoleType};
 use aptos_short_hex_str::AsShortHexStr;

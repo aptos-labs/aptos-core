@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::EXECUTION_GAS_MULTIPLIER as MUL;
@@ -114,5 +114,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.aggregator.read.base, "aggregator.read.base", 300 * MUL],
     [.aggregator.sub.base, "aggregator.sub.base", 300 * MUL],
     [.aggregator.destroy.base, "aggregator.destroy.base", 500 * MUL],
-    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL]
+    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL],
+
+    [.object.exists_at.base_cost, { 7.. => "object.exists_at.base" }, 250 * MUL]
 ]);

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{lru_node_cache::LruNodeCache, state_merkle_db::Node, OTHER_TIMERS_SECONDS};
