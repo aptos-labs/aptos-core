@@ -29,6 +29,7 @@ module aptos_framework::staking_contract {
     use std::error;
     use std::signer;
     use std::vector;
+    use std::debug;
 
     use aptos_std::pool_u64::{Self, Pool};
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -344,6 +345,27 @@ module aptos_framework::staking_contract {
         stake::increase_lockup_with_cap(&staking_contract.owner_cap);
 
         emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
+    }
+
+    public entry fun update_commision(staker: &signer, operator: address, new_commission_percentage: u64) acquires Store {
+        assert!(
+            new_commission_percentage >= 0 && new_commission_percentage <= 100,
+            error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
+        );
+
+        let staker_address = signer::address_of(staker);
+        assert!(exists<Store>(staker_address), error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER));
+
+        let store = borrow_global_mut<Store>(staker_address);
+        let staking_contract = simple_map::borrow_mut(&mut store.staking_contracts, &operator);
+        distribute_internal(staker_address, operator, staking_contract, &mut store.distribute_events);
+        request_commission_internal(
+            operator,
+            staking_contract,
+            &mut store.add_distribution_events,
+            &mut store.request_commission_events,
+        );
+        staking_contract.commission_percentage = new_commission_percentage;
     }
 
     /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
@@ -1191,6 +1213,33 @@ module aptos_framework::staking_contract {
         assert_distribution(staker_address, operator_address, operator_address, unpaid_commission - 1);
         assert_distribution(staker_address, operator_address, staker_address, withdrawn_stake);
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
+    }
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    public entry fun test_update_commission(aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store {
+        let initial_balance = INITIAL_BALANCE * 2;
+        setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        let new_balance = with_rewards(initial_balance);
+        debug::print(&new_balance);
+        // Operator joins the validator set so rewards are generated.
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        let new_balance = with_rewards(initial_balance);
+        stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
+
+        update_commision(staker, operator_address, 5);
+        debug::print(&new_balance);
+        stake::end_epoch();
+        let new_balance = with_rewards(initial_balance);
+        debug::print(&new_balance);
+
     }
 
     #[test_only]

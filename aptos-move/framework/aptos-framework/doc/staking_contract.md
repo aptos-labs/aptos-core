@@ -54,6 +54,7 @@ pool.
 -  [Function `add_stake`](#0x1_staking_contract_add_stake)
 -  [Function `update_voter`](#0x1_staking_contract_update_voter)
 -  [Function `reset_lockup`](#0x1_staking_contract_reset_lockup)
+-  [Function `update_commision`](#0x1_staking_contract_update_commision)
 -  [Function `request_commission`](#0x1_staking_contract_request_commission)
 -  [Function `request_commission_internal`](#0x1_staking_contract_request_commission_internal)
 -  [Function `unlock_stake`](#0x1_staking_contract_unlock_stake)
@@ -1113,6 +1114,47 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
     <a href="stake.md#0x1_stake_increase_lockup_with_cap">stake::increase_lockup_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap);
 
     emit_event(&<b>mut</b> store.reset_lockup_events, <a href="staking_contract.md#0x1_staking_contract_ResetLockupEvent">ResetLockupEvent</a> { operator, pool_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_contract_update_commision"></a>
+
+## Function `update_commision`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+    <b>assert</b>!(
+        new_commission_percentage &gt;= 0 && new_commission_percentage &lt;= 100,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>),
+    );
+
+    <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>));
+
+    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> store.staking_contracts, &operator);
+    <a href="staking_contract.md#0x1_staking_contract_distribute_internal">distribute_internal</a>(staker_address, operator, <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>, &<b>mut</b> store.distribute_events);
+    <a href="staking_contract.md#0x1_staking_contract_request_commission_internal">request_commission_internal</a>(
+        operator,
+        <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>,
+        &<b>mut</b> store.add_distribution_events,
+        &<b>mut</b> store.request_commission_events,
+    );
+    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage = new_commission_percentage;
 }
 </code></pre>
 
