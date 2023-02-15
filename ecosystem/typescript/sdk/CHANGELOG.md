@@ -6,6 +6,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.7.0 (2023-02-15)
+
+- Add Indexer support
+
 ## 1.6.0 (2023-01-20)
 
 - Add support to Move view functions
