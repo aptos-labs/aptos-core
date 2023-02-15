@@ -10,6 +10,7 @@ on:
 
 jobs:
   linkChecker:
+    permissions: write-all
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
