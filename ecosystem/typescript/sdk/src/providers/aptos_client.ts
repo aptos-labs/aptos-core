@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString, MaybeHexString } from "./hex_string";
+import { HexString, MaybeHexString } from "../hex_string";
 import {
   clear,
   DEFAULT_TXN_EXP_SEC_FROM_NOW,
@@ -12,16 +12,16 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
-} from "./utils";
-import { AptosAccount } from "./aptos_account";
-import * as Gen from "./generated/index";
+} from "../utils";
+import { AptosAccount } from "../aptos_account";
+import * as Gen from "../generated/index";
 import {
   TxnBuilderTypes,
   TransactionBuilderEd25519,
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
   TransactionBuilderMultiEd25519,
-} from "./transaction_builder";
+} from "../transaction_builder";
 import {
   bcsSerializeBytes,
   bcsSerializeU8,
@@ -32,8 +32,8 @@ import {
   serializeVector,
   Uint64,
   AnyNumber,
-} from "./bcs";
-import { Ed25519PublicKey, MultiEd25519PublicKey } from "./aptos_types";
+} from "../bcs";
+import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
