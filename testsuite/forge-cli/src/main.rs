@@ -1151,7 +1151,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_fullnode_count(100)
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 9000,
+            mempool_backlog: 20000,
         }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
