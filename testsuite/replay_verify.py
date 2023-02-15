@@ -52,7 +52,7 @@ def replay_verify_partition(
     # run and print output
     process = subprocess.Popen(
         [
-            "target/release/replay-verify",
+            "BLABLABLAtarget/release/replay-verify",
             *txns_to_skip_args,
             "--concurrent-downloads",
             "2",
