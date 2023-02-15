@@ -41,6 +41,4 @@ public entry fun airdrop(whitelist: vector<address>) acquires ModuleData {
 After offering the token, the wallet receiver (eg: [Petra](https://petra.app/)) would see the offer as shown below:
 ![petra_screenshot.png](../../../static/img/token-airdrop.png)
 
-(/static/img/token-airdrop.png)
-
 This completes the Aptos token airdrop example.
