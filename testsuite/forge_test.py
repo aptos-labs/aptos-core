@@ -33,7 +33,7 @@ from forge import (
     LocalForgeRunner,
     RunResult,
     SystemContext,
-    assert_provided_image_tags_has_profile_or_features,
+    ensure_provided_image_tags_has_profile_or_features,
     create_forge_command,
     find_recent_images,
     find_recent_images_by_profile_or_features,
@@ -189,13 +189,32 @@ class FakeConfigBackend(ForgeConfigBackend):
         return self.store
 
 
+class FakeCommand:
+    def __init__(
+        self, command: str, result_or_exception: Union[RunResult, Exception]
+    ) -> None:
+        self.command = command
+        self.result_or_exception = result_or_exception
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FakeCommand):
+            return False
+        return self.command == other.command
+
+    def __hash__(self) -> int:
+        return hash(self.command)
+
+    def __repr__(self) -> str:
+        return f"FakeCommand({self.command})"
+
+
 class SpyShell(FakeShell):
     def __init__(
         self,
-        command_map: Dict[str, Union[RunResult, Exception]],
+        expected_command_list: Sequence[FakeCommand],
         strict: bool = False,
     ) -> None:
-        self.command_map = command_map
+        self.expected_command_list = expected_command_list
         self.commands = []
         self.strict = strict
 
@@ -206,7 +225,17 @@ class SpyShell(FakeShell):
             if self.strict
             else super().run(command)
         )
-        result = self.command_map.get(rendered_command, default)
+        # get how many times it's been called before
+        times_called_before = self.commands.count(rendered_command)
+        if rendered_command in self.expected_command_list:
+            command_index = [
+                i
+                for i, command in enumerate(self.expected_command_list)
+                if command.command == rendered_command
+            ][times_called_before]
+            result = self.expected_command_list[command_index]
+        else:
+            raise Exception("")
         self.commands.append(rendered_command)
         if isinstance(result, Exception):
             raise result
@@ -440,19 +469,19 @@ class TestFindRecentImage(unittest.TestCase):
                 [
                     ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=potato",
+                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=potato",
                         RunResult(1, b""),
                     ),
                     ("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=lychee",
+                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=lychee",
                         RunResult(0, b""),
                     ),
                 ]
             )
         )
         git = Git(shell)
-        image_tags = find_recent_images(shell, git, 1, "aptos/validator")
+        image_tags = find_recent_images(shell, git, 1, "aptos/validator-testing")
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
@@ -462,7 +491,7 @@ class TestFindRecentImage(unittest.TestCase):
                 [
                     ("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=failpoints_tomato",
+                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=failpoints_tomato",
                         RunResult(0, b""),
                     ),
                 ]
@@ -481,7 +510,7 @@ class TestFindRecentImage(unittest.TestCase):
                 [
                     ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=performance_potato",
+                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=performance_potato",
                         RunResult(0, b""),
                     ),
                 ]
@@ -516,7 +545,7 @@ class TestFindRecentImage(unittest.TestCase):
                 [
                     ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
+                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=crab",
                         RunResult(1, b""),
                     ),
                 ]
@@ -525,7 +554,9 @@ class TestFindRecentImage(unittest.TestCase):
         git = Git(shell)
         with self.assertRaises(Exception):
             list(
-                find_recent_images(shell, git, 1, "aptos/validator", commit_threshold=1)
+                find_recent_images(
+                    shell, git, 1, "aptos/validator-testing", commit_threshold=1
+                )
             )
 
     def testFindRecentFewImages(
@@ -552,21 +583,34 @@ class TestFindRecentImage(unittest.TestCase):
         self.assertEqual(list(images), ["crab", "shrimp"])
 
     def testFailpointsProvidedImageTag(self) -> None:
-        with self.assertRaises(AssertionError):
-            assert_provided_image_tags_has_profile_or_features(
-                "potato_tomato",
-                "failpoints_performance_potato",
-                enable_failpoints=True,
-                enable_performance_profile=False,
-            )
+        tag1, tag2 = ensure_provided_image_tags_has_profile_or_features(
+            "potato_tomato",
+            "failpoints_performance_potato",
+            enable_failpoints=True,
+            enable_performance_profile=False,
+        )
+        self.assertEqual(tag1, "failpoints_potato_tomato")  # it's added
+        self.assertEqual(tag2, "failpoints_performance_potato")  # no change
+
+    def testPerformaneProfilePartialProvidedImageTag(self) -> None:
+        tag1, tag2 = ensure_provided_image_tags_has_profile_or_features(
+            "potato_tomato",
+            None,
+            enable_failpoints=False,
+            enable_performance_profile=True,
+        )
+        self.assertEqual(tag1, "performance_potato_tomato")  # it's added
+        self.assertIsNone(tag2)
 
     def testFailpointsNoProvidedImageTag(self) -> None:
-        assert_provided_image_tags_has_profile_or_features(
+        tag1, tag2 = ensure_provided_image_tags_has_profile_or_features(
             None,
             None,
             enable_failpoints=True,
             enable_performance_profile=False,
         )
+        self.assertIsNone(tag1)
+        self.assertIsNone(tag2)
 
 
 class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
@@ -708,8 +752,43 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     ),
                     ("git rev-parse HEAD~0", RunResult(0, b"banana")),
                     (
-                        "aws ecr describe-images --repository-name aptos/validator --im"
-                        "age-ids imageTag=banana",
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator-testing "
+                        "--image-ids imageTag=banana",
+                        RunResult(0, b""),
+                    ),
+                    (
+                        "aws ecr describe-images --repository-name aptos/forge --image-ids "
+                        "imageTag=banana",
                         RunResult(0, b""),
                     ),
                     (

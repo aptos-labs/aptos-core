@@ -24,14 +24,6 @@ IMAGE_TAG_ENV = "IMAGE_TAG"
 # if running in github actions, this is the output key that will contain the latest image tag
 GH_OUTPUT_KEY = "IMAGE_TAG"
 
-# map of build variant (e.g. cargo profile and )
-BUILD_VARIANT_TAG_PREFIX_MAP = {
-    "performance": "performance",
-    "failpoints": "failpoints",
-    "indexer": "indexer",
-    "release": "",  # the default release profile has no tag prefix
-}
-
 
 def main():
     shell = LocalShell()
