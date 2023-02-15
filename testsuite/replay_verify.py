@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 import os
 import subprocess
 import shutil
+import sys
 from multiprocessing import Pool, freeze_support
 from typing import Tuple
 
@@ -23,9 +24,9 @@ def replay_verify_partition(
     latest_version: int,
     txns_to_skip: Tuple[int],
     backup_config_template_path: str,
-) -> None:
+) -> int:
     """
-    Run replay-verify for a partition of the backup
+    Run replay-verify for a partition of the backup, returning the CLI's return code
 
     n: partition number
     N: total number of partitions
@@ -65,10 +66,10 @@ def replay_verify_partition(
             str(start),
             "--end-version",
             str(end),
+            "--lazy-quit",
             "command-adapter",
             "--config",
             backup_config_template_path,
-            "--lazy-quit",
         ],
         stdout=subprocess.PIPE,
     )
@@ -76,6 +77,11 @@ def replay_verify_partition(
         raise Exception(f"[partition {n}] stdout is None")
     for line in iter(process.stdout.readline, b""):
         print(f"[partition {n}] {line}", flush=True)
+
+    # set the returncode
+    process.communicate()
+
+    return process
 
 
 def main():
@@ -114,7 +120,7 @@ def main():
     PER_PARTITION = (LATEST_VERSION - HISTORY_START) // N
 
     with Pool(N) as p:
-        p.starmap(
+        all_procs = p.starmap(
             replay_verify_partition,
             [
                 (
@@ -131,6 +137,16 @@ def main():
         )
 
     print("[main process] finished")
+
+    err = False
+    for p in all_procs:
+        if p.returncode != 0:
+            print("======== ERROR ========")
+            print(f"ERROR: partition failed (exit {p.returncode}): {p.args}")
+            err = True
+
+    if err:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

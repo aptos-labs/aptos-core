@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # Test replay-verify by running it on a public testnet backup

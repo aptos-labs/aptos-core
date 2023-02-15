@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// This wraps around `futures::stream::futures_unorderd::FuturesUnordered` to provide similar

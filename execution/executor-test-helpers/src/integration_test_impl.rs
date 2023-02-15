@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};

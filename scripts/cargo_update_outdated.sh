@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # This script modifies local cargo files to reflect compatibility (semver)

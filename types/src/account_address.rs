@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction::authenticator::{AuthenticationKey, Scheme};
 use anyhow::bail;
@@ -144,18 +144,22 @@ pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> Accou
     AccountAddress::new(array)
 }
 
-pub fn create_token_id(creator: AccountAddress, collection: &str, name: &str) -> AccountAddress {
+pub fn create_token_address(
+    creator: AccountAddress,
+    collection: &str,
+    name: &str,
+) -> AccountAddress {
     let mut seed = vec![];
     seed.extend(collection.as_bytes());
     seed.extend(b"::");
     seed.extend(name.as_bytes());
-    create_object_id(creator, &seed)
+    create_object_address(creator, &seed)
 }
 
-pub fn create_object_id(creator: AccountAddress, seed: &[u8]) -> AccountAddress {
+pub fn create_object_address(creator: AccountAddress, seed: &[u8]) -> AccountAddress {
     let mut input = bcs::to_bytes(&creator).unwrap();
     input.extend(seed);
-    input.push(Scheme::DeriveObjectIdFromSeed as u8);
+    input.push(Scheme::DeriveObjectAddressFromSeed as u8);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(hash.as_ref()).unwrap()
 }
@@ -244,7 +248,7 @@ mod test {
 
     #[test]
     fn address_hash() {
-        let address: AccountAddress =
+        let address =
             AccountAddress::from_hex_literal("0xca843279e3427144cead5e4d5999a3d0").unwrap();
 
         let hash_vec =
@@ -255,5 +259,15 @@ mod test {
         let bytes = &hash_vec[..32];
         hash.copy_from_slice(bytes);
         assert_eq!(address.hash(), HashValue::new(hash));
+    }
+
+    #[test]
+    fn token_address() {
+        let address = AccountAddress::from_hex_literal("0xb0b").unwrap();
+        println!(
+            "{:?}",
+            super::create_token_address(address, "bob's collection", "bob's token")
+        );
+        // println!("{:?}", create_object_address(address, guid);
     }
 }

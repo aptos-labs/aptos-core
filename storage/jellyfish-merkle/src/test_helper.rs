@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, JellyfishMerkleTree, TestKey};

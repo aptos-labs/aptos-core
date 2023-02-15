@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
@@ -636,7 +636,7 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig<'static> {
         3000,
         2500,
         true,
-        false,
+        true,
         &ChangingWorkingQuorumTest {
             min_tps: 750,
             always_healthy_nodes: 2,

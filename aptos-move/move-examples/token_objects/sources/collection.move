@@ -24,7 +24,7 @@ module token_objects::collection {
     use std::signer;
     use std::string::{Self, String};
 
-    use aptos_framework::object::{Self, CreatorRef, ObjectId};
+    use aptos_framework::object::{Self, ConstructorRef, Object};
 
     friend token_objects::token;
 
@@ -90,8 +90,8 @@ module token_objects::collection {
         name: String,
         royalty: Option<Royalty>,
         uri: String,
-    ): CreatorRef {
-        let collection_seed = create_collection_id_seed(&name);
+    ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
         let creator_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&creator_ref);
 
@@ -124,8 +124,8 @@ module token_objects::collection {
         name: String,
         royalty: Option<Royalty>,
         uri: String,
-    ): CreatorRef {
-        let collection_seed = create_collection_id_seed(&name);
+    ): ConstructorRef {
+        let collection_seed = create_collection_seed(&name);
         let creator_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&creator_ref);
 
@@ -152,11 +152,11 @@ module token_objects::collection {
         move_to(object_signer, royalty);
     }
 
-    public fun create_collection_id(creator: &address, name: &String): ObjectId {
-        object::create_object_id(creator, create_collection_id_seed(name))
+    public fun create_collection_address(creator: &address, name: &String): address {
+        object::create_object_address(creator, create_collection_seed(name))
     }
 
-    public fun create_collection_id_seed(name: &String): vector<u8> {
+    public fun create_collection_seed(name: &String): vector<u8> {
         *string::bytes(name)
     }
 
@@ -169,9 +169,9 @@ module token_objects::collection {
     }
 
     public(friend) fun increment_supply(creator: &address, name: &String) acquires FixedSupply {
-        let collection_id = object::object_id_address(&create_collection_id(creator, name));
-        if (exists<FixedSupply>(collection_id)) {
-            let supply = borrow_global_mut<FixedSupply>(collection_id);
+        let collection_addr = create_collection_address(creator, name);
+        if (exists<FixedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
@@ -181,9 +181,9 @@ module token_objects::collection {
     }
 
     public(friend) fun decrement_supply(creator: &address, name: &String) acquires FixedSupply {
-        let collection_id = object::object_id_address(&create_collection_id(creator, name));
-        if (exists<FixedSupply>(collection_id)) {
-            let supply = borrow_global_mut<FixedSupply>(collection_id);
+        let collection_addr = create_collection_address(creator, name);
+        if (exists<FixedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
         }
     }
@@ -236,72 +236,54 @@ module token_objects::collection {
     }
 
     // Accessors
-
-    public fun is_collection(collection_id: ObjectId): bool {
-        exists<Collection>(object::object_id_address(&collection_id))
-    }
-
-    public fun creator(collection_id: ObjectId): address acquires Collection {
+    inline fun verify<T: key>(collection: &Object<T>): address {
+        let collection_address = object::object_address(collection);
         assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
+            exists<Collection>(collection_address),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).creator
+        collection_address
     }
 
-    public fun description(collection_id: ObjectId): String acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).description
+    public fun creator<T: key>(collection: Object<T>): address acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).creator
     }
 
-    public fun is_description_mutable(collection_id: ObjectId): bool acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).mutability_config.description
+    public fun description<T: key>(collection: Object<T>): String acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).description
     }
 
-    public fun is_uri_mutable(collection_id: ObjectId): bool acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).mutability_config.uri
+    public fun is_description_mutable<T: key>(collection: Object<T>): bool acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).mutability_config.description
     }
 
-    public fun name(collection_id: ObjectId): String acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).name
+    public fun is_uri_mutable<T: key>(collection: Object<T>): bool acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).mutability_config.uri
     }
 
-    public fun uri(collection_id: ObjectId): String acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-        borrow_global<Collection>(object::object_id_address(&collection_id)).uri
+    public fun name<T: key>(collection: Object<T>): String acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).name
+    }
+
+    public fun uri<T: key>(collection: Object<T>): String acquires Collection {
+        let collection_address = verify(&collection);
+        borrow_global<Collection>(collection_address).uri
     }
 
     // Mutators
 
-    public fun set_description(
+    public fun set_description<T: key>(
         creator: &signer,
-        collection_id: ObjectId,
+        collection: Object<T>,
         description: String,
     ) acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-
-        let collection = borrow_global_mut<Collection>(object::object_id_address(&collection_id));
+        let collection_address = verify(&collection);
+        let collection = borrow_global_mut<Collection>(collection_address);
         assert!(
             collection.creator == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
@@ -315,17 +297,13 @@ module token_objects::collection {
         collection.description = description;
     }
 
-    public fun set_uri(
+    public fun set_uri<T: key>(
         creator: &signer,
-        collection_id: ObjectId,
+        collection: Object<T>,
         uri: String,
     ) acquires Collection {
-        assert!(
-            exists<Collection>(object::object_id_address(&collection_id)),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-
-        let collection = borrow_global_mut<Collection>(object::object_id_address(&collection_id));
+        let collection_address = verify(&collection);
+        let collection = borrow_global_mut<Collection>(collection_address);
         assert!(
             collection.creator == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
@@ -347,10 +325,12 @@ module token_objects::collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
 
-        let collection_id = create_collection_id(&creator_address, &collection_name);
-        assert!(object::owner(collection_id) == creator_address, 1);
-        object::transfer(creator, collection_id, signer::address_of(trader));
-        assert!(object::owner(collection_id) == signer::address_of(trader), 1);
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&creator_address, &collection_name),
+        );
+        assert!(object::owner(collection) == creator_address, 1);
+        object::transfer(creator, collection, signer::address_of(trader));
+        assert!(object::owner(collection) == signer::address_of(trader), 1);
     }
 
     #[test(creator = @0x123)]
@@ -366,8 +346,10 @@ module token_objects::collection {
     entry fun test_immutable_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
-        let collection_id = create_collection_id(&signer::address_of(creator), &collection_name);
-        set_description(creator, collection_id, string::utf8(b"fail"));
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&signer::address_of(creator), &collection_name),
+        );
+        set_description(creator, collection, string::utf8(b"fail"));
     }
 
     #[test(creator = @0x123)]
@@ -375,30 +357,36 @@ module token_objects::collection {
     entry fun test_immutable_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
-        let collection_id = create_collection_id(&signer::address_of(creator), &collection_name);
-        set_uri(creator, collection_id, string::utf8(b"fail"));
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&signer::address_of(creator), &collection_name),
+        );
+        set_uri(creator, collection, string::utf8(b"fail"));
     }
 
     #[test(creator = @0x123)]
     entry fun test_mutable_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_mutable_collection_helper(creator, *&collection_name);
-        let collection_id = create_collection_id(&signer::address_of(creator), &collection_name);
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&signer::address_of(creator), &collection_name),
+        );
         let description = string::utf8(b"no fail");
-        assert!(description != description(collection_id), 0);
-        set_description(creator, collection_id, *&description);
-        assert!(description == description(collection_id), 1);
+        assert!(description != description(collection), 0);
+        set_description(creator, collection, *&description);
+        assert!(description == description(collection), 1);
     }
 
     #[test(creator = @0x123)]
     entry fun test_mutable_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_mutable_collection_helper(creator, *&collection_name);
-        let collection_id = create_collection_id(&signer::address_of(creator), &collection_name);
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&signer::address_of(creator), &collection_name),
+        );
         let uri = string::utf8(b"no fail");
-        assert!(uri != uri(collection_id), 0);
-        set_uri(creator, collection_id, *&uri);
-        assert!(uri == uri(collection_id), 1);
+        assert!(uri != uri(collection), 0);
+        set_uri(creator, collection, *&uri);
+        assert!(uri == uri(collection), 1);
     }
 
     // Test helpers

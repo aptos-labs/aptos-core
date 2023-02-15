@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! An implementation of HKDF, the HMAC-based Extract-and-Expand Key Derivation Function

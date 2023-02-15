@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount, getAddressFromAccountOrAddress } from "./aptos_account";
-import { AptosClient, OptionalTransactionArgs } from "./aptos_client";
+import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
 import { HexString, MaybeHexString } from "./hex_string";
 import { TransactionBuilderABI } from "./transaction_builder";
 import { COIN_ABIS } from "./abis";

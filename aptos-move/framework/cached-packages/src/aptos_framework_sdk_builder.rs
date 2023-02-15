@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This file was generated. Do not modify!
@@ -273,7 +273,7 @@ pub enum EntryFunctionCall {
 
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
-        object_id: AccountAddress,
+        object: AccountAddress,
         to: AccountAddress,
     },
 
@@ -720,7 +720,7 @@ impl EntryFunctionCall {
                 amount,
             } => managed_coin_mint(coin_type, dst_addr, amount),
             ManagedCoinRegister { coin_type } => managed_coin_register(coin_type),
-            ObjectTransferCall { object_id, to } => object_transfer_call(object_id, to),
+            ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1559,7 +1559,7 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
 }
 
 /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
-pub fn object_transfer_call(object_id: AccountAddress, to: AccountAddress) -> TransactionPayload {
+pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1570,10 +1570,7 @@ pub fn object_transfer_call(object_id: AccountAddress, to: AccountAddress) -> Tr
         ),
         ident_str!("transfer_call").to_owned(),
         vec![],
-        vec![
-            bcs::to_bytes(&object_id).unwrap(),
-            bcs::to_bytes(&to).unwrap(),
-        ],
+        vec![bcs::to_bytes(&object).unwrap(), bcs::to_bytes(&to).unwrap()],
     ))
 }
 
@@ -2943,7 +2940,7 @@ mod decoder {
     pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
-                object_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                object: bcs::from_bytes(script.args().get(0)?).ok()?,
                 to: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -50,7 +50,7 @@ pub struct BatchGenerator {
     mempool_txn_pull_max_count: u64,
     mempool_txn_pull_max_bytes: u64,
     batch_expiry_round_gap_when_init: Round,
-    end_batch_ms: u128,
+    end_batch_ms: u64,
     last_end_batch_time: Instant,
     // for consensus back pressure
     block_store: Arc<dyn BlockReader + Send + Sync>,
@@ -70,7 +70,7 @@ impl BatchGenerator {
         max_batch_counts: usize,
         max_batch_bytes: usize,
         batch_expiry_round_gap_when_init: Round,
-        end_batch_ms: u128,
+        end_batch_ms: u64,
         block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         let batch_id = if let Some(id) = db
@@ -146,7 +146,7 @@ impl BatchGenerator {
 
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
-        if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms {
+        if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms as u128 {
             end_batch = true;
         }
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::block_info::Round;
@@ -11,7 +11,7 @@ pub struct QuorumStoreConfig {
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
     pub mempool_pulling_interval: usize,
-    pub end_batch_ms: u128,
+    pub end_batch_ms: u64,
     pub max_batch_counts: usize,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,

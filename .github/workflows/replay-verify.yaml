@@ -21,6 +21,9 @@ on:
   pull_request:
     paths:
       - ".github/workflows/replay-verify.yaml"
+      - "testsuite/replay-verify.py"
+  schedule:
+    - cron: "0 8,20 * * *"
 
 # cancel redundant builds
 concurrency:
@@ -30,7 +33,7 @@ concurrency:
 
 jobs:
   replay-testnet:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
     secrets: inherit
     with:
@@ -46,7 +49,7 @@ jobs:
       TIMEOUT_MINUTES: 720
 
   replay-mainnet:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
     secrets: inherit
     with:

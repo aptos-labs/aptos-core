@@ -1,5 +1,5 @@
 #!/bin/bash -eux
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # This build script is used with Google OSS-Fuzz to build fuzzer with their docker container.
