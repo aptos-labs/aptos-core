@@ -223,7 +223,7 @@ impl StateSnapshotRestoreController {
         let config = verifier_config(
             false,
             // FIXME: fead chain id & timestamp from the state.
-            &TimedFeatures::enable_all(),
+            &TimedFeatures::enable_all().with_replay_override(),
         );
         for (key, value) in blob {
             if let StateKey::AccessPath(p) = key {
