@@ -6,6 +6,7 @@ import getpass
 import json
 import secrets
 import subprocess
+from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
@@ -480,20 +481,21 @@ def publish_sign(args):
     )
 
 
-def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
-    """Convert a multisig publication transaction proposal to a raw
-    transaction."""
+@contextmanager
+def download_and_compile(proposal: Dict[str, Any]):
+    """Download from GitHub and compile in a temporary directory the
+    package specified in a transaction proposal, yielding the package's
+    build path."""
     zip_url = get_github_zip_archive_url(
         user=proposal["github_user"],
         project=proposal["github_project"],
         commit=proposal["commit"],
     )  # Get URL for ZIP archive of project.
-    # Get temporary directory.
-    with TemporaryDirectory() as temp_dir:
-        # Request to download Git ZIP archive.
-        response = requests.get(url=zip_url, stream=True)
-        # Assert successful response.
-        assert response.ok, f"Repo download failure: {response.text}"
+    # Request to download Git ZIP archive.
+    response = requests.get(url=zip_url, stream=True)
+    # Assert successful response.
+    assert response.ok, f"Repo download failure: {response.text}"
+    with TemporaryDirectory() as temp_dir:  # For temporary directory:
         # Print ZIP file extraction notice.
         print(f"Extracting {zip_url} to temporary directory {temp_dir}.")
         # Extract ZIP file contents to temp dir.
@@ -507,14 +509,14 @@ def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
             manifest_data = toml.load(manifest)  # Load manifest data.
             # Get package name from manifest.
             package_name = manifest_data["package"]["name"]
-        # Get publisher address.
-        publisher_address = proposal["multisig"]["address"]
+        # Get multisig address.
+        multisig_address = proposal["multisig"]["address"]
         # Get named address for build command.
         named_address = proposal["named_address"]
         command = (  # Get apto CLI build command.
             f"aptos move compile --save-metadata "
             f"--package-dir {manifest_path.parent} "
-            f"--named-addresses {named_address}={publisher_address}"
+            f"--named-addresses {named_address}={multisig_address}"
         )
         # Print aptos CLI build command to run.
         print(f"Running aptos CLI command: {command}\n")
@@ -522,19 +524,25 @@ def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
         subprocess.run(command.split(), stdout=subprocess.PIPE)
         # Get path for package build files.
         build_path = manifest_path.parent / Path("build") / Path(package_name)
+        yield build_path  # Yield build path.
+
+
+def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
+    """Convert a multisig publication transaction proposal to a raw
+    transaction."""
+    # Download and compile package from proposal, get build path:
+    with download_and_compile(proposal) as build_path:
         # Open package metadata build file:
         with open(build_path / Path("package-metadata.bcs"), "rb") as file:
             package_metadata = file.read()  # Read in contents.
-        modules = []  # Initialize empty module bytecode list.
-        bytecode_files = [  # Get bytecode file paths.
-            child
-            for child in (build_path / Path("bytecode_modules")).iterdir()
-            if child.is_file()
-        ]
-        # Loop over package module bytecode files:
-        for file in bytecode_files:
-            with open(file, "rb") as module:  # With file open:
-                modules.append(module.read())  # Append bytecode.
+        # Get bytecode modules path.
+        modules_path = build_path / Path("bytecode_modules")
+        # Get list of bytecode module paths.
+        module_paths = [m for m in modules_path.iterdir() if m.is_file()]
+        modules = []  # Initialize empty modules list.
+        for module_path in module_paths:  # Loop over module paths:
+            with open(module_path, "rb") as module:  # With module open:
+                modules.append(module.read())  # Extract bytecode.
     payload = EntryFunction.natural(  # Construct payload.
         module="0x1::code",
         function="publish_package_txn",
