@@ -397,7 +397,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => single_test_suite("three_region_simulation"),
+        "land_blocking" => Ok(land_blocking_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -1145,9 +1145,10 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_fullnode_count(100)
         .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5500 }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
