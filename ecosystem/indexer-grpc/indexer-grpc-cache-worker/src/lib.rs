@@ -71,8 +71,14 @@ pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
 pub async fn create_grpc_client(address: String) -> GrpcClientType {
     backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
         Ok(
-            datastream::indexer_stream_client::IndexerStreamClient::connect(address.clone())
-                .await?,
+            match datastream::indexer_stream_client::IndexerStreamClient::connect(address.clone())
+                .await {
+                    Ok(client) => client,
+                    Err(e) => {
+                        aptos_logger::error!(address=address.clone(), "[Indexer Cache] Failed to connect to indexer gRPC server: {}", e);
+                        e
+                    }
+                },
         )
     })
     .await
