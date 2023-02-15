@@ -579,7 +579,7 @@ Derives an object address from source material: sha3_256([creator address | seed
 Returns the address of within an ObjectId.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
@@ -588,7 +588,7 @@ Returns the address of within an ObjectId.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
     <a href="object.md#0x1_object">object</a>.inner
 }
 </code></pre>
