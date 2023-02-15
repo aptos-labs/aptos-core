@@ -145,7 +145,7 @@ module aptos_framework::object {
     native fun exists_at<T: key>(object: address): bool;
 
     /// Returns the address of within an ObjectId.
-    public fun object_address<T>(object: &Object<T>): address {
+    public fun object_address<T: key>(object: &Object<T>): address {
         object.inner
     }
 
