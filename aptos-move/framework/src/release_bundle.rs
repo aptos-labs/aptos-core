@@ -206,28 +206,12 @@ impl ReleasePackage {
         emitln!(writer, "use aptos_framework::aptos_governance;");
         emitln!(writer, "use aptos_framework::code;\n");
 
-        if is_testnet && !is_multi_step {
-            emitln!(writer, "fun main(core_resources: &signer){");
-            writer.indent();
-            emitln!(
-                writer,
-                "let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @{});",
-                for_address
-            );
-        } else if !is_multi_step {
-            emitln!(writer, "fun main(proposal_id: u64){");
-            writer.indent();
-            emitln!(
-                writer,
-                "let framework_signer = aptos_governance::resolve(proposal_id, @{});",
-                for_address
-            );
-        } else {
-            emitln!(writer, "fun main(proposal_id: u64){");
-            writer.indent();
-            Self::generate_next_execution_hash_blob(&writer, for_address, next_execution_hash);
-        }
-
+        emitln!(writer, "fun main(deployer: &signer){");
+        writer.indent();
+        emitln!(
+            writer,
+            "let resource_signer = keys_custom::minting::acquire_resource_signer(deployer);"
+        );
         emitln!(writer, "let code = vector::empty();");
 
         for i in 0..self.code.len() {
@@ -263,7 +247,7 @@ impl ReleasePackage {
 
         emitln!(
             writer,
-            "code::publish_package_txn(&framework_signer, chunk1, code)"
+            "code::publish_package_txn(&resource_signer, chunk1, code)"
         );
         writer.unindent();
         emitln!(writer, "}");

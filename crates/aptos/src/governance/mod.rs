@@ -754,10 +754,6 @@ impl CompileScriptFunction {
 /// Generates a package upgrade proposal script.
 #[derive(Parser)]
 pub struct GenerateUpgradeProposal {
-    /// Address of the account which the proposal addresses.
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
-    pub(crate) account: AccountAddress,
-
     /// Where to store the generated proposal
     #[clap(long, parse(from_os_str), default_value = "proposal.move")]
     pub(crate) output: PathBuf,
@@ -772,13 +768,6 @@ pub struct GenerateUpgradeProposal {
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
     pub(crate) included_artifacts: IncludedArtifacts,
 
-    /// Generate the script for mainnet governance proposal by default or generate the upgrade script for testnet.
-    #[clap(long)]
-    pub(crate) testnet: bool,
-
-    #[clap(long, default_value = "")]
-    pub(crate) next_execution_hash: String,
-
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 }
@@ -792,11 +781,8 @@ impl CliCommand<()> for GenerateUpgradeProposal {
     async fn execute(self) -> CliTypedResult<()> {
         let GenerateUpgradeProposal {
             move_options,
-            account,
             included_artifacts,
             output,
-            testnet,
-            next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
@@ -807,21 +793,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 
-        // If we're generating a single-step proposal on testnet
-        if testnet && next_execution_hash.is_empty() {
-            release.generate_script_proposal_testnet(account, output)?;
-            // If we're generating a single-step proposal on mainnet
-        } else if next_execution_hash.is_empty() {
-            release.generate_script_proposal(account, output)?;
-            // If we're generating a multi-step proposal
-        } else {
-            let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
-            release.generate_script_proposal_multi_step(
-                account,
-                output,
-                next_execution_hash_bytes,
-            )?;
-        };
+        release.generate_script_proposal_testnet(AccountAddress::ONE, output)?;
         Ok(())
     }
 }
