@@ -1151,7 +1151,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5200 }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["epoch_duration_secs"] = 3600.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(
