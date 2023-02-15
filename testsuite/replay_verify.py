@@ -65,10 +65,10 @@ def replay_verify_partition(
             str(start),
             "--end-version",
             str(end),
+            "--lazy-quit",
             "command-adapter",
             "--config",
             backup_config_template_path,
-            "--lazy-quit",
         ],
         stdout=subprocess.PIPE,
     )
