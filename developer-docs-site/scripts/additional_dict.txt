@@ -12,6 +12,8 @@ APT's
 APTs
 AUTH
 AWS
+AIP
+AIPs
 Ait
 ApiExplorer
 Aptos
