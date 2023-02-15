@@ -35,6 +35,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from nacl.signing import VerifyKey
 
+# Constants >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 MAX_SIGNATORIES = 32
 """Maximum number of signatories on a multisig account."""
 
@@ -63,15 +65,71 @@ TEST_PASSWORD = "Aptos"
 USE_TEST_PASSWORD = True
 """True if using test password for bypassing prompts."""
 
+# Constants <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Aptos accounts >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+def fund_address_from_faucet(address: str):
+    """Fund an account address using devnet faucet."""
+    command = (  # Construct aptos CLI command.
+        f"aptos account fund-with-faucet --account {address} "
+        f"--faucet-url {FAUCET_URL} --url {NETWORK_URLS['devnet']}"
+    )
+    # Print command to run.
+    print(f"Running aptos CLI command: {command}")
+    # Run command.
+    subprocess.run(command.split(), stdout=subprocess.PIPE, check=True)
+    balance = RestClient(NETWORK_URLS["devnet"]).account_balance(
+        AccountAddress(prefixed_hex_to_bytes(address))
+    )  # Check balance.
+    assert balance != 0, "Funding failed."
+    print(f"New balance: {balance}")  # Print user feedback.
+
+
+def get_sequence_number(address: bytes, network: str) -> int:
+    """Return sequence number of account having address for network."""
+    client = RestClient(NETWORK_URLS[network])  # Get network client.
+    # Return account sequence number.
+    return client.account_sequence_number(AccountAddress(address))
+
+
+# Aptos accounts <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# String operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 
 def bytes_to_prefixed_hex(input_bytes: bytes) -> str:
     """Convert bytes to hex string with 0x prefix."""
     return f"0x{input_bytes.hex()}"
 
 
+def check_name(tokens: List[str]) -> str:
+    """Check list of tokens for valid name, return concatenated str."""
+    name = " ".join(tokens)  # Get name.
+    # Assert that name is not blank space.
+    assert len(name) != 0 and not name.isspace(), "Name may not be blank."
+    return name  # Return name.
+
+
+def get_github_zip_archive_url(user: str, project: str, commit: str) -> str:
+    """Return GitHub URL of a repository zip archive."""
+    return f"https://github.com/{user}/{project}/archive/{commit}.zip"
+
+
 def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
     """Convert hex string with 0x prefix to bytes."""
     return bytes.fromhex(prefixed_hex[2:])
+
+
+# String operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# File operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+def check_outfile_exists(path: Path):
+    """Verify desired outfile does not already exist."""
+    assert not path.exists(), f"{path} already exists."
 
 
 def get_file_path(
@@ -82,6 +140,27 @@ def get_file_path(
         return optional_path  # Use it as the path.
     # Otherwise return a new path from tokens and extension.
     return Path("_".join(name_tokens).casefold() + "." + extension)
+
+
+def write_json_file(path: Path, data: Dict[str, str], check_if_exists: bool):
+    """Write JSON data to path, printing contents of new file and
+    optionally checking if the file already exists."""
+    if check_if_exists:
+        check_outfile_exists(path)  # Check if file exists.
+    # With file open for writing:
+    with open(path, "w", encoding="utf-8") as file:
+        # Dump JSON data to file.
+        json.dump(data, file, indent=4)
+    filetype = data["filetype"]  # Get file type from data.
+    # With file open for reading:
+    with open(path, "r", encoding="utf-8") as file:
+        # Print contents of file.
+        print(f"{filetype} now at {path}: \n{file.read()}")
+
+
+# File operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Password protection >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
@@ -108,19 +187,6 @@ def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
         print("Invalid password.")  # Inform user.
         private_key = None  # Set private key to none.
     return data, private_key  # Return JSON data, private key.
-
-
-def check_name(tokens: List[str]) -> str:
-    """Check list of tokens for valid name, return concatenated str."""
-    name = " ".join(tokens)  # Get name.
-    # Assert that name is not blank space.
-    assert len(name) != 0 and not name.isspace(), "Name may not be blank."
-    return name  # Return name.
-
-
-def check_outfile_exists(path: Path):
-    """Verify desired outfile does not already exist."""
-    assert not path.exists(), f"{path} already exists."
 
 
 def check_password_length(password: str):
@@ -171,81 +237,9 @@ def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     return encrypted_private_key, salt  # Return key, salt.
 
 
-def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract public fields from signatory keyfile JSON data."""
-    return dict(
-        (field, data[field])
-        for field in ["signatory", "public_key", "authentication_key"]
-    )
+# Password protection <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-
-def metafile_incorporate(args):
-    """Incorporate single-signer keyfiles to multisig metafile."""
-    metafile_check_update(
-        metafile_json={"n_signatories": 0, "signatories": []},
-        name_tokens=args.name,
-        threshold=args.threshold,
-        keyfiles=args.keyfiles,
-        outfile=args.outfile,
-    )
-
-
-def metafile_append(args):
-    """Append signatory/signatories to a multisig metafile."""
-    metafile_check_update(
-        metafile_json=json.load(args.metafile),
-        name_tokens=args.name,
-        threshold=args.threshold,
-        keyfiles=args.keyfiles,
-        outfile=args.outfile,
-    )
-
-
-def check_signatories_threshold(n_signatories: int, threshold: int):
-    """Verify the number of signatories and threshold on a multisig."""
-    assert MIN_SIGNATORIES <= n_signatories <= MAX_SIGNATORIES, (
-        f"Number of signatories must be between {MIN_SIGNATORIES} and "
-        f"{MAX_SIGNATORIES} (inclusive)."
-    )  # Assert valid number of signatories.
-    assert MIN_THRESHOLD <= threshold <= n_signatories, (
-        f"Signature threshold must be greater than {MIN_THRESHOLD} and less "
-        f"than the number of signatories."
-    )  # Assert valid signature threshold.
-
-
-def metafile_remove(args):
-    """Remove signatories from a multisig metafile."""
-    metafile_json = json.load(args.metafile)  # Load metafile JSON.
-    # Sort 0-indexed signatory list indices from high to low.
-    args.signatories.sort(reverse=True)
-    # Loop over 0-indexed IDs to remove, high to low:
-    for index in args.signatories:
-        # Remove signatory at index from list.
-        del metafile_json["signatories"][index]
-    # Decrement signatory count.
-    metafile_json["n_signatories"] -= len(args.signatories)
-    metafile_check_update(  # Check and write data to disk.
-        metafile_json=metafile_json,
-        name_tokens=args.name,
-        threshold=args.threshold,
-        keyfiles=None,
-        outfile=args.outfile,
-    )
-
-
-def metafile_threshold(args):
-    """Update threshold for a multisig metafile."""
-    metafile_json = json.load(args.metafile)  # Load metafile JSON.
-    assert (  # Assert that threshold update is specified.
-        metafile_json["threshold"] != args.threshold
-    ), "No threshold update specified."
-    metafile_check_update(  # Check and write data to disk.
-        metafile_json=metafile_json,
-        name_tokens=args.name,
-        threshold=args.threshold,
-        keyfiles=None,
-        outfile=args.outfile,
-    )
+# Multisig metafiles >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def metafile_check_update(
@@ -306,230 +300,181 @@ def metafile_check_update(
     )
 
 
-def keyfile_change_password(args):
-    """Change password for a single-signer keyfile."""
-    # Check password, get keyfile data and optional private key bytes.
-    data, private_key_bytes = check_keyfile_password(args.keyfile)
-    if private_key_bytes is not None:  # If able to decrypt private key:
-        # Encrypt private key.
-        encrypted_bytes, salt = encrypt_private_key(private_key_bytes)
-        # Get encrypted private key hex.
-        encrypted_private_key_hex = bytes_to_prefixed_hex(encrypted_bytes)
-        # Update JSON with encrypted private key.
-        data["encrypted_private_key"] = encrypted_private_key_hex
-        # Update JSON with new salt.
-        data["salt"] = bytes_to_prefixed_hex(salt)
-        # Write JSON to keyfile, skipping check for if file exists.
-        write_json_file(args.keyfile, data, False)
+def metafile_to_multisig_public_key(path: Path) -> MultiEd25519PublicKey:
+    """Get multisig public key instance from metafile at path."""
+    # With metafile open:
+    with open(path, encoding="utf-8") as metafile:
+        data = json.load(metafile)  # Load JSON data.
+    keys = []  # Init empty public keys list.
+    for signatory in data["signatories"]:  # Loop over signatories:
+        # Get public key bytes.
+        public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
+        # Append public key to list
+        keys.append(PublicKey(VerifyKey(public_key_bytes)))
+    # Return multisig public key instance.
+    return MultiEd25519PublicKey(keys, data["threshold"])
 
 
-def keyfile_extract(args):
-    """Extract private key from keyfile, store via
-    aptos_sdk.account.Account.store"""
-    check_outfile_exists(args.account_store)  # Check if path exists.
-    # Try loading private key bytes.
-    _, private_key_bytes = check_keyfile_password(args.keyfile)
-    # If able to successfully decrypt:
-    if private_key_bytes is not None:
-        # Load account.
-        account = Account.load_key(private_key_bytes.hex())
-        # Store Aptos account file.
-        account.store(f"{args.account_store}")
-        # Open new Aptos account store:
-        with open(args.account_store, "r", encoding="utf-8") as outfile:
-            # Print contents of new account store.
-            print(f"New account store at {args.account_store}:")
-            print(f"{outfile.read()}")
+def update_multisig_address(path: Path, address_prefixed_hex: str):
+    """Update the address for a multisig metafile."""
+    print("Updating address in multisig metafile.")
+    # With multisig metafile open:
+    with open(path, "r", encoding="utf-8") as metafile:
+        data = json.load(metafile)  # Load JSON data from metafile.
+    # Update address field.
+    data["address"] = address_prefixed_hex
+    # Overwrite JSON data in file.
+    write_json_file(path=path, data=data, check_if_exists=False)
 
 
-def keyfile_generate(args):
-    """Generate a keyfile for a single signer."""
-    signatory = check_name(args.signatory)
-    if args.account_store is None:  # If no account store supplied:
-        account = Account.generate()  # Generate new account.
-        # If vanity prefix supplied:
-        if args.vanity_prefix is not None:
-            to_check = args.vanity_prefix  # Define prefix to check.
-            # Get number of characters in vanity prefix.
-            n_chars = len(to_check)
-            if n_chars % 2 == 1:  # If odd number of hex characters:
-                # Append 0 to make valid hexstring.
-                to_check = args.vanity_prefix + "0"
-            # Check that hex can be converted to bytes.
-            prefixed_hex_to_bytes(to_check)
-            print("Mining vanity address...")  # Print feedback message.
-            len_prefix = len(args.vanity_prefix)  # Get prefix length.
-            # While account address does not have prefix:
-            while account.address().hex()[0:len_prefix] != args.vanity_prefix:
-                account = Account.generate()  # Generate another.
-    else:  # If account store path supplied:
-        # Generate an account from it.
-        account = Account.load(f"{args.account_store}")
-    # Get private key bytes.
-    private_key_bytes = account.private_key.key.encode()
-    # Encrypt private key.
-    encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
-    # Get encrypted private key hex.
-    key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
-    write_json_file(  # Write JSON to keyfile.
-        path=get_file_path(args.outfile, args.signatory, "keyfile"),
-        data={
-            "filetype": "Keyfile",
-            "signatory": signatory,
-            "public_key": f"{account.public_key()}",
-            "authentication_key": account.auth_key(),
-            "encrypted_private_key": key_hex,
-            "salt": bytes_to_prefixed_hex(salt),
-        },
-        check_if_exists=True,
+# Multisig metafiles <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Authentication key rotation >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+def construct_raw_rotation_transaction(
+    from_scheme: int,
+    from_public_key_bytes: bytes,
+    to_scheme: int,
+    to_public_key_bytes: bytes,
+    cap_rotate_key: bytes,
+    cap_update_table: bytes,
+    sender_prefixed_hex: str,
+    sequence_number: int,
+    expiry: datetime,
+    chain_id: int,
+) -> RawTransaction:
+    """Return a raw authentication key rotation transaction."""
+    payload = EntryFunction.natural(
+        module="0x1::account",
+        function="rotate_authentication_key",
+        ty_args=[],
+        args=[
+            TransactionArgument(from_scheme, Serializer.u8),
+            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(to_scheme, Serializer.u8),
+            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
+            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
+            TransactionArgument(cap_update_table, Serializer.to_bytes),
+        ],
+    )  # Construct entry function payload.
+    return construct_raw_transaction(  # Return raw transaction.
+        sender_prefixed_hex=sender_prefixed_hex,
+        sequence_number=sequence_number,
+        payload=payload,
+        expiry=expiry,
+        chain_id=chain_id,
     )
 
 
-def get_github_zip_archive_url(user: str, project: str, commit: str) -> str:
-    """Return GitHub URL of a repository zip archive."""
-    return f"https://github.com/{user}/{project}/archive/{commit}.zip"
-
-
-def publish_execute(args):
-    """Publish a Move package from a multisig account."""
-    execute_transaction_from_signatures(
-        signature_files=args.signatures,
-        proposal_indexer_func=get_publication_transaction,
-        network=args.network,
-    )
-
-
-def script_execute(args):
-    """Invoke a Move script from a multisig account."""
-    execute_transaction_from_signatures(
-        signature_files=args.signatures,
-        proposal_indexer_func=get_script_transaction,
-        network=args.network,
-    )
-
-
-def execute_transaction_from_signatures(
-    signature_files: Option[List[TextIOWrapper]],
-    proposal_indexer_func: Callable[[Dict[str, Any]], RawTransaction],
-    network: str,
-    is_rotation_transaction=False,
+def extract_challenge_proposal_data(
+    signature_files: List[TextIOWrapper],
+    proposal: Option[Dict[str, Any]],
+    signatures_manifest=List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Execute multisig transaction indicated by proposal signature
-    files, returning proposal.
+    """Extract from signature files challenge proposal data and append
+    to ongoing signatures manifest."""
+    for file in signature_files:  # Loop over signature files.
+        signature_data = json.load(file)  # Load data for file.
+        if proposal is None:  # If challenge proposal undefined:
+            # Initialize it to that from first signature file.
+            proposal = signature_data["challenge_proposal"]
+        else:  # If challenge proposal already defined:
+            assert (  # Assert it is same across all signature files.
+                signature_data["challenge_proposal"] == proposal
+            ), "Signature proposal mismatch."
+        signatures_manifest.append(
+            {  # Append signature data.
+                "signatory": signature_data["signatory"],
+                "signature": signature_data["signature"],
+            }
+        )
+    return proposal  # Return proposal.
 
-    If transaction is a rotation transaction, transaction does not
-    contain an embedded multisig metafile. Hence in this case the
-    multisig public key is extracted from the challenge proposal.
 
-    Otherwise, the public key of the multisig account is found in the
-    multisig metafile embedded in the transaction proposal.
-    """
-    signature_map, proposal = index_proposal_signatures(
-        signature_files, "transaction_proposal"
-    )  # Index signatures into signature map, transaction proposal.
-    if is_rotation_transaction:  # If rotation transaction:
-        # Public key is in challenge proposal.
-        public_key_hex = proposal["challenge_proposal"]["from_public_key"]
-    else:  # If not rotation transaction:
-        # Public key is in embedded multisig metafile.
-        public_key_hex = proposal["multisig"]["public_key"]
-    # Get public key bytes.
-    public_key_bytes = prefixed_hex_to_bytes(public_key_hex)
-    # Get public key class instance.
-    public_key = MultiEd25519PublicKey.from_bytes(public_key_bytes)
-    # Get a raw transaction to sign from the transaction proposal.
-    raw_transaction = proposal_indexer_func(proposal)
-    assert_successful_transaction(  # Assert transaction succeeds.
-        network=network,
-        raw_transaction=raw_transaction,
-        public_key=public_key,
-        signature=MultiEd25519Signature(public_key, signature_map),
+def get_rotation_challenge_bcs(proposal_data: Dict[str, str]) -> bytes:
+    """Convert challenge proposal data map to BCS serialization."""
+    # Get proposal fields as bytes.
+    (originator_address_bytes, current_auth_key_bytes, new_pubkey_bytes) = (
+        prefixed_hex_to_bytes(proposal_data["originator"]),
+        prefixed_hex_to_bytes(proposal_data["current_auth_key"]),
+        prefixed_hex_to_bytes(proposal_data["new_public_key"]),
     )
-    return proposal  # Return proposal from signature files.
+    rotation_proof_challenge = RotationProofChallenge(
+        sequence_number=int(proposal_data["sequence_number"]),
+        originator=AccountAddress(originator_address_bytes),
+        current_auth_key=AccountAddress(current_auth_key_bytes),
+        new_public_key=new_pubkey_bytes,
+    )  # Declare a rotation proof challenge.
+    serializer = Serializer()  # Init BCS serializer.
+    # Serialize rotation proof challenge.
+    rotation_proof_challenge.serialize(serializer)
+    return serializer.output()  # Return BCS.
 
 
-def publish_propose(args):
-    """Propose the publication of a Move package hosted on GitHub."""
-    # Load publisher data.
-    publisher_data = json.load(args.metafile)
-    # Get publisher account address.
-    publisher_address = publisher_data["address"]
-    assert publisher_address is not None, "Need an address to publish from."
-    sequence_number = get_sequence_number(
-        prefixed_hex_to_bytes(publisher_address), args.network
-    )  # Get originating account sequence number.
-    write_json_file(  # Write JSON to proposal file.
-        path=get_file_path(args.outfile, args.name, "publication_proposal"),
-        data={
-            "filetype": "Publication proposal",
-            "description": check_name(args.name),
-            "github_user": args.user,
-            "github_project": args.project,
-            "commit": args.commit,
-            "manifest_path": args.manifest,
-            "named_address": args.named_address,
-            "multisig": publisher_data,
-            "sequence_number": sequence_number,
-            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
-            "expiry": args.expiry.isoformat(),
-        },
-        check_if_exists=True,
-    )
+def get_rotation_transaction(proposal: Dict[str, Any]) -> RawTransaction:
+    """Convert a multisig authentication key rotation transaction to a
+    raw transaction"""
+    # Get rotation proof challenge proposal.
+    challenge_proposal = proposal["challenge_proposal"]
+    from_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["from_public_key"]
+    )  # Get from public key bytes.
+    cap_rotate_key = MultiEd25519Signature(
+        MultiEd25519PublicKey.from_bytes(from_public_key_bytes),
+        signature_json_to_map(proposal["challenge_from_signatures"]),
+    ).to_bytes()  # Get key rotation capability signature.
+    to_public_key_bytes = prefixed_hex_to_bytes(
+        challenge_proposal["new_public_key"]
+    )  # Get public key bytes for to account.
+    # If account to rotate to is a single signer:
+    if challenge_proposal["to_is_single_signer"]:
+        to_scheme = Authenticator.ED25519  # Scheme is single-signer.
+        cap_update_table = prefixed_hex_to_bytes(
+            proposal["challenge_to_signatures"][0]["signature"]
+        )  # Update table capability signature is only one provided.
+    else:  # If account to rotate to is a multisig:
+        to_scheme = Authenticator.MULTI_ED25519  # Scheme is multisig.
+        cap_update_table = MultiEd25519Signature(
+            MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
+            signature_json_to_map(proposal["challenge_to_signatures"]),
+        ).to_bytes()  # Get table update capability signature.
+    return construct_raw_rotation_transaction(
+        from_scheme=Authenticator.MULTI_ED25519,
+        from_public_key_bytes=from_public_key_bytes,
+        to_scheme=to_scheme,
+        to_public_key_bytes=to_public_key_bytes,
+        cap_rotate_key=cap_rotate_key,
+        cap_update_table=cap_update_table,
+        sender_prefixed_hex=challenge_proposal["originator"],
+        sequence_number=challenge_proposal["sequence_number"],
+        expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
+        chain_id=challenge_proposal["chain_id"],
+    )  # Construct raw rotation transaction.
 
 
-def script_propose(args):
-    """Propose the invocation of a Move script hosted on GitHub."""
-    # Load caller data.
-    caller_data = json.load(args.metafile)
-    # Get caller account address.
-    caller_address = caller_data["address"]
-    assert caller_address is not None, "Need an address to call from."
-    sequence_number = get_sequence_number(
-        prefixed_hex_to_bytes(caller_address), args.network
-    )  # Get calling account sequence number.
-    write_json_file(  # Write JSON to proposal file.
-        path=get_file_path(args.outfile, args.name, "script_proposal"),
-        data={
-            "filetype": "Script proposal",
-            "description": check_name(args.name),
-            "github_user": args.user,
-            "github_project": args.project,
-            "commit": args.commit,
-            "manifest_path": args.manifest,
-            "named_address": args.named_address,
-            "script_name": args.script_name,
-            "multisig": caller_data,
-            "sequence_number": sequence_number,
-            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
-            "expiry": args.expiry.isoformat(),
-        },
-        check_if_exists=True,
-    )
+# Authentication key rotation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Transaction construction >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-def publish_sign(args):
-    """Sign a package publication proposal."""
-    proposal = json.load(args.proposal)  # Load proposal data.
-    sign_raw_transaction(  # Sign corresponding raw transaction.
-        keyfile=args.keyfile,
-        raw_transaction=get_publication_transaction(proposal),
-        optional_outfile_path=args.outfile,
-        name_tokens=args.name,
-        proposal=proposal,
-        filetype="Publication signature",
-    )
-
-
-def script_sign(args):
-    """Sign a script invocation proposal."""
-    proposal = json.load(args.proposal)  # Load proposal data.
-    sign_raw_transaction(  # Sign corresponding raw transaction.
-        keyfile=args.keyfile,
-        raw_transaction=get_script_transaction(proposal),
-        optional_outfile_path=args.outfile,
-        name_tokens=args.name,
-        proposal=proposal,
-        filetype="Script signature",
+def construct_raw_transaction(
+    sender_prefixed_hex: str,
+    sequence_number: int,
+    payload: Dict[str, Any],
+    expiry: datetime,
+    chain_id: int,
+) -> RawTransaction:
+    """Return a raw transaction for given payload and metadata, using
+    default gas config values."""
+    return RawTransaction(  # Return raw transaction.
+        sender=AccountAddress(prefixed_hex_to_bytes(sender_prefixed_hex)),
+        sequence_number=sequence_number,
+        payload=TransactionPayload(payload),
+        max_gas_amount=ClientConfig.max_gas_amount,
+        gas_unit_price=ClientConfig.gas_unit_price,
+        expiration_timestamps_secs=int(expiry.timestamp()),
+        chain_id=chain_id,
     )
 
 
@@ -565,7 +510,7 @@ def download_and_compile(proposal: Dict[str, Any]):
         multisig_address = proposal["multisig"]["address"]
         # Get named address for build command.
         named_address = proposal["named_address"]
-        command = (  # Get apto CLI build command.
+        command = (  # Get aptos CLI build command.
             f"aptos move compile --save-metadata "
             f"--package-dir {manifest_path.parent} "
             f"--named-addresses {named_address}={multisig_address}"
@@ -573,7 +518,7 @@ def download_and_compile(proposal: Dict[str, Any]):
         # Print aptos CLI build command to run.
         print(f"Running aptos CLI command: {command}\n")
         # Run aptos CLI build command.
-        subprocess.run(command.split(), stdout=subprocess.PIPE)
+        subprocess.run(command.split(), stdout=subprocess.PIPE, check=True)
         # Get path for package build files.
         build_path = manifest_path.parent / Path("build") / Path(package_name)
         yield build_path  # Yield build path.
@@ -645,186 +590,29 @@ def get_script_transaction(proposal: Dict[str, Any]) -> RawTransaction:
     return get_proposal_transaction(payload, proposal)
 
 
-def keyfile_fund(args):
-    """Fund account linked to keyfile using devnet faucet, assuming
-    account address matches authentication key."""
-    data = json.load(args.keyfile)  # Load JSON data from keyfile.
-    address = data["authentication_key"]  # Get address.
-    fund_address_from_faucet(address)  # Fund from faucet.
+# Transaction construction <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Transaction signing >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-def fund_address_from_faucet(address: str):
-    """Fund an account address using devnet faucet."""
-    command = (  # Construct aptos CLI command.
-        f"aptos account fund-with-faucet --account {address} "
-        f"--faucet-url {FAUCET_URL} --url {NETWORK_URLS['devnet']}"
+def check_signatories_threshold(n_signatories: int, threshold: int):
+    """Verify the number of signatories and threshold on a multisig."""
+    assert MIN_SIGNATORIES <= n_signatories <= MAX_SIGNATORIES, (
+        f"Number of signatories must be between {MIN_SIGNATORIES} and "
+        f"{MAX_SIGNATORIES} (inclusive)."
+    )  # Assert valid number of signatories.
+    assert MIN_THRESHOLD <= threshold <= n_signatories, (
+        f"Signature threshold must be greater than {MIN_THRESHOLD} and less "
+        f"than the number of signatories."
+    )  # Assert valid signature threshold.
+
+
+def get_public_signatory_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract public fields from signatory keyfile JSON data."""
+    return dict(
+        (field, data[field])
+        for field in ["signatory", "public_key", "authentication_key"]
     )
-    # Print command to run.
-    print(f"Running aptos CLI command: {command}")
-    # Run command.
-    subprocess.run(command.split(), stdout=subprocess.PIPE, check=True)
-    balance = RestClient(NETWORK_URLS["devnet"]).account_balance(
-        AccountAddress(prefixed_hex_to_bytes(address))
-    )  # Check balance.
-    assert balance != 0, "Funding failed."
-    print(f"New balance: {balance}")  # Print user feedback.
-
-
-def metafile_fund(args):
-    """Fund account at multisig address using devnet faucet, defaulting
-    to authentication key for address."""
-    with open(args.metafile, encoding="utf-8") as metafile:
-        data = json.load(metafile)  # Load JSON data from metafile.
-    address = data["address"]  # Get multisig address.
-    auth_key = data["authentication_key"]  # Get its authentication key.
-    # Determine the address to fund.
-    address_to_fund = auth_key if address is None else address
-    fund_address_from_faucet(address_to_fund)  # Fund from faucet.
-    if address is None:  # If no address listed before funding:
-        # Update multisig metafile address to authentication key.
-        update_multisig_address(args.metafile, auth_key)
-
-
-def keyfile_verify(args):
-    """Verify password for single-signer keyfile generated via
-    keyfile_generate(), show public key and authentication key."""
-    # Load JSON data and try getting private key bytes.
-    data, private_key_bytes = check_keyfile_password(args.keyfile)
-    if private_key_bytes is not None:  # If able to decrypt private key:
-        # Print keyfile info.
-        print(f'Keyfile password verified for {data["signatory"]}')
-        print(f'Public key:         {data["public_key"]}')
-        print(f'Authentication key: {data["authentication_key"]}')
-
-
-def write_json_file(path: Path, data: Dict[str, str], check_if_exists: bool):
-    """Write JSON data to path, printing contents of new file and
-    optionally checking if the file already exists."""
-    if check_if_exists:
-        check_outfile_exists(path)  # Check if file exists.
-    # With file open for writing:
-    with open(path, "w", encoding="utf-8") as file:
-        # Dump JSON data to file.
-        json.dump(data, file, indent=4)
-    filetype = data["filetype"]  # Get file type from data.
-    # With file open for reading:
-    with open(path, "r", encoding="utf-8") as file:
-        # Print contents of file.
-        print(f"{filetype} now at {path}: \n{file.read()}")
-
-
-def get_sequence_number(address: bytes, network: str) -> int:
-    """Return sequence number of account having address for network."""
-    client = RestClient(NETWORK_URLS[network])  # Get network client.
-    # Return account sequence number.
-    return client.account_sequence_number(AccountAddress(address))
-
-
-def rotate_challenge_propose(args):
-    """Propose a rotation proof challenge, storing an output file.
-
-    Accepts either a single-signer keyfile or multisig metafile for both
-    originating and target accounts. If single-signer, assumes account
-    address is identical to authentication key."""
-    # Load originator data.
-    originator_data = json.load(args.originator)
-    target_data = json.load(args.target)  # Load target data.
-    # Check if originator is single-signer.
-    from_is_single = originator_data["filetype"] == "Keyfile"
-    # Check if target is single-signer.
-    to_is_single = target_data["filetype"] == "Keyfile"
-    if from_is_single:  # If a single-signer originator:
-        # Address is assumed to be authentication key.
-        originator_address = originator_data["authentication_key"]
-    else:  # If multisig originator:
-        # Address is that indicated in metafile.
-        originator_address = originator_data["address"]
-    if to_is_single:  # If a single-signer target:
-        assert target_data["authentication_key"] == originator_address, (
-            "Authentication key of single-signer target account must match "
-            "originating address."
-        )  # Assert authentication key identical to from address.
-    sequence_number = get_sequence_number(
-        prefixed_hex_to_bytes(originator_address), args.network
-    )  # Get originating account sequence number.
-    write_json_file(  # Write JSON to proposal file.
-        path=get_file_path(args.outfile, args.name, "challenge_proposal"),
-        data={
-            "filetype": "Rotation proof challenge proposal",
-            "description": check_name(args.name),
-            "from_public_key": originator_data["public_key"],
-            "from_is_single_signer": from_is_single,
-            "to_is_single_signer": to_is_single,
-            "sequence_number": sequence_number,
-            "originator": originator_address,
-            "current_auth_key": originator_data["authentication_key"],
-            "new_public_key": target_data["public_key"],
-            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
-            "expiry": args.expiry.isoformat(),
-        },
-        check_if_exists=True,
-    )
-
-
-def get_rotation_challenge_bcs(proposal_data: Dict[str, str]) -> bytes:
-    """Convert challenge proposal data map to BCS serialization."""
-    # Get proposal fields as bytes.
-    (originator_address_bytes, current_auth_key_bytes, new_pubkey_bytes) = (
-        prefixed_hex_to_bytes(proposal_data["originator"]),
-        prefixed_hex_to_bytes(proposal_data["current_auth_key"]),
-        prefixed_hex_to_bytes(proposal_data["new_public_key"]),
-    )
-    rotation_proof_challenge = RotationProofChallenge(
-        sequence_number=int(proposal_data["sequence_number"]),
-        originator=AccountAddress(originator_address_bytes),
-        current_auth_key=AccountAddress(current_auth_key_bytes),
-        new_public_key=new_pubkey_bytes,
-    )  # Declare a rotation proof challenge.
-    serializer = Serializer()  # Init BCS serializer.
-    # Serialize rotation proof challenge.
-    rotation_proof_challenge.serialize(serializer)
-    return serializer.output()  # Return BCS.
-
-
-def rotate_challenge_sign(args):
-    """Sign a rotation proof challenge proposal, storing output file."""
-    proposal_data = json.load(args.proposal)  # Load proposal data.
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
-    if private_key_bytes is None:  # If can't decrypt private key:
-        return  # Return.
-    # Get rotation proof challenged BCS bytes.
-    rotation_proof_challenge_bcs = get_rotation_challenge_bcs(proposal_data)
-    # Create Aptos-style account.
-    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
-    # Sign the serialized rotation proof challnege.
-    signature = account.sign(rotation_proof_challenge_bcs).data()
-    write_json_file(  # Write JSON to signature file.
-        path=get_file_path(args.outfile, args.name, "challenge_signature"),
-        data={
-            "filetype": "Rotation proof challenge signature",
-            "description": check_name(args.name),
-            "challenge_proposal": proposal_data,
-            "signatory": get_public_signatory_fields(keyfile_data),
-            "signature": bytes_to_prefixed_hex(signature),
-        },
-        check_if_exists=True,
-    )
-
-
-def metafile_to_multisig_public_key(path: Path) -> MultiEd25519PublicKey:
-    """Get multisig public key instance from metafile at path."""
-    # With metafile open:
-    with open(path, encoding="utf-8") as metafile:
-        data = json.load(metafile)  # Load JSON data.
-    keys = []  # Init empty public keys list.
-    for signatory in data["signatories"]:  # Loop over signatories:
-        # Get public key bytes.
-        public_key_bytes = prefixed_hex_to_bytes(signatory["public_key"])
-        # Append public key to list
-        keys.append(PublicKey(VerifyKey(public_key_bytes)))
-    # Return multisig public key instance.
-    return MultiEd25519PublicKey(keys, data["threshold"])
 
 
 def index_proposal_signatures(
@@ -854,260 +642,6 @@ def index_proposal_signatures(
         signature_map.append((pubkey, sig))
     # Return signature map and proposal.
     return signature_map, proposal
-
-
-def rotate_execute_single(args):
-    """Rotate authentication key for single-signer account.
-
-    Only supports rotation to a multisig account."""
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
-    if private_key_bytes is None:  # If can't decrypt private key:
-        return  # Return without rotating.
-    # Create Aptos-style account for single signer.
-    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
-    # Get public key bytes for account.
-    from_public_key_bytes = prefixed_hex_to_bytes(keyfile_data["public_key"])
-    signature_map, proposal = index_proposal_signatures(
-        args.signatures, "challenge_proposal"
-    )  # Index signatures into signature map, extract challenge proposal.
-    # Get rotation challenge BCS.
-    rotation_challenge_bcs = get_rotation_challenge_bcs(proposal)
-    # Get capability to update address mapping for multisig account.
-    cap_update_table = MultiEd25519Signature(
-        metafile_to_multisig_public_key(args.metafile), signature_map
-    ).to_bytes()
-    raw_transaction = construct_raw_rotation_transaction(
-        from_scheme=Authenticator.ED25519,
-        from_public_key_bytes=from_public_key_bytes,
-        to_scheme=Authenticator.MULTI_ED25519,
-        to_public_key_bytes=prefixed_hex_to_bytes(proposal["new_public_key"]),
-        cap_rotate_key=account.sign(rotation_challenge_bcs).data(),
-        cap_update_table=cap_update_table,
-        sender_prefixed_hex=proposal["originator"],
-        sequence_number=proposal["sequence_number"],
-        expiry=datetime.fromisoformat(proposal["expiry"]),
-        chain_id=proposal["chain_id"],
-    )  # Construct raw rotation transaction.
-    assert_successful_transaction(  # Assert transaction succeeds.
-        network=args.network,
-        raw_transaction=raw_transaction,
-        public_key=account.public_key(),
-        signature=account.sign(raw_transaction.keyed()),
-    )
-    # Update multisig metafile address.
-    update_multisig_address(args.metafile, proposal["originator"])
-
-
-def assert_successful_transaction(
-    network: str,
-    raw_transaction: RawTransaction,
-    public_key: Union[PublicKey, MultiEd25519PublicKey],
-    signature: Union[Signature, MultiEd25519Signature],
-):
-    """Submit a signed BCS transaction, asserting that it succeeds."""
-    # Get REST client for network.
-    client = RestClient(NETWORK_URLS[network])
-    auth_inner = (
-        Ed25519Authenticator
-        if isinstance(public_key, PublicKey)
-        else MultiEd25519Authenticator
-    )  # Get inner authenticator structure.
-    # Get authenticator.
-    authenticator = Authenticator(auth_inner(public_key, signature))
-    # Get signed transaction.
-    signed_transaction = SignedTransaction(raw_transaction, authenticator)
-    # Submit transaction, storing its hash.
-    tx_hash = client.submit_bcs_transaction(signed_transaction)
-    # Wait for transaction to succeed (asserts success).
-    client.wait_for_transaction(tx_hash)
-    print(f"Transaction successful: {tx_hash}")
-
-
-def rotate_execute_multisig(args):
-    """Rotate authentication key for a multisig account.
-
-    Only supports rotation to a single-signer account if the account has
-    as its authentication key the multisig account address."""
-    proposal = execute_transaction_from_signatures(
-        signature_files=args.signatures,
-        proposal_indexer_func=get_rotation_transaction,
-        network=args.network,
-        is_rotation_transaction=True,
-    )  # Execute rotation transaction from signatures, storing proposal.
-    # Update multisig metafile address for from account.
-    update_multisig_address(args.metafile, None)
-    # If just rotated to a multisig account:
-    if not proposal["challenge_proposal"]["to_is_single_signer"]:
-        update_multisig_address(
-            args.to_metafile, proposal["challenge_proposal"]["originator"]
-        )  # Update metafile address for account just rotated to.
-
-
-def get_rotation_transaction(proposal: Dict[str, Any]) -> RawTransaction:
-    """Convert a multisig authentication key rotation transaction to a
-    raw transaction"""
-    # Get rotation proof challenge proposal.
-    challenge_proposal = proposal["challenge_proposal"]
-    from_public_key_bytes = prefixed_hex_to_bytes(
-        challenge_proposal["from_public_key"]
-    )  # Get from public key bytes.
-    cap_rotate_key = MultiEd25519Signature(
-        MultiEd25519PublicKey.from_bytes(from_public_key_bytes),
-        signature_json_to_map(proposal["challenge_from_signatures"]),
-    ).to_bytes()  # Get key rotation capability signature.
-    to_public_key_bytes = prefixed_hex_to_bytes(
-        challenge_proposal["new_public_key"]
-    )  # Get public key bytes for to account.
-    # If account to rotate to is a single signer:
-    if challenge_proposal["to_is_single_signer"]:
-        to_scheme = Authenticator.ED25519  # Scheme is single-signer.
-        cap_update_table = prefixed_hex_to_bytes(
-            proposal["challenge_to_signatures"][0]["signature"]
-        )  # Update table capability signature is only one provided.
-    else:  # If account to rotate to is a multisig:
-        to_scheme = Authenticator.MULTI_ED25519  # Scheme is multisig.
-        cap_update_table = MultiEd25519Signature(
-            MultiEd25519PublicKey.from_bytes(to_public_key_bytes),
-            signature_json_to_map(proposal["challenge_to_signatures"]),
-        ).to_bytes()  # Get table update capability signature.
-    return construct_raw_rotation_transaction(
-        from_scheme=Authenticator.MULTI_ED25519,
-        from_public_key_bytes=from_public_key_bytes,
-        to_scheme=to_scheme,
-        to_public_key_bytes=to_public_key_bytes,
-        cap_rotate_key=cap_rotate_key,
-        cap_update_table=cap_update_table,
-        sender_prefixed_hex=challenge_proposal["originator"],
-        sequence_number=challenge_proposal["sequence_number"],
-        expiry=datetime.fromisoformat(challenge_proposal["expiry"]),
-        chain_id=challenge_proposal["chain_id"],
-    )  # Construct raw rotation transaction.
-
-
-def extract_challenge_proposal_data(
-    signature_files: List[TextIOWrapper],
-    proposal: Option[Dict[str, Any]],
-    signatures_manifest=List[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """Extract from signature files challenge proposal data and append
-    to ongoing signatures manifest."""
-    for file in signature_files:  # Loop over signature files.
-        signature_data = json.load(file)  # Load data for file.
-        if proposal is None:  # If challenge proposal undefined:
-            # Initialize it to that from first signature file.
-            proposal = signature_data["challenge_proposal"]
-        else:  # If challenge proposal already defined:
-            assert (  # Assert it is same across all signature files.
-                signature_data["challenge_proposal"] == proposal
-            ), "Signature proposal mismatch."
-        signatures_manifest.append(
-            {  # Append signature data.
-                "signatory": signature_data["signatory"],
-                "signature": signature_data["signature"],
-            }
-        )
-    return proposal  # Return proposal.
-
-
-def rotate_transaction_propose(args):
-    """Propose authentication key rotation transaction from multisig."""
-    # Initialize empty from and to signatures for challenge proposal.
-    challenge_from_signatures, challenge_to_signatures = [], []
-    challenge_proposal = extract_challenge_proposal_data(
-        signature_files=args.from_signatures,
-        proposal=None,
-        signatures_manifest=challenge_from_signatures,
-    )  # Extract from challenge proposal signatures.
-    challenge_proposal = extract_challenge_proposal_data(
-        signature_files=args.to_signatures,
-        proposal=challenge_proposal,
-        signatures_manifest=challenge_to_signatures,
-    )  # Extract to challenge proposal signatures.
-    write_json_file(  # Write JSON to transaction proposal file.
-        path=get_file_path(
-            optional_path=args.outfile,
-            name_tokens=args.name,
-            extension="rotation_transaction_proposal",
-        ),
-        data={
-            "filetype": "Rotation transaction proposal",
-            "description": check_name(args.name),
-            "challenge_proposal": challenge_proposal,
-            "challenge_from_signatures": challenge_from_signatures,
-            "challenge_to_signatures": challenge_to_signatures,
-        },
-        check_if_exists=True,
-    )
-
-
-def signature_json_to_map(
-    manifest: List[Dict[str, Any]]
-) -> List[Tuple[PublicKey, Signature]]:
-    """Convert a JSON signature manifest to a classed signature map."""
-    to_bytes = prefixed_hex_to_bytes  # Shorten func name for brevity.
-    return [  # Return list comprehension.
-        (
-            PublicKey(VerifyKey(to_bytes(entry["signatory"]["public_key"]))),
-            Signature(to_bytes(entry["signature"])),
-        )
-        for entry in manifest
-    ]
-
-
-def construct_raw_transaction(
-    sender_prefixed_hex: str,
-    sequence_number: int,
-    payload: Dict[str, Any],
-    expiry: datetime,
-    chain_id: int,
-) -> RawTransaction:
-    """Return a raw transaction for given payload and metadata, using
-    default gas config values."""
-    return RawTransaction(  # Return raw transaction.
-        sender=AccountAddress(prefixed_hex_to_bytes(sender_prefixed_hex)),
-        sequence_number=sequence_number,
-        payload=TransactionPayload(payload),
-        max_gas_amount=ClientConfig.max_gas_amount,
-        gas_unit_price=ClientConfig.gas_unit_price,
-        expiration_timestamps_secs=int(expiry.timestamp()),
-        chain_id=chain_id,
-    )
-
-
-def construct_raw_rotation_transaction(
-    from_scheme: int,
-    from_public_key_bytes: bytes,
-    to_scheme: int,
-    to_public_key_bytes: bytes,
-    cap_rotate_key: bytes,
-    cap_update_table: bytes,
-    sender_prefixed_hex: str,
-    sequence_number: int,
-    expiry: datetime,
-    chain_id: int,
-) -> RawTransaction:
-    """Return a raw authentication key rotation transaction."""
-    payload = EntryFunction.natural(
-        module="0x1::account",
-        function="rotate_authentication_key",
-        ty_args=[],
-        args=[
-            TransactionArgument(from_scheme, Serializer.u8),
-            TransactionArgument(from_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(to_scheme, Serializer.u8),
-            TransactionArgument(to_public_key_bytes, Serializer.to_bytes),
-            TransactionArgument(cap_rotate_key, Serializer.to_bytes),
-            TransactionArgument(cap_update_table, Serializer.to_bytes),
-        ],
-    )  # Construct entry function payload.
-    return construct_raw_transaction(  # Return raw transaction.
-        sender_prefixed_hex=sender_prefixed_hex,
-        sequence_number=sequence_number,
-        payload=payload,
-        expiry=expiry,
-        chain_id=chain_id,
-    )
 
 
 def sign_raw_transaction(
@@ -1144,31 +678,93 @@ def sign_raw_transaction(
     )
 
 
-def rotate_transaction_sign(args):
-    """Sign an authentication key rotation transaction from a multisig
-    account."""
-    proposal = json.load(args.proposal)  # Load proposal data.
-    sign_raw_transaction(  # Sign corresponding raw transaction.
-        keyfile=args.keyfile,
-        raw_transaction=get_rotation_transaction(proposal),
-        optional_outfile_path=args.outfile,
-        name_tokens=args.name,
-        proposal=proposal,
-        filetype="Rotation transaction signature",
+def signature_json_to_map(
+    manifest: List[Dict[str, Any]]
+) -> List[Tuple[PublicKey, Signature]]:
+    """Convert a JSON signature manifest to a classed signature map."""
+    to_bytes = prefixed_hex_to_bytes  # Shorten func name for brevity.
+    return [  # Return list comprehension.
+        (
+            PublicKey(VerifyKey(to_bytes(entry["signatory"]["public_key"]))),
+            Signature(to_bytes(entry["signature"])),
+        )
+        for entry in manifest
+    ]
+
+
+# Transaction signing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Transaction submission >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+def assert_successful_transaction(
+    network: str,
+    raw_transaction: RawTransaction,
+    public_key: Union[PublicKey, MultiEd25519PublicKey],
+    signature: Union[Signature, MultiEd25519Signature],
+):
+    """Submit a signed BCS transaction, asserting that it succeeds."""
+    # Get REST client for network.
+    client = RestClient(NETWORK_URLS[network])
+    auth_inner = (
+        Ed25519Authenticator
+        if isinstance(public_key, PublicKey)
+        else MultiEd25519Authenticator
+    )  # Get inner authenticator structure.
+    # Get authenticator.
+    authenticator = Authenticator(auth_inner(public_key, signature))
+    # Get signed transaction.
+    signed_transaction = SignedTransaction(raw_transaction, authenticator)
+    # Submit transaction, storing its hash.
+    tx_hash = client.submit_bcs_transaction(signed_transaction)
+    # Wait for transaction to succeed (asserts success).
+    client.wait_for_transaction(tx_hash)
+    print(f"Transaction successful: {tx_hash}")
+
+
+def execute_transaction_from_signatures(
+    signature_files: Option[List[TextIOWrapper]],
+    proposal_indexer_func: Callable[[Dict[str, Any]], RawTransaction],
+    network: str,
+    is_rotation_transaction=False,
+) -> Dict[str, Any]:
+    """Execute multisig transaction indicated by proposal signature
+    files, returning proposal.
+
+    If transaction is a rotation transaction, transaction does not
+    contain an embedded multisig metafile. Hence in this case the
+    multisig public key is extracted from the challenge proposal.
+
+    Otherwise, the public key of the multisig account is found in the
+    multisig metafile embedded in the transaction proposal.
+    """
+    signature_map, proposal = index_proposal_signatures(
+        signature_files, "transaction_proposal"
+    )  # Index signatures into signature map, transaction proposal.
+    if is_rotation_transaction:  # If rotation transaction:
+        # Public key is in challenge proposal.
+        public_key_hex = proposal["challenge_proposal"]["from_public_key"]
+    else:  # If not rotation transaction:
+        # Public key is in embedded multisig metafile.
+        public_key_hex = proposal["multisig"]["public_key"]
+    # Get public key bytes.
+    public_key_bytes = prefixed_hex_to_bytes(public_key_hex)
+    # Get public key class instance.
+    public_key = MultiEd25519PublicKey.from_bytes(public_key_bytes)
+    # Get a raw transaction to sign from the transaction proposal.
+    raw_transaction = proposal_indexer_func(proposal)
+    assert_successful_transaction(  # Assert transaction succeeds.
+        network=network,
+        raw_transaction=raw_transaction,
+        public_key=public_key,
+        signature=MultiEd25519Signature(public_key, signature_map),
     )
+    return proposal  # Return proposal from signature files.
 
 
-def update_multisig_address(path: Path, address_prefixed_hex: str):
-    """Update the address for a multisig metafile."""
-    print("Updating address in multisig metafile.")
-    # With multisig metafile open:
-    with open(path, "r", encoding="utf-8") as metafile:
-        data = json.load(metafile)  # Load JSON data from metafile.
-    # Update address field.
-    data["address"] = address_prefixed_hex
-    # Overwrite JSON data in file.
-    write_json_file(path=path, data=data, check_if_exists=False)
+# Transaction submission <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+# AMEE commands >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 # AMEE parser.
 parser = argparse.ArgumentParser(
@@ -1196,6 +792,24 @@ parser_keyfile = subparsers.add_parser(
 )
 subparsers_keyfile = parser_keyfile.add_subparsers(required=True)
 
+
+def keyfile_change_password(args):
+    """Change password for a single-signer keyfile."""
+    # Check password, get keyfile data and optional private key bytes.
+    data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is not None:  # If able to decrypt private key:
+        # Encrypt private key.
+        encrypted_bytes, salt = encrypt_private_key(private_key_bytes)
+        # Get encrypted private key hex.
+        encrypted_private_key_hex = bytes_to_prefixed_hex(encrypted_bytes)
+        # Update JSON with encrypted private key.
+        data["encrypted_private_key"] = encrypted_private_key_hex
+        # Update JSON with new salt.
+        data["salt"] = bytes_to_prefixed_hex(salt)
+        # Write JSON to keyfile, skipping check for if file exists.
+        write_json_file(args.keyfile, data, False)
+
+
 # Keyfile change password subcommand parser.
 parser_keyfile_change_password = subparsers_keyfile.add_parser(
     name="change-password",
@@ -1207,6 +821,26 @@ parser_keyfile_change_password.set_defaults(func=keyfile_change_password)
 parser_keyfile_change_password.add_argument(
     "keyfile", type=Path, help="Relative path to keyfile."
 )
+
+
+def keyfile_extract(args):
+    """Extract private key from keyfile, store via
+    aptos_sdk.account.Account.store"""
+    check_outfile_exists(args.account_store)  # Check if path exists.
+    # Try loading private key bytes.
+    _, private_key_bytes = check_keyfile_password(args.keyfile)
+    # If able to successfully decrypt:
+    if private_key_bytes is not None:
+        # Load account.
+        account = Account.load_key(private_key_bytes.hex())
+        # Store Aptos account file.
+        account.store(f"{args.account_store}")
+        # Open new Aptos account store:
+        with open(args.account_store, "r", encoding="utf-8") as outfile:
+            # Print contents of new account store.
+            print(f"New account store at {args.account_store}:")
+            print(f"{outfile.read()}")
+
 
 # Keyfile extract subcommand parser.
 parser_keyfile_extract = subparsers_keyfile.add_parser(
@@ -1226,6 +860,73 @@ parser_keyfile_extract.add_argument(
     type=Path,
     help="Relative path to account file to store in.",
 )
+
+
+def keyfile_fund(args):
+    """Fund account linked to keyfile using devnet faucet, assuming
+    account address matches authentication key."""
+    data = json.load(args.keyfile)  # Load JSON data from keyfile.
+    address = data["authentication_key"]  # Get address.
+    fund_address_from_faucet(address)  # Fund from faucet.
+
+
+# Keyfile fund subcommand parser.
+parser_keyfile_fund = subparsers_keyfile.add_parser(
+    name="fund",
+    aliases=["f"],
+    description="Fund account linked to keyfile using devnet faucet.",
+    help="Fund on devnet faucet.",
+)
+parser_keyfile_fund.set_defaults(func=keyfile_fund)
+parser_keyfile_fund.add_argument(
+    "keyfile",
+    type=argparse.FileType("r", encoding="utf-8"),
+    help="Relative path to keyfile.",
+)
+
+
+def keyfile_generate(args):
+    """Generate a keyfile for a single signer."""
+    signatory = check_name(args.signatory)
+    if args.account_store is None:  # If no account store supplied:
+        account = Account.generate()  # Generate new account.
+        # If vanity prefix supplied:
+        if args.vanity_prefix is not None:
+            to_check = args.vanity_prefix  # Define prefix to check.
+            # Get number of characters in vanity prefix.
+            n_chars = len(to_check)
+            if n_chars % 2 == 1:  # If odd number of hex characters:
+                # Append 0 to make valid hexstring.
+                to_check = args.vanity_prefix + "0"
+            # Check that hex can be converted to bytes.
+            prefixed_hex_to_bytes(to_check)
+            print("Mining vanity address...")  # Print feedback message.
+            len_prefix = len(args.vanity_prefix)  # Get prefix length.
+            # While account address does not have prefix:
+            while account.address().hex()[0:len_prefix] != args.vanity_prefix:
+                account = Account.generate()  # Generate another.
+    else:  # If account store path supplied:
+        # Generate an account from it.
+        account = Account.load(f"{args.account_store}")
+    # Get private key bytes.
+    private_key_bytes = account.private_key.key.encode()
+    # Encrypt private key.
+    encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
+    # Get encrypted private key hex.
+    key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
+    write_json_file(  # Write JSON to keyfile.
+        path=get_file_path(args.outfile, args.signatory, "keyfile"),
+        data={
+            "filetype": "Keyfile",
+            "signatory": signatory,
+            "public_key": f"{account.public_key()}",
+            "authentication_key": account.auth_key(),
+            "encrypted_private_key": key_hex,
+            "salt": bytes_to_prefixed_hex(salt),
+        },
+        check_if_exists=True,
+    )
+
 
 # Keyfile generate subcommand parser.
 parser_keyfile_generate = subparsers_keyfile.add_parser(
@@ -1260,6 +961,19 @@ exclusive_group.add_argument(
     help="Vanity address prefix, for example 0xf00.",
 )
 
+
+def keyfile_verify(args):
+    """Verify password for single-signer keyfile generated via
+    keyfile_generate(), show public key and authentication key."""
+    # Load JSON data and try getting private key bytes.
+    data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is not None:  # If able to decrypt private key:
+        # Print keyfile info.
+        print(f'Keyfile password verified for {data["signatory"]}')
+        print(f'Public key:         {data["public_key"]}')
+        print(f'Authentication key: {data["authentication_key"]}')
+
+
 # Keyfile verify subcommand parser.
 parser_keyfile_verify = subparsers_keyfile.add_parser(
     name="verify",
@@ -1272,19 +986,6 @@ parser_keyfile_verify.add_argument(
     "keyfile", type=Path, help="Relative path to keyfile."
 )
 
-# Keyfile fund subcommand parser.
-parser_keyfile_fund = subparsers_keyfile.add_parser(
-    name="fund",
-    aliases=["f"],
-    description="Fund account linked to keyfile using devnet faucet.",
-    help="Fund on devnet faucet.",
-)
-parser_keyfile_fund.set_defaults(func=keyfile_fund)
-parser_keyfile_fund.add_argument(
-    "keyfile",
-    type=argparse.FileType("r", encoding="utf-8"),
-    help="Relative path to keyfile.",
-)
 
 # Metafile subcommand parser.
 parser_metafile = subparsers.add_parser(
@@ -1294,6 +995,18 @@ parser_metafile = subparsers.add_parser(
     help="Multisig metafile operations.",
 )
 subparsers_metafile = parser_metafile.add_subparsers(required=True)
+
+
+def metafile_append(args):
+    """Append signatory/signatories to a multisig metafile."""
+    metafile_check_update(
+        metafile_json=json.load(args.metafile),
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=args.keyfiles,
+        outfile=args.outfile,
+    )
+
 
 # Metafile append subcommand parser.
 parser_metafile_append = subparsers_metafile.add_parser(
@@ -1336,6 +1049,22 @@ parser_metafile_append.add_argument(
     help="Custom relative path to new multisig metafile.",
 )
 
+
+def metafile_fund(args):
+    """Fund account at multisig address using devnet faucet, defaulting
+    to authentication key for address."""
+    with open(args.metafile, encoding="utf-8") as metafile:
+        data = json.load(metafile)  # Load JSON data from metafile.
+    address = data["address"]  # Get multisig address.
+    auth_key = data["authentication_key"]  # Get its authentication key.
+    # Determine the address to fund.
+    address_to_fund = auth_key if address is None else address
+    fund_address_from_faucet(address_to_fund)  # Fund from faucet.
+    if address is None:  # If no address listed before funding:
+        # Update multisig metafile address to authentication key.
+        update_multisig_address(args.metafile, auth_key)
+
+
 # Metafile fund subcommand parser.
 parser_metafile_fund = subparsers_metafile.add_parser(
     name="fund",
@@ -1349,6 +1078,18 @@ parser_metafile_fund.add_argument(
     type=Path,
     help="Relative path to metafile.",
 )
+
+
+def metafile_incorporate(args):
+    """Incorporate single-signer keyfiles to multisig metafile."""
+    metafile_check_update(
+        metafile_json={"n_signatories": 0, "signatories": []},
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=args.keyfiles,
+        outfile=args.outfile,
+    )
+
 
 # Metafile incorporate subcommand parser.
 parser_metafile_incorporate = subparsers_metafile.add_parser(
@@ -1386,6 +1127,27 @@ parser_metafile_incorporate.add_argument(
     type=Path,
     help="Custom relative path to desired multisig metafile.",
 )
+
+
+def metafile_remove(args):
+    """Remove signatories from a multisig metafile."""
+    metafile_json = json.load(args.metafile)  # Load metafile JSON.
+    # Sort 0-indexed signatory list indices from high to low.
+    args.signatories.sort(reverse=True)
+    # Loop over 0-indexed IDs to remove, high to low:
+    for index in args.signatories:
+        # Remove signatory at index from list.
+        del metafile_json["signatories"][index]
+    # Decrement signatory count.
+    metafile_json["n_signatories"] -= len(args.signatories)
+    metafile_check_update(  # Check and write data to disk.
+        metafile_json=metafile_json,
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=None,
+        outfile=args.outfile,
+    )
+
 
 # Metafile remove subcommand parser.
 parser_metafile_remove = subparsers_metafile.add_parser(
@@ -1429,6 +1191,22 @@ parser_metafile_remove.add_argument(
     help="Custom relative path to new multisig metafile.",
 )
 
+
+def metafile_threshold(args):
+    """Update threshold for a multisig metafile."""
+    metafile_json = json.load(args.metafile)  # Load metafile JSON.
+    assert (  # Assert that threshold update is specified.
+        metafile_json["threshold"] != args.threshold
+    ), "No threshold update specified."
+    metafile_check_update(  # Check and write data to disk.
+        metafile_json=metafile_json,
+        name_tokens=args.name,
+        threshold=args.threshold,
+        keyfiles=None,
+        outfile=args.outfile,
+    )
+
+
 # Metafile threshold subcommand parser.
 parser_metafile_threshold = subparsers_metafile.add_parser(
     name="threshold",
@@ -1470,6 +1248,16 @@ parser_publish = subparsers.add_parser(
 )
 subparsers_publish = parser_publish.add_subparsers(required=True)
 
+
+def publish_execute(args):
+    """Publish a Move package from a multisig account."""
+    execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_publication_transaction,
+        network=args.network,
+    )
+
+
 # Publish execute subcommand parser.
 parser_publish_execute = subparsers_publish.add_parser(
     name="execute",
@@ -1487,6 +1275,36 @@ parser_publish_execute.add_argument(
     help="""Relative paths to publication transaction signatures for at least
         threshold number of multisig signatories.""",
 )
+
+
+def publish_propose(args):
+    """Propose the publication of a Move package hosted on GitHub."""
+    # Load publisher data.
+    publisher_data = json.load(args.metafile)
+    # Get publisher account address.
+    publisher_address = publisher_data["address"]
+    assert publisher_address is not None, "Need an address to publish from."
+    sequence_number = get_sequence_number(
+        prefixed_hex_to_bytes(publisher_address), args.network
+    )  # Get originating account sequence number.
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "publication_proposal"),
+        data={
+            "filetype": "Publication proposal",
+            "description": check_name(args.name),
+            "github_user": args.user,
+            "github_project": args.project,
+            "commit": args.commit,
+            "manifest_path": args.manifest,
+            "named_address": args.named_address,
+            "multisig": publisher_data,
+            "sequence_number": sequence_number,
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
+        },
+        check_if_exists=True,
+    )
+
 
 # Publish propose subcommand parser.
 parser_publish_propose = subparsers_publish.add_parser(
@@ -1546,6 +1364,20 @@ parser_publish_propose.add_argument(
     help="Relative path to publication proposal outfile.",
 )
 
+
+def publish_sign(args):
+    """Sign a package publication proposal."""
+    proposal = json.load(args.proposal)  # Load proposal data.
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_publication_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Publication signature",
+    )
+
+
 # Publish sign subcommand parser.
 parser_publish_sign = subparsers_publish.add_parser(
     name="sign",
@@ -1596,6 +1428,53 @@ parser_rotate_challenge = subparsers_rotate.add_parser(
 tmp = parser_rotate_challenge.add_subparsers(required=True)
 subparsers_rotate_challenge = tmp  # Temp variable for line breaking.
 
+
+def rotate_challenge_propose(args):
+    """Propose a rotation proof challenge, storing an output file.
+
+    Accepts either a single-signer keyfile or multisig metafile for both
+    originating and target accounts. If single-signer, assumes account
+    address is identical to authentication key."""
+    # Load originator data.
+    originator_data = json.load(args.originator)
+    target_data = json.load(args.target)  # Load target data.
+    # Check if originator is single-signer.
+    from_is_single = originator_data["filetype"] == "Keyfile"
+    # Check if target is single-signer.
+    to_is_single = target_data["filetype"] == "Keyfile"
+    if from_is_single:  # If a single-signer originator:
+        # Address is assumed to be authentication key.
+        originator_address = originator_data["authentication_key"]
+    else:  # If multisig originator:
+        # Address is that indicated in metafile.
+        originator_address = originator_data["address"]
+    if to_is_single:  # If a single-signer target:
+        assert target_data["authentication_key"] == originator_address, (
+            "Authentication key of single-signer target account must match "
+            "originating address."
+        )  # Assert authentication key identical to from address.
+    sequence_number = get_sequence_number(
+        prefixed_hex_to_bytes(originator_address), args.network
+    )  # Get originating account sequence number.
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "challenge_proposal"),
+        data={
+            "filetype": "Rotation proof challenge proposal",
+            "description": check_name(args.name),
+            "from_public_key": originator_data["public_key"],
+            "from_is_single_signer": from_is_single,
+            "to_is_single_signer": to_is_single,
+            "sequence_number": sequence_number,
+            "originator": originator_address,
+            "current_auth_key": originator_data["authentication_key"],
+            "new_public_key": target_data["public_key"],
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
+        },
+        check_if_exists=True,
+    )
+
+
 # Rotate challenge propose subcommand parser.
 parser_rotate_challenge_propose = subparsers_rotate_challenge.add_parser(
     name="propose",
@@ -1636,6 +1515,33 @@ parser_rotate_challenge_propose.add_argument(
     type=Path,
     help="Relative path to rotation proof challenge proposal outfile.",
 )
+
+
+def rotate_challenge_sign(args):
+    """Sign a rotation proof challenge proposal, storing output file."""
+    proposal_data = json.load(args.proposal)  # Load proposal data.
+    # Check password, get keyfile data and optional private key bytes.
+    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is None:  # If can't decrypt private key:
+        return  # Return.
+    # Get rotation proof challenged BCS bytes.
+    rotation_proof_challenge_bcs = get_rotation_challenge_bcs(proposal_data)
+    # Create Aptos-style account.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    # Sign the serialized rotation proof challenge.
+    signature = account.sign(rotation_proof_challenge_bcs).data()
+    write_json_file(  # Write JSON to signature file.
+        path=get_file_path(args.outfile, args.name, "challenge_signature"),
+        data={
+            "filetype": "Rotation proof challenge signature",
+            "description": check_name(args.name),
+            "challenge_proposal": proposal_data,
+            "signatory": get_public_signatory_fields(keyfile_data),
+            "signature": bytes_to_prefixed_hex(signature),
+        },
+        check_if_exists=True,
+    )
+
 
 # Rotate challenge sign subcommand parser.
 parser_rotate_challenge_sign = subparsers_rotate_challenge.add_parser(
@@ -1678,6 +1584,50 @@ parser_rotate_execute = subparsers_rotate.add_parser(
 tmp = parser_rotate_execute.add_subparsers(required=True)
 subparsers_rotate_execute = tmp  # Temp variable for line breaking.
 
+
+def rotate_execute_single(args):
+    """Rotate authentication key for single-signer account.
+
+    Only supports rotation to a multisig account."""
+    # Check password, get keyfile data and optional private key bytes.
+    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    if private_key_bytes is None:  # If can't decrypt private key:
+        return  # Return without rotating.
+    # Create Aptos-style account for single signer.
+    account = Account.load_key(bytes_to_prefixed_hex(private_key_bytes))
+    # Get public key bytes for account.
+    from_public_key_bytes = prefixed_hex_to_bytes(keyfile_data["public_key"])
+    signature_map, proposal = index_proposal_signatures(
+        args.signatures, "challenge_proposal"
+    )  # Index signatures into signature map, extract challenge proposal.
+    # Get rotation challenge BCS.
+    rotation_challenge_bcs = get_rotation_challenge_bcs(proposal)
+    # Get capability to update address mapping for multisig account.
+    cap_update_table = MultiEd25519Signature(
+        metafile_to_multisig_public_key(args.metafile), signature_map
+    ).to_bytes()
+    raw_transaction = construct_raw_rotation_transaction(
+        from_scheme=Authenticator.ED25519,
+        from_public_key_bytes=from_public_key_bytes,
+        to_scheme=Authenticator.MULTI_ED25519,
+        to_public_key_bytes=prefixed_hex_to_bytes(proposal["new_public_key"]),
+        cap_rotate_key=account.sign(rotation_challenge_bcs).data(),
+        cap_update_table=cap_update_table,
+        sender_prefixed_hex=proposal["originator"],
+        sequence_number=proposal["sequence_number"],
+        expiry=datetime.fromisoformat(proposal["expiry"]),
+        chain_id=proposal["chain_id"],
+    )  # Construct raw rotation transaction.
+    assert_successful_transaction(  # Assert transaction succeeds.
+        network=args.network,
+        raw_transaction=raw_transaction,
+        public_key=account.public_key(),
+        signature=account.sign(raw_transaction.keyed()),
+    )
+    # Update multisig metafile address.
+    update_multisig_address(args.metafile, proposal["originator"])
+
+
 # Rotate execute single subcommand parser.
 parser_rotate_execute_single = subparsers_rotate_execute.add_parser(
     name="single",
@@ -1708,6 +1658,27 @@ parser_rotate_execute_single.add_argument(
     help="""Relative paths to rotation proof challenge signature files from
         threshold number of signatories.""",
 )
+
+
+def rotate_execute_multisig(args):
+    """Rotate authentication key for a multisig account.
+
+    Only supports rotation to a single-signer account if the account has
+    as its authentication key the multisig account address."""
+    proposal = execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_rotation_transaction,
+        network=args.network,
+        is_rotation_transaction=True,
+    )  # Execute rotation transaction from signatures, storing proposal.
+    # Update multisig metafile address for from account.
+    update_multisig_address(args.metafile, None)
+    # If just rotated to a multisig account:
+    if not proposal["challenge_proposal"]["to_is_single_signer"]:
+        update_multisig_address(
+            args.to_metafile, proposal["challenge_proposal"]["originator"]
+        )  # Update metafile address for account just rotated to.
+
 
 # Rotate execute multisig subcommand parser.
 parser_rotate_execute_multisig = subparsers_rotate_execute.add_parser(
@@ -1755,6 +1726,38 @@ parser_rotate_transaction = subparsers_rotate.add_parser(
 tmp = parser_rotate_transaction.add_subparsers(required=True)
 subparsers_rotate_transaction = tmp  # Temp variable for line breaking.
 
+
+def rotate_transaction_propose(args):
+    """Propose authentication key rotation transaction from multisig."""
+    # Initialize empty from and to signatures for challenge proposal.
+    challenge_from_signatures, challenge_to_signatures = [], []
+    challenge_proposal = extract_challenge_proposal_data(
+        signature_files=args.from_signatures,
+        proposal=None,
+        signatures_manifest=challenge_from_signatures,
+    )  # Extract from challenge proposal signatures.
+    challenge_proposal = extract_challenge_proposal_data(
+        signature_files=args.to_signatures,
+        proposal=challenge_proposal,
+        signatures_manifest=challenge_to_signatures,
+    )  # Extract to challenge proposal signatures.
+    write_json_file(  # Write JSON to transaction proposal file.
+        path=get_file_path(
+            optional_path=args.outfile,
+            name_tokens=args.name,
+            extension="rotation_transaction_proposal",
+        ),
+        data={
+            "filetype": "Rotation transaction proposal",
+            "description": check_name(args.name),
+            "challenge_proposal": challenge_proposal,
+            "challenge_from_signatures": challenge_from_signatures,
+            "challenge_to_signatures": challenge_to_signatures,
+        },
+        check_if_exists=True,
+    )
+
+
 # Rotate transaction propose subcommand parser.
 parser_rotate_transaction_propose = subparsers_rotate_transaction.add_parser(
     name="propose",
@@ -1798,6 +1801,21 @@ parser_rotate_transaction_propose.add_argument(
     help="Relative path to rotation transaction proposal outfile.",
 )
 
+
+def rotate_transaction_sign(args):
+    """Sign an authentication key rotation transaction from a multisig
+    account."""
+    proposal = json.load(args.proposal)  # Load proposal data.
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_rotation_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Rotation transaction signature",
+    )
+
+
 # Rotate transaction sign subcommand parser.
 parser_rotate_transaction_sign = subparsers_rotate_transaction.add_parser(
     name="sign",
@@ -1838,6 +1856,16 @@ parser_script = subparsers.add_parser(
 )
 subparsers_script = parser_script.add_subparsers(required=True)
 
+
+def script_execute(args):
+    """Invoke a Move script from a multisig account."""
+    execute_transaction_from_signatures(
+        signature_files=args.signatures,
+        proposal_indexer_func=get_script_transaction,
+        network=args.network,
+    )
+
+
 # Script execute subcommand parser.
 parser_script_execute = subparsers_script.add_parser(
     name="execute",
@@ -1855,6 +1883,37 @@ parser_script_execute.add_argument(
     help="""Relative paths to script transaction signatures for at least
         threshold number of multisig signatories.""",
 )
+
+
+def script_propose(args):
+    """Propose the invocation of a Move script hosted on GitHub."""
+    # Load caller data.
+    caller_data = json.load(args.metafile)
+    # Get caller account address.
+    caller_address = caller_data["address"]
+    assert caller_address is not None, "Need an address to call from."
+    sequence_number = get_sequence_number(
+        prefixed_hex_to_bytes(caller_address), args.network
+    )  # Get calling account sequence number.
+    write_json_file(  # Write JSON to proposal file.
+        path=get_file_path(args.outfile, args.name, "script_proposal"),
+        data={
+            "filetype": "Script proposal",
+            "description": check_name(args.name),
+            "github_user": args.user,
+            "github_project": args.project,
+            "commit": args.commit,
+            "manifest_path": args.manifest,
+            "named_address": args.named_address,
+            "script_name": args.script_name,
+            "multisig": caller_data,
+            "sequence_number": sequence_number,
+            "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
+            "expiry": args.expiry.isoformat(),
+        },
+        check_if_exists=True,
+    )
+
 
 # Script propose subcommand parser.
 parser_script_propose = subparsers_script.add_parser(
@@ -1920,6 +1979,20 @@ parser_script_propose.add_argument(
     help="Relative path to invocation proposal outfile.",
 )
 
+
+def script_sign(args):
+    """Sign a script invocation proposal."""
+    proposal = json.load(args.proposal)  # Load proposal data.
+    sign_raw_transaction(  # Sign corresponding raw transaction.
+        keyfile=args.keyfile,
+        raw_transaction=get_script_transaction(proposal),
+        optional_outfile_path=args.outfile,
+        name_tokens=args.name,
+        proposal=proposal,
+        filetype="Script signature",
+    )
+
+
 # Script sign subcommand parser.
 parser_script_sign = subparsers_script.add_parser(
     name="sign",
@@ -1951,6 +2024,7 @@ parser_script_sign.add_argument(
     help="Relative path to script invocation transaction signature outfile.",
 )
 
+# AMEE commands <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
 parsed_args.func(parsed_args)  # Call command line argument function.
