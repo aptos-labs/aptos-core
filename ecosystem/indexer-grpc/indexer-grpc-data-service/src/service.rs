@@ -25,6 +25,9 @@ use uuid::Uuid;
 
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, Status>> + Send>>;
 
+const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
+const DATA_NOT_READY_SLEEP_DURATION: u64 = 1000;
+
 pub struct DatastreamServer {
     pub redis_client: Client,
 }
@@ -59,10 +62,10 @@ impl IndexerStream for DatastreamServer {
         let req = req.into_inner();
         // Round the version to the nearest STORAGE_BLOB_SIZE.
         let mut current_version =
-            req.starting_version / BLOB_TRANSACTION_CHUNK_SIZE * BLOB_TRANSACTION_CHUNK_SIZE;
+            (req.starting_version / BLOB_TRANSACTION_CHUNK_SIZE) * BLOB_TRANSACTION_CHUNK_SIZE;
 
         tokio::spawn(async move {
-            let mut ma = MovingAverage::new(10_000);
+            let mut ma = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
             let request_id = Uuid::new_v4().to_string();
             let chain_id = conn
                 .get("chain_id")
@@ -95,7 +98,7 @@ impl IndexerStream for DatastreamServer {
                     },
 
                     CacheCoverageStatus::DataNotReady => {
-                        sleep(Duration::from_millis(1000));
+                        sleep(Duration::from_millis(DATA_NOT_READY_SLEEP_DURATION));
                         continue;
                     },
                     CacheCoverageStatus::CacheHit => {
