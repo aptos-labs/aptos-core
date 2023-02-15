@@ -4,23 +4,14 @@
 use aptos_indexer_grpc_utils::{
     get_file_store_bucket_name,
     storage::{
-        generate_blob_name, get_file_store_metadata, upload_file_store_metadata,
+        generate_blob_name, get_file_store_metadata, upload_file_store_metadata, TransactionsBlob,
         BLOB_TRANSACTION_CHUNK_SIZE,
     },
 };
 use aptos_moving_average::MovingAverage;
 use cloud_storage::Object;
 use redis::{Client, Commands};
-use serde::{Deserialize, Serialize};
 use std::{thread::sleep, time::Duration};
-
-#[derive(Serialize, Deserialize)]
-struct TransactionsBlob {
-    /// The version of the first transaction in the blob.
-    pub starting_version: u64,
-    /// The transactions in the blob.
-    pub transactions: Vec<String>,
-}
 
 pub struct Processor {
     pub redis_client: Client,

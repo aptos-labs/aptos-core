@@ -1406,6 +1406,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crash-handler",
+ "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-moving-average",
  "aptos-protos",
@@ -1423,6 +1424,29 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "tonic",
+ "warp",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-data-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crash-handler",
+ "aptos-indexer-grpc-utils",
+ "aptos-logger",
+ "aptos-moving-average",
+ "aptos-protos",
+ "aptos-runtimes",
+ "cloud-storage",
+ "futures",
+ "prost",
+ "redis",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "uuid",
  "warp",
 ]
 
@@ -1506,6 +1530,7 @@ dependencies = [
  "anyhow",
  "cloud-storage",
  "futures-util",
+ "redis",
  "serde 1.0.149",
  "serde_json",
 ]
