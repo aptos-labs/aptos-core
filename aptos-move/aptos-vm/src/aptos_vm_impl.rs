@@ -147,7 +147,10 @@ impl AptosVMImpl {
 
         let timestamp = fetch_timestamp(&storage);
 
-        let timed_features = TimedFeatures::new(chain_id, timestamp.timestamp.microseconds);
+        let mut timed_features = TimedFeatures::new(chain_id, timestamp.timestamp.microseconds);
+        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+            timed_features = timed_features.with_override_profile(profile)
+        }
 
         let inner = MoveVmExt::new(
             native_gas_params,

@@ -37,7 +37,7 @@ pub use self::{
         ProposerElectionType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
-    timed_features::{TimedFeatureFlag, TimedFeatures},
+    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 

@@ -24,7 +24,7 @@ enum TimedFeaturesImpl {
 }
 
 #[derive(Debug, Clone)]
-enum TimedFeatureOverride {
+pub enum TimedFeatureOverride {
     Replay,
 }
 
@@ -89,10 +89,10 @@ impl TimedFeatures {
         }
     }
 
-    pub fn with_replay_override(self) -> Self {
+    pub fn with_override_profile(self, profile: TimedFeatureOverride) -> Self {
         Self {
             inner: self.inner,
-            override_: Some(TimedFeatureOverride::Replay),
+            override_: Some(profile),
         }
     }
 

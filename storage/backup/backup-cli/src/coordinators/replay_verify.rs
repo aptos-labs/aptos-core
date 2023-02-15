@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
+use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 
@@ -77,6 +77,7 @@ impl ReplayVerifyCoordinator {
 
     async fn run_impl(self) -> Result<()> {
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
