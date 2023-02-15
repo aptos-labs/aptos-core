@@ -127,7 +127,7 @@ module aptos_framework::account {
     /// An attempt to create a resource account on an account that has a committed transaction
     const EACCOUNT_ALREADY_USED: u64 = 16;
 
-    native fun create_signer(addr: address): signer;
+    public(friend) native fun create_signer(addr: address): signer;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.

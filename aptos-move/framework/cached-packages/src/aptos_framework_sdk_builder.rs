@@ -76,12 +76,40 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
+    /// Batch version of APT transfer.
+    AptosAccountBatchTransfer {
+        recipients: Vec<AccountAddress>,
+        amounts: Vec<u64>,
+    },
+
+    /// Batch version of transfer_coins.
+    AptosAccountBatchTransferCoins {
+        coin_type: TypeTag,
+        recipients: Vec<AccountAddress>,
+        amounts: Vec<u64>,
+    },
+
     /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
 
+    /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
+    AptosAccountSetAllowDirectCoinTransfers {
+        allow: bool,
+    },
+
+    /// Convenient function to transfer APT to a recipient account that might not exist.
+    /// This would create the recipient account first, which also registers it to receive APT, before transferring.
     AptosAccountTransfer {
+        to: AccountAddress,
+        amount: u64,
+    },
+
+    /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
+    /// This would create the recipient account first and register it to receive the CoinType, before transferring.
+    AptosAccountTransferCoins {
+        coin_type: TypeTag,
         to: AccountAddress,
         amount: u64,
     },
@@ -507,8 +535,25 @@ impl EntryFunctionCall {
                 cap_rotate_key,
                 cap_update_table,
             ),
+            AptosAccountBatchTransfer {
+                recipients,
+                amounts,
+            } => aptos_account_batch_transfer(recipients, amounts),
+            AptosAccountBatchTransferCoins {
+                coin_type,
+                recipients,
+                amounts,
+            } => aptos_account_batch_transfer_coins(coin_type, recipients, amounts),
             AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
+            AptosAccountSetAllowDirectCoinTransfers { allow } => {
+                aptos_account_set_allow_direct_coin_transfers(allow)
+            }
             AptosAccountTransfer { to, amount } => aptos_account_transfer(to, amount),
+            AptosAccountTransferCoins {
+                coin_type,
+                to,
+                amount,
+            } => aptos_account_transfer_coins(coin_type, to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
@@ -858,6 +903,51 @@ pub fn account_rotate_authentication_key(
     ))
 }
 
+/// Batch version of APT transfer.
+pub fn aptos_account_batch_transfer(
+    recipients: Vec<AccountAddress>,
+    amounts: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("batch_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipients).unwrap(),
+            bcs::to_bytes(&amounts).unwrap(),
+        ],
+    ))
+}
+
+/// Batch version of transfer_coins.
+pub fn aptos_account_batch_transfer_coins(
+    coin_type: TypeTag,
+    recipients: Vec<AccountAddress>,
+    amounts: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("batch_transfer_coins").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&recipients).unwrap(),
+            bcs::to_bytes(&amounts).unwrap(),
+        ],
+    ))
+}
+
 /// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -874,6 +964,24 @@ pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayl
     ))
 }
 
+/// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
+pub fn aptos_account_set_allow_direct_coin_transfers(allow: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("set_allow_direct_coin_transfers").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&allow).unwrap()],
+    ))
+}
+
+/// Convenient function to transfer APT to a recipient account that might not exist.
+/// This would create the recipient account first, which also registers it to receive APT, before transferring.
 pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -885,6 +993,27 @@ pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPay
         ),
         ident_str!("transfer").to_owned(),
         vec![],
+        vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
+/// This would create the recipient account first and register it to receive the CoinType, before transferring.
+pub fn aptos_account_transfer_coins(
+    coin_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("transfer_coins").to_owned(),
+        vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
 }
@@ -2191,6 +2320,31 @@ mod decoder {
         }
     }
 
+    pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountBatchTransfer {
+                recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_batch_transfer_coins(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountBatchTransferCoins {
+                coin_type: script.ty_args().get(0)?.clone(),
+                recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountCreateAccount {
@@ -2201,9 +2355,33 @@ mod decoder {
         }
     }
 
+    pub fn aptos_account_set_allow_direct_coin_transfers(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountSetAllowDirectCoinTransfers {
+                allow: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountTransfer {
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_account_transfer_coins(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountTransferCoins {
+                coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -2976,12 +3154,28 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key),
         );
         map.insert(
+            "aptos_account_batch_transfer".to_string(),
+            Box::new(decoder::aptos_account_batch_transfer),
+        );
+        map.insert(
+            "aptos_account_batch_transfer_coins".to_string(),
+            Box::new(decoder::aptos_account_batch_transfer_coins),
+        );
+        map.insert(
             "aptos_account_create_account".to_string(),
             Box::new(decoder::aptos_account_create_account),
         );
         map.insert(
+            "aptos_account_set_allow_direct_coin_transfers".to_string(),
+            Box::new(decoder::aptos_account_set_allow_direct_coin_transfers),
+        );
+        map.insert(
             "aptos_account_transfer".to_string(),
             Box::new(decoder::aptos_account_transfer),
+        );
+        map.insert(
+            "aptos_account_transfer_coins".to_string(),
+            Box::new(decoder::aptos_account_transfer_coins),
         );
         map.insert(
             "aptos_coin_claim_mint_capability".to_string(),
