@@ -8,17 +8,17 @@ pub mod storage;
 pub const CACHE_KEY_CHAIN_ID: &str = "chain_id";
 const CACHE_LATEST_VERSION: &str = "latest_version";
 
-const CACHE_SIZE_ESTIMATION: u64 = 10_000_000_u64;
+const CACHE_SIZE_ESTIMATION: u64 = 10_000_000;
 
 pub const BLOB_STORAGE_SIZE: u64 = 1_000;
 
-// This is an Enum to indicate the cache status of the requested version.
+/// Enum to indicate the cache status of the requested version.
 pub enum CacheCoverageStatus {
-    // Requested version is not processed by cache worker yet.
+    /// Requested version is not processed by cache worker yet.
     DataNotReady,
-    // Requested version is cached.
+    /// Requested version is cached.
     CacheHit,
-    // Requested version is evicted from cache.
+    /// Requested version is evicted from cache.
     CacheEvicted,
 }
 
@@ -49,8 +49,8 @@ pub async fn update_cache_latest_version(
         .map_err(|e| e.into())
 }
 
-// This function is used to check the cache status of the requested version.
-// The CacheEvicted is only an estimation from current latest version.
+/// Check the cache status of the requested version.
+/// The CacheEvicted is only an estimation from current latest version.
 pub async fn get_cache_coverage_status(
     conn: &mut impl redis::ConnectionLike,
     requested_version: u64,
@@ -60,11 +60,10 @@ pub async fn get_cache_coverage_status(
         Err(err) => return Err(err.into()),
     };
 
-    let request_batch_upper_bound = requested_version + BLOB_STORAGE_SIZE;
+    let request_batch_upper_bound = requested_version.checked_add(BLOB_STORAGE_SIZE).expect("Version boundary calculation overflows.");
     // Estimated cache lower bound is the latest version minus the cache size estimation; default to
     // 0.
-    let estimated_cache_lower_bound =
-        std::cmp::max(latest_version, CACHE_SIZE_ESTIMATION) - CACHE_SIZE_ESTIMATION;
+    let estimated_cache_lower_bound = latest_version.saturating_sub(CACHE_SIZE_ESTIMATION);
     if request_batch_upper_bound > latest_version {
         // The cache should contain [requested_version, requested_version + BLOB_STORAGE_SIZE),
         // if upper bound is not covered, then the data is not ready.
