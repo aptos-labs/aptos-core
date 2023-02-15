@@ -5,30 +5,29 @@ id: "aptos-token-comparison"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Compare the Aptos Token Standards"
+# Compare Aptos Token Standards
 
 :::tip Aptos token standard
 For details, see the official [Aptos Token](./aptos-token.md) standard.
 :::
 
-## Introduction
 One of the major applications of blockchains is token generation and use; this use requires a standard defining
 the pattern a token must comply with. The Aptos team and communities have been moving
 fast and steadily to support various projects and creators to launch their tokens on the Aptos
 blockchain. As a new L1 blockchain equipped with the [Move programming language](../../guides/move-guides/index.md) - a relatively new language exclusively designed for the safety of smart contracts - our token standard inevitably differs from other
 blockchains. In this document, we will briefly compare the token standard of Aptos with those of Ethereum and Solana.
 
-### Account model
+## Account model
 In order to understand tokens, we have to compare the account model across different
 blockchains. This section contains a brief summary.
 
-#### Ethereum 
+### Ethereum 
 Ethereum has two types of accounts: Externally-owned accounts essentially just stores
 a balance of Ether. Contract accounts manage their underlying smart contracts and have an associated 
 storage map that stores all the persisted data, which can be mutated only by the contract, enforced 
 by EVM.
 
-#### Solana
+### Solana
 There are also two types of accounts on the Solana blockchain: executable and non-executable.
 But how the data and code are stored and managed is different. In Ethereum, the data is stored
 under the same contract account that manages this piece of data. In the Solana blockchain,
@@ -36,7 +35,7 @@ the data store and program are separated into different accounts. An executable 
 stores only contract code while all the associated data is stored in non-executable accounts owned
 by the executable account.
 
-#### Aptos
+### Aptos
 The [accounts](../accounts.md) in Aptos are homogeneous in that they can store both smart contracts and data. But
 distinct from Ethereum, the associated data of a smart contract is distributed across the space
 of all accounts. The associated data of a contract in Ethereum is broken into pieces
@@ -56,7 +55,7 @@ owners of a token type. For Solana and Aptos, the opposite is true if no indexin
 code can be easily written to do some operations like airdrop to all the holders relying on on-chain
 data only while Solana/Aptos facilitate listing all the tokens an account owns.
 
-### Token standard comparison
+## Token standard comparison
 In Ethereum or even the whole blockchain world, the Fungible Token (FT) was initially introduced by
 [EIP-20](https://eips.ethereum.org/EIPS/eip-20), and Non-Fungible Token (NFT) was defined in 
 [EIP-721](https://eips.ethereum.org/EIPS/eip-721). Later, [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155)
@@ -74,7 +73,7 @@ also has a similar generic token contract, which also implicitly defines token s
 a new ERC20 smart contract for each new token, all you need to do is call a function in the contract with necessary
 arguments. Depending on what function you call, the token contract will mint/transfer/burn/... tokens.
 
-#### Token identification
+### Token identification
 Aptos identifies a token by its `TokenId` that includes `TokenDataId` and `property_version`. The
 `property_version` shares the same concept with *Edition Account* in Solana, but there is no explicit
 counterpart in Ethereum as it is not required in any token standard interface.
@@ -88,7 +87,7 @@ one token type. In Aptos, a creator account can have multiple token types create
 different collections and token names. 
 
 
-#### Token categorization
+### Token categorization
 it is critical to understand, in Aptos, how to categorize different tokens to expect different sets
 of features:
 - `Fungible Token`: Each FT has one unique `TokenId`, which means tokens sharing the same creator, collection,
@@ -107,7 +106,7 @@ mutating corresponding fields in `token_properties`.
 In a nutshell, `Edition` is to Solana token is what `property_version` is to Aptos token; but there is no similar concept
 in Ethereum token standard.
 
-#### Token metadata
+### Token metadata
 Aptos token has metadata defined in `TokenData` with the multiple fields that describe widely
 acknowledged property data that needs to be understood by dapps. To name a few fields:
 - `name`: The name of the token. It must be unique within a collection. 
