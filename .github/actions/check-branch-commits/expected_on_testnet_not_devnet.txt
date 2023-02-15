@@ -4,11 +4,6 @@
 # not on the devnet branch.
 
 895ae28e4a105430d8b9d2ce2f6e48c3b2c7fcf0 # Expected divergence. Will clear when devnet is wiped and recut.
-e1696306cc7ec493cc4c203bfc8d5a4d86b73d44 # Expected divergence. Will clear when devnet is wiped and recut.
-8e4d39bbd9a1332293daee35a5283a3a47244a09 # Expected divergence. Will clear when devnet is wiped and recut.
-0347e6b4f71408e8b40b4efea082dc7af5a8e319 # Expected divergence. Will clear when devnet is wiped and recut.
-c353200e7cc14a8be14d09690ccb35c429b79d34 # Expected divergence. Will clear when devnet is wiped and recut.
-c0ea7d6616dcc717343392b803ae3a5e175533ab # Expected divergence. Will clear when devnet is wiped and recut.
 
 a78970aa2a6fd6fa7db94d6d5700a902807102c7 # Different commit hash and message: https://github.com/aptos-labs/aptos-core/commit/08ba4052c2e8b1de994706d1faf0f84e7c935ae1
 6aae9a3595da0321a8bda0220fcf593060d44941 # Included in https://github.com/aptos-labs/aptos-core/commit/7bd412edb762cbdc935f28f62a91fc69c8daf639
