@@ -823,14 +823,11 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
     let mut admin = context.create_account().await;
 
-    let named_addresses = vec![
-        ("entry_func_fail".to_string(), admin.address()),
-    ];
+    let named_addresses = vec![("entry_func_fail".to_string(), admin.address())];
 
     let named_addresses_clone = named_addresses.clone();
     let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("test-context/move");
+        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("test-context/move");
         TestContext::build_package(path, named_addresses_clone)
     });
     let txn = context.publish_package(&mut admin, txn).await;
@@ -841,15 +838,11 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
                 "/transactions/by_hash/{}",
                 txn.committed_hash().to_hex_literal()
             )
-                .as_str(),
+            .as_str(),
         )
         .await;
 
-    assert!(
-        !resp["success"].as_bool().unwrap(),
-        "{}",
-        pretty(&resp)
-    );
+    assert!(!resp["success"].as_bool().unwrap(), "{}", pretty(&resp));
 }
 
 #[ignore] // re-enable after cleaning compiled code
@@ -1106,7 +1099,6 @@ fn gen_string(len: u64) -> String {
         .map(char::from)
         .collect()
 }
-
 
 // For use when not using the methods on `TestContext` directly.
 fn build_path(path: &str) -> String {

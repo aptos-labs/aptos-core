@@ -61,33 +61,34 @@ async fn test_gen_resource_group() {
     let response = context.gen_resource(&user.address(), &secondary).await;
     assert!(response.is_none());
 
-   // Init secondary
-   context.api_execute_entry_function(
-       &mut user,
-       &format!("0x{}::secondary::init", admin1.address()),
-       json!([]),
-       json!([55]),
-   )
-   .await;
-   let response = context.gen_resource(&user.address(), &secondary).await;
-   assert_eq!(response.unwrap()["data"]["value"], 55);
+    // Init secondary
+    context
+        .api_execute_entry_function(
+            &mut user,
+            &format!("0x{}::secondary::init", admin1.address()),
+            json!([]),
+            json!([55]),
+        )
+        .await;
+    let response = context.gen_resource(&user.address(), &secondary).await;
+    assert_eq!(response.unwrap()["data"]["value"], 55);
 
-   let response = context.gen_resource(&user.address(), &primary).await;
-   assert!(response.is_none());
+    let response = context.gen_resource(&user.address(), &primary).await;
+    assert!(response.is_none());
 
-   // Init primary
-   context.api_execute_entry_function(
-       &mut user,
-       &format!("0x{}::primary::init", admin0.address()),
-       json!([]),
-       json!(["35"]),
-   )
-   .await;
-   let response = context.gen_resource(&user.address(), &primary).await;
-   assert_eq!(response.unwrap()["data"]["value"], "35");
+    // Init primary
+    context
+        .api_execute_entry_function(
+            &mut user,
+            &format!("0x{}::primary::init", admin0.address()),
+            json!([]),
+            json!(["35"]),
+        )
+        .await;
+    let response = context.gen_resource(&user.address(), &primary).await;
+    assert_eq!(response.unwrap()["data"]["value"], "35");
 
-   let response = context.gen_resource(&user.address(), &secondary).await;
-   assert_eq!(response.unwrap()["data"]["value"], 55);
+    let response = context.gen_resource(&user.address(), &secondary).await;
+    assert_eq!(response.unwrap()["data"]["value"], 55);
 }
-
 

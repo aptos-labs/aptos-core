@@ -7,6 +7,7 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
         NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
@@ -16,16 +17,19 @@ use aptos_config::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::BuiltPackage;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_framework::BuiltPackage;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_sdk::{bcs, transaction_builder::TransactionFactory, types::{
-    account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-    LocalAccount,
-}};
+use aptos_sdk::{
+    bcs,
+    transaction_builder::TransactionFactory,
+    types::{
+        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
+        LocalAccount,
+    },
+};
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -35,7 +39,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{Transaction, TransactionStatus, TransactionPayload},
+    transaction::{Transaction, TransactionPayload, TransactionStatus},
 };
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::VMValidator;
@@ -48,7 +52,6 @@ use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
 const TRANSFER_AMOUNT: u64 = 10_000_000;
-
 
 #[derive(Clone, Debug)]
 pub enum ApiSpecificConfig {
@@ -336,6 +339,7 @@ impl TestContext {
         self.commit_mempool_txns(1).await;
         account
     }
+
     pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
         let mut tc = self.root_account().await;
         self.create_user_account_by(&mut tc, account)
@@ -413,9 +417,9 @@ impl TestContext {
         named_addresses: Vec<(String, AccountAddress)>,
     ) -> TransactionPayload {
         let mut build_options = aptos_framework::BuildOptions::default();
-        let _ = named_addresses
-            .into_iter()
-            .for_each(|(name, address)| { build_options.named_addresses.insert(name, address); });
+        named_addresses.into_iter().for_each(|(name, address)| {
+            build_options.named_addresses.insert(name, address);
+        });
 
         let package = BuiltPackage::build(path, build_options).unwrap();
         let code = package.extract_code();
@@ -496,10 +500,10 @@ impl TestContext {
     }
 
     pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {
-        //let account_resource = self
-        //    .api_get_account_resource(account, "0x1", "account", "Account")
-        //    .await;
-        let account_resource = self.gen_resource(&account, "0x1::account::Account").await.unwrap();
+        let account_resource = self
+            .gen_resource(&account, "0x1::account::Account")
+            .await
+            .unwrap();
         account_resource["data"]["sequence_number"]
             .as_str()
             .unwrap()
@@ -538,17 +542,13 @@ impl TestContext {
         name: &str,
     ) -> serde_json::Value {
         let resources = self
-            .get(&format!(
-                "/accounts/{}/resources",
-                account.to_hex_literal()
-            ))
+            .get(&format!("/accounts/{}/resources", account.to_hex_literal()))
             .await;
         let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
         vals.into_iter()
             .find(|v| v["type"] == format!("{}::{}::{}", resource_account_address, module, name,))
             .unwrap()
     }
-
 
     // TODO: remove the helper function since we don't publish module directly anymore
     pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
@@ -574,13 +574,13 @@ impl TestContext {
         self.api_execute_txn(
             account,
             json!({
-            "type": "entry_function_payload",
-            "function": function,
-            "type_arguments": type_args,
-            "arguments": args
-        }),
+                "type": "entry_function_payload",
+                "function": function,
+                "type_arguments": type_args,
+                "arguments": args
+            }),
         )
-            .await;
+        .await;
     }
 
     async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {

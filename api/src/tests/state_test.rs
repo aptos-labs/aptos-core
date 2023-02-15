@@ -322,13 +322,8 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
 
     ctx.api_publish_module(account, module.try_into().unwrap())
         .await;
-    ctx.api_execute_entry_function(
-        account,
-        "make_test_tables",
-        json!([]),
-        json!([]),
-    )
-    .await
+    ctx.api_execute_entry_function(account, "make_test_tables", json!([]), json!([]))
+        .await
 }
 
 async fn build_test_module(account: AccountAddress) -> Vec<u8> {
