@@ -59,6 +59,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
+    "indexer-grpc",
     BUILD_ADDL_TESTING_IMAGES == "true" ? [
       "validator-testing"
     ] : []
@@ -76,6 +77,7 @@ target "_common" {
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
     generate_cache_from("telemetry-service"),
+    generate_cache_from("indexer-grpc"),
 
     // testing targets
     generate_cache_from("validator-testing"),
@@ -144,6 +146,13 @@ target "telemetry-service" {
   target   = "telemetry-service"
   cache-to = generate_cache_to("telemetry-service")
   tags     = generate_tags("telemetry-service")
+}
+
+target "indexer-grpc" {
+  inherits = ["_common"]
+  target   = "indexer-grpc"
+  cache-to = generate_cache_to("indexer-grpc")
+  tags     = generate_tags("indexer-grpc")
 }
 
 function "generate_cache_from" {
