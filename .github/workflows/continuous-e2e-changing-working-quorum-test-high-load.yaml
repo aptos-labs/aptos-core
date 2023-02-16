@@ -12,7 +12,16 @@ on:
 jobs:
   ### Please remember to use different namespace for different tests
   # Performance test in an optimal setting
+  check-repo: 
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+
   run-forge-changing-working-quorum-test-high-load:
+    needs: check-repo
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:

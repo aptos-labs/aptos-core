@@ -67,6 +67,10 @@ jobs:
           ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
           fetch-depth: 0
 
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+        
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
 
       - name: Install python deps

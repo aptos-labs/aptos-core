@@ -10,8 +10,17 @@ on:
     - cron: "0 9 * * *"
 
 jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+
   # Run a faster chaos forge to quickly surface correctness failures
   run-release-blocking-forge:
+    needs: check-repo
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
