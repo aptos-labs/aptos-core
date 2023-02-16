@@ -115,15 +115,10 @@ impl BatchAggregator {
         }
     }
 
+    #[inline]
     fn is_new_batch(batch_id: BatchId, prev_batch_id: BatchId) -> bool {
         // If the nonce has changed, this is a new batch (after validator DB was wiped).
-        if batch_id.nonce != prev_batch_id.nonce {
-            true
-        } else if batch_id > prev_batch_id {
-            true
-        } else {
-            false
-        }
+        batch_id.nonce != prev_batch_id.nonce || batch_id > prev_batch_id
     }
 
     fn is_outdated_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
