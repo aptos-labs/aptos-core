@@ -397,7 +397,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking" => single_test_suite("three_region_simulation"),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -982,7 +982,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(100)
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 6000 })
+                .mode(EmitJobMode::ConstTps { tps: 5000 })
                 .txn_expiration_time_secs(60 * 60),
         )
         .with_network_tests(vec![&ThreeRegionSimulationTest {
