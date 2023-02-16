@@ -6,7 +6,7 @@ hidden: false
 
 # Learn Aptos Concepts
 
-Start here to get into the core concepts of the Aptos blockchain. Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) and [papers](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/papers) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub while continuing your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
+Start here to get into the core concepts of the Aptos blockchain. Then review the Aptos source code found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub while continuing your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
 
 - ### [Aptos White Paper](../aptos-white-paper/index.md)
 - ### [Accounts](./accounts.md)
