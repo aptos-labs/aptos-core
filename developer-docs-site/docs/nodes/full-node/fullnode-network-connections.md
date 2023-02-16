@@ -75,7 +75,7 @@ For example:
 
 :::tip
 
-Peer ID is synonymous with `AccountAddress`. See [NetworkAddress](https://github.com/aptos-labs/aptos-core/blob/main/documentation/specifications/network/network-address.md) to see how the `addresses` key value is constructed.
+Peer ID is synonymous with `AccountAddress`.
 
 :::
 
