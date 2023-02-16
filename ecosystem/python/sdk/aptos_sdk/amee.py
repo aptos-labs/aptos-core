@@ -35,7 +35,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from nacl.signing import VerifyKey
 
-# Constants >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Constants >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 MAX_SIGNATORIES = 32
 """Maximum number of signatories on a multisig account."""
@@ -62,12 +62,9 @@ FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 TEST_PASSWORD = "Aptos"
 """Test password for bypassing prompts."""
 
-USE_TEST_PASSWORD = True
-"""True if using test password for bypassing prompts."""
+# Constants <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Constants <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-# Aptos accounts >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Aptos accounts >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def fund_address_from_faucet(address: str):
@@ -94,9 +91,9 @@ def get_sequence_number(address: bytes, network: str) -> int:
     return client.account_sequence_number(AccountAddress(address))
 
 
-# Aptos accounts <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Aptos accounts <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# String operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# String operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def bytes_to_prefixed_hex(input_bytes: bytes) -> str:
@@ -122,9 +119,9 @@ def prefixed_hex_to_bytes(prefixed_hex: str) -> bytes:
     return bytes.fromhex(prefixed_hex[2:])
 
 
-# String operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# String operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# File operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# File operations >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def check_outfile_exists(path: Path):
@@ -158,12 +155,15 @@ def write_json_file(path: Path, data: Dict[str, str], check_if_exists: bool):
         print(f"{filetype} now at {path}: \n{file.read()}")
 
 
-# File operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# File operations <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Password protection >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Password protection >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
+def check_keyfile_password(
+    path: Path,
+    use_test_password: bool,
+) -> Tuple[Dict[Any, Any], Option[bytes]]:
     """Check keyfile password, returning JSON data/private key bytes."""
     with open(path, "r", encoding="utf-8") as keyfile:  # Open keyfile:
         data = json.load(keyfile)  # Load JSON data from keyfile.
@@ -171,7 +171,7 @@ def check_keyfile_password(path: Path) -> Tuple[Dict[Any, Any], Option[bytes]]:
     encrypted_hex = data["encrypted_private_key"]  # Get encrypted key.
     # Convert encrypted private key hex to bytes.
     encrypted_private_key = prefixed_hex_to_bytes(encrypted_hex)
-    if USE_TEST_PASSWORD:  # If using test password:
+    if use_test_password:  # If using test password:
         print("Using test password.")  # Print user notice.
         password = TEST_PASSWORD  # Set password to test password.
     else:  # Otherwise:
@@ -215,9 +215,12 @@ def derive_password_protection_fernet(password: str, salt: bytes) -> Fernet:
     return Fernet(base64.urlsafe_b64encode(derived_key))
 
 
-def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
+def encrypt_private_key(
+    private_key_bytes: bytes,
+    use_test_password: bool,
+) -> Tuple[bytes, bytes]:
     """Return encrypted private key and salt."""
-    if USE_TEST_PASSWORD:  # If using test password:
+    if use_test_password:  # If using test password:
         print("Using test password.")  # Print user notice.
         password = TEST_PASSWORD  # Set password to test password.
     else:  # Otherwise:
@@ -237,9 +240,9 @@ def encrypt_private_key(private_key_bytes: bytes) -> Tuple[bytes, bytes]:
     return encrypted_private_key, salt  # Return key, salt.
 
 
-# Password protection <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Password protection <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Multisig metafiles >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Multisig metafiles >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def metafile_check_update(
@@ -327,9 +330,9 @@ def update_multisig_address(path: Path, address_prefixed_hex: str):
     write_json_file(path=path, data=data, check_if_exists=False)
 
 
-# Multisig metafiles <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Multisig metafiles <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Authentication key rotation >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Authentication key rotation >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def construct_raw_rotation_transaction(
@@ -453,9 +456,9 @@ def get_rotation_transaction(proposal: Dict[str, Any]) -> RawTransaction:
     )  # Construct raw rotation transaction.
 
 
-# Authentication key rotation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Authentication key rotation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Transaction construction >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Transaction construction >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def construct_raw_transaction(
@@ -590,9 +593,9 @@ def get_script_transaction(proposal: Dict[str, Any]) -> RawTransaction:
     return get_proposal_transaction(payload, proposal)
 
 
-# Transaction construction <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Transaction construction <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Transaction signing >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Transaction signing >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def check_signatories_threshold(n_signatories: int, threshold: int):
@@ -651,10 +654,12 @@ def sign_raw_transaction(
     name_tokens: List[str],
     proposal: Dict[str, Any],
     filetype: str,
+    use_test_password: bool,
 ):
     """Sign a raw transaction and store in an outfile."""
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(keyfile)
+    keyfile_data, private_key_bytes = check_keyfile_password(
+        keyfile, use_test_password
+    )  # Check password, get keyfile data and private key bytes.
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return.
     # Create Aptos-style account for single signer.
@@ -692,9 +697,9 @@ def signature_json_to_map(
     ]
 
 
-# Transaction signing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Transaction signing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# Transaction submission >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Transaction submission >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 def assert_successful_transaction(
@@ -762,9 +767,9 @@ def execute_transaction_from_signatures(
     return proposal  # Return proposal from signature files.
 
 
-# Transaction submission <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Transaction submission <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-# AMEE commands >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# AMEE commands >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 # AMEE parser.
 parser = argparse.ArgumentParser(
@@ -783,6 +788,16 @@ network_parser.add_argument(
     help="Network to use, defaults to devnet.",
 )
 
+# Use test password parent parser.
+use_test_password_parser = argparse.ArgumentParser(add_help=False)
+use_test_password_parser.add_argument(
+    "-u",
+    "--use-test-password",
+    action="store_true",
+    help="Flag to use test password."
+)
+
+
 # Keyfile subcommand parser.
 parser_keyfile = subparsers.add_parser(
     name="keyfile",
@@ -795,11 +810,13 @@ subparsers_keyfile = parser_keyfile.add_subparsers(required=True)
 
 def keyfile_change_password(args):
     """Change password for a single-signer keyfile."""
-    # Check password, get keyfile data and optional private key bytes.
-    data, private_key_bytes = check_keyfile_password(args.keyfile)
+    data, private_key_bytes = check_keyfile_password(
+        args.keyfile, args.use_test_password
+    )  # Check password, get keyfile data and private key bytes.
     if private_key_bytes is not None:  # If able to decrypt private key:
-        # Encrypt private key.
-        encrypted_bytes, salt = encrypt_private_key(private_key_bytes)
+        encrypted_bytes, salt = encrypt_private_key(
+            private_key_bytes, args.use_test_password
+        ) # Encrypt private key.
         # Get encrypted private key hex.
         encrypted_private_key_hex = bytes_to_prefixed_hex(encrypted_bytes)
         # Update JSON with encrypted private key.
@@ -816,6 +833,7 @@ parser_keyfile_change_password = subparsers_keyfile.add_parser(
     aliases=["c"],
     description="Change password for a single-singer keyfile.",
     help="Change keyfile password.",
+    parents=[use_test_password_parser],
 )
 parser_keyfile_change_password.set_defaults(func=keyfile_change_password)
 parser_keyfile_change_password.add_argument(
@@ -827,8 +845,9 @@ def keyfile_extract(args):
     """Extract private key from keyfile, store via
     aptos_sdk.account.Account.store"""
     check_outfile_exists(args.account_store)  # Check if path exists.
-    # Try loading private key bytes.
-    _, private_key_bytes = check_keyfile_password(args.keyfile)
+    _, private_key_bytes = check_keyfile_password(
+        args.keyfile, args.use_test_password
+    )  # Try loading private key bytes.
     # If able to successfully decrypt:
     if private_key_bytes is not None:
         # Load account.
@@ -849,6 +868,7 @@ parser_keyfile_extract = subparsers_keyfile.add_parser(
     description="""Generate an `aptos_sdk.account.Account` from a single-signer
         keyfile then store on disk via `aptos_sdk.account.Account.store`.""",
     help="Extract Aptos account store from keyfile.",
+    parents=[use_test_password_parser],
 )
 parser_keyfile_extract.set_defaults(func=keyfile_extract)
 parser_keyfile_extract.add_argument(
@@ -910,8 +930,9 @@ def keyfile_generate(args):
         account = Account.load(f"{args.account_store}")
     # Get private key bytes.
     private_key_bytes = account.private_key.key.encode()
-    # Encrypt private key.
-    encrypted_private_key_bytes, salt = encrypt_private_key(private_key_bytes)
+    encrypted_private_key_bytes, salt = encrypt_private_key(
+        private_key_bytes, args.use_test_password
+    ) # Encrypt private key.
     # Get encrypted private key hex.
     key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
     write_json_file(  # Write JSON to keyfile.
@@ -934,6 +955,7 @@ parser_keyfile_generate = subparsers_keyfile.add_parser(
     aliases=["g"],
     description="Generate a single-signer keyfile.",
     help="Generate new keyfile.",
+    parents=[use_test_password_parser],
 )
 parser_keyfile_generate.set_defaults(func=keyfile_generate)
 parser_keyfile_generate.add_argument(
@@ -965,8 +987,9 @@ exclusive_group.add_argument(
 def keyfile_verify(args):
     """Verify password for single-signer keyfile generated via
     keyfile_generate(), show public key and authentication key."""
-    # Load JSON data and try getting private key bytes.
-    data, private_key_bytes = check_keyfile_password(args.keyfile)
+    data, private_key_bytes = check_keyfile_password(
+        args.keyfile, args.use_test_password
+    )  # Load JSON data and try getting private key bytes.
     if private_key_bytes is not None:  # If able to decrypt private key:
         # Print keyfile info.
         print(f'Keyfile password verified for {data["signatory"]}')
@@ -980,6 +1003,7 @@ parser_keyfile_verify = subparsers_keyfile.add_parser(
     aliases=["v"],
     description="Verify password for a single-signer keyfile.",
     help="Verify keyfile password.",
+    parents=[use_test_password_parser],
 )
 parser_keyfile_verify.set_defaults(func=keyfile_verify)
 parser_keyfile_verify.add_argument(
@@ -1375,6 +1399,7 @@ def publish_sign(args):
         name_tokens=args.name,
         proposal=proposal,
         filetype="Publication signature",
+        use_test_password=args.use_test_password,
     )
 
 
@@ -1384,6 +1409,7 @@ parser_publish_sign = subparsers_publish.add_parser(
     aliases=["s"],
     description="Sign a package publication transaction.",
     help="Package publication transaction signing.",
+    parents=[use_test_password_parser],
 )
 parser_publish_sign.set_defaults(func=publish_sign)
 parser_publish_sign.add_argument(
@@ -1520,8 +1546,9 @@ parser_rotate_challenge_propose.add_argument(
 def rotate_challenge_sign(args):
     """Sign a rotation proof challenge proposal, storing output file."""
     proposal_data = json.load(args.proposal)  # Load proposal data.
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    keyfile_data, private_key_bytes = check_keyfile_password(
+        args.keyfile, args.use_test_password
+    )  # Check password, get keyfile data and private key bytes.
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return.
     # Get rotation proof challenged BCS bytes.
@@ -1549,6 +1576,7 @@ parser_rotate_challenge_sign = subparsers_rotate_challenge.add_parser(
     aliases=["s"],
     description="Sign a rotation proof challenge proposal.",
     help="Rotation proof challenge proposal signing.",
+    parents=[use_test_password_parser],
 )
 parser_rotate_challenge_sign.set_defaults(func=rotate_challenge_sign)
 parser_rotate_challenge_sign.add_argument(
@@ -1589,8 +1617,9 @@ def rotate_execute_single(args):
     """Rotate authentication key for single-signer account.
 
     Only supports rotation to a multisig account."""
-    # Check password, get keyfile data and optional private key bytes.
-    keyfile_data, private_key_bytes = check_keyfile_password(args.keyfile)
+    keyfile_data, private_key_bytes = check_keyfile_password(
+        args.keyfile, args.use_test_password
+    )  # Check password, get keyfile data and private key bytes.
     if private_key_bytes is None:  # If can't decrypt private key:
         return  # Return without rotating.
     # Create Aptos-style account for single signer.
@@ -1637,7 +1666,7 @@ parser_rotate_execute_single = subparsers_rotate_execute.add_parser(
         account address is identical to its authentication key. Requires
         single-signer password approval.""",
     help="Rotate single-signer account to multisig account.",
-    parents=[network_parser],
+    parents=[network_parser, use_test_password_parser],
 )
 parser_rotate_execute_single.set_defaults(func=rotate_execute_single)
 parser_rotate_execute_single.add_argument(
@@ -1813,6 +1842,7 @@ def rotate_transaction_sign(args):
         name_tokens=args.name,
         proposal=proposal,
         filetype="Rotation transaction signature",
+        use_test_password=args.use_test_password,
     )
 
 
@@ -1822,6 +1852,7 @@ parser_rotate_transaction_sign = subparsers_rotate_transaction.add_parser(
     aliases=["s"],
     description="Sign an authentication key rotation transaction.",
     help="Authentication key rotation transaction signing.",
+    parents=[use_test_password_parser],
 )
 parser_rotate_transaction_sign.set_defaults(func=rotate_transaction_sign)
 parser_rotate_transaction_sign.add_argument(
@@ -1990,6 +2021,7 @@ def script_sign(args):
         name_tokens=args.name,
         proposal=proposal,
         filetype="Script signature",
+        use_test_password=args.use_test_password,
     )
 
 
@@ -1999,6 +2031,7 @@ parser_script_sign = subparsers_script.add_parser(
     aliases=["s"],
     description="Sign a script invocation transaction.",
     help="Script invocation transaction signing.",
+    parents=[use_test_password_parser],
 )
 parser_script_sign.set_defaults(func=script_sign)
 parser_script_sign.add_argument(
@@ -2024,7 +2057,7 @@ parser_script_sign.add_argument(
     help="Relative path to script invocation transaction signature outfile.",
 )
 
-# AMEE commands <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# AMEE commands <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 parsed_args = parser.parse_args()  # Parse command line arguments.
 parsed_args.func(parsed_args)  # Call command line argument function.

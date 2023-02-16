@@ -28,6 +28,7 @@ module upgrade_and_govern::parameters {
          governance_parameters_ref.parameter_2)
     }
 
+    // :!:>appended
     use std::signer::address_of;
 
     const E_INVALID_AUTHORITY: u64 = 0;
@@ -44,4 +45,5 @@ module upgrade_and_govern::parameters {
         governance_parameters_ref_mut.parameter_1 = parameter_1;
         governance_parameters_ref_mut.parameter_2 = parameter_2;
     }
-}
+
+} // <:!:appended

@@ -1,3 +1,4 @@
+// :!:>module
 /// Mock coin transfer module that invokes governance parameters.
 module upgrade_and_govern::transfer {
 
@@ -15,4 +16,4 @@ module upgrade_and_govern::transfer {
         coin::transfer<AptosCoin>(from, to_2, amount_2);
     }
 
-}
+} // <:!:module

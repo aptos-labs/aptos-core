@@ -1,3 +1,4 @@
+// :!:>module
 /// Mock on-chain governance parameters.
 module upgrade_and_govern::parameters {
 
@@ -28,4 +29,4 @@ module upgrade_and_govern::parameters {
          governance_parameters_ref.parameter_2)
     }
 
-}
+} // <:!:module

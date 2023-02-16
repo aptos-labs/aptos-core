@@ -23,7 +23,7 @@ Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-
 
 ## Step 2: Start the example
 
-Navigate to the Python SDK directory:
+Navigate to the Python SDK examples directory:
 
 ```zsh
 cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/examples
@@ -32,20 +32,25 @@ cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/examples
 Run the `multisig.py` example:
 
 ```zsh
-python multisig.py
+poetry run python multisig.py
 ```
+
+:::tip
+This example uses the Aptos devnet, which has historically been reset each Thursday.
+Make sure devnet is live when you try running the example!
+:::
 
 ## Step 3: Generate single signer accounts
 
 First, we will generate single signer accounts for Alice, Bob, and Chad:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_1
 ```
 
 Fresh accounts are generated for each example run, but the output should resemble:
 
-```zsh
+```zsh title=Output
 === Account addresses ===
 Alice: 0x9635724a9e3f7997c9975c76398e434504544d4044a6c34d5125f7825574e861
 Bob:   0x4509faa7d24179368cc340548345acb7fde777191f1a69bda0fad619f0df67fd
@@ -68,13 +73,13 @@ For each user, note the [account address](../concepts/accounts.md#account-addres
 
 Next generate a [K-of-N multi-signer](../concepts/accounts.md#multisigner-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_2
 ```
 
 The multisig account address depends on the public keys of the single signers. (Hence, it will be different for each example.) But the output should resemble:
 
-```zsh
+```zsh title=Output
 === 2-of-3 Multisig account ===
 Account public key: 2-of-3 Multi-Ed25519 public key
 Account address:    0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
@@ -84,11 +89,11 @@ Account address:    0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b5
 
 Next fund all accounts:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_3
 ```
 
-```zsh
+```zsh title=Output
 === Funding accounts ===
 Alice's balance:  10000000
 Bob's balance:    20000000
@@ -105,13 +110,13 @@ Since it is a two-of-three multisig account, signatures are required only from t
 
 First generate a raw transaction, signed by Alice and Bob, but not by Chad.
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_4
 ```
 
 Again, signatures vary for each example run:
 
-```zsh
+```zsh title=Output
 === Individual signatures ===
 Alice: 0x370c9bdd467bb7de36ade1bffe66f29de153b0f4807a2a964d4c63f3e2c4dc0f7032e42db1f3c45ae55c6ea0cde0802ba1ccd4bfa655dcbd0040e507a7eea800
 Bob:   0xf8bf5676affd2a8f5d594844c5fed63c3b02c599b9f9e8067b941169366dc72257ae31313332d4fa52f877b709cddcb80719c44a0ca9870f9c886f90286f9000
@@ -122,11 +127,11 @@ Bob:   0xf8bf5676affd2a8f5d594844c5fed63c3b02c599b9f9e8067b941169366dc72257ae313
 Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
 
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_5
 ```
 
-```zsh
+```zsh title=Output
 === Submitting transaction ===
 Transaction hash: 0x4da4bb16ff481e22f22cf049cda3faa2df60a4dbd2c40aabee441d890b23c1dd
 ```
@@ -135,11 +140,11 @@ Transaction hash: 0x4da4bb16ff481e22f22cf049cda3faa2df60a4dbd2c40aabee441d890b23
 
 Check the new account balances:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_6
 ```
 
-```zsh
+```zsh title=Output
 === New account balances===
 Alice's balance:  10000000
 Bob's balance:    20000000
@@ -158,11 +163,11 @@ In this section, a fourth user named Deedee will generate a vanity address, then
 
 A fourth user, Deedee, wants her account address to start with `0xdd..`, so she generates random accounts until she finds one with a matching account address:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_7
 ```
 
-```zsh
+```zsh title=Output
 === Funding vanity address ===
 Deedee's address:    0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 Deedee's public key: 0x90b17d64843ca7ece0f96498bca49c269f585eda24105b0b9894ab7976c52c73
@@ -176,11 +181,11 @@ Deedee's signature, `cap_rotate_key`, verifies that she approves of the authenti
 The multisig signature, `cap_update_table`, verifies that the multisig approves of the authentication key rotation.
 Here, Bob and Chad provide individual signatures for the multisig:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_8
 ```
 
-```zsh
+```zsh title=Output
 === Signing rotation proof challenge ===
 cap_rotate_key:   0x71e3b8357051409881de4286046b477612d59ee9826d03f017ade18b0b5025801eef302a113dc687bceec9618fe43f684f53d6eea48309ef7a146ac606180b0d
 cap_update_table: 0xa3c0f67cbe4a98cc3956373a62e15ca03f1d8b2cc61c5650e85157a84806fa9e8834197b75fd7cfc9d2b15230ef96ceed7f8e35e4ec0775c4fef2ebdf4ef15048cea52b850bc688ff658c643aa6974bd4b734d2d700f45c977a69bf7491fdb888b18f9ed28c317b91e37153920339534278bcacb985f1fbd500457628311590c60000000
@@ -191,11 +196,11 @@ cap_update_table: 0xa3c0f67cbe4a98cc3956373a62e15ca03f1d8b2cc61c5650e85157a84806
 Now that the relevant signatures have been gathered, the authentication key rotation transaction can be submitted.
 After it executes, the rotated authentication key matches the address of the first multisig account (the one that sent octas to Chad):
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_9
 ```
 
-```zsh
+```zsh title=Output
 === Submitting authentication key rotation transaction ===
 Auth key pre-rotation: 0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
@@ -219,50 +224,13 @@ Here, [semantic versioning](https://semver.org/) is used to distinguish between 
 Version 1.0.0 of the `UpgradeAndGovern` package contains a simple manifest and a single Move source file:
 
 ```toml title="Move.toml"
-[package]
-name = 'UpgradeAndGovern'
-version = '1.0.0'
-
-[addresses]
-upgrade_and_govern = '_'
-
-[dependencies.AptosFramework]
-local = '../../../framework/aptos-framework'
+:!: static/move-examples/upgrade_and_govern/v1_0_0/Move.toml manifest
 ```
 
 ```rust title="parameters.move"
-/// Mock on-chain governance parameters.
-module upgrade_and_govern::parameters {
-
-    struct GovernanceParameters has key {
-        parameter_1: u64,
-        parameter_2: u64
-    }
-
-    const GENESIS_PARAMETER_1: u64 = 123;
-    const GENESIS_PARAMETER_2: u64 = 456;
-
-    fun init_module(
-        upgrade_and_govern: &signer
-    ) {
-        let governance_parameters = GovernanceParameters{
-            parameter_1: GENESIS_PARAMETER_1,
-            parameter_2: GENESIS_PARAMETER_2};
-        move_to<GovernanceParameters>(
-            upgrade_and_govern, governance_parameters);
-    }
-
-    public fun get_parameters():
-    (u64, u64)
-    acquires GovernanceParameters {
-        let governance_parameters_ref =
-            borrow_global<GovernanceParameters>(@upgrade_and_govern);
-        (governance_parameters_ref.parameter_1,
-         governance_parameters_ref.parameter_2)
-    }
-
-}
+:!: static/move-examples/upgrade_and_govern/v1_0_0/sources/parameters.move module
 ```
+
 
 As soon as the package is published, a `GovernanceParameters` resource is moved to the package account with the values specified by `GENESIS_PARAMETER_1` and `GENESIS_PARAMETER_2`.
 Then, the `get_parameters()` function can be used to look up the governance parameters, but note that in this version there is no setter function.
@@ -274,11 +242,11 @@ Here, Alice and Chad will sign off on the publication transaction.
 
 All compilation and publication operations are handled via the ongoing Python script:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_10
 ```
 
-```zsh
+```zsh title=Output
 === Publishing v1.0.0 ===
 Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
@@ -300,64 +268,24 @@ On-chain upgrade number: 0
 
 Version 1.1.0 of the `UpgradeAndGovern` packages adds the following parameter setter functionality at the end of `parameters.move`:
 
-```rust
-use std::signer::address_of;
-
-const E_INVALID_AUTHORITY: u64 = 0;
-
-public entry fun set_parameters(
-    upgrade_and_govern: &signer,
-    parameter_1: u64,
-    parameter_2: u64
-) acquires GovernanceParameters {
-    assert!(address_of(upgrade_and_govern) == @upgrade_and_govern,
-            E_INVALID_AUTHORITY);
-    let governance_parameters_ref_mut =
-        borrow_global_mut<GovernanceParameters>(@upgrade_and_govern);
-    governance_parameters_ref_mut.parameter_1 = parameter_1;
-    governance_parameters_ref_mut.parameter_2 = parameter_2;
-}
+```rust title=parameters.move
+:!: static/move-examples/upgrade_and_govern/v1_1_0/sources/parameters.move appended
 ```
 
 Here, the account that the package is published under has the authority to change the `GovernanceParameter` values from the genesis values set in `v1.0.0` to the new `parameter_1` and `parameter_2` values.
 
 There is also a new module, `transfer.move`:
 
-```rust
-/// Mock coin transfer module that invokes governance parameters.
-module upgrade_and_govern::transfer {
-
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin;
-    use upgrade_and_govern::parameters;
-
-    public entry fun transfer_octas(
-        from: &signer,
-        to_1: address,
-        to_2: address
-    ) {
-        let (amount_1, amount_2) = parameters::get_parameters();
-        coin::transfer<AptosCoin>(from, to_1, amount_1);
-        coin::transfer<AptosCoin>(from, to_2, amount_2);
-    }
-
-}
+```rust title=transfer.move
+:!: static/move-examples/upgrade_and_govern/v1_1_0/sources/transfer.move module
 ```
 
 This module simply looks up the `GovernanceParameter` values, and treats them as the amount of octas to send to two recipients.
 
 Lastly, the manifest has been updated with the new version number:
 
-```toml
-[package]
-name = 'UpgradeAndGovern'
-version = '1.1.0'
-
-[addresses]
-upgrade_and_govern = '_'
-
-[dependencies.AptosFramework]
-local = '../../../framework/aptos-framework'
+```toml title=Move.toml
+:!: static/move-examples/upgrade_and_govern/v1_1_0/Move.toml manifest
 ```
 
 ### Step 8.4: Upgrade to v1.1.0
@@ -365,11 +293,11 @@ local = '../../../framework/aptos-framework'
 Alice, Bob, and Chad will all sign off on this publication transaction, which results in an upgrade.
 This process is almost identical to that of the `v1.0.0` publication:
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_11
 ```
 
-```zsh
+```zsh title=Output
 === Publishing v1.1.0 ===
 Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
 
@@ -392,24 +320,8 @@ Note that the on-chain upgrade number has been incremented by 1.
 
 `UpgradeAndGovern` version 1.1.0 also includes a Move script defined in `set_and_transfer.move`:
 
-```rust
-script {
-    use upgrade_and_govern::parameters;
-    use upgrade_and_govern::transfer;
-
-    const PARAMETER_1: u64 = 300;
-    const PARAMETER_2: u64 = 200;
-
-    fun main(
-        upgrade_and_govern: &signer,
-        to_1: address,
-        to_2: address
-    ) {
-        parameters::set_parameters(
-            upgrade_and_govern, PARAMETER_1, PARAMETER_2);
-        transfer::transfer_octas(upgrade_and_govern, to_1, to_2);
-    }
-}
+```rust title=set_and_transfer.move
+:!: static/move-examples/upgrade_and_govern/v1_1_0/scripts/set_and_transfer.move script
 ```
 
 This script calls the governance parameter setter using hard-coded values defined at the top of the script, then calls the octa transfer function.
@@ -427,11 +339,11 @@ A Move script, by contrast, collapses multiple governance function calls into a 
 Alice and Bob sign off on the Move script, which sends coins from the vanity multisig account to their personal accounts.
 Here, the amounts sent to each account are specified in the hard-coded values from the script.
 
-```python
+```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_12
 ```
 
-```zsh
+```zsh title=Output
 === Invoking Move script ===
 Transaction hash: 0x05903b30e3a88829d5ba802a671ba5b692c53bb870e2fb393a2b9cbdf153b120
 
@@ -442,4 +354,190 @@ Bob's balance:   20000200
 Chad's balance:  30000100
 ```
 
-Congratulations on completing the tutorial on K-of-N multi-signer authentication operations!
+## Step 9: Expedite execution with AMEE
+
+The above code snippets demonstrate concepts relevant to multisig operations, but are impractical for realistic workflows:
+all of the private keys are stored in memory on the same machine, the function calls do not generalize to other multisig operations, etc.
+As a result, there is a significant amount of overhead required to implement a bespoke solution that ports the above concepts to one's particular use case, which almost necessarily involves signers coordinating across space and time through an off-chain social consensus strategy (e.g. Have enough signatories signed yet? How do we compile their signatures?)
+
+To expedite this process, the Python SDK thus provides the Aptos Multisig Execution Expeditor (AMEE), a command-line tool that facilitates general multisig workflows through straightforward data structures and function calls.
+
+To use AMEE, navigate to the Python SDK directory:
+
+```zsh
+cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk
+```
+
+Then call up the help menu from the command line:
+
+```python title=Command
+:!: static/sdks/python/examples/multisig.sh help
+```
+
+```zsh title=Output
+usage: amee.py [-h] {keyfile,k,metafile,m,publish,p,rotate,r,script,s} ...
+
+Aptos Multisig Execution Expeditor (AMEE): A collection of tools designed to expedite multisig account execution.
+
+positional arguments:
+  {keyfile,k,metafile,m,publish,p,rotate,r,script,s}
+    keyfile (k)         Single-signer keyfile operations.
+    metafile (m)        Multisig metafile operations.
+    publish (p)         Move package publication.
+    rotate (r)          Authentication key rotation operations.
+    script (s)          Move script invocation.
+
+optional arguments:
+  -h, --help            show this help message and exit
+```
+
+AMEE offers a rich collection of useful subcommands, and to access their all of their help menus recursively simply call the `multisig.sh` shell script file with the `menus` argument (still from inside the `aptos_sdk` directory):
+
+```zsh title=Command
+sh ../examples/multisig.sh menus
+```
+
+```zsh title=Output
+
+<Top-level help menu>
+
+...
+
+usage: amee.py keyfile [-h] {change-password,c,extract,e,fund,f,generate,g,verify,v} ...
+
+Assorted single-signer keyfile operations.
+
+positional arguments:
+  {change-password,c,extract,e,fund,f,generate,g,verify,v}
+    change-password (c)
+                        Change keyfile password.
+    extract (e)         Extract Aptos account store from keyfile.
+    fund (f)            Fund on devnet faucet.
+    generate (g)        Generate new keyfile.
+    verify (v)          Verify keyfile password.
+
+options:
+  -h, --help            show this help message and exit
+
+
+
+
+
+usage: amee.py keyfile change-password [-h] [-u] keyfile
+
+Change password for a single-singer keyfile.
+
+positional arguments:
+  keyfile               Relative path to keyfile.
+
+options:
+  -h, --help            show this help message and exit
+  -u, --use-test-password
+                        Flag to use test password.
+
+...
+
+<More menus>
+
+```
+
+### Step 9.1 Understand keyfiles
+
+Unlike the `aptos` CLI which stores private keys in plain text on disk, AMEE encrypts single-signer private keys in a [JSON](https://docs.python.org/3/library/json.html) keyfile format with password protection:
+
+```zsh title=Command
+:!: static/sdks/python/examples/multisig.sh generate_keyfile
+```
+
+This initiates a hidden password prompt and creates a new file on disk:
+
+```zsh title=Output
+Enter new password for encrypting private key:
+Re-enter password:
+Keyfile now at the_aptos_foundation.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "The Aptos Foundation",
+    "public_key": "0x7d1bed984fd185595059f94cbe95ed3e4ce9b49bd3c53bace8102813cfdc4adc",
+    "authentication_key": "0x682b1a757af92532d184aab6d6ca7fa92b8229c38118c1729187ed1fb2106b15",
+    "encrypted_private_key": "0x674141414141426a377157643961486e544875424b4e43546831586454654855376956734656465039335a336266544f4f4d7157785354544a5671387932364d69494c364f724e44447143766871626b35564b36306e4362726a33566356536330636965524d5f777656466c5a394273314f78714151384c6d352d764b6666344443716978365a35397a4a65",
+    "salt": "0x5e323ba1f941152c38be4b05a04e24dd"
+}
+```
+
+This keyfile can be decrypted using the password to produce an unprotected account store (via `aptos_sdk.account.Account.store()`), which may be useful when trying to fund via the testnet faucet. Note here the abbreviation of `keyfile` to `k`:
+
+```zsh title=Command
+:!: static/sdks/python/examples/multisig.sh extract_keyfile
+```
+
+```zsh title=Output
+Enter password for encrypted private key:
+New account store at the_aptos_foundation.account_store:
+{"account_address": "0x682b1a757af92532d184aab6d6ca7fa92b8229c38118c1729187ed1fb2106b15", "private_key": "0x4ae3985bd49571cf67b42a391d72956a95cfb9aa634fd05c019a96a6eccd399d"}
+```
+
+Similarly, AMEE can generate keyfiles from an unprotected account store format. Note here the abbreviation of `generate` to `g` and the optional `outfile` positional argument:
+
+```zsh title=Command
+:!: static/sdks/python/examples/multisig.sh generate_from_store
+```
+
+```zsh title=Output
+Enter new password for encrypting private key:
+Re-enter password:
+Keyfile now at from_store.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "The Aptos Foundation",
+    "public_key": "0x7d1bed984fd185595059f94cbe95ed3e4ce9b49bd3c53bace8102813cfdc4adc",
+    "authentication_key": "0x682b1a757af92532d184aab6d6ca7fa92b8229c38118c1729187ed1fb2106b15",
+    "encrypted_private_key": "0x674141414141426a3771576861794330645a4949575051494f4f5a45647847426b5659723638506a464d666a5768486549357375437834696747514b6373466a683741732d78616e4958426e326a717066683071376c486c76364159646761765a514e2d715669664a50776e7a6c655f4436546d57762d426e3471765f5f6e45664e737530336f7a7a75702d",
+    "salt": "0x0656247cc0c7d571058a9b9ad7d6858b"
+}
+```
+
+To change the password on a keyfile:
+
+
+```zsh title=Command
+:!: static/sdks/python/examples/multisig.sh change_password
+```
+
+```zsh title=Output
+Enter password for encrypted private key:
+Enter new password for encrypting private key:
+Re-enter password:
+Keyfile now at from_store.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "The Aptos Foundation",
+    "public_key": "0x7d1bed984fd185595059f94cbe95ed3e4ce9b49bd3c53bace8102813cfdc4adc",
+    "authentication_key": "0x682b1a757af92532d184aab6d6ca7fa92b8229c38118c1729187ed1fb2106b15",
+    "encrypted_private_key": "0x674141414141426a3771576c48575570445a56707149732d6153785773753630696a656565315a5f684f365469696f523276705946565f2d7077556c49466c3656625468303731486c3654744a456e6575693443596d417065454f4f687435435a316f4b55444762536c43584b5067534e466664455135615f414a614270757a4637445a5554555870533149",
+    "salt": "0xd831bcda8cfac7b94a2065c7c829eac3"
+}
+```
+
+Now verify the new password:
+
+```zsh title=Command
+:!: static/sdks/python/examples/multisig.sh verify_password
+```
+
+```zsh title=Output
+Enter password for encrypted private key:
+Keyfile password verified for The Aptos Foundation
+Public key:         0x7d1bed984fd185595059f94cbe95ed3e4ce9b49bd3c53bace8102813cfdc4adc
+Authentication key: 0x682b1a757af92532d184aab6d6ca7fa92b8229c38118c1729187ed1fb2106b15
+```
+
+Note that all of these commands can be run in a scripted fashion simply by calling the `multisig.sh` shell script with the `keyfiles` argument.
+
+```zsh title=Command
+sh ../examples/multisig.sh keyfiles
+```
+
+:::tip
+Try running the shell script yourself, then experiment with variations on the commands!
+:::
