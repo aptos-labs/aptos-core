@@ -12,10 +12,10 @@ Nodes in an Aptos network, both the validator nodes and the fullnodes, must alwa
 
 :::tip Need to start a node quickly?
 If you need to start a node quickly, here's what we recommend by use case:
-  - **Devnet public fullnode**: To sync the entire blockchain history, download [a snapshot](/nodes/full-node/bootstrap-fullnode). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
-  - **Testnet public fullnode**: To sync the entire blockchain history, download [a snapshot](/nodes/full-node/bootstrap-fullnode). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
-  - **Mainnet public fullnode**: To sync the entire blockchain history, use [output syncing](/guides/state-sync#applying-all-transaction-outputs). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
-  - **Mainnet validator or validator fullnode**: Use [output syncing](/guides/state-sync#applying-all-transaction-outputs). Note: [fast sync](/guides/state-sync#fast-syncing) is not recommended.
+  - **Devnet public fullnode**: To sync the entire blockchain history, download [a snapshot](../nodes/full-node/bootstrap-fullnode.md). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Testnet public fullnode**: To sync the entire blockchain history, download [a snapshot](../nodes/full-node/bootstrap-fullnode.md). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Mainnet public fullnode**: To sync the entire blockchain history, use [output syncing](state-sync.md#applying-all-transaction-outputs). Otherwise, use [fast sync](state-sync.md#fast-syncing).
+  - **Mainnet validator or validator fullnode**: Use [output syncing](state-sync.md#applying-all-transaction-outputs). Note: [fast sync](state-sync.md#fast-syncing) is not recommended.
 :::
 
 ## State sync modes
