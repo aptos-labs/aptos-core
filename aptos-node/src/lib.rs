@@ -136,10 +136,11 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
+    _indexer_grpc_runtime: Option<Runtime>,
+    _indexer_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _indexer_grpc: Option<Runtime>,
-    _index_runtime: Option<Runtime>,
+    _peer_monitoring_service_runtime: Runtime,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
@@ -386,11 +387,18 @@ pub fn setup_environment_and_start_node(
         network_runtimes,
         consensus_network_interfaces,
         mempool_network_interfaces,
+        peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
         &mut event_subscription_service,
+    );
+
+    // Start the peer monitoring service
+    let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
+        &node_config,
+        peer_monitoring_service_network_interfaces,
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
@@ -404,7 +412,7 @@ pub fn setup_environment_and_start_node(
         )?;
 
     // Bootstrap the API and indexer
-    let (mempool_client_receiver, api_runtime, index_runtime, indexer_grpc) =
+    let (mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc_runtime) =
         services::bootstrap_api_and_indexer(&node_config, aptos_db, chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
@@ -440,10 +448,11 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
-        _index_runtime: index_runtime,
-        _indexer_grpc: indexer_grpc,
+        _indexer_grpc_runtime: indexer_grpc_runtime,
+        _indexer_runtime: indexer_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
+        _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
