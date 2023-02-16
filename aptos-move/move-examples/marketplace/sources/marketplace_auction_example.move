@@ -201,8 +201,10 @@ module marketplace::marketplace_auction_example {
             withdraw_expiration_sec, // allow time to withdraw
         );
 
-        // initialized coin store when listing
-        coin::register<CoinType>(owner);
+        // initialized coin store when listing If it is not already registered
+        if (!coin::is_account_registered<CoinType>(signer::address_of(owner))) {
+            coin::register<CoinType>(owner);
+        };
 
         let auctions = borrow_global_mut<Auctions<CoinType>>(@marketplace);
         event::emit_event<ListingEvent>(
