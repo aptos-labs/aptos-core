@@ -8,7 +8,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
     proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::{BlockProposalCommand, ConsensusResponse},
+    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -73,10 +73,10 @@ impl ProofManager {
         self.proofs_for_consensus.mark_committed(digests);
     }
 
-    pub(crate) fn handle_proposal_request(&mut self, msg: BlockProposalCommand) {
+    pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
             // TODO: check what max_txns consensus is using
-            BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, filter, callback) => {
+            GetPayloadCommand::GetPayloadRequest(round, max_txns, max_bytes, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -96,7 +96,7 @@ impl ProofManager {
                     .proofs_for_consensus
                     .num_total_txns(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
-                let res = ConsensusResponse::GetBlockResponse(
+                let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {
                         Payload::empty(true)
                     } else {
@@ -125,7 +125,7 @@ impl ProofManager {
         mut self,
         mut network_sender: NetworkSender,
         back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
-        mut proposal_rx: Receiver<BlockProposalCommand>,
+        mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
         let mut back_pressure = false;

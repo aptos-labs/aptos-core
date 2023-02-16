@@ -628,7 +628,7 @@ impl EpochManager {
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
-            QuorumStoreBuilder::InQuorumStore(InnerBuilder::new(
+            QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
                 self.epoch(),
                 self.author,
                 self.config.quorum_store_configs.clone(),
