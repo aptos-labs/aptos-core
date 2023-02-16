@@ -23,6 +23,34 @@ const sidebars = {
       className: "sidebar-title",
     },
     "whats-new-in-docs",
+        {
+      type: "category",
+      label: "Aptos Releases",
+      collapsible: true,
+      collapsed: false,
+      items: [
+        {
+      type: 'link',
+      label: 'aptos-node-v1.2.4',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.4',
+        },
+        {
+      type: 'link',
+      label: 'aptos-node-v1.1.0',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0',
+        },
+        {
+      type: 'link',
+      label: 'aptos-cli-v1.0.5',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.5',
+        },
+        {
+      type: 'link',
+      label: 'ptos-cli-v1.0.4',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.4',
+        },
+      ],
+    },
     {
       type: "category",
       label: "Read the Aptos White Paper",
