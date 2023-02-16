@@ -38,11 +38,14 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   push:
     branches:
       - main
+      # release branches
       - devnet
       - testnet
       - mainnet
       - aptos-node-v*
+      # experimental branches
       - performance_benchmark
+      - quorum-store
 
 # cancel redundant builds
 concurrency:

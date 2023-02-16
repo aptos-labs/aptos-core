@@ -12,8 +12,6 @@ To kickstart your journey in the Aptos ecosystem, set up your environment as nee
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
 
-Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) and [papers](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/papers) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub while continuing your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
-
 ## Use supported operating systems
 
 Aptos can be built on various operating systems, including Linux, macOS. and Windows. Aptos is tested extensively on Linux and macOS, and less so on Windows. Here are the versions we use:

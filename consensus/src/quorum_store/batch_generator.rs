@@ -19,6 +19,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
 use futures_channel::{mpsc::Sender, oneshot};
+use rand::{thread_rng, RngCore};
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -73,15 +74,20 @@ impl BatchGenerator {
         end_batch_ms: u64,
         block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
-        let batch_id = if let Some(id) = db
+        let batch_id = if let Some(mut id) = db
             .clean_and_get_batch_id(epoch)
             .expect("Could not read from db")
         {
-            id + 1
+            // If the node shut down mid-batch, then this increment is needed
+            id.increment();
+            id
         } else {
-            0
+            BatchId::new(thread_rng().next_u64())
         };
-        db.save_batch_id(epoch, batch_id + 1)
+        info!("Initialized with batch_id of {}", batch_id);
+        let mut incremented_batch_id = batch_id;
+        incremented_batch_id.increment();
+        db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
 
         Self {
@@ -188,8 +194,10 @@ impl BatchGenerator {
 
             counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
 
+            let mut incremented_batch_id = batch_id;
+            incremented_batch_id.increment();
             self.db
-                .save_batch_id(self.latest_logical_time.epoch(), batch_id + 1)
+                .save_batch_id(self.latest_logical_time.epoch(), incremented_batch_id)
                 .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();

@@ -37,7 +37,7 @@ impl BatchIdDB for MockBatchIdDB {
         &self,
         _current_epoch: u64,
     ) -> anyhow::Result<Option<BatchId>, DbError> {
-        Ok(Some(0))
+        Ok(Some(BatchId::new_for_test(0)))
     }
 
     fn save_batch_id(&self, _epoch: u64, _batch_id: BatchId) -> anyhow::Result<(), DbError> {
@@ -121,7 +121,7 @@ async fn test_batch_creation() {
         // Expect AppendToBatch for 1 txn
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
         if let BatchCoordinatorCommand::AppendToBatch(data, batch_id) = quorum_store_command {
-            assert_eq!(batch_id, 1);
+            assert_eq!(batch_id, BatchId::new_for_test(1));
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, serialize(&signed_txns));
         } else {
@@ -154,7 +154,7 @@ async fn test_batch_creation() {
         // Expect AppendBatch for 9 txns
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
         if let BatchCoordinatorCommand::AppendToBatch(data, batch_id) = quorum_store_command {
-            assert_eq!(batch_id, 2);
+            assert_eq!(batch_id, BatchId::new_for_test(2));
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, serialize(&signed_txns));
         } else {

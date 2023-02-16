@@ -752,9 +752,15 @@ impl From<CompiledModule> for MoveModule {
             exposed_functions: m
                 .function_defs
                 .iter()
-                .filter(|def| match def.visibility {
-                    Visibility::Public | Visibility::Friend => true,
-                    Visibility::Private => false,
+                // Return all entry or public functions.
+                // Private entry functions are still callable by entry function transactions so
+                // they should be included.
+                .filter(|def| {
+                    def.is_entry
+                        || match def.visibility {
+                            Visibility::Public | Visibility::Friend => true,
+                            Visibility::Private => false,
+                        }
                 })
                 .map(|def| m.new_move_function(def))
                 .collect(),
