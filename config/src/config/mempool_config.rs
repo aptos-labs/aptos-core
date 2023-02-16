@@ -31,12 +31,12 @@ pub struct MempoolConfig {
 impl Default for MempoolConfig {
     fn default() -> MempoolConfig {
         MempoolConfig {
-            shared_mempool_tick_interval_ms: 50,
+            shared_mempool_tick_interval_ms: 200,
             shared_mempool_backoff_interval_ms: 30_000,
             shared_mempool_batch_size: 100,
             shared_mempool_max_batch_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
             shared_mempool_ack_timeout_ms: 2_000,
-            shared_mempool_max_concurrent_inbound_syncs: 4,
+            shared_mempool_max_concurrent_inbound_syncs: 2,
             max_broadcasts_per_peer: 1,
             mempool_snapshot_interval_secs: 180,
             capacity: 2_000_000,
