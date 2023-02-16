@@ -60,7 +60,9 @@ pub async fn get_cache_coverage_status(
         Err(err) => return Err(err.into()),
     };
 
-    let request_batch_upper_bound = requested_version.checked_add(BLOB_STORAGE_SIZE).expect("Version boundary calculation overflows.");
+    let request_batch_upper_bound = requested_version
+        .checked_add(BLOB_STORAGE_SIZE)
+        .expect("Version boundary calculation overflows.");
     // Estimated cache lower bound is the latest version minus the cache size estimation; default to
     // 0.
     let estimated_cache_lower_bound = latest_version.saturating_sub(CACHE_SIZE_ESTIMATION);
