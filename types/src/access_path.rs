@@ -74,17 +74,26 @@ impl AccessPath {
         AccessPath { address, path }
     }
 
-    pub fn resource_path_vec(tag: StructTag) -> Vec<u8> {
-        bcs::to_bytes(&Path::Resource(tag)).expect("Unexpected serialization error")
+    /// An access path which has no valid target, used for representing failure of computing one.
+    pub fn undefined() -> Self {
+        AccessPath {
+            address: AccountAddress::ZERO,
+            path: vec![],
+        }
+    }
+
+    pub fn resource_path_vec(tag: StructTag) -> Result<Vec<u8>> {
+        let r = bcs::to_bytes(&Path::Resource(tag))?;
+        Ok(r)
     }
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
-    pub fn resource_access_path(address: AccountAddress, type_: StructTag) -> AccessPath {
-        AccessPath {
+    pub fn resource_access_path(address: AccountAddress, type_: StructTag) -> Result<AccessPath> {
+        Ok(AccessPath {
             address,
-            path: AccessPath::resource_path_vec(type_),
-        }
+            path: AccessPath::resource_path_vec(type_)?,
+        })
     }
 
     pub fn resource_group_path_vec(tag: StructTag) -> Vec<u8> {
