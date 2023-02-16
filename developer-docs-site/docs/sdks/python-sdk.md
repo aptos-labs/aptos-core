@@ -42,4 +42,4 @@ cp -r /path/to/aptos-core/ecosystem/python/sdk/aptos-sdk aptos-sdk
 
 ## Using the Python SDK
 
-See the [Developer Tutorials](/tutorials/index.md) for code examples showing how to use the Python SDK.
+See the [Developer Tutorials](https://aptos.dev/tutorials/aptos-quickstarts) for code examples showing how to use the Python SDK.
