@@ -110,9 +110,9 @@ impl CoinInfoResource {
 
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
-    pub fn to_writeset(&self) -> WriteSet {
+    pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
         let ap =
-            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag());
+            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag())?;
 
         let value_state_key = self
             .supply
@@ -134,6 +134,6 @@ impl CoinInfoResource {
                 WriteOp::Modification(bcs::to_bytes(&0_u128).unwrap()),
             ),
         ];
-        WriteSetMut::new(write_set).freeze().unwrap()
+        Ok(WriteSetMut::new(write_set).freeze().unwrap())
     }
 }

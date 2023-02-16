@@ -38,15 +38,15 @@ fn test_script(chain_id: ChainId, time: u64) {
     let mut executor = FakeExecutor::from_head_genesis();
 
     executor.write_state_value(
-        StateKey::access_path(AccessPath::resource_access_path(
-            CORE_CODE_ADDRESS,
-            StructTag {
+        StateKey::access_path(
+            AccessPath::resource_access_path(CORE_CODE_ADDRESS, StructTag {
                 address: CORE_CODE_ADDRESS,
                 module: Identifier::new("chain_id").unwrap(),
                 name: Identifier::new("ChainId").unwrap(),
                 type_params: vec![],
-            },
-        )),
+            })
+            .expect("access path in test"),
+        ),
         bcs::to_bytes(&chain_id).unwrap(),
     );
 

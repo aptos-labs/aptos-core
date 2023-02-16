@@ -40,7 +40,7 @@ pub trait AccountView {
     }
 
     fn get_on_chain_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(T::access_path().path)
+        self.get_resource_impl(T::access_path()?.path)
     }
 
     fn get_version(&self) -> anyhow::Result<Option<Version>> {
@@ -74,7 +74,7 @@ pub trait AccountView {
     }
 
     fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(T::access_path().path)
+        self.get_resource_impl(T::access_path()?.path)
     }
 
     fn get_resource_impl<T: DeserializeOwned>(&self, path: Vec<u8>) -> anyhow::Result<Option<T>> {

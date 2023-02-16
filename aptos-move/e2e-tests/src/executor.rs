@@ -21,7 +21,6 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
-use aptos_types::on_chain_config::{Features, TimedFeatureOverride};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -30,7 +29,9 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{OnChainConfig, TimedFeatures, ValidatorSet, Version},
+    on_chain_config::{
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+    },
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -290,7 +291,8 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
+        let ap =
+            AccessPath::resource_access_path(*addr, T::struct_tag()).expect("access path in test");
         let data_blob =
             TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
                 .expect("account must exist in data store")
