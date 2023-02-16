@@ -44,8 +44,8 @@ pub mod db_debugger;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_options::{
-        gen_kv_cfds, gen_ledger_cfds, gen_state_merkle_cfds, kv_db_column_families,
-        ledger_db_column_families, state_merkle_db_column_families,
+        gen_ledger_cfds, gen_state_kv_cfds, gen_state_merkle_cfds, ledger_db_column_families,
+        state_kv_db_column_families, state_merkle_db_column_families,
     },
     errors::AptosDbError,
     event_store::EventStore,
@@ -127,7 +127,7 @@ use std::{
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
-pub const KV_DB_NAME: &str = "kv_db";
+pub const STATE_KV_DB_NAME: &str = "state_kv_db";
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -250,7 +250,7 @@ impl Drop for RocksdbPropertyReporter {
 pub struct AptosDB {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
-    _kv_db: Arc<Option<DB>>,
+    _state_kv_db: Arc<Option<DB>>,
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
@@ -265,7 +265,7 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
-        kv_rocksdb: Option<DB>,
+        state_kv_rocksdb: Option<DB>,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
@@ -273,7 +273,7 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
-        let arc_kv_rocksdb = Arc::new(kv_rocksdb);
+        let arc_state_kv_rocksdb = Arc::new(state_kv_rocksdb);
         let state_pruner = StatePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
@@ -300,7 +300,7 @@ impl AptosDB {
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
-            _kv_db: Arc::clone(&arc_kv_rocksdb),
+            _state_kv_db: Arc::clone(&arc_state_kv_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_store,
@@ -329,13 +329,13 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
-        let (ledger_db, state_merkle_db, kv_db) =
+        let (ledger_db, state_merkle_db, state_kv_db) =
             Self::open_dbs(db_root_path.as_ref(), rocksdb_configs, readonly)?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
             state_merkle_db,
-            kv_db,
+            state_kv_db,
             pruner_config,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
@@ -358,9 +358,9 @@ impl AptosDB {
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let kv_db_path = db_root_path.as_ref().join(KV_DB_NAME);
+        let state_kv_db_path = db_root_path.as_ref().join(STATE_KV_DB_NAME);
 
-        let (ledger_db, state_merkle_db, kv_db) = if readonly {
+        let (ledger_db, state_merkle_db, state_kv_db) = if readonly {
             (
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
@@ -374,12 +374,12 @@ impl AptosDB {
                     STATE_MERKLE_DB_NAME,
                     state_merkle_db_column_families(),
                 )?,
-                if rocksdb_configs.use_kv_db {
+                if rocksdb_configs.use_state_kv_db {
                     Some(DB::open_cf_readonly(
-                        &gen_rocksdb_options(&rocksdb_configs.kv_db_config, true),
-                        kv_db_path.clone(),
-                        KV_DB_NAME,
-                        kv_db_column_families(),
+                        &gen_rocksdb_options(&rocksdb_configs.state_kv_db_config, true),
+                        state_kv_db_path.clone(),
+                        STATE_KV_DB_NAME,
+                        state_kv_db_column_families(),
                     )?)
                 } else {
                     None
@@ -399,12 +399,12 @@ impl AptosDB {
                     STATE_MERKLE_DB_NAME,
                     gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
-                if rocksdb_configs.use_kv_db {
+                if rocksdb_configs.use_state_kv_db {
                     Some(DB::open_cf(
-                        &gen_rocksdb_options(&rocksdb_configs.kv_db_config, false),
-                        kv_db_path.clone(),
-                        KV_DB_NAME,
-                        gen_kv_cfds(&rocksdb_configs.kv_db_config),
+                        &gen_rocksdb_options(&rocksdb_configs.state_kv_db_config, false),
+                        state_kv_db_path.clone(),
+                        STATE_KV_DB_NAME,
+                        gen_state_kv_cfds(&rocksdb_configs.state_kv_db_config),
                     )?)
                 } else {
                     None
@@ -412,8 +412,8 @@ impl AptosDB {
             )
         };
 
-        if rocksdb_configs.use_kv_db {
-            info!(kv_db_path = kv_db_path, "Opened K/V DB.",);
+        if rocksdb_configs.use_state_kv_db {
+            info!(state_kv_db_path = state_kv_db_path, "Opened state K/V DB.",);
         }
         info!(
             ledger_db_path = ledger_db_path,
@@ -422,7 +422,7 @@ impl AptosDB {
             "Opened AptosDB (LedgerDB + StateMerkleDB).",
         );
 
-        Ok((ledger_db, state_merkle_db, kv_db))
+        Ok((ledger_db, state_merkle_db, state_kv_db))
     }
 
     fn open_indexer(
@@ -478,8 +478,8 @@ impl AptosDB {
         let state_merkle_db_primary_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let state_merkle_db_secondary_path =
             secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let kv_db_primary_path = db_root_path.as_ref().join(KV_DB_NAME);
-        let kv_db_secondary_path = secondary_db_root_path.as_ref().join(KV_DB_NAME);
+        let state_kv_db_primary_path = db_root_path.as_ref().join(STATE_KV_DB_NAME);
+        let state_kv_db_secondary_path = secondary_db_root_path.as_ref().join(STATE_KV_DB_NAME);
 
         // Secondary needs `max_open_files = -1` per
         // https://github.com/facebook/rocksdb/wiki/Read-only-and-Secondary-instances
@@ -501,13 +501,13 @@ impl AptosDB {
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
             )?,
-            if rocksdb_configs.use_kv_db {
+            if rocksdb_configs.use_state_kv_db {
                 Some(DB::open_cf_as_secondary(
-                    &gen_rocksdb_options(&rocksdb_configs.kv_db_config, false),
-                    kv_db_primary_path,
-                    kv_db_secondary_path,
-                    "kv_db_sec",
-                    kv_db_column_families(),
+                    &gen_rocksdb_options(&rocksdb_configs.state_kv_db_config, false),
+                    state_kv_db_primary_path,
+                    state_kv_db_secondary_path,
+                    "state_kv_db_sec",
+                    state_kv_db_column_families(),
                 )?)
             } else {
                 None
