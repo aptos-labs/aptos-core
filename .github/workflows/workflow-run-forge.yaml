@@ -48,7 +48,7 @@ on:
       FORGE_ENABLE_FAILPOINTS:
         required: false
         type: string
-        description: Whether to use failpoints images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
+        description: Whether to use failpoints images
       FORGE_ENABLE_HAPROXY:
         required: false
         type: string
@@ -56,7 +56,7 @@ on:
       FORGE_ENABLE_PERFORMANCE:
         required: false
         type: string
-        description: Whether to use performance images. If this option is true, and you plan to manually pass in IMAGE_TAGs, note that the tagging schema is different
+        description: Whether to use performance images
       COMMENT_HEADER:
         required: false
         type: string

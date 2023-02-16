@@ -75,7 +75,7 @@ jobs:
       - name: Determine image tag
         id: determine-test-image-tag
         # forge relies on the default and failpoints variants
-        run: python3 testsuite/find_latest_image.py --variant failpoints
+        run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
 
   run-forge-three-region:
     if: ${{ github.event_name != 'pull_request' }}
@@ -99,8 +99,8 @@ jobs:
       FORGE_NAMESPACE: forge-three-region-with-different-node-speed
       FORGE_RUNNER_DURATION_SECS: 3600
       FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
-      POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
+      POST_TO_SLACK: true
 
   run-forge-consensus-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -148,8 +148,8 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_failures_catching_up
-      POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
+      POST_TO_SLACK: true
 
   run-forge-state-sync-perf-fullnode-apply-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -161,4 +161,17 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
+      POST_TO_SLACK: true
+
+  run-forge-performance-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-performance
+      FORGE_RUNNER_DURATION_SECS: 7200
+      FORGE_TEST_SUITE: land_blocking
+      FORGE_ENABLE_PERFORMANCE: true
       POST_TO_SLACK: true

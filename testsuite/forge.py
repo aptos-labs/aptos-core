@@ -37,6 +37,18 @@ from forge_wrapper_core.shell import LocalShell, Shell
 from forge_wrapper_core.time import SystemTime, Time
 from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob
 
+# map of build variant (e.g. cargo profile and feature flags)
+BUILD_VARIANT_TAG_PREFIX_MAP = {
+    "performance": "performance",
+    "failpoints": "failpoints",
+    "indexer": "indexer",
+    "release": "",  # the default release profile has no tag prefix
+}
+
+VALIDATOR_IMAGE_NAME = "aptos/validator"
+VALIDATOR_TESTING_IMAGE_NAME = "aptos/validator-testing"
+FORGE_IMAGE_NAME = "aptos/forge"
+
 
 @dataclass
 class RunResult:
@@ -820,25 +832,38 @@ def get_current_cluster_name(shell: Shell) -> str:
     return matches[0]
 
 
-def assert_provided_image_tags_has_profile_or_features(
+def add_build_variant_prefix(image_tag: str, variant: str) -> str:
+    """Add the necessary image tag prefix to specify the correct image tag for the build variant"""
+    variant_prefix = BUILD_VARIANT_TAG_PREFIX_MAP[variant]
+    if not image_tag.startswith(variant_prefix):
+        return f"{variant_prefix}_{image_tag}"
+    return image_tag
+
+
+def ensure_provided_image_tags_has_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     enable_failpoints: bool,
     enable_performance_profile: bool,
-):
+) -> Tuple[str, str]:
+    """
+    Ensure that the build variant specified is reflected in the image tag. If not, then return the image tag
+    with the prefix that is expected
+    """
+    ret = []
     for tag in [image_tag, upgrade_image_tag]:
+        curr_tag = None
         if not tag:
-            continue
-        if (
-            enable_failpoints
-        ):  # testing image requires the tag to be prefixed with failpoints_
-            assert tag.startswith(
-                "failpoints"
-            ), f"Missing failpoints_ feature prefix in {tag}"
-        if enable_performance_profile:
-            assert tag.startswith(
-                "performance"
-            ), f"Missing performance_ profile prefix in {tag}"
+            pass
+        elif enable_failpoints:
+            curr_tag = add_build_variant_prefix(tag, "failpoints")
+        elif enable_performance_profile:
+            curr_tag = add_build_variant_prefix(tag, "performance")
+        else:
+            curr_tag = tag
+        ret.append(curr_tag)
+
+    return tuple(ret)
 
 
 def find_recent_images_by_profile_or_features(
@@ -848,7 +873,6 @@ def find_recent_images_by_profile_or_features(
     enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
 ) -> Sequence[str]:
-    image_name = "aptos/validator"
     image_tag_prefix = ""
     if enable_failpoints and enable_performance_profile:
         raise Exception(
@@ -864,7 +888,7 @@ def find_recent_images_by_profile_or_features(
         shell,
         git,
         num_images,
-        image_name=image_name,
+        image_name=VALIDATOR_TESTING_IMAGE_NAME,
         image_tag_prefixes=[image_tag_prefix],
     )
 
@@ -1300,7 +1324,7 @@ def test(
 
     # In the below, assume that the image is pushed to all registries
     # across all clouds and supported regions
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_failpoints=enable_failpoints,
@@ -1338,7 +1362,7 @@ def test(
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
 
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_failpoints=enable_failpoints,
@@ -1353,6 +1377,17 @@ def test(
     print("\tforge: ", forge_image_tag)
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
+
+    # finally, whether we've derived the image tags or used the user-inputted ones, check if they exist
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, image_tag
+    ), f"swarm (validator) image does not exist: {image_tag}"
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag
+    ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
+    assert image_exists(
+        shell, FORGE_IMAGE_NAME, forge_image_tag
+    ), f"forge (test runner) image does not exist: {forge_image_tag}"
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
