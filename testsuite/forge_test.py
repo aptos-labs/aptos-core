@@ -207,6 +207,9 @@ class FakeCommand:
     def __repr__(self) -> str:
         return f"FakeCommand({self.command})"
 
+    def __str__(self) -> str:
+        return self.command
+
 
 class SpyShell(FakeShell):
     def __init__(
@@ -218,24 +221,38 @@ class SpyShell(FakeShell):
         self.commands = []
         self.strict = strict
 
+    def get_fake_commands(self) -> Sequence[str]:
+        """Get the list of commands that are expected to be run"""
+        return [fakecommand.command for fakecommand in self.expected_command_list]
+
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
+        """Mock a command run by adding it to a list of commands and returning the result"""
         rendered_command = " ".join(command)
         default = (
             Exception(f"Command not mocked: {rendered_command}")
             if self.strict
             else super().run(command)
         )
-        # get how many times it's been called before
+        # get how many times it's been called before, and use that to index into the expected command list
+        # XXX: could be optimized, since it does N^2 scans of the command list
         times_called_before = self.commands.count(rendered_command)
-        if rendered_command in self.expected_command_list:
-            command_index = [
-                i
-                for i, command in enumerate(self.expected_command_list)
-                if command.command == rendered_command
-            ][times_called_before]
-            result = self.expected_command_list[command_index]
+        if rendered_command in self.get_fake_commands():
+            try:
+                command_index = [
+                    i
+                    for i, fakecommand in enumerate(self.expected_command_list)
+                    if fakecommand.command == rendered_command
+                ][times_called_before - 1]
+            except IndexError:
+                pretty_fake_cmds = "\n".join(self.get_fake_commands())
+                raise Exception(
+                    f"Did not find command {times_called_before} times in expected command list: {rendered_command}\n{pretty_fake_cmds}"
+                )
+            result = self.expected_command_list[command_index].result_or_exception
         else:
-            raise Exception("")
+            raise Exception(
+                f"Did not find command in expected command list: {rendered_command}"
+            )
         self.commands.append(rendered_command)
         if isinstance(result, Exception):
             raise result
@@ -247,7 +264,8 @@ class SpyShell(FakeShell):
         return self.run(command, stream_output)
 
     def assert_commands(self, testcase) -> None:
-        testcase.assertEqual(list(self.command_map.keys()), self.commands)
+        """Compare the list of commands that were run to the list of expected commands"""
+        testcase.assertEqual(self.get_fake_commands(), self.commands)
 
 
 class SpyFilesystem(FakeFilesystem):
@@ -351,6 +369,25 @@ def fake_context(
     )
 
 
+class SpyTests(unittest.TestCase):
+    def testSpyShell(self) -> None:
+        shell = SpyShell(
+            [
+                FakeCommand(
+                    "echo hello",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "echo hello_banana",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        shell.run(["echo", "hello"])
+        shell.run(["echo", "hello_banana"])
+        shell.assert_commands(self)
+
+
 class ForgeRunnerTests(unittest.TestCase):
     maxDiff = None
 
@@ -385,18 +422,16 @@ class ForgeRunnerTests(unittest.TestCase):
             ]
         )
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        cargo_run,
-                        RunResult(0, b"orange"),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf get pods -n forge-potato",
-                        RunResult(0, b"Pods"),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    cargo_run,
+                    RunResult(0, b"orange"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+            ]
         )
         filesystem = SpyFilesystem({}, {})
         context = fake_context(shell, filesystem, mode="local")
@@ -410,38 +445,36 @@ class ForgeRunnerTests(unittest.TestCase):
     def testK8sRunner(self) -> None:
         self.maxDiff = None
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf apply -n default -f temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
-                        RunResult(0, b"Succeeded"),
-                    ),
-                    (
-                        "kubectl --kubeconfig kubeconf get pods -n forge-potato",
-                        RunResult(0, b"Pods"),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf apply -n default -f temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                    RunResult(0, b"Succeeded"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+            ]
         )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
         template_fixture = get_fixture_path("forge-test-runner-template.fixture")
@@ -465,20 +498,18 @@ class ForgeRunnerTests(unittest.TestCase):
 class TestFindRecentImage(unittest.TestCase):
     def testFindRecentImage(self) -> None:
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=potato",
-                        RunResult(1, b""),
-                    ),
-                    ("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=lychee",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=potato",
+                    RunResult(1, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=lychee",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         git = Git(shell)
         image_tags = find_recent_images(shell, git, 1, "aptos/validator-testing")
@@ -487,15 +518,13 @@ class TestFindRecentImage(unittest.TestCase):
 
     def testFindRecentFailpointsImage(self) -> None:
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=failpoints_tomato",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"tomato\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=failpoints_tomato",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
@@ -506,15 +535,13 @@ class TestFindRecentImage(unittest.TestCase):
 
     def testFindRecentPerformanceImage(self) -> None:
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=performance_potato",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=performance_potato",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
@@ -528,7 +555,7 @@ class TestFindRecentImage(unittest.TestCase):
         shell.assert_commands(self)
 
     def testFailBothFailpointsPerformance(self) -> None:
-        shell = SpyShell(OrderedDict())
+        shell = SpyShell([])
         git = Git(shell)
         with self.assertRaises(Exception):
             find_recent_images_by_profile_or_features(
@@ -541,15 +568,13 @@ class TestFindRecentImage(unittest.TestCase):
 
     def testDidntFindRecentImage(self) -> None:
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=crab",
-                        RunResult(1, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing --image-ids imageTag=crab",
+                    RunResult(1, b""),
+                ),
+            ]
         )
         git = Git(shell)
         with self.assertRaises(Exception):
@@ -563,20 +588,18 @@ class TestFindRecentImage(unittest.TestCase):
         self,
     ) -> None:  # such as in compat test where we find 2 images
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
-                        RunResult(0, b""),
-                    ),
-                    ("git rev-parse HEAD~1", RunResult(0, b"shrimp\n")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=shrimp",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
+                    RunResult(0, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~1", RunResult(0, b"shrimp\n")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=shrimp",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         git = Git(shell)
         images = find_recent_images(shell, git, 2, "aptos/validator")
@@ -738,93 +761,71 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
     def testMain(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws sts get-caller-identity",
-                        RunResult(0, b'{"Account": "123456789012"}'),
-                    ),
-                    (
-                        # NOTE: with multi-cloud support, we set the kubeconfig to ensure auth before continuing
-                        # See changes in: https://github.com/aptos-labs/aptos-core/pull/6166
-                        "aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1",
-                        RunResult(0, b""),
-                    ),
-                    ("git rev-parse HEAD~0", RunResult(0, b"banana")),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/validator-testing "
-                        "--image-ids imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws ecr describe-images --repository-name aptos/forge --image-ids "
-                        "imageTag=banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
-                        "--force",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
-                        "forge-namespace=forge-perry-1659078000",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 apply -n default -f temp2",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 wait -n default --timeout=5m --for=condition=Ready "
-                        "pod/forge-perry-1659078000-1659078000-banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 logs -n default -f forge-perry-1659078000-1659078000-banana",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 get pod -n default forge-perry-1659078000-1659078000-banana -o "
-                        "jsonpath='{.status.phase}'",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws sts get-caller-identity",
+                    RunResult(0, b'{"Account": "123456789012"}'),
+                ),
+                FakeCommand(
+                    # NOTE: with multi-cloud support, we set the kubeconfig to ensure auth before continuing
+                    # See changes in: https://github.com/aptos-labs/aptos-core/pull/6166
+                    "aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"banana")),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "--image-ids imageTag=banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "--image-ids imageTag=banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/validator-testing "
+                    "--image-ids imageTag=banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws ecr describe-images --repository-name aptos/forge --image-ids "
+                    "imageTag=banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
+                    "--force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
+                    "forge-namespace=forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 apply -n default -f temp2",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --timeout=5m --for=condition=Ready "
+                    "pod/forge-perry-1659078000-1659078000-banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 logs -n default -f forge-perry-1659078000-1659078000-banana",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 get pod -n default forge-perry-1659078000-1659078000-banana -o "
+                    "jsonpath='{.status.phase}'",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         filesystem = SpyFilesystem(
             {
@@ -925,11 +926,11 @@ class TestListClusters(unittest.TestCase):
             ),
         )
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("aws eks list-clusters", RunResult(0, fake_clusters.encode())),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws eks list-clusters", RunResult(0, fake_clusters.encode())
+                ),
+            ]
         )
         clusters = list_eks_clusters(shell)
         self.assertEqual(clusters, ["aptos-forge-banana-1", "aptos-forge-potato-2"])
@@ -938,11 +939,9 @@ class TestListClusters(unittest.TestCase):
     def testListClustersFails(self) -> None:
         with self.assertRaises(Exception):
             shell = SpyShell(
-                OrderedDict(
-                    [
-                        ("Blah", RunResult(0, b"")),
-                    ]
-                )
+                [
+                    FakeCommand("Blah", RunResult(0, b"")),
+                ]
             )
             list_eks_clusters(shell)
             shell.assert_commands(self)
@@ -974,26 +973,24 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl get pods -n default --kubeconfig temp1 -o json",
-                        RunResult(0, json.dumps(fake_first_pods).encode()),
-                    ),
-                    (
-                        "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "kubectl get pods -n default --kubeconfig temp2 -o json",
-                        RunResult(0, json.dumps(fake_second_pods).encode()),
-                    ),
-                ]
-            ),
+            [
+                FakeCommand(
+                    "aws eks update-kubeconfig --name aptos-forge-banana --kubeconfig temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n default --kubeconfig temp1 -o json",
+                    RunResult(0, json.dumps(fake_first_pods).encode()),
+                ),
+                FakeCommand(
+                    "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n default --kubeconfig temp2 -o json",
+                    RunResult(0, json.dumps(fake_second_pods).encode()),
+                ),
+            ],
             strict=True,
         )
         filesystem = SpyFilesystem({}, {}, ["temp1", "temp2"])
@@ -1045,11 +1042,9 @@ class ForgeConfigTests(unittest.TestCase):
     def testCreate(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    ("aws s3 mb s3://forge-wrapper-config", RunResult(0, b"")),
-                ]
-            )
+            [
+                FakeCommand("aws s3 mb s3://forge-wrapper-config", RunResult(0, b"")),
+            ]
         )
         with patch.object(forge, "LocalShell", lambda: shell):
             result = runner.invoke(
@@ -1143,25 +1138,23 @@ class ForgeConfigTests(unittest.TestCase):
         }
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp1",
-                        RunResult(0, json.dumps(helm_before).encode("utf-8")),
-                    ),
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp2",
-                        RunResult(0, json.dumps(helm_after_missing).encode("utf-8")),
-                    ),
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp3",
-                        RunResult(0, json.dumps(helm_after_complete).encode("utf-8")),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp1",
+                    RunResult(0, json.dumps(helm_before).encode("utf-8")),
+                ),
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp2",
+                    RunResult(0, json.dumps(helm_after_missing).encode("utf-8")),
+                ),
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp3",
+                    RunResult(0, json.dumps(helm_after_complete).encode("utf-8")),
+                ),
+            ]
         )
 
         filesystem = SpyFilesystem(
@@ -1226,20 +1219,18 @@ class ForgeConfigTests(unittest.TestCase):
     def testHelmSetConfig(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws s3api put-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json --body temp2",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws s3api put-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json --body temp2",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         config_before = {
             "enabled_clusters": ["banana"],
@@ -1285,20 +1276,18 @@ class ForgeConfigTests(unittest.TestCase):
     def testHelmSetNewConfig(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws s3api put-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json --body temp2",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws s3api put-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json --body temp2",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         config_before = {
             "enabled_clusters": ["banana"],
@@ -1342,20 +1331,18 @@ class ForgeConfigTests(unittest.TestCase):
     def testHelmSetConfigPreview(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws s3api put-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json --body temp2",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws s3api put-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json --body temp2",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         config_fixture_before = get_fixture_path(
             "forge-default-helm-values-before.fixture"
@@ -1410,20 +1397,18 @@ class ForgeConfigTests(unittest.TestCase):
     def testClusterDelete(self) -> None:
         runner = CliRunner()
         shell = SpyShell(
-            OrderedDict(
-                [
-                    (
-                        "aws s3api get-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json temp1",
-                        RunResult(0, b""),
-                    ),
-                    (
-                        "aws s3api put-object --bucket forge-wrapper-config --key "
-                        "forge-wrapper-config.json --body temp2",
-                        RunResult(0, b""),
-                    ),
-                ]
-            )
+            [
+                FakeCommand(
+                    "aws s3api get-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "aws s3api put-object --bucket forge-wrapper-config --key "
+                    "forge-wrapper-config.json --body temp2",
+                    RunResult(0, b""),
+                ),
+            ]
         )
         clusters_before = {
             "enabled_clusters": ["banana"],
