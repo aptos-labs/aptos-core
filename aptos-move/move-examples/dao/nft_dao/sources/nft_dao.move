@@ -572,7 +572,22 @@ module dao_platform::nft_dao {
         dao_config.admin = @0x0;
     }
 
-    /// Admin changes the DAO name
+    /// Convenient batch update function for the admin to udpate multiple fields in the DAO.
+    public entry fun admin_update_dao(
+        admin: &signer,
+        dao: address,
+        name: String,
+        voting_threshold: u64,
+        voting_duration: u64,
+        min_proposer_voting_power: u64,
+    ) acquires DAO {
+        admin_change_dao_name(admin, dao, name);
+        admin_change_dao_threshold(admin, dao, voting_threshold);
+        admin_change_dao_voting_duration(admin, dao, voting_duration);
+        admin_change_dao_min_voting_power(admin, dao, min_proposer_voting_power);
+    }
+
+    /// Allow the admin to update the DAO's name.
     public entry fun admin_change_dao_name(admin: &signer, dao: address, new_name: String) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         assert!(string::length(&new_name) < 128, error::invalid_argument(ESTRING_TOO_LONG));
@@ -586,20 +601,19 @@ module dao_platform::nft_dao {
         nft_dao_events::emit_change_name_event(old_name, new_name, dao);
     }
 
-    /// Admin changes the DAO threshold
+    /// Allow the admin to update the DAO's voting threshold (the min votes required for a proposal to be resolvable).
     public entry fun admin_change_dao_threshold(admin: &signer, dao: address, new_threshold: u64) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let admin_addr = signer::address_of(admin);
         let dao_config = borrow_global_mut<DAO>(dao);
         assert!(admin_addr == dao_config.admin, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
 
-        // update the dao name to a new name
         let old_threshold = dao_config.resolve_threshold;
         dao_config.resolve_threshold = new_threshold;
         nft_dao_events::emit_change_threshold_event(old_threshold, new_threshold, dao);
     }
 
-    /// Admin changes the DAO threshold
+    /// Allow the admin to update the DAO's voting duration.
     public entry fun admin_change_dao_voting_duration(admin: &signer, dao: address, new_duration: u64) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let admin_addr = signer::address_of(admin);
@@ -612,7 +626,7 @@ module dao_platform::nft_dao {
         nft_dao_events::emit_change_duration_event(old_duration, new_duration, dao);
     }
 
-    /// Admin changes the DAO min voting power
+    /// Allow the admin to update the DAO's min required voting power to create proposals.
     public entry fun admin_change_dao_min_voting_power(admin: &signer, dao: address, new_power: u64) acquires DAO {
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let admin_addr = signer::address_of(admin);
