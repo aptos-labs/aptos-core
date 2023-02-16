@@ -718,7 +718,7 @@ impl TryFrom<MoveType> for TypeTag {
                 return Err(anyhow::anyhow!(
                     "Invalid move type for converting into `TypeTag`: {:?}",
                     &tag
-                ))
+                ));
             },
         };
         Ok(ret)
@@ -752,9 +752,10 @@ impl From<CompiledModule> for MoveModule {
             exposed_functions: m
                 .function_defs
                 .iter()
-                .filter(|def| match def.visibility {
-                    Visibility::Public | Visibility::Friend => true,
-                    Visibility::Private => false,
+                .filter(|def| match (def.visibility, def.is_entry) {
+                    (_, true) => true,
+                    (Visibility::Public, false) | (Visibility::Friend, false) => true,
+                    (Visibility::Private, false) => false,
                 })
                 .map(|def| m.new_move_function(def))
                 .collect(),
@@ -1181,6 +1182,7 @@ impl fmt::Display for EntryFunctionId {
 pub fn verify_function_identifier(function: &str) -> anyhow::Result<()> {
     verify_identifier(function).map_err(|_| format_err!("invalid Move function name: {}", function))
 }
+
 pub fn verify_module_identifier(module: &str) -> anyhow::Result<()> {
     verify_identifier(module).map_err(|_| format_err!("invalid Move module name: {}", module))
 }
