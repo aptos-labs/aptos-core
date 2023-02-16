@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.5"
+version = "1.0.6"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
