@@ -83,6 +83,7 @@ spec aptos_framework::vesting {
     }
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
+        // Uses `total_accumulated_rewards` which is not verified.
         pragma verify = false;
     }
 
@@ -318,12 +319,12 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
-        // Call of the `staking_contract::unlock_stake`.
+        // Calls `staking_contract::unlock_stake`.
         pragma verify = false;
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
-        // Call of the `staking_contract::distribute`.
+        // Calls `staking_contract::distribute`.
         pragma verify = false;
     }
 
