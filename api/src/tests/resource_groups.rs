@@ -158,7 +158,7 @@ async fn read_resource(
     context.get(&request).await
 }
 
-fn build_package(
+pub fn build_package(
     path: PathBuf,
     named_addresses: Vec<(String, AccountAddress)>,
 ) -> TransactionPayload {
@@ -175,7 +175,7 @@ fn build_package(
     aptos_stdlib::code_publish_package_txn(bcs::to_bytes(&metadata).unwrap(), code)
 }
 
-async fn publish_package(
+pub async fn publish_package(
     context: &mut TestContext,
     publisher: &mut LocalAccount,
     payload: TransactionPayload,
