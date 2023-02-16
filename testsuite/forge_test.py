@@ -528,6 +528,29 @@ class TestFindRecentImage(unittest.TestCase):
                 find_recent_images(shell, git, 1, "aptos/validator", commit_threshold=1)
             )
 
+    def testFindRecentFewImages(
+        self,
+    ) -> None:  # such as in compat test where we find 2 images
+        shell = SpyShell(
+            OrderedDict(
+                [
+                    ("git rev-parse HEAD~0", RunResult(0, b"crab\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=crab",
+                        RunResult(0, b""),
+                    ),
+                    ("git rev-parse HEAD~1", RunResult(0, b"shrimp\n")),
+                    (
+                        "aws ecr describe-images --repository-name aptos/validator --image-ids imageTag=shrimp",
+                        RunResult(0, b""),
+                    ),
+                ]
+            )
+        )
+        git = Git(shell)
+        images = find_recent_images(shell, git, 2, "aptos/validator")
+        self.assertEqual(list(images), ["crab", "shrimp"])
+
     def testFailpointsProvidedImageTag(self) -> None:
         with self.assertRaises(AssertionError):
             assert_provided_image_tags_has_profile_or_features(

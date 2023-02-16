@@ -889,22 +889,27 @@ def find_recent_images(
 
     # the number of images we need to find is actually the number of unique images
     # multiplied by the number of image tag prefixes (e.g. variants) we expect to find
-    num_images_with_variants = num_images * len(image_tag_prefixes)
+    num_variants = len(image_tag_prefixes)
+    num_images_with_variants = num_images * num_variants
 
-    ret = []
+    ret = []  # the list of images we will return
     for revision in git.last(commit_threshold):
-        ret = []  # reset the count each time we search all prefixes for a single commit
+        temp_ret = []  # count variants for this revision
         for prefix in image_tag_prefixes:
             image_tag = f"{prefix}{revision}"
             exists = image_exists(shell, image_name, image_tag)
             if exists:
-                ret.append(image_tag)
-            if len(ret) >= num_images_with_variants:
-                return ret
+                temp_ret.append(image_tag)
+            if len(temp_ret) >= num_variants:
+                ret.extend(temp_ret)
+        if len(ret) >= num_images_with_variants:  # we have enough images
+            break
     if len(ret) < num_images_with_variants:
         raise Exception(
             f"Could not find {num_images} recent images with prefixes {image_tag_prefixes}"
         )
+
+    return ret
 
 
 def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
