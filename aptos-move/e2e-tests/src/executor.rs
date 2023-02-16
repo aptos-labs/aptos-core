@@ -21,6 +21,7 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
+use aptos_types::on_chain_config::{Features, TimedFeatureOverride};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -29,7 +30,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, TimedFeatures, ValidatorSet, Version},
+    on_chain_config::{OnChainConfig, TimedFeatures, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -575,6 +576,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -582,8 +586,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
-                // FIXME: should probably read the timestamp from storage.
-                TimedFeatures::enable_all(),
+                timed_features,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
