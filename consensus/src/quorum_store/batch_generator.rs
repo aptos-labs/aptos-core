@@ -78,11 +78,10 @@ impl BatchGenerator {
             .clean_and_get_batch_id(epoch)
             .expect("Could not read from db")
         {
-            // If the node shutdown mid-batch, then this increment is needed
+            // If the node shut down mid-batch, then this increment is needed
             id.increment();
             id
         } else {
-            // The first batch starts at index 1
             BatchId::new(thread_rng().next_u64())
         };
         info!("Initialized with batch_id of {}", batch_id);

@@ -18,6 +18,9 @@ use std::{
 )]
 pub struct BatchId {
     pub id: u64,
+    /// A random number that is stored in the DB and updated only if the value does not exist in
+    /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
+    /// id starts again at 0.
     pub nonce: u64,
 }
 
