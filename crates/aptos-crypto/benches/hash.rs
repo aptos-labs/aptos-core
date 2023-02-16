@@ -26,6 +26,20 @@ fn bench_group(c: &mut Criterion) {
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
 
+    let max_input_size = 65536;
+    for n in (0..max_input_size).step_by(max_input_size / 97) {
+        group.bench_function(BenchmarkId::new("sha2_256_as_baseline", n), move |b|{
+            b.iter_with_setup(
+                || random_bytes(&mut thread_rng(), n),
+                |bytes| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(bytes);
+                    let _output = hasher.finalize();
+                }
+            );
+        });
+    }
+
     group.sample_size(1000);
     group.plot_config(plot_config);
 

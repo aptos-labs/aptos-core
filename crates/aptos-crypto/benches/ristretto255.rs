@@ -5,7 +5,7 @@
 extern crate criterion;
 
 use aptos_crypto::test_utils::random_bytes;
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput, BenchmarkId};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE,
     ristretto::{CompressedRistretto, RistrettoPoint},
@@ -14,9 +14,29 @@ use curve25519_dalek::{
 };
 use rand::{distributions::Uniform, prelude::ThreadRng, thread_rng, Rng};
 use std::ops::{Add, Mul, Neg, Sub};
+use curve25519_dalek::traits::VartimeMultiscalarMul;
 
 fn benchmark_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("ristretto255");
+
+    let max_input_size_1 = 190;
+    let step_1 = max_input_size_1 / 47;
+    let max_input_size_2 = 2048;
+    let step_2 = (max_input_size_2 - max_input_size_1) / 47;
+    for n in (0..max_input_size_1).step_by(step_1).chain((max_input_size_1..max_input_size_2).step_by(step_2)) {
+        group.bench_function(BenchmarkId::new("vartime_multiscalar_mul", n), move|b|{
+            b.iter_with_setup(
+                ||{
+                    let points: Vec<RistrettoPoint> = (0..n).map(|_i|RistrettoPoint::random(&mut thread_rng())).collect();
+                    let scalars: Vec<Scalar> = (0..n).map(|_i|Scalar::random(&mut thread_rng())).collect();
+                    (points, scalars)
+                },
+                |(points, scalars)|{
+                    let _result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter());
+                }
+            )
+        });
+    }
 
     group.sample_size(1000);
 
@@ -43,7 +63,6 @@ fn benchmark_groups(c: &mut Criterion) {
     scalar_neg(&mut group);
     scalar_sub(&mut group);
 
-    group.finish();
 }
 
 /// Benchmarks the time for a single scalar multiplication on the Ristretto255 basepoint (with precomputation).
