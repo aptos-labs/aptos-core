@@ -1,5 +1,7 @@
-use crate::tests::common;
-use crate::{assert_success, MoveHarness};
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::create_resource_address;
 use move_core_types::account_address::AccountAddress;
 
@@ -13,7 +15,7 @@ fn test_nft_dao_txn_arguments() {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("dao_platform".to_string(), acc.address().clone());
+        .insert("dao_platform".to_string(), *acc.address());
 
     // build the package from our example code
     let package = aptos_framework::BuiltPackage::build(
@@ -43,11 +45,11 @@ fn test_nft_dao_txn_arguments() {
         .collect();
     let desc = "desc".to_owned().into_bytes();
     let voter = h.new_account_at(AccountAddress::from_hex_literal("0xaf").unwrap());
-    let mut res = h.run_transaction_payload(
+    h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_create_collection_script(
             collection_name.clone(),
-            desc.clone(),
+            desc,
             "".to_owned().into_bytes(),
             5,
             vec![false, false, false],
@@ -63,7 +65,7 @@ fn test_nft_dao_txn_arguments() {
                 1,
                 1,
                 "".to_owned().into_bytes(),
-                acc.address().clone(),
+                *acc.address(),
                 1,
                 0,
                 vec![false, false, false, false, false],
@@ -92,13 +94,13 @@ fn test_nft_dao_txn_arguments() {
     let mut salt = bcs::to_bytes("dao").unwrap();
     salt.append(&mut bcs::to_bytes(acc.address()).unwrap());
     salt.append(&mut bcs::to_bytes(&collection_name).unwrap());
-    let dao = create_resource_address(acc.address().clone(), salt.as_slice());
+    let dao = create_resource_address(*acc.address(), salt.as_slice());
 
     // transfer two NFTs to DAO and transfer 1 NFT to voter
     h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
-            acc.address().clone(),
+            *acc.address(),
             collection_name.clone(),
             token_names[0].clone(),
             0,
@@ -109,7 +111,7 @@ fn test_nft_dao_txn_arguments() {
     h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
-            acc.address().clone(),
+            *acc.address(),
             collection_name.clone(),
             token_names[1].clone(),
             0,
@@ -125,11 +127,11 @@ fn test_nft_dao_txn_arguments() {
     h.run_transaction_payload(
         &acc,
         aptos_cached_packages::aptos_token_sdk_builder::token_transfer_with_opt_in(
-            acc.address().clone(),
+            *acc.address(),
             collection_name.clone(),
             token_names[2].clone(),
             0,
-            voter.address().clone(),
+            *voter.address(),
             1,
         ),
     );
@@ -201,7 +203,7 @@ fn test_nft_dao_txn_arguments() {
     );
     // resolve
     h.new_epoch();
-    res = h.run_entry_function(
+    let res = h.run_entry_function(
         &voter,
         str::parse("0xcafe::nft_dao::resolve").unwrap(),
         vec![],

@@ -1,20 +1,20 @@
-/// Currently there are no easy ways for projects in the ecosystem to engage with their communities post mint. A key part of building a vibrant NFT community (as well as community of other web3 verticals) is to empower holders and supporters to be included in the decision making process of a project via a DAO. To do this, we must provide easy to use DAO management tooling for projects on Aptos to build a DAO where entry is gated by the ownership of a token in a NFT collection.
-///
 /// With the NFT DAO, token holders can
-/// - be able to create a DAO and connect it to my existing NFT project
+/// - be able to create a DAO and connect it to their existing NFT project
 /// - be able to create proposals that can be voted on-chain
-/// - be able to have proposal results conclude and execute on-chain
+/// - be able to have proposal results concluded and executed on-chain
 ///
 /// An example e2e flow. For more details check the `An Example E2E Flow` section
 /// There are multiple roles: DAO platform operator, DAO creator, proposer and voter.
-/// 1. platform operator deploy this package to create a DAO platform
+/// 1. Platform operator deploys this package to create a DAO platform. They can deploy the contract as immutable to
+/// enable trustlessness.
 /// 2. DAO creator calls `create_dao` to create their DAO.
-/// 3. A proposer can specify the DAO she wants to create a proposal and create the proposal through  `create_proposal`
-///     A proposal can execute a list of functions of 3 types. eg: transferring multiple NFTs can be a proposal of multiple offer_nft function.
-///         3.a: no-op, no automatic execution happens on chain. Only the proposal and its results are recorded on-chain for DAO admin to take actions
-///         3.b: transfer fund, the fund will be automatically transferred from DAO resource account to the destination account.
-///         3.c: offer nft, one NFT will be offered to the destination account.
-/// 4. A voter can vote for a proposal of a DAO through `vote`
+/// 3. A proposer can specify the DAO they want to create a proposal and create the proposal through `create_proposal`
+///    A proposal can execute a list of functions of 3 types. eg: transferring multiple NFTs can be a proposal of multiple offer_nft function:
+///         a: no-op, no execution happens on chain. Only the proposal and its results are recorded on-chain for DAO
+///            admin to take actions off-chain
+///         b: Transfer APT funds: from DAO account to the specified destination account.
+///         c: Offer NFTs to the specified destination account.
+/// 4. A voter can vote for a proposal of a DAO through `vote`.
 /// 5. Anyone can call the `resolve` to resolve a proposal. A proposal voting duration has to expire and the proposal should have more votes than the minimal required threshold.
 ///
 /// The DAO plaform also support admin operations. For more details, check readme `Special DAO Admin Functions` section
@@ -190,6 +190,42 @@ module dao_platform::nft_dao {
         no_votes: BucketTable<TokenId, address>,
     }
 
+    //////////////////// All view functions ////////////////////////////////
+
+    #[view]
+    /// Get the proposal
+    public fun get_proposal(proposal_id: u64, nft_dao: address): Proposal acquires Proposals {
+        assert!(exists<Proposals>(nft_dao), error::not_found(EPRPOSALS_NOT_EXIST_AT_ADDRESS));
+        let proposals = &borrow_global<Proposals>(nft_dao).proposals;
+        assert!(table::contains(proposals, proposal_id), error::not_found(EPRPOSAL_ID_NOT_EXIST));
+        *table::borrow(proposals, proposal_id)
+    }
+
+    #[view]
+    /// Get the proposal resolution result
+    public fun get_proposal_resolution(proposal_id: u64, nft_dao: address): u8 acquires Proposals {
+        let proposal = get_proposal(proposal_id, nft_dao);
+        proposal.resolution
+    }
+
+    #[view]
+    /// Unpack the DAO fields
+    public fun unpack_dao(nft_dao: address): (String, u64, address, String, u64, u64, u64, address, Option<address>) acquires DAO {
+        let dao = borrow_global<DAO>(nft_dao);
+        (
+            dao.name,
+            dao.resolve_threshold,
+            dao.governance_token.creator,
+            dao.governance_token.collection,
+            dao.voting_duration,
+            dao.min_required_proposer_voting_power,
+            dao.next_proposal_id,
+            dao.admin,
+            dao.pending_admin,
+        )
+    }
+
+    /////////////////////////// DAO flow //////////////////////////////////
     /// Creator creates a DAO on the platform
     public entry fun create_dao(
         admin: &signer,
@@ -443,6 +479,8 @@ module dao_platform::nft_dao {
         resolve_internal(option::none(), proposal_id, nft_dao);
     }
 
+    /////////////////////////// Admin flow //////////////////////////////////
+
     /// Admin can veto an active proposal
     public entry fun admin_veto_proposal(admin: &signer, proposal_id: u64, nft_dao: address, reason: String) acquires DAO, Proposals {
         assert!(exists<DAO>(nft_dao), error::not_found(EDAO_NOT_EXIST));
@@ -588,7 +626,7 @@ module dao_platform::nft_dao {
     }
 
     /// DAO creator can quit the platform and claim back his resource account signer capability
-    public fun destory_dao_and_reclaim_signer_capability(account: &signer, dao: address): SignerCapability acquires DAO {
+    public fun destroy_dao_and_reclaim_signer_capability(account: &signer, dao: address): SignerCapability acquires DAO {
         let addr = signer::address_of(account);
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let dao_config = borrow_global_mut<DAO>(dao);
@@ -607,22 +645,6 @@ module dao_platform::nft_dao {
        dao_signer_capability
     }
 
-    #[view]
-    /// Get the proposal
-    public fun get_proposal(proposal_id: u64, nft_dao: address): Proposal acquires Proposals {
-        assert!(exists<Proposals>(nft_dao), error::not_found(EPRPOSALS_NOT_EXIST_AT_ADDRESS));
-        let proposals = &borrow_global<Proposals>(nft_dao).proposals;
-        assert!(table::contains(proposals, proposal_id), error::not_found(EPRPOSAL_ID_NOT_EXIST));
-        *table::borrow(proposals, proposal_id)
-    }
-
-    #[view]
-    /// Get the proposal resolution result
-    public fun get_proposal_resolution(proposal_id: u64, nft_dao: address): u8 acquires Proposals {
-        let proposal = get_proposal(proposal_id, nft_dao);
-        proposal.resolution
-    }
-
     /// Unpack the proposal fields
     public fun unpack_proposal(proposal: &Proposal): (String, String, vector<String>, vector<PropertyMap>, u64, u8) {
         (
@@ -635,23 +657,7 @@ module dao_platform::nft_dao {
         )
     }
 
-    #[view]
-    /// Unpack the DAO fields
-    public fun unpack_dao(nft_dao: address): (String, u64, address, String, u64, u64, u64, address, Option<address>) acquires DAO {
-        let dao = borrow_global<DAO>(nft_dao);
-        (
-            dao.name,
-            dao.resolve_threshold,
-            dao.governance_token.creator,
-            dao.governance_token.collection,
-            dao.voting_duration,
-            dao.min_required_proposer_voting_power,
-            dao.next_proposal_id,
-            dao.admin,
-            dao.pending_admin,
-        )
-    }
-
+    /////////////////////////// Private functions //////////////////////////////////
     /// Transfer coin from the DAO account to the destination account
     fun transfer_fund(res_acct: &signer, dst: address, amount: u64) {
         coin::transfer<AptosCoin>(res_acct, dst, amount);
@@ -772,6 +778,7 @@ module dao_platform::nft_dao {
         }
     }
 
+    /////////////////////////// Tests //////////////////////////////////
     #[test_only]
     public fun create_one_token(
         creator: &signer,
