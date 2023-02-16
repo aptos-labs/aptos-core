@@ -49,7 +49,7 @@ def main():
     args = parser.parse_args()
 
     # If the IMAGE_TAG environment variable is set, check that
-    if IMAGE_TAG_ENV in os.environ:
+    if IMAGE_TAG_ENV in os.environ and os.environ[IMAGE_TAG_ENV]:
         image_tag = os.environ[IMAGE_TAG_ENV]
         if not image_exists(shell, IMAGE_NAME, image_tag):
             sys.exit(1)
