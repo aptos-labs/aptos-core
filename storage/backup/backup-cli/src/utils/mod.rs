@@ -64,13 +64,13 @@ pub struct RocksdbOpt {
     state_merkle_db_max_open_files: i32,
     #[clap(long, default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
-    #[clap(long)]
-    use_kv_db: bool,
-    #[clap(long, default_value = "5000")]
-    kv_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
-    kv_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "1000")]
+    #[clap(long, hidden(true))]
+    use_state_kv_db: bool,
+    #[clap(long, hidden(true), default_value = "5000")]
+    state_kv_db_max_open_files: i32,
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
+    state_kv_db_max_total_wal_size: u64,
+    #[clap(long, hidden(true), default_value = "1000")]
     index_db_max_open_files: i32,
     #[clap(long, default_value = "1073741824")] // 1GB
     index_db_max_total_wal_size: u64,
@@ -93,10 +93,10 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },
-            use_kv_db: opt.use_kv_db,
-            kv_db_config: RocksdbConfig {
-                max_open_files: opt.kv_db_max_open_files,
-                max_total_wal_size: opt.kv_db_max_total_wal_size,
+            use_state_kv_db: opt.use_state_kv_db,
+            state_kv_db_config: RocksdbConfig {
+                max_open_files: opt.state_kv_db_max_open_files,
+                max_total_wal_size: opt.state_kv_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },
