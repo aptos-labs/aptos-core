@@ -110,11 +110,7 @@ impl TimedFeatures {
             OnNamedChain {
                 named_chain,
                 timestamp,
-            } => {
-                println!("{:?}", named_chain);
-                println!("{}", timestamp);
-                *timestamp >= flag.activation_time_on(named_chain)
-            }
+            } => *timestamp >= flag.activation_time_on(named_chain),
             EnableAll => true,
         }
     }

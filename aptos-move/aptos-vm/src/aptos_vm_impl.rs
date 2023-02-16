@@ -18,25 +18,22 @@ use aptos_gas::{
 };
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::chain_id::ChainId;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
-        Version,
+        ApprovedExecutionHashes, ConfigurationResource, GasSchedule, GasScheduleV2, OnChainConfig,
+        StorageGasSchedule, Version,
     },
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
-use aptos_types::{chain_id::ChainId, timestamp::Timestamp};
 use aptos_types::{on_chain_config::TimedFeatures, transaction::AbortInfo};
-use aptos_types::{
-    on_chain_config::{FeatureFlag, Features},
-    timestamp::TimestampResource,
-};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
-    language_storage::{ModuleId, StructTag},
+    language_storage::ModuleId,
     move_resource::MoveStructType,
     resolver::ResourceResolver,
     value::{serialize_values, MoveValue},
@@ -57,29 +54,6 @@ pub struct AptosVMImpl {
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     features: Features,
-}
-
-fn fetch_timestamp(storage: &impl ResourceResolver) -> TimestampResource {
-    // 01/01/1970
-    const DEFAULT_TIMESTAMP: TimestampResource = TimestampResource {
-        timestamp: Timestamp { microseconds: 0 },
-    };
-
-    match storage.get_resource(
-        &CORE_CODE_ADDRESS,
-        &StructTag {
-            address: TimestampResource::ADDRESS,
-            module: TimestampResource::MODULE_NAME.to_owned(),
-            name: TimestampResource::STRUCT_NAME.to_owned(),
-            type_params: vec![],
-        },
-    ) {
-        Ok(Some(bytes)) => match bcs::from_bytes::<TimestampResource>(&bytes) {
-            Ok(timestamp) => timestamp,
-            Err(_) => DEFAULT_TIMESTAMP,
-        },
-        Ok(None) | Err(_) => DEFAULT_TIMESTAMP,
-    }
 }
 
 impl AptosVMImpl {
@@ -145,9 +119,11 @@ impl AptosVMImpl {
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
 
-        let timestamp = fetch_timestamp(&storage);
+        let timestamp = ConfigurationResource::fetch_config(&storage)
+            .map(|config| config.last_reconfiguration_time())
+            .unwrap_or(0);
 
-        let mut timed_features = TimedFeatures::new(chain_id, timestamp.timestamp.microseconds);
+        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
         if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
             timed_features = timed_features.with_override_profile(profile)
         }

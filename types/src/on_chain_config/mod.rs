@@ -242,3 +242,8 @@ impl MoveStructType for ConfigurationResource {
 }
 
 impl MoveResource for ConfigurationResource {}
+
+impl OnChainConfig for ConfigurationResource {
+    const MODULE_IDENTIFIER: &'static str = "reconfiguration";
+    const TYPE_IDENTIFIER: &'static str = "Configuration";
+}
