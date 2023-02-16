@@ -256,7 +256,9 @@ fn test_new_genesis() {
                 ContractEvent::new(
                     *configuration.events().key(),
                     0,
-                    TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
+                    TypeTag::Struct(Box::new(
+                        <ConfigurationResource as MoveStructType>::struct_tag(),
+                    )),
                     vec![],
                 ),
                 ContractEvent::new(
