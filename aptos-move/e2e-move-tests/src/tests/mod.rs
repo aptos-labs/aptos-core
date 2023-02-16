@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod access_path_test;
 mod aggregator;
 mod attributes;
 mod chain_id;

@@ -369,7 +369,8 @@ impl<'a> AptosTestAdapter<'a> {
         let account_access_path = AccessPath::resource_access_path(ResourceKey::new(
             *signer_addr,
             AccountResource::struct_tag(),
-        ));
+        ))
+        .expect("access path in test");
         let account_blob = self
             .storage
             .get_state_value(&StateKey::AccessPath(account_access_path))
@@ -390,7 +391,8 @@ impl<'a> AptosTestAdapter<'a> {
         let coin_access_path = AccessPath::resource_access_path(ResourceKey::new(
             *signer_addr,
             aptos_coin_tag.clone(),
-        ));
+        ))
+        .expect("access path in test");
 
         let balance_blob = self
             .storage

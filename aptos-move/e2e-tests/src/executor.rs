@@ -290,7 +290,8 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
+        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()))
+            .expect("access path in test");
         let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
