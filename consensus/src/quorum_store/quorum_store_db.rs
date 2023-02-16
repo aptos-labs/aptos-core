@@ -9,11 +9,13 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info};
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
+
+/// The name of the quorum store db file
+pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDB";
 
 pub trait BatchIdDB: Send + Sync {
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError>;
@@ -29,12 +31,12 @@ impl QuorumStoreDB {
         let column_families = vec![BATCH_CF_NAME, BATCH_ID_CF_NAME];
 
         // TODO: this fails twins tests because it assumes a unique path per process
-        let path = db_root_path.as_ref().join("quorumstoreDB");
+        let path = db_root_path.as_ref().join(QUORUM_STORE_DB_NAME);
         let instant = Instant::now();
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        let db = DB::open(path.clone(), "quorumstoreDB", column_families, &opts)
+        let db = DB::open(path.clone(), QUORUM_STORE_DB_NAME, column_families, &opts)
             .expect("QuorumstoreDB open failed; unable to continue");
 
         info!(
@@ -90,7 +92,7 @@ impl BatchIdDB for QuorumStoreDB {
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError> {
         let mut iter = self.db.iter::<BatchIdSchema>(ReadOptions::default())?;
         iter.seek_to_first();
-        let epoch_batch_id = iter.collect::<Result<HashMap<u64, Round>>>()?;
+        let epoch_batch_id = iter.collect::<Result<HashMap<u64, BatchId>>>()?;
         let mut ret = None;
         for (epoch, batch_id) in epoch_batch_id {
             assert!(current_epoch >= epoch);

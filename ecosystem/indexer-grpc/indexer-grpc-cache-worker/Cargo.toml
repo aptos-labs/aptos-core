@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crash-handler = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
