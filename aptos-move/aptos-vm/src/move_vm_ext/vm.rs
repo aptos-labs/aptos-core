@@ -122,10 +122,23 @@ pub fn verifier_config(
     let mut max_back_edges_per_module = None;
     let mut max_basic_blocks_in_script = None;
 
-    if timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges) {
+    let mut max_per_fun_meter_units = None;
+    let mut max_per_mod_meter_units = None;
+
+    let legacy_limit_back_edges =
+        timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges);
+    let metering = timed_features.is_enabled(TimedFeatureFlag::VerifierMetering);
+
+    if legacy_limit_back_edges && !metering {
+        // Turn on limit on back edges, as long as metering is not active
         max_back_edges_per_function = Some(20);
         max_back_edges_per_module = Some(400);
         max_basic_blocks_in_script = Some(1024);
+    }
+
+    if metering {
+        max_per_fun_meter_units = Some(1000 * 80000);
+        max_per_mod_meter_units = Some(1000 * 80000);
     }
 
     VerifierConfig {
@@ -143,5 +156,7 @@ pub fn verifier_config(
         max_back_edges_per_function,
         max_back_edges_per_module,
         max_basic_blocks_in_script,
+        max_per_fun_meter_units,
+        max_per_mod_meter_units,
     }
 }

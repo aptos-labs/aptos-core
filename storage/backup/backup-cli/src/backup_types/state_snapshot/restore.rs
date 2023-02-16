@@ -225,7 +225,7 @@ impl StateSnapshotRestoreController {
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
         let config = verifier_config(
             false,
-            // FIXME: fead chain id & timestamp from the state.
+            // FIXME: feed chain id & timestamp from the state.
             &TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Replay),
         );
         for (key, value) in blob {
