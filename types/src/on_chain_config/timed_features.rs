@@ -11,6 +11,7 @@ pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59
 pub enum TimedFeatureFlag {
     VerifierLimitBackEdges,
     NativesAbortEarlyIfOutOfGas,
+    VerifierMetering,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -26,6 +27,7 @@ enum TimedFeaturesImpl {
 #[derive(Debug, Clone)]
 pub enum TimedFeatureOverride {
     Replay,
+    Testing,
 }
 
 impl TimedFeatureOverride {
@@ -36,9 +38,12 @@ impl TimedFeatureOverride {
 
         Some(match self {
             Replay => match flag {
-                // Add overrides for replay here.
-                _ => return None,
+                // During replay we want to have metering on but none of the other new features
+                VerifierMetering => true,
+                VerifierLimitBackEdges => false,
+                NativesAbortEarlyIfOutOfGas => false,
             },
+            Testing => !matches!(flag, VerifierLimitBackEdges), // Activate all flags but not legacy back edges
         })
     }
 }
@@ -58,8 +63,11 @@ impl TimedFeatureFlag {
             (VerifierLimitBackEdges, TESTNET) => 1675792800000, /* Tuesday, February 7, 2023 10:00:00 AM GMT-08:00 */
             (VerifierLimitBackEdges, MAINNET) => NOT_YET_SPECIFIED,
 
-            (NativesAbortEarlyIfOutOfGas, TESTNET) => 1676311200000, /* Monday, February 13, 2023 10:00:00 AM GMT-08:00 */
+            (NativesAbortEarlyIfOutOfGas, TESTNET) => NOT_YET_SPECIFIED,
             (NativesAbortEarlyIfOutOfGas, MAINNET) => NOT_YET_SPECIFIED,
+
+            (VerifierMetering, TESTNET) => NOT_YET_SPECIFIED,
+            (VerifierMetering, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
