@@ -7,7 +7,7 @@
 /// There are multiple roles: DAO platform operator, DAO creator, proposer and voter.
 /// 1. Platform operator deploys this package to create a DAO platform. They can deploy the contract as immutable to
 /// enable trustlessness.
-/// 2. DAO creator calls `create_dao` to create their DAO.
+/// 2. DAO creator calls `create_dao` to create their DAO. This will create the DAO in a separate resource account.
 /// 3. A proposer can specify the DAO they want to create a proposal and create the proposal through `create_proposal`
 ///    A proposal can execute a list of functions of 3 types. eg: transferring multiple NFTs can be a proposal of multiple offer_nft function:
 ///         a: no-op, no execution happens on chain. Only the proposal and its results are recorded on-chain for DAO
@@ -15,18 +15,14 @@
 ///         b: Transfer APT funds: from DAO account to the specified destination account.
 ///         c: Offer NFTs to the specified destination account.
 /// 4. A voter can vote for a proposal of a DAO through `vote`.
-/// 5. Anyone can call the `resolve` to resolve a proposal. A proposal voting duration has to expire and the proposal should have more votes than the minimal required threshold.
+/// 5. Anyone can call the `resolve` to resolve a proposal. A proposal voting duration has to expire and the proposal
+/// should have more votes than the minimal required threshold.
 ///
 /// The DAO plaform also support admin operations. For more details, check readme `Special DAO Admin Functions` section
 ///
 /// An example of DAO removal from existing DAO plaform.
-/// 1. The DAO creator can call `reclaim_signer_capability` to remove her DAO from the platform and get back her resource account's signercapability
-///
-/// Note: For each proposal of a DAO, we track the all the token_ids voted in a bucket table to prevent a token_id being used twice for voting
-///
-/// Note: This current version stores all the signer_capability in the contract space. If the code upgrades, a potential risk is the platform operation can obtain the signer capability of the DAOs on this platform
-/// It allows the operator to obtain the signer of these DAOs without any consent.
-/// TODO: explore new tooling to dynamically compiling DAO modules on server side and store the signercapability in each DAO's own moudle to avoid exposing signer capability to platform
+/// 1. The DAO creator can call `reclaim_signer_capability` to remove their DAO from the platform and get back her
+/// resource account's signercapability
 module dao_platform::nft_dao {
     use aptos_framework::account::{SignerCapability, create_signer_with_capability};
     use aptos_framework::account;
@@ -43,11 +39,9 @@ module dao_platform::nft_dao {
     use dao_platform::nft_dao_events::{Self, emit_create_dao_event};
     use std::bcs;
     use std::error;
-    use std::option::Option;
-    use std::option;
+    use std::option::{Self, Option};
     use std::signer;
-    use std::string::String;
-    use std::string;
+    use std::string::{Self, String};
     use std::vector;
 
     /// This account doesn't have enough voting power
@@ -110,32 +104,35 @@ module dao_platform::nft_dao {
     /// Proposal not found
     const EPROPOSAL_NOT_FOUND: u64 = 20;
 
-    /// Voting statistics not exist
+    /// Voting statistics resource cannot be found. The DAO might have been incorrectly initialized
     const EVOTING_STATISTICS_NOT_FOUND: u64 = 21;
 
-    /// Constants
+    /// Constants that represent the different state of DAO proposals.
     const PROPOSAL_PENDING: u8 = 0;
     const PROPOSAL_RESOLVED_PASSED: u8 = 1;
     const PROPOSAL_RESOLVED_NOT_PASSED: u8 = 2;
     const PROPOSAL_RESOLVED_BY_ADMIN: u8 = 3;
     const PROPOSAL_VETOED_BY_ADMIN: u8 = 4;
 
+    /// The core struct that contains details and configurations of the DAO.
     struct DAO has key {
         /// Name of the DAO
         name: String,
-        /// The minimum number of total votes (both yes and no) a proposal must have in order to be considered valid. A proposal would still need more yes than no to pass.
+        /// The minimum number of total votes (both yes and no) a proposal must have in order to be considered valid.
+        /// A proposal still needs more yes than no to pass.
         resolve_threshold: u64,
-        /// The NFT Collection that is used to govern the DAO
+        /// The NFT Collection that is used to govern the DAO.
         governance_token: GovernanceToken,
-        /// The voting duration in secs
+        /// The voting duration in secs.
         voting_duration: u64,
-        /// Minimum weight for proposal
+        /// Minimum required voting power (number of NFT tokens) an account must have to create a proposal.
         min_required_proposer_voting_power: u64,
-        /// Proposal counter
+        /// The id that will be used for the next proposal.
         next_proposal_id: u64,
-        /// DAO resource account signer capability
+        /// The signer capability for the resource account where the DAO is hosted (aka the DAO account).
         dao_signer_capability: SignerCapability,
-        /// DAO admin account
+        /// The address of the DAO's admin who has certain permissions over the DAO.
+        /// This can be set to 0x0 to remove all admin powers.
         admin: address,
         /// The pending claims waiting for new admin to claim
         pending_admin: Option<address>,
@@ -546,19 +543,28 @@ module dao_platform::nft_dao {
     }
 
     /// Claim DAO's admin from an offer. The new_admin will become the admin of the DAO.
-    public entry fun claim_admin(new_admin: &signer, dao: address) acquires DAO {
+    public entry fun claim_admin(account: &signer, dao: address) acquires DAO {
         // DAO offer exists
         assert!(exists<DAO>(dao), error::not_found(EDAO_NOT_EXIST));
         let dao_config = borrow_global_mut<DAO>(dao);
         assert!(option::is_some(&dao_config.pending_admin), error::invalid_argument(EADMIN_OFFER_NOT_EXIST));
-        let target_addr = option::extract(&mut dao_config.pending_admin);
-        let receiver = signer::address_of(new_admin);
-        assert!(target_addr == receiver, error::not_found(EADMIN_OFFER_NOT_EXIST));
 
+        // Allow setting the admin to 0x0.
+        let new_admin = option::extract(&mut dao_config.pending_admin);
         let old_admin = dao_config.admin;
+        let caller_address = signer::address_of(account);
+        if (new_admin == @0x0) {
+            // If the admin is being updated to 0x0, for security reasons, this finalization must only be done by the
+            // current admin.
+            assert!(old_admin == caller_address, error::permission_denied(EINVALID_ADMIN_ACCOUNT));
+        } else {
+            // Otherwise, only the new admin can finalize the transfer.
+            assert!(new_admin == caller_address, error::not_found(EADMIN_OFFER_NOT_EXIST));
+        };
+
         // update the DAO's admin address
-        dao_config.admin = receiver;
-        nft_dao_events::emit_admin_claim_event(old_admin, receiver, dao);
+        dao_config.admin = new_admin;
+        nft_dao_events::emit_admin_claim_event(old_admin, new_admin, dao);
     }
 
     /// Admin disable the DAO admin through setting the admin to 0x0
@@ -984,8 +990,31 @@ module dao_platform::nft_dao {
         offer_admin(admin, dao, new_addr);
         // new admin claim the dao
         claim_admin(new_admin, dao);
-        let dao_config = borrow_global_mut<DAO>(dao);
-        assert!(dao_config.admin == new_addr, 1);
+        assert!(borrow_global_mut<DAO>(dao).admin == new_addr, 1);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0xdeaf)]
+    public fun test_transferring_ownership_to_zero_address(aptos_framework: &signer, admin: &signer) acquires DAO {
+        // admin creates a dao
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        let old_addr = signer::address_of(admin);
+        account::create_account_for_test(@0x1);
+        account::create_account_for_test(old_addr);
+
+        let dao = create_dao_and_get_dao_address(
+            admin,
+            string::utf8(b"my_dao"),
+            1,
+            10,
+            old_addr,
+            string::utf8(b"Hello, World"),
+            1,
+        );
+
+        // admin transfers power to 0x0 and finalizes the transfer.
+        offer_admin(admin, dao, @0x0);
+        claim_admin(admin, dao);
+        assert!(borrow_global_mut<DAO>(dao).admin == @0x0, 1);
     }
 
     #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
