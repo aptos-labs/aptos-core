@@ -10,6 +10,14 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The state synchronization (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
 
+:::tip Need to start a node quickly?
+If you need to start a node quickly, here's what we recommend by use case:
+  - **Devnet public fullnode**: To sync the entire blockchain history, download [a snapshot](/nodes/full-node/bootstrap-fullnode). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
+  - **Testnet public fullnode**: To sync the entire blockchain history, download [a snapshot](/nodes/full-node/bootstrap-fullnode). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
+  - **Mainnet public fullnode**: To sync the entire blockchain history, use [output syncing](/guides/state-sync#applying-all-transaction-outputs). Otherwise, use [fast sync](/guides/state-sync#fast-syncing).
+  - **Mainnet validator or validator fullnode**: Use [output syncing](/guides/state-sync#applying-all-transaction-outputs). Note: [fast sync](/guides/state-sync#fast-syncing) is not recommended.
+:::
+
 ## State sync modes
 
 State sync runs in two modes. All nodes will first bootstrap (in bootstrapping mode) on startup, and then continuously synchronize (in continuous sync mode). 
