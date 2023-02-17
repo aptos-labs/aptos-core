@@ -3,9 +3,12 @@
 
 use crate::natives::{
     cryptography::{ristretto255_point, ristretto255_scalar},
-    helpers::make_native_from_func,
+    helpers::{make_native_from_func, make_safe_native},
 };
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{
+    on_chain_config::{TimedFeatureFlag, TimedFeatures},
+    vm_status::StatusCode,
+};
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
@@ -48,7 +51,10 @@ pub struct GasParameters {
     pub scalar_parse_arg: InternalGasPerArg,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
             "point_is_canonical_internal",
@@ -125,10 +131,21 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "multi_scalar_mul_internal",
-            make_native_from_func(
-                gas_params.clone(),
-                ristretto255_point::native_multi_scalar_mul,
-            ),
+            // See:
+            //  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
+            //  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-w6m7-x6c3-pph2
+            if timed_features.is_enabled(TimedFeatureFlag::Ristretto255NativeFloatingPointFix) {
+                make_safe_native(
+                    gas_params.clone(),
+                    timed_features,
+                    ristretto255_point::safe_native_multi_scalar_mul_no_floating_point,
+                )
+            } else {
+                make_native_from_func(
+                    gas_params.clone(),
+                    ristretto255_point::native_multi_scalar_mul,
+                )
+            },
         ),
         (
             "scalar_is_canonical_internal",
