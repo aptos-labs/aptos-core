@@ -31,10 +31,6 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",

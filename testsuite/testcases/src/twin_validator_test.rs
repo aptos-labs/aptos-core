@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::NetworkLoadTest;
 use anyhow::Context;
 use aptos_forge::{NetworkContext, NetworkTest, NodeExt, Test};
 use aptos_sdk::move_types::account_address::AccountAddress;
@@ -16,11 +16,7 @@ impl Test for TwinValidatorTest {
     }
 }
 
-impl NetworkLoadTest for TwinValidatorTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-}
+impl NetworkLoadTest for TwinValidatorTest {}
 
 impl NetworkTest for TwinValidatorTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {

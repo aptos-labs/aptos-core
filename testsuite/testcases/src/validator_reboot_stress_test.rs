@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::NetworkLoadTest;
 use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, Test};
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
@@ -20,10 +20,6 @@ impl Test for ValidatorRebootStressTest {
 }
 
 impl NetworkLoadTest for ValidatorRebootStressTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         let start = Instant::now();
         let runtime = Runtime::new().unwrap();

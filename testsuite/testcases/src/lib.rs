@@ -104,6 +104,8 @@ pub enum LoadDestination {
     AllNodes,
     AllValidators,
     AllFullnodes,
+    // Send to AllFullnodes, if any exist, otherwise to AllValidators
+    FullnodesOtherwiseValidators,
     Peers(Vec<PeerId>),
 }
 
@@ -116,6 +118,13 @@ impl LoadDestination {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::FullnodesOtherwiseValidators => {
+                if all_fullnodes.is_empty() {
+                    all_validators
+                } else {
+                    all_fullnodes
+                }
+            },
             LoadDestination::Peers(peers) => peers,
         }
     }
@@ -123,7 +132,7 @@ impl LoadDestination {
 
 pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
