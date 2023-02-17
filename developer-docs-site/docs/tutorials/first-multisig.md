@@ -565,6 +565,8 @@ The first part of the demo generates a vanity account for both Ace and Bee, via 
 :!: static/sdks/python/examples/multisig.sh metafiles_ace_bee
 ```
 
+Here, each keyfile's authentication key begins with the specified vanity prefix:
+
 ```zsh title=Output
 === Generate vanity account for Ace ===
 
@@ -790,7 +792,7 @@ Multisig metafile now at ace_and_dee_removed.multisig:
 
 Thus far all AMEE operations have been conducted off-chain, because the relevant keyfile and metafile operations have simply involved public keys, private keys, and authentication keys.
 
-As such, all multisig metafiles have `"address": null`, since there is an on-chain account address has not yet been linked with any of the multisig accounts.
+As such, all multisig metafiles have `"address": null`, since an on-chain account address has not yet been linked with any of the multisig accounts.
 
 ### Step 9.3 Authentication key rotation
 
@@ -825,7 +827,10 @@ First, generate a vanity account for Ace and Bee, funding Ace since his account 
 
 Note that the `keyfile fund` command is used to wrap a call to the `aptos` CLI:
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Generate vanity account for Ace ===
 
 
@@ -865,6 +870,8 @@ Running aptos CLI command: aptos account fund-with-faucet --account 0xace3e630af
 New balance: 100000000
 ```
 
+</details>
+
 Next incorporate Ace and Bee into a multisig account, proposing a rotation challenge to the multisig account:
 
 ```zsh title="multisig.sh snippet"
@@ -874,7 +881,10 @@ Next incorporate Ace and Bee into a multisig account, proposing a rotation chall
 Here, since the multisig account has a threshold of 1, only Ace needs to sign the rotation proof challenge.
 Then he can initiate the authentication key rotation transaction from his account:
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Incorporate to 1-of-2 multisig ===
 
 
@@ -981,6 +991,8 @@ Multisig metafile now at initial.multisig:
 }
 ```
 
+</details>
+
 Note that after the successful rotation transaction, the `"address"` field of the multisig metafile has been updated to the vanity address starting with `0xace`.
 
 Now, propose a threshold increase to 2 signatories:
@@ -991,7 +1003,10 @@ Now, propose a threshold increase to 2 signatories:
 
 In this case, Ace and Bee both need to sign the rotation proof challenge since the account is rotating to a 2-of-2 multisig:
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Increase metafile threshold to two signatures ===
 
 
@@ -1098,6 +1113,8 @@ Rotation proof challenge signature now at bee_increase.challenge_signature:
 }
 ```
 
+</details>
+
 Now that the rotation proof challenge has been signed, the rotation transaction can be proposed.
 Note that even though Ace and Bee both needed to sign the challenge (since the account to rotate to requires two signatures), only one of them needs to sign the transaction proposal (since the account undergoing rotation is originally 1-of-2).
 Here, only Bee signs the transaction proposal, then the transaction can be executed.
@@ -1106,7 +1123,10 @@ Here, only Bee signs the transaction proposal, then the transaction can be execu
 :!: static/sdks/python/examples/multisig.sh rotate_increase_execute
 ```
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Propose rotation transaction ===
 
 
@@ -1272,6 +1292,8 @@ Multisig metafile now at increased.multisig:
 }
 ```
 
+</details>
+
 Note that the `"address"` field of `initial.multisig` has been set to `null`, and `increased.multisig` now reflects the vanity address starting with `0xace`.
 
 Next, propose a rotation proof challenge for rotating the account back to have Ace as a single signer:
@@ -1282,7 +1304,10 @@ Next, propose a rotation proof challenge for rotating the account back to have A
 
 Here, Ace and Bee both need to sign the proposal since the account undergoing rotation is a 2-of-2 multisig:
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Propose rotation challenge for rotating back to Ace ===
 
 Rotation proof challenge proposal now at return.challenge_proposal:
@@ -1361,6 +1386,8 @@ Rotation proof challenge signature now at bee_return.challenge_signature:
 }
 ```
 
+</details>
+
 Now that both challenge signatures are available, a transaction from the multisig account can be proposed and executed:
 
 ```zsh title="multisig.sh snippet"
@@ -1369,7 +1396,10 @@ Now that both challenge signatures are available, a transaction from the multisi
 
 In this case, both Ace and Bee have to sign the transaction since the account undergoing rotation starts off as a 2-of-2 multisig:
 
-```zsh title=Output
+<details>
+<summary>Output</summary>
+
+```zsh
 === Propose rotation transaction ===
 
 
@@ -1574,6 +1604,8 @@ Multisig metafile now at increased.multisig:
 }
 
 ```
+
+</details>
 
 Note that after the rotation, the metafile has been updated with `"address": null`
 
