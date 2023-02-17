@@ -9,10 +9,11 @@ use crate::{
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
     transaction::{ChangeSetConfigs, TransactionGasParameters},
-    StorageGasParameters,
+    FeePerGasUnit, StorageGasParameters,
 };
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOp,
+    account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
+    state_store::state_key::StateKey, write_set::WriteOp,
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
@@ -29,6 +30,7 @@ use std::collections::BTreeMap;
 // Change log:
 // - V7
 //   - Native support for exists<T>
+//   - New formulae for storage fees based on fixed APT costs
 // - V6
 //   - Added a new native function - blake2b_256.
 // - V5
@@ -773,11 +775,65 @@ impl AptosGasMeter {
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
 
-    pub fn charge_write_set_gas<'a>(
+    pub fn charge_write_set_gas_for_io<'a>(
         &mut self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> VMResult<()> {
         let cost = self.storage_gas_params.pricing.calculate_write_set_gas(ops);
         self.charge(cost).map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn charge_storage_fee<'a>(
+        &mut self,
+        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        events: impl IntoIterator<Item = &'a ContractEvent>,
+        txn_size: NumBytes,
+        gas_unit_price: FeePerGasUnit,
+    ) -> VMResult<()> {
+        // The new storage fee are only active since version 7.
+        if self.feature_version < 7 {
+            return Ok(());
+        }
+
+        // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
+        // to avoid causing them issues. We should revisit the problem and figure out a
+        // better way to handle this.
+        if gas_unit_price.is_zero() {
+            return Ok(());
+        }
+
+        // Calculate the storage fees.
+        let txn_params = &self.gas_params.txn;
+        let write_fee = txn_params.calculate_write_set_storage_fee(write_ops);
+        let event_fee = txn_params.calculate_event_storage_fee(events);
+        let txn_fee = txn_params.calculate_transaction_storage_fee(txn_size);
+        let fee = write_fee + event_fee + txn_fee;
+
+        // Because the storage fees are defined in terms of fixed APT costs, we need
+        // to convert them into gas units.
+        //
+        // u128 is used to protect against overflow and preverse as much precision as
+        // possible in the extreme cases.
+        fn div_ceil(n: u128, d: u128) -> u128 {
+            if n % d == 0 {
+                n / d
+            } else {
+                n / d + 1
+            }
+        }
+        let gas_consumed_internal = div_ceil(
+            (u64::from(fee) as u128) * (u64::from(txn_params.gas_unit_scaling_factor) as u128),
+            u64::from(gas_unit_price) as u128,
+        );
+        let gas_consumed_internal = InternalGas::new(
+            if gas_consumed_internal > u64::MAX as u128 {
+                u64::MAX
+            } else {
+                gas_consumed_internal as u64
+            },
+        );
+
+        self.charge(gas_consumed_internal)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

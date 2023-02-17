@@ -4,7 +4,13 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{AbstractValueSize, FeePerGasUnit, Gas, GasScalingFactor, GasUnit};
+use crate::algebra::{
+    AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasScalingFactor, GasUnit,
+    NumSlots,
+};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes,
     ToUnitFractionalWithParams, ToUnitWithParams,
@@ -125,6 +131,27 @@ crate::params::define_gas_parameters!(
             { 5.. => "max_bytes_all_events_per_transaction"},
             10 << 20, // all events from a single transaction are 10MB max
         ],
+        [
+            storage_fee_per_state_slot_create: FeePerSlot,
+            { 7.. => "storage_fee_per_state_slot_create" },
+            50000,
+        ],
+        [
+            storage_fee_per_excess_state_byte: FeePerByte,
+            { 7.. => "storage_fee_per_excess_state_byte" },
+            50,
+        ],
+        [
+            storage_fee_per_event_byte: FeePerByte,
+            { 7.. => "storage_fee_per_event_byte" },
+            1,
+        ],
+        [
+            storage_fee_per_transaction_byte: FeePerByte,
+            { 7.. => "storage_fee_per_transaction_byte" },
+            1,
+        ],
+
     ]
 );
 
@@ -136,6 +163,57 @@ impl TransactionGasParameters {
             0 => 1.into(),
             x => x.into(),
         }
+    }
+
+    /// New formula to charge storage fee for write set items based on fixed APT costs.
+    pub fn calculate_write_set_storage_fee<'a>(
+        &self,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> Fee {
+        let excess_fee = |size: NumBytes| -> Fee {
+            match size.checked_sub(self.free_write_bytes_quota) {
+                Some(excess) => excess * self.storage_fee_per_excess_state_byte,
+                None => 0.into(),
+            }
+        };
+
+        let mut fee = Fee::zero();
+        let mut new_slots = NumSlots::zero();
+
+        for (key, op) in ops {
+            let key_size = NumBytes::new(key.size() as u64);
+            match op {
+                WriteOp::Creation(data) => {
+                    new_slots += 1.into();
+                    let val_size = NumBytes::new(data.len() as u64);
+                    fee += excess_fee(key_size + val_size);
+                },
+                WriteOp::Modification(data) => {
+                    let val_size = NumBytes::new(data.len() as u64);
+                    fee += excess_fee(key_size + val_size);
+                },
+                WriteOp::Deletion => (),
+            }
+        }
+
+        fee += new_slots * self.storage_fee_per_state_slot_create;
+
+        fee
+    }
+
+    /// New formula to charge storage fee for events based on fixed APT costs.
+    pub fn calculate_event_storage_fee<'a>(
+        &self,
+        events: impl IntoIterator<Item = &'a ContractEvent>,
+    ) -> Fee {
+        events.into_iter().fold(Fee::zero(), |acc, event| {
+            acc + self.storage_fee_per_event_byte * NumBytes::new(event.size() as u64)
+        })
+    }
+
+    /// New formula to charge storage fee for transaction based on fixed APT costs.
+    pub fn calculate_transaction_storage_fee(&self, txn_size: NumBytes) -> Fee {
+        self.storage_fee_per_transaction_byte * txn_size
     }
 
     /// Calculate the intrinsic gas for the transaction based upon its size in bytes.

@@ -200,7 +200,7 @@ impl MoveHarness {
             .transaction()
             .sequence_number(seq_no)
             .max_gas_amount(2_000_000)
-            .gas_unit_price(1)
+            .gas_unit_price(100)
             .payload(payload)
             .sign()
     }
