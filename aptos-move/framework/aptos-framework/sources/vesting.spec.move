@@ -5,52 +5,42 @@ spec aptos_framework::vesting {
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec vesting_start_secs(vesting_contract_address: address): u64 {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec period_duration_secs(vesting_contract_address: address): u64 {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec remaining_grant(vesting_contract_address: address): u64 {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec beneficiary(vesting_contract_address: address, shareholder: address): address {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec operator_commission_percentage(vesting_contract_address: address): u64 {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec vesting_contracts(admin: address): vector<address> {
-        pragma verify = true;
         aborts_if false;
     }
 
     spec operator(vesting_contract_address: address): address {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec voter(vesting_contract_address: address): address {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
     spec vesting_schedule(vesting_contract_address: address): VestingSchedule {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(vesting_contract_address);
     }
 
@@ -88,12 +78,10 @@ spec aptos_framework::vesting {
     }
 
     spec shareholders(vesting_contract_address: address): vector<address> {
-        pragma verify = true;
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
     }
 
     spec shareholder(vesting_contract_address: address, beneficiary: address): address {
-        pragma verify = true;
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
     }
 
@@ -102,7 +90,6 @@ spec aptos_framework::vesting {
         start_timestamp_secs: u64,
         period_duration: u64,
     ): VestingSchedule {
-        pragma verify = true;
         aborts_if !(len(schedule) > 0);
         aborts_if !(period_duration > 0);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
@@ -150,7 +137,6 @@ spec aptos_framework::vesting {
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
-        pragma verify = true;
         // Call of the `staking_contract::distribute`.
         pragma aborts_if_is_partial;
         include VerifyAdminAbortsIf;
@@ -164,7 +150,6 @@ spec aptos_framework::vesting {
         new_operator: address,
         commission_percentage: u64,
     ) {
-        pragma verify = true;
         // Call of the `staking_contract::switch_operator`.
         pragma aborts_if_is_partial;
         include VerifyAdminAbortsIf;
@@ -183,7 +168,6 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_voter: address,
     ) {
-        pragma verify = true;
         include VerifyAdminAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -197,7 +181,6 @@ spec aptos_framework::vesting {
         admin: &signer,
         contract_address: address,
     ) {
-        pragma verify = true;
         // TODO: Unable to handle abort from `stake::assert_stake_pool_exists`.
         pragma aborts_if_is_partial;
         aborts_if !exists<VestingContract>(contract_address);
@@ -217,7 +200,6 @@ spec aptos_framework::vesting {
         shareholder: address,
         new_beneficiary: address,
     ) {
-        pragma verify = true;
         aborts_if !account::exists_at(new_beneficiary);
         aborts_if !coin::is_account_registered<AptosCoin>(new_beneficiary);
         include VerifyAdminAbortsIf;
@@ -230,7 +212,6 @@ spec aptos_framework::vesting {
         contract_address: address,
         shareholder: address,
     ) {
-        pragma verify = true;
         // TODO: The abort of functions on either side of a logical operator can not be handled.
         pragma aborts_if_is_partial;
         aborts_if !exists<VestingContract>(contract_address);
@@ -244,7 +225,6 @@ spec aptos_framework::vesting {
         role: String,
         role_holder: address,
     ) {
-        pragma verify = true;
         pragma aborts_if_is_partial;
         include SetManagementRoleAbortsIf;
     }
@@ -254,26 +234,22 @@ spec aptos_framework::vesting {
         contract_address: address,
         beneficiary_resetter: address,
     ) {
-        pragma verify = true;
         pragma aborts_if_is_partial;
         aborts_if !std::string::spec_internal_check_utf8(ROLE_BENEFICIARY_RESETTER);
         include SetManagementRoleAbortsIf;
     }
 
     spec get_role_holder(contract_address: address, role: String): address {
-        pragma verify = true;
         aborts_if !exists<VestingAccountManagement>(contract_address);
         let roles = global<VestingAccountManagement>(contract_address).roles;
         aborts_if !simple_map::spec_contains_key(roles,role);
     }
 
     spec get_vesting_account_signer(admin: &signer, contract_address: address): signer {
-        pragma verify = true;
         include VerifyAdminAbortsIf;
     }
 
     spec get_vesting_account_signer_internal(vesting_contract: &VestingContract): signer {
-        pragma verify = true;
         aborts_if false;
     }
 
@@ -283,7 +259,6 @@ spec aptos_framework::vesting {
         admin: &signer,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) {
-        pragma verify = true;
         // TODO: Could not verify `coin::register` because can't get the `account_signer`.
         pragma aborts_if_is_partial;
         let admin_addr = signer::address_of(admin);
@@ -304,17 +279,14 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
-        pragma verify = true;
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }
 
     spec assert_vesting_contract_exists(contract_address: address) {
-        pragma verify = true;
         aborts_if !exists<VestingContract>(contract_address);
     }
 
     spec assert_active_vesting_contract(contract_address: address) {
-        pragma verify = true;
         include ActiveVestingContractAbortsIf<VestingContract>;
     }
 
@@ -329,7 +301,6 @@ spec aptos_framework::vesting {
     }
 
     spec get_beneficiary(contract: &VestingContract, shareholder: address): address {
-        pragma verify = true;
         aborts_if false;
     }
 
