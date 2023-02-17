@@ -235,7 +235,7 @@ impl BufferItem {
                     author,
                     partial_commit_proof.ledger_info().clone(),
                     signature,
-                    1000000 / 100, // 1mb / 100
+                    1000000 * 32 / 144 / 100, // BLS
                 );
                 debug!("{} advance to signed", partial_commit_proof.commit_info());
 
