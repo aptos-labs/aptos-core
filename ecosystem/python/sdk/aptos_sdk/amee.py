@@ -2060,5 +2060,6 @@ parser_script_sign.add_argument(
 
 # AMEE commands <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-parsed_args = parser.parse_args()  # Parse command line arguments.
-parsed_args.func(parsed_args)  # Call command line argument function.
+if __name__ == "__main__":
+    parsed_args = parser.parse_args()  # Parse command line arguments.
+    parsed_args.func(parsed_args)  # Call parsed args callback function.
