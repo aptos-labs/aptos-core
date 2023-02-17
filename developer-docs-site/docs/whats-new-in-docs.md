@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 17 February 2023
+
+- Recommended specific paths for starting up an Aptos node via [state synchronization](guides/state-sync.md) depending upon node type and network.
+
 ## 14 February 2023
 
 - Added instructions for [working with `PropertyMap` off-chain](concepts/coin-and-token/propertymap-offchain) via the Aptos TypeScript SDK, enabling reading and writing of Binary Canonical Serialization (BCS) data in your app.
