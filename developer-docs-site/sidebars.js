@@ -55,7 +55,7 @@ const sidebars = {
       type: "category",
       label: "Read the Aptos White Paper",
       collapsible: true,
-      collapsed: false,
+      collapsed: true,
       link: { type: "doc", id: "aptos-white-paper/index" },
       items: ["aptos-white-paper/in-korean"],
     },
