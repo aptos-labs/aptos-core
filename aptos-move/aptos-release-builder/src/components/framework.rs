@@ -72,7 +72,7 @@ pub fn generate_upgrade_proposals(
         let mut package_path = if config.git_hash.is_some() {
             temp_root_path.path().to_path_buf()
         } else {
-            root_path.clone()
+            root_path.canonicalize()?
         };
 
         package_path.push(relative_package_path);

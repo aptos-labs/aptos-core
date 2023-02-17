@@ -840,14 +840,21 @@ impl GenerateExecutionHash {
             compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
-                framework_local_dir: Option::from(
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("..")
-                        .join("..")
-                        .join("aptos-move")
+                framework_local_dir: Option::from({
+                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    path.pop();
+                    path.pop();
+                    path.join("aptos-move")
                         .join("framework")
-                        .join("aptos-framework"),
-                ),
+                        .join("aptos-framework")
+                        .canonicalize()
+                        .map_err(|err| {
+                            CliError::IO(
+                                format!("Failed to canonicalize aptos framework path: {:?}", path),
+                                err,
+                            )
+                        })?
+                }),
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,
