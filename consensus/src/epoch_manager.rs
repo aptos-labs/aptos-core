@@ -649,8 +649,7 @@ impl EpochManager {
             ))
         };
 
-        let (batch_reader, payload_manager, quorum_store_msg_tx) =
-            quorum_store_builder.init_payload_manager();
+        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
         self.quorum_store_msg_tx = quorum_store_msg_tx;
 
         let payload_client = QuorumStoreClient::new(
@@ -681,8 +680,7 @@ impl EpochManager {
             payload_manager.clone(),
         ));
 
-        self.quorum_store_coordinator_tx =
-            quorum_store_builder.start(block_store.clone(), batch_reader);
+        self.quorum_store_coordinator_tx = quorum_store_builder.start(block_store.clone());
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)

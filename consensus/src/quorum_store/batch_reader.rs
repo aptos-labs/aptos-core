@@ -359,35 +359,6 @@ impl BatchReader {
         self.last_certified_round.load(Ordering::Relaxed)
     }
 
-    pub async fn get_batch_optimistic(
-        &self,
-        proof: ProofOfStore,
-    ) -> Option<Vec<SignedTransaction>> {
-        match self.db_cache.get(proof.digest()) {
-            Some(value) => {
-                let (tx, rx) = oneshot::channel();
-                if payload_storage_mode(&value) == StorageMode::PersistedOnly {
-                    assert!(
-                        value.maybe_payload.is_none(),
-                        "BatchReader payload and storage kind mismatch"
-                    );
-                    self.batch_store_tx
-                        .send(BatchStoreCommand::BatchRequest(
-                            *proof.digest(),
-                            self.my_peer_id,
-                            Some(tx),
-                        ))
-                        .await
-                        .expect("Failed to send to BatchStore");
-                    rx.await.ok().and_then(|res| res.ok())
-                } else {
-                    value.maybe_payload.clone()
-                }
-            },
-            None => None,
-        }
-    }
-
     pub async fn get_batch(
         &self,
         proof: ProofOfStore,
