@@ -10,6 +10,7 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     models::stake_models::{
+        delegator_activities::DelegatedStakingActivity,
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
@@ -47,9 +48,11 @@ fn insert_to_db_impl(
     conn: &mut PgConnection,
     current_stake_pool_voters: &[CurrentStakingPoolVoter],
     proposal_votes: &[ProposalVote],
+    delegator_actvities: &[DelegatedStakingActivity],
 ) -> Result<(), diesel::result::Error> {
     insert_current_stake_pool_voter(conn, current_stake_pool_voters)?;
     insert_proposal_votes(conn, proposal_votes)?;
+    insert_delegator_activities(conn, delegator_actvities)?;
     Ok(())
 }
 
@@ -60,6 +63,7 @@ fn insert_to_db(
     end_version: u64,
     current_stake_pool_voters: Vec<CurrentStakingPoolVoter>,
     proposal_votes: Vec<ProposalVote>,
+    delegator_actvities: Vec<DelegatedStakingActivity>,
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -71,7 +75,12 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(pg_conn, &current_stake_pool_voters, &proposal_votes)
+            insert_to_db_impl(
+                pg_conn,
+                &current_stake_pool_voters,
+                &proposal_votes,
+                &delegator_actvities,
+            )
         }) {
         Ok(_) => Ok(()),
         Err(_) => conn
@@ -80,8 +89,14 @@ fn insert_to_db(
             .run::<_, Error, _>(|pg_conn| {
                 let current_stake_pool_voters = clean_data_for_db(current_stake_pool_voters, true);
                 let proposal_votes = clean_data_for_db(proposal_votes, true);
+                let delegator_actvities = clean_data_for_db(delegator_actvities, true);
 
-                insert_to_db_impl(pg_conn, &current_stake_pool_voters, &proposal_votes)
+                insert_to_db_impl(
+                    pg_conn,
+                    &current_stake_pool_voters,
+                    &proposal_votes,
+                    &delegator_actvities,
+                )
             }),
     }
 }
@@ -134,6 +149,26 @@ fn insert_proposal_votes(
     Ok(())
 }
 
+fn insert_delegator_activities(
+    conn: &mut PgConnection,
+    item_to_insert: &[DelegatedStakingActivity],
+) -> Result<(), diesel::result::Error> {
+    use schema::delegated_staking_activities::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), DelegatedStakingActivity::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::delegated_staking_activities::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, event_index))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionProcessor for StakeTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -148,12 +183,17 @@ impl TransactionProcessor for StakeTransactionProcessor {
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let mut all_current_stake_pool_voters: StakingPoolVoterMap = HashMap::new();
         let mut all_proposal_votes = vec![];
+        let mut all_delegator_activities = vec![];
 
         for txn in &transactions {
             let current_stake_pool_voter = CurrentStakingPoolVoter::from_transaction(txn).unwrap();
             all_current_stake_pool_voters.extend(current_stake_pool_voter);
             let mut proposal_votes = ProposalVote::from_transaction(txn).unwrap();
             all_proposal_votes.append(&mut proposal_votes);
+
+            // Add delegator activities
+            let mut delegator_activities = DelegatedStakingActivity::from_transaction(txn).unwrap();
+            all_delegator_activities.append(&mut delegator_activities);
         }
         let mut all_current_stake_pool_voters = all_current_stake_pool_voters
             .into_values()
@@ -171,6 +211,7 @@ impl TransactionProcessor for StakeTransactionProcessor {
             end_version,
             all_current_stake_pool_voters,
             all_proposal_votes,
+            all_delegator_activities,
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

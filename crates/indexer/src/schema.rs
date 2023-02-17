@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+=======
+>>>>>>> 4e6f1e1a40 (Delegator activities)
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -141,6 +144,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_delegator_balances (delegator_address, pool_address, pool_type) {
+        delegator_address -> Varchar,
+        pool_address -> Varchar,
+        pool_type -> Varchar,
+        amount -> Numeric,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_staking_pool_voter (staking_pool_address) {
         staking_pool_address -> Varchar,
         voter_address -> Varchar,
@@ -222,6 +236,18 @@ diesel::table! {
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         last_transaction_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    delegated_staking_activities (transaction_version, event_index) {
+        transaction_version -> Int8,
+        event_index -> Int8,
+        delegator_address -> Varchar,
+        pool_address -> Varchar,
+        event_type -> Text,
+        amount -> Numeric,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -505,11 +531,13 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_ans_lookup,
     current_coin_balances,
     current_collection_datas,
+    current_delegator_balances,
     current_staking_pool_voter,
     current_table_items,
     current_token_datas,
     current_token_ownerships,
     current_token_pending_claims,
+    delegated_staking_activities,
     events,
     indexer_status,
     ledger_infos,
