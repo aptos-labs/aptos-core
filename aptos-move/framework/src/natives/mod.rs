@@ -200,24 +200,30 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
-    add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
+    add_natives_from_module!(
+        "ed25519",
+        ed25519::make_all(gas_params.ed25519.clone(), timed_features.clone())
+    );
     add_natives_from_module!("genesis", account::make_all(gas_params.account));
-    add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
+    add_natives_from_module!(
+        "multi_ed25519",
+        multi_ed25519::make_all(gas_params.ed25519, timed_features.clone())
+    );
     add_natives_from_module!(
         "bls12381",
-        cryptography::bls12381::make_all(gas_params.bls12381)
+        cryptography::bls12381::make_all(gas_params.bls12381, timed_features.clone())
     );
     add_natives_from_module!(
         "secp256k1",
-        cryptography::secp256k1::make_all(gas_params.secp256k1)
+        cryptography::secp256k1::make_all(gas_params.secp256k1, timed_features.clone())
     );
     add_natives_from_module!(
         "aptos_hash",
-        hash::make_all(gas_params.hash, timed_features)
+        hash::make_all(gas_params.hash, timed_features.clone())
     );
     add_natives_from_module!(
         "ristretto255",
-        cryptography::ristretto255::make_all(gas_params.ristretto255)
+        cryptography::ristretto255::make_all(gas_params.ristretto255, timed_features)
     );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));

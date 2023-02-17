@@ -6,6 +6,8 @@
 
 use crate::natives::cryptography::ristretto255::{pop_64_byte_slice, GasParameters};
 use crate::natives::cryptography::ristretto255::{pop_scalar_from_bytes, scalar_from_struct};
+use crate::natives::helpers::{SafeNativeContext, SafeNativeResult};
+use crate::{safely_assert_eq, safely_pop_arg, safely_pop_type_arg};
 use better_any::{Tid, TidAble};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -20,7 +22,7 @@ use move_vm_types::{
     values::{Reference, StructRef, Value, VectorRef},
 };
 use sha2::Sha512;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use std::{cell::RefCell, collections::VecDeque, convert::TryFrom, fmt::Display};
 
@@ -502,6 +504,13 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
 }
 
+/// WARNING: This native will be retired because it uses floating point arithmetic to compute gas costs.
+/// Even worse, there is a divide-by-zero bug here: If anyone calls this native with vectors of size 1,
+/// then `num = 1`, which means that division by `f64::log2(nums)`, which equals 0, is a division by
+/// zero.
+///
+/// Pre-conditions: The # of scalars & points are both > 0. This is ensured by the Move calling
+/// function.
 pub(crate) fn native_multi_scalar_mul(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -520,6 +529,8 @@ pub(crate) fn native_multi_scalar_mul(
     let scalars_ref = pop_arg!(args, VectorRef);
     let points_ref = pop_arg!(args, VectorRef);
 
+    // Invariant (enforced by caller): # of scalars = # of points
+    // Invariant (enforced by caller): num > 0
     let num = scalars_ref.len(&scalar_type)?.value_as::<u64>()? as usize;
 
     // parse scalars
@@ -553,6 +564,134 @@ pub(crate) fn native_multi_scalar_mul(
     let result_handle = point_data.add_point(result);
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
+}
+
+/// For all $n > 0$, returns $\floor{\log_2{n}}$, contained within a `Some`.
+/// For $n = 0$, returns `None`.
+#[allow(non_snake_case)]
+fn log2_floor(n: usize) -> Option<usize> {
+    if n == 0 {
+        return None;
+    }
+
+    // NOTE: n > 0, so n.leading_zeros() cannot equal usize::BITS. Therefore, we will never cast -1 to a usize.
+    Some(((usize::BITS - n.leading_zeros()) - 1) as usize)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::natives::cryptography::ristretto255_point::log2_floor;
+
+    #[test]
+    fn test_log2_floor() {
+        assert_eq!(log2_floor(usize::MIN), None);
+        assert_eq!(log2_floor(0), None);
+        assert_eq!(log2_floor(1), Some(0));
+
+        assert_eq!(log2_floor(2), Some(1));
+        assert_eq!(log2_floor(3), Some(1));
+
+        assert_eq!(log2_floor(4), Some(2));
+        assert_eq!(log2_floor(5), Some(2));
+        assert_eq!(log2_floor(6), Some(2));
+        assert_eq!(log2_floor(7), Some(2));
+
+        assert_eq!(log2_floor(8), Some(3));
+        assert_eq!(log2_floor(9), Some(3));
+        assert_eq!(log2_floor(10), Some(3));
+        assert_eq!(log2_floor(11), Some(3));
+        assert_eq!(log2_floor(12), Some(3));
+        assert_eq!(log2_floor(13), Some(3));
+        assert_eq!(log2_floor(14), Some(3));
+        assert_eq!(log2_floor(15), Some(3));
+
+        assert_eq!(log2_floor(16), Some(4));
+
+        // usize::MAX = 2^{usize::BITS} - 1, so the floor will be usize::BITS - 1
+        assert_eq!(log2_floor(usize::MAX), Some((usize::BITS - 1) as usize));
+
+        println!("All good.");
+    }
+}
+
+// See:
+//  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
+//  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-w6m7-x6c3-pph2
+/// This upgrades 'native_multi_scalar_mul' in two ways:
+/// 1. It is a "safe" native that uses `SafeNativeContext::charge` to prevent DoS attacks.
+/// 2. It no longer uses floating-point arithmetic to compute the gas costs.
+///
+/// Pre-conditions: The # of scalars & points are both > 0. This is ensured by the Move calling
+/// function.
+pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 2);
+    safely_assert_eq!(args.len(), 2);
+
+    let scalar_type = safely_pop_type_arg!(ty_args);
+    let point_type = safely_pop_type_arg!(ty_args);
+
+    let scalars_ref = safely_pop_arg!(args, VectorRef);
+    let points_ref = safely_pop_arg!(args, VectorRef);
+
+    // Invariant (enforced by caller): num > 0 and # of scalars = # of points
+    let num = scalars_ref.len(&scalar_type)?.value_as::<u64>()? as usize;
+
+    // Invariant: log2_floor(num + 1) > 0. This is because num >= 1, thanks to the invariant we enforce on
+    // the caller of this native. Therefore, num + 1 >= 2, which implies log2_floor(num + 1) >= 1.
+    // So we never divide by zero.
+    context.charge(
+        gas_params.point_parse_arg * NumArgs::new(num as u64)
+            + gas_params.scalar_parse_arg * NumArgs::new(num as u64)
+            + gas_params.point_mul * NumArgs::new((num / log2_floor(num + 1).unwrap()) as u64),
+    )?;
+
+    // parse scalars
+    let mut scalars = Vec::with_capacity(num);
+    for i in 0..num {
+        let move_scalar = scalars_ref.borrow_elem(i, &scalar_type)?;
+        let scalar = scalar_from_struct(move_scalar)?;
+
+        scalars.push(scalar);
+    }
+
+    let result = {
+        let point_data = context
+            .extensions()
+            .get::<NativeRistrettoPointContext>()
+            .point_data
+            .borrow();
+
+        // parse points
+        let mut points = Vec::with_capacity(num);
+        for i in 0..num {
+            let move_point = points_ref.borrow_elem(i, &point_type)?;
+            let point_handle = get_point_handle_from_struct(move_point)?;
+
+            points.push(point_data.get_point(&point_handle));
+        }
+
+        RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter())
+    };
+
+    // NOTE: The variable-time multiscalar multiplication (MSM) algorithm for a size-n MSM employed in curve25519 is:
+    //  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
+    //  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
+    // For simplicity, we estimate the complexity as O(n / log_2 n)
+
+    let mut point_data_mut = context
+        .extensions()
+        .get::<NativeRistrettoPointContext>()
+        .point_data
+        .borrow_mut();
+
+    let result_handle = point_data_mut.add_point(result);
+
+    Ok(smallvec![Value::u64(result_handle)])
 }
 
 // =========================================================================================
