@@ -65,7 +65,10 @@ async fn test_txn_broadcast() {
     // set up validator_client. proposals not sent from this validator. txn should still go through.
     let validator_client = swarm.validator(validator).unwrap().rest_client();
     validator_client
-        .set_failpoint("consensus::send_proposal".to_string(), "return".to_string())
+        .set_failpoint(
+            "consensus::send::proposal".to_string(),
+            "return".to_string(),
+        )
         .await
         .unwrap();
 
