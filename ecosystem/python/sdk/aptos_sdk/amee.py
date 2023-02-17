@@ -1,4 +1,7 @@
-"""Aptos Multisig Execution Expeditor (AMEE)."""
+"""Aptos Multisig Execution Expeditor (AMEE).
+
+See "Your First Multisig" tutorial.
+"""
 
 import argparse
 import base64
@@ -791,10 +794,7 @@ network_parser.add_argument(
 # Use test password parent parser.
 use_test_password_parser = argparse.ArgumentParser(add_help=False)
 use_test_password_parser.add_argument(
-    "-u",
-    "--use-test-password",
-    action="store_true",
-    help="Flag to use test password."
+    "-u", "--use-test-password", action="store_true", help="Use test password."
 )
 
 
@@ -816,7 +816,7 @@ def keyfile_change_password(args):
     if private_key_bytes is not None:  # If able to decrypt private key:
         encrypted_bytes, salt = encrypt_private_key(
             private_key_bytes, args.use_test_password
-        ) # Encrypt private key.
+        )  # Encrypt private key.
         # Get encrypted private key hex.
         encrypted_private_key_hex = bytes_to_prefixed_hex(encrypted_bytes)
         # Update JSON with encrypted private key.
@@ -932,7 +932,7 @@ def keyfile_generate(args):
     private_key_bytes = account.private_key.key.encode()
     encrypted_private_key_bytes, salt = encrypt_private_key(
         private_key_bytes, args.use_test_password
-    ) # Encrypt private key.
+    )  # Encrypt private key.
     # Get encrypted private key hex.
     key_hex = bytes_to_prefixed_hex(encrypted_private_key_bytes)
     write_json_file(  # Write JSON to keyfile.
