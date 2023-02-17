@@ -156,6 +156,10 @@ class MultiEd25519Authenticator:
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
 
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> MultiEd25519Authenticator:
+        raise NotImplementedError
+
     def serialize(self, serializer: Serializer):
         serializer.struct(self.public_key)
         serializer.struct(self.signature)
