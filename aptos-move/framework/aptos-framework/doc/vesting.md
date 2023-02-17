@@ -2688,8 +2688,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2705,8 +2704,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2722,8 +2720,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2739,8 +2736,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2756,8 +2752,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2773,8 +2768,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2790,8 +2784,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -2807,8 +2800,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2824,8 +2816,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2841,8 +2832,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 </code></pre>
 
 
@@ -2910,8 +2900,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
 </code></pre>
 
 
@@ -2927,8 +2916,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
 </code></pre>
 
 
@@ -2944,8 +2932,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !(len(schedule) &gt; 0);
+<pre><code><b>aborts_if</b> !(len(schedule) &gt; 0);
 <b>aborts_if</b> !(period_duration &gt; 0);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !(start_timestamp_secs &gt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
@@ -3092,8 +3079,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>aborts_if</b> vesting_contract.state != <a href="vesting.md#0x1_vesting_VESTING_POOL_TERMINATED">VESTING_POOL_TERMINATED</a>;
@@ -3112,8 +3098,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 </code></pre>
 
@@ -3146,8 +3131,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> operator = vesting_contract.staking.operator;
 <b>let</b> staker = vesting_contract.signer_cap.<a href="account.md#0x1_account">account</a>;
@@ -3167,8 +3151,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> vesting_contract1 = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract1.admin;
@@ -3191,8 +3174,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(new_beneficiary);
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(new_beneficiary);
 <b>aborts_if</b> !<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(new_beneficiary);
 <b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> <b>post</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
@@ -3212,8 +3194,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> <b>post</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>ensures</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(vesting_contract.beneficiaries,shareholder);
@@ -3232,8 +3213,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="vesting.md#0x1_vesting_SetManagementRoleAbortsIf">SetManagementRoleAbortsIf</a>;
 </code></pre>
 
@@ -3250,8 +3230,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="vesting.md#0x1_vesting_ROLE_BENEFICIARY_RESETTER">ROLE_BENEFICIARY_RESETTER</a>);
 <b>include</b> <a href="vesting.md#0x1_vesting_SetManagementRoleAbortsIf">SetManagementRoleAbortsIf</a>;
 </code></pre>
@@ -3269,8 +3248,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address);
 <b>let</b> roles = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address).roles;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(roles,role);
 </code></pre>
@@ -3288,8 +3266,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 </code></pre>
 
 
@@ -3305,8 +3282,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -3331,8 +3307,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> admin_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin);
 <b>let</b> admin_store = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(admin_addr);
 <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(admin_addr);
@@ -3361,8 +3336,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 </code></pre>
 
 
@@ -3378,8 +3352,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 </code></pre>
 
 
@@ -3395,8 +3368,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;;
+<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;;
 </code></pre>
 
 
@@ -3444,8 +3416,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
