@@ -239,7 +239,7 @@ impl BatchCoordinator {
                         .await
                         .expect("Failed to send to BatchStore");
 
-                    counters::NUM_FRAGMENT_PER_BATCH.observe(self.local_fragment_id as f64);
+                    counters::NUM_FRAGMENT_PER_BATCH.observe((self.local_fragment_id + 1) as f64);
 
                     self.local_fragment_id = 0;
                 },
