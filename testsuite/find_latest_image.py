@@ -24,14 +24,6 @@ IMAGE_TAG_ENV = "IMAGE_TAG"
 # if running in github actions, this is the output key that will contain the latest image tag
 GH_OUTPUT_KEY = "IMAGE_TAG"
 
-# map of build variant (e.g. cargo profile and )
-BUILD_VARIANT_TAG_PREFIX_MAP = {
-    "performance": "performance",
-    "failpoints": "failpoints",
-    "indexer": "indexer",
-    "release": "",  # the default release profile has no tag prefix
-}
-
 
 def main():
     shell = LocalShell()
@@ -49,7 +41,7 @@ def main():
     args = parser.parse_args()
 
     # If the IMAGE_TAG environment variable is set, check that
-    if IMAGE_TAG_ENV in os.environ:
+    if IMAGE_TAG_ENV in os.environ and os.environ[IMAGE_TAG_ENV]:
         image_tag = os.environ[IMAGE_TAG_ENV]
         if not image_exists(shell, IMAGE_NAME, image_tag):
             sys.exit(1)

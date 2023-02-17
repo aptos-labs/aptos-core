@@ -1,8 +1,11 @@
-import * as core from "@actions/core";
-import * as github from "@actions/github";
-import * as glob from "@actions/glob";
+import core from "@actions/core";
+import github from "@actions/github";
+import glob from "@actions/glob";
 import findRepoRoot from "find-git-root";
 import * as path from "path";
+import * as url from "url";
+
+const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
 const owner = "aptos-labs";
 const repo = "aptos-core";
@@ -31,12 +34,16 @@ export async function pruneGithubWorkflowRuns() {
 
   core.info(`\nFound the following workflow files in the repo:\n${workflowFilesPresentInRepo.join("\n")}`);
 
-  const workflowResponse = await ghClient.rest.actions.listRepoWorkflows({
-    owner,
-    repo,
-  });
+  const workflowResponse = await ghClient.paginate(
+    ghClient.rest.actions.listRepoWorkflows,
+    {
+      owner,
+      repo,
+    },
+    (response) => response.data,
+  );
 
-  const obsoleteWorkflows = workflowResponse.data.workflows.filter(
+  const obsoleteWorkflows = workflowResponse.filter(
     (workflow) => !workflowFilesPresentInRepo.includes(path.basename(workflow.path)),
   );
 
@@ -64,11 +71,21 @@ Deleting their workflow runs now...`,
 
     for (const [index, run] of workflowRuns.entries()) {
       core.info(`Workflow: "${wf.name}" - Deleting Run (${index + 1}/${workflowRuns.length}) - Run ID: ${run.id}`);
-      await ghClient.rest.actions.deleteWorkflowRun({
-        owner,
-        repo,
-        run_id: run.id,
-      });
+      try {
+        await ghClient.rest.actions.deleteWorkflowRun({
+          owner,
+          repo,
+          run_id: run.id,
+        });
+      } catch (e: any) {
+        if (e.status === 403) {
+          core.warning(
+            `Failed to delete workflow with 403 permission error: path: ${wf.path}, workflow_run_id: ${run.id}, message: ${e.message}. It's probably present in another branch. Skipping...`,
+          );
+          continue;
+        }
+        throw e;
+      }
       totalDeleted++;
     }
   }
@@ -77,4 +94,4 @@ Deleting their workflow runs now...`,
 }
 
 // Run the function above.
-pruneGithubWorkflowRuns()
+pruneGithubWorkflowRuns();

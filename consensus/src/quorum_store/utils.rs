@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -89,7 +89,7 @@ impl BatchBuilder {
     pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
         assert!(self.data.is_empty());
 
-        self.id += 1;
+        self.id.increment();
         self.num_bytes = 0;
         self.num_txns = 0;
         mem::take(&mut self.summaries)

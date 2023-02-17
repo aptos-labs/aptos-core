@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod aggregator;
@@ -18,6 +18,7 @@ mod max_loop_depth;
 mod memory_quota;
 mod mint_nft;
 mod new_integer_types;
+mod nft_dao;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod resource_groups;

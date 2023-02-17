@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # This script is a utility script used by some rust tests such as aptos-core/secure/storage/src/tests/vault.rs .

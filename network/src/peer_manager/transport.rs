@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     counters::{self, FAILED_LABEL, SUCCEEDED_LABEL},

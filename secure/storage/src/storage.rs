@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     rocks_db::RocksDbStorage, CryptoStorage, Error, GetResponse, GitHubStorage, InMemoryStorage,

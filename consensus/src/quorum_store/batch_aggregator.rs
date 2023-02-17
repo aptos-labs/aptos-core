@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
@@ -115,8 +115,17 @@ impl BatchAggregator {
         }
     }
 
+    #[inline]
+    fn is_new_batch(batch_id: BatchId, prev_batch_id: BatchId) -> bool {
+        // If the nonce has changed, this is a new batch (after validator DB was wiped).
+        batch_id.nonce != prev_batch_id.nonce || batch_id > prev_batch_id
+    }
+
     fn is_outdated_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
         if let Some(self_batch_id) = self.batch_id {
+            if Self::is_new_batch(batch_id, self_batch_id) {
+                return false;
+            }
             let next_fragment_id = self.next_fragment_id();
             if next_fragment_id == 0 {
                 // In this case, the next fragment must start self_batch_id + 1
@@ -133,7 +142,7 @@ impl BatchAggregator {
     fn is_missed_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
         match self.batch_id {
             Some(self_batch_id) => {
-                if batch_id > self_batch_id {
+                if Self::is_new_batch(batch_id, self_batch_id) {
                     self.batch_state.is_some() || fragment_id > 0
                 } else {
                     assert!(

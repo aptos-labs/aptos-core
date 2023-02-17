@@ -79,6 +79,7 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
+    "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
@@ -219,6 +220,7 @@ aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
+aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
@@ -331,7 +333,6 @@ crossbeam-queue = "0.3.5"
 curve25519-dalek = "3"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
-deadpool-redis = "0.8.0"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }

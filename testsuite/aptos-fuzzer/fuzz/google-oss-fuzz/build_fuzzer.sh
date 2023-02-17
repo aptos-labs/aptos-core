@@ -1,5 +1,5 @@
 #!/bin/bash -eux
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # this file builds a single fuzzer target

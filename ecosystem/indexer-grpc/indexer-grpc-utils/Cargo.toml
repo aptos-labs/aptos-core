@@ -8,5 +8,6 @@ edition = "2021"
 anyhow = { workspace = true }
 cloud-storage = { workspace = true }
 futures-util = { workspace = true }
+redis = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
