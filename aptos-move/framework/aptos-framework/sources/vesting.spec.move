@@ -45,7 +45,7 @@ spec aptos_framework::vesting {
     }
 
     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
-        // Verification out of resources/timeout
+        // TODO: Verification out of resources/timeout
         pragma verify = false;
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
         let vesting_contract = global<VestingContract>(vesting_contract_address);
@@ -73,7 +73,7 @@ spec aptos_framework::vesting {
     }
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
-        // Uses `total_accumulated_rewards` which is not verified.
+        // TODO: Uses `total_accumulated_rewards` which is not verified.
         pragma verify = false;
     }
 
@@ -97,7 +97,7 @@ spec aptos_framework::vesting {
     }
 
     spec create_vesting_contract {
-        // Data invariant does not hold.
+        // TODO: Data invariant does not hold.
         pragma verify = false;
     }
 
@@ -137,7 +137,7 @@ spec aptos_framework::vesting {
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
-        // Call of the `staking_contract::distribute`.
+        // TODO: Calls `staking_contract::distribute`.
         pragma aborts_if_is_partial;
         include VerifyAdminAbortsIf;
         let vesting_contract = global<VestingContract>(contract_address);
@@ -150,7 +150,7 @@ spec aptos_framework::vesting {
         new_operator: address,
         commission_percentage: u64,
     ) {
-        // Call of the `staking_contract::switch_operator`.
+        // TODO: Calls `staking_contract::switch_operator`.
         pragma aborts_if_is_partial;
         include VerifyAdminAbortsIf;
     }
@@ -291,12 +291,12 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
-        // Calls `staking_contract::unlock_stake`.
+        // TODO: Calls `staking_contract::unlock_stake`.
         pragma verify = false;
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
-        // Calls `staking_contract::distribute`.
+        // TODO: Calls `staking_contract::distribute`.
         pragma verify = false;
     }
 
