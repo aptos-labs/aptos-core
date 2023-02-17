@@ -34,7 +34,7 @@ impl NetworkLoadTest for NetworkBandwidthTest {
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
