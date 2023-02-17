@@ -17,6 +17,7 @@ pub struct CommitVote {
     author: Author,
     ledger_info: LedgerInfo,
     signature: bls12381::Signature,
+    bytes: Vec<u8>, // bytes to emulate the VRF shares
 }
 
 // this is required by structured log
@@ -43,12 +44,14 @@ impl CommitVote {
         author: Author,
         ledger_info_placeholder: LedgerInfo,
         validator_signer: &ValidatorSigner,
+        size: usize,
     ) -> Result<Self, CryptoMaterialError> {
         let signature = validator_signer.sign(&ledger_info_placeholder)?;
         Ok(Self::new_with_signature(
             author,
             ledger_info_placeholder,
             signature,
+            size,
         ))
     }
 
@@ -57,11 +60,14 @@ impl CommitVote {
         author: Author,
         ledger_info: LedgerInfo,
         signature: bls12381::Signature,
+        size: usize,
     ) -> Self {
+        let bytes: Vec<u8> = vec![u8::MAX; size];
         Self {
             author,
             ledger_info,
             signature,
+            bytes,
         }
     }
 
