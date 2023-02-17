@@ -37,7 +37,7 @@ use std::sync::{
 };
 use tokio::time::{Duration, Instant};
 
-pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 60000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 #[derive(Debug, Default)]
