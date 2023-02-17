@@ -441,7 +441,7 @@ options:
 
 ```
 
-### Step 9.1 Understand keyfiles
+### Step 9.1 Keyfiles
 
 Unlike the `aptos` CLI which stores private keys in plain text on disk, AMEE encrypts single-signer private keys in a [JSON](https://docs.python.org/3/library/json.html) keyfile format with password protection:
 
@@ -541,3 +541,1048 @@ sh ../examples/multisig.sh keyfiles
 :::tip
 Try running the shell script yourself, then experiment with variations on the commands!
 :::
+
+### Step 9.2 Metafiles
+
+AMEE manages multisig account metadata through metafiles, which assimilate information from multiple single-signer keyfiles.
+
+The below demo script, also in `multisig.sh`, demonstrates assorted metafile operations:
+
+| Command                | Use                                                              |
+|------------------------|------------------------------------------------------------------|
+| `metafile incorporate` | Incorporate multiple signers into a multisig metafile            |
+| `metafile threshold`   | Modify the threshold, outputting a new metafile                  |
+| `metafile append`      | Append a new signatory or signatories, outputting a new metafile |
+| `metafile remove`      | Remove a signatory or signatories, outputting a new metafile     |
+
+```zsh title=Command
+sh ../examples/multisig.sh keyfiles
+```
+
+The first part of the demo generates a vanity account for both Ace and Bee, via the `--vanity-prefix` argument, which mines an account having a matching authentication key prefix. Note also the use of the `--use-test-password` command to reduce password inputs for the demo process:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_ace_bee
+```
+
+```zsh title=Output
+=== Generate vanity account for Ace ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at ace.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Ace",
+    "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a",
+    "authentication_key": "0xace34c150c214397f17f3374bb9bca9d56ae9ad80c5cc26e5e3104ba2e72132a",
+    "encrypted_private_key": "0x674141414141426a37753267476d4e49386b636d6577514b3172355f356c6c49426b545861715859667268646e343137337a4d524d52454f487a4766725078686d576834346b6344754231455338525a6d344b36692d684941376c7346326c7a33364a6f4a6b3472315f62564d424e54483062354737675275476d5a41315a6d33773044376863536a4c424b",
+    "salt": "0x0248e25cfe88b9f00bfb1948df6791f9"
+}
+
+
+=== Generate vanity account for Bee ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at bee.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Bee",
+    "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6",
+    "authentication_key": "0xbeea9f7d3365f1c95348b803297081458eb77babc4c059518e3453b398653349",
+    "encrypted_private_key": "0x674141414141426a377532674659654e366c34566e77457077705065626566583167697a66434c635138496e594875334b70586c37437034566f4d6d686943376937483255366c314f5a46674d4e5a6c3852442d7267796d4c345376443444645249572d4a497353796d2d78743451355a5f6a376e4a546e554e4277483978626a6f59515346755f73373750",
+    "salt": "0x16312e818976ccf60dae4006f0161c12"
+}
+
+```
+
+Next, Ace and Bee are incorporated into a 1-of-2 multisig via `metafile incorporate`:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_incorporate
+```
+
+```zsh title=Output
+=== Incorporate Ace and Bee into 1-of-2 multisig ===
+
+
+Multisig metafile now at ace_and_bee.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Ace and Bee",
+    "address": null,
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e601",
+    "authentication_key": "0x9e6413fac20e0d493c78b6a7744d71c8ad772796e7dcd3f78bf5d647d6a31afe",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a",
+            "authentication_key": "0xace34c150c214397f17f3374bb9bca9d56ae9ad80c5cc26e5e3104ba2e72132a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6",
+            "authentication_key": "0xbeea9f7d3365f1c95348b803297081458eb77babc4c059518e3453b398653349"
+        }
+    ]
+}
+```
+
+The `metafile threshold` command is used to increase the threshold to two signatures:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_threshold
+```
+
+```zsh title=Output
+=== Increase threshold to two signatures ===
+
+
+Multisig metafile now at ace_and_bee_increased.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Ace and Bee increased",
+    "address": null,
+    "threshold": 2,
+    "n_signatories": 2,
+    "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e602",
+    "authentication_key": "0x7a66bb589973c243e91251bdf26e43b47b7e0297e713ab48428d0b489b9618f8",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a",
+            "authentication_key": "0xace34c150c214397f17f3374bb9bca9d56ae9ad80c5cc26e5e3104ba2e72132a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6",
+            "authentication_key": "0xbeea9f7d3365f1c95348b803297081458eb77babc4c059518e3453b398653349"
+        }
+    ]
+}
+```
+
+Now Cad and Dee have vanity accounts generated as well:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_cad_dee
+```
+
+```zsh title=Output
+=== Generate vanity account for Cad ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at cad.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Cad",
+    "public_key": "0x774ffbf31e70681a795a61d5c8e47fa05e5088925ffa27d7eeb8e16d8bd1d5bb",
+    "authentication_key": "0xcad97c90570bdecf8737d3317604291f6c4cdd6f4651924c79eded5c9c4d0da7",
+    "encrypted_private_key": "0x674141414141426a37753269346d665469474f3873507459687531424470516831675a6b4c4541595936444f4b42694e567a444f346a38457764536955745144424a7a7454535f594777425764373238414d527a43455f39444270727a767a4d70676c544236665141574141674a4d777a4c32543056357453474b34724765395254536a7a33456774656434",
+    "salt": "0xdef251c71a113c7ddbbafc2881f297ed"
+}
+
+
+=== Generate vanity account for Dee ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at dee.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Dee",
+    "public_key": "0x159481f2929ba902f4640815ca27662843e2090438ea0db630e4addb150741a7",
+    "authentication_key": "0xdeee312ec51d2f30f4291fa3105d907237b2550afcb9e608192f1b44af5cd747",
+    "encrypted_private_key": "0x674141414141426a377532695a416d6335623373304a4c456165784a44655955414830456f5a78737a6e704165677072356d474332435467756c675a70343566372d32704b716e314d3744737456326375716133502d4a7647363758773152686270656a583033746775515758564f4e326c744361486c56345a4c4f466b7878556b55356b4b536e47636764",
+    "salt": "0x027b97dac9ab2f60f847e51dd71ddf35"
+}
+
+```
+
+Now Cad and Dee are appended to the first multisig metafile via `metafile append`:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_append
+```
+
+```zsh title=Output
+
+=== Append Cad and Dee to 3-of-4 multisig ===
+
+
+Multisig metafile now at cad_and_dee_added.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Cad and Dee added",
+    "address": null,
+    "threshold": 3,
+    "n_signatories": 4,
+    "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6774ffbf31e70681a795a61d5c8e47fa05e5088925ffa27d7eeb8e16d8bd1d5bb159481f2929ba902f4640815ca27662843e2090438ea0db630e4addb150741a703",
+    "authentication_key": "0x2fc0693aed20883859cb9a03e25c31943267d91d6062992e56c251496d793ec9",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x198fed1db594fc9df0b926cef3a17471e394b627506a2bba37e71c7b7186898a",
+            "authentication_key": "0xace34c150c214397f17f3374bb9bca9d56ae9ad80c5cc26e5e3104ba2e72132a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6",
+            "authentication_key": "0xbeea9f7d3365f1c95348b803297081458eb77babc4c059518e3453b398653349"
+        },
+        {
+            "signatory": "Cad",
+            "public_key": "0x774ffbf31e70681a795a61d5c8e47fa05e5088925ffa27d7eeb8e16d8bd1d5bb",
+            "authentication_key": "0xcad97c90570bdecf8737d3317604291f6c4cdd6f4651924c79eded5c9c4d0da7"
+        },
+        {
+            "signatory": "Dee",
+            "public_key": "0x159481f2929ba902f4640815ca27662843e2090438ea0db630e4addb150741a7",
+            "authentication_key": "0xdeee312ec51d2f30f4291fa3105d907237b2550afcb9e608192f1b44af5cd747"
+        }
+    ]
+}
+
+```
+
+Finally, Ace and Dee are removed from the resultant multisig via `metafile remove` to produce another 1-of-2 multisig:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh metafiles_remove
+```
+
+```zsh title=Output
+
+=== Remove Ace and Dee for 1-of-2 multisig ===
+
+
+Multisig metafile now at ace_and_dee_removed.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Ace and Dee removed",
+    "address": null,
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6774ffbf31e70681a795a61d5c8e47fa05e5088925ffa27d7eeb8e16d8bd1d5bb01",
+    "authentication_key": "0xeef31014c0e711722bf1b652188d0829d71d27aa05cfe25e31bdc38a0ebc5ffd",
+    "signatories": [
+        {
+            "signatory": "Bee",
+            "public_key": "0x7bf9cbad4386d95c239f0b2b186a3b970e0c9bd0914eaaec00756abf5ea675e6",
+            "authentication_key": "0xbeea9f7d3365f1c95348b803297081458eb77babc4c059518e3453b398653349"
+        },
+        {
+            "signatory": "Cad",
+            "public_key": "0x774ffbf31e70681a795a61d5c8e47fa05e5088925ffa27d7eeb8e16d8bd1d5bb",
+            "authentication_key": "0xcad97c90570bdecf8737d3317604291f6c4cdd6f4651924c79eded5c9c4d0da7"
+        }
+    ]
+}
+```
+
+Thus far all AMEE operations have been conducted off-chain, because the relevant keyfile and metafile operations have simply involved public keys, private keys, and authentication keys.
+
+As such, all multisig metafiles have `"address": null`, since there is an on-chain account address has not yet been linked with any of the multisig accounts.
+
+### Step 9.3 Authentication key rotation
+
+In this section, the authentication key for Ace's vanity account will be rotated to a 1-of-2 multisig including Ace and Bee, then to a 2-of-2 multisig, and finally back to Ace as a single signer.
+Here the demo script uses devnet to automatically fund Ace's account from the faucet, but note that Bee's account does not need to be funded, because only her *signature* is required throughout operations.
+
+In general, authentication key rotation can be used to "convert" a single-signer account to a multisig account, to modify signatories or the threshold of a multisig account, and to convert a multisig account back to a single-signer account.
+
+| Command                      | Use                                                              |
+|------------------------------|------------------------------------------------------------------|
+| `rotate challenge propose`   | Propose a rotation proof challenge                               |
+| `rotate challenge sign`      | Sign a rotation proof challenge                                  |
+| `rotate transaction propose` | Propose key rotation transaction for multisig account            |
+| `rotate transaction sign`    | Sign key rotation transaction for multisig account               |
+| `rotate execute single`      | Execute key rotation transaction from single-signer account      |
+| `rotate execute multisig`    | Execute key rotation transaction from multisig account           |
+
+:::tip
+The next few demos use the Aptos devnet, which has historically been reset each Thursday.
+Make sure devnet is live when you try running the examples!
+:::
+
+```zsh title=Command
+sh ../examples/multisig.sh rotate
+```
+
+First, generate a vanity account for Ace and Bee, funding Ace since his account will need to pay for authentication key rotation transactions:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_prep_accounts
+```
+
+Note that the `keyfile fund` command is used to wrap a call to the `aptos` CLI:
+
+```zsh title=Output
+=== Generate vanity account for Ace ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at ace.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Ace",
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "encrypted_private_key": "0x674141414141426a37762d5074594a4e397066647776426b59666a7043616a52736a51516f785279496359356e41336a646a6d4852652d5657534a5f554b4c774e4e716a713976416d7334423941526858493763614865444c735039685f47484a3530717557374e6e4e31794c6364625a347436747a4b4b4858576d4a4c384e6b386b556779553279586565",
+    "salt": "0x3b98be7c51cfd4aa511d2e7050c714af"
+}
+
+
+=== Generate vanity account for Bee ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at bee.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Bee",
+    "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+    "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3",
+    "encrypted_private_key": "0x674141414141426a37762d515752725870697532417937533431445a495779357934625f38624a7948536761326c3433543944484967756e5978483259615369446f394331493969567a6f54475767395930614c4a49537a4d74574f5042466e6533375143587a73517a3843373848576a626b47715a59754a587742616b6d6367455f554d79726b46625242",
+    "salt": "0x6b659b567324ce0883483240bfa77241"
+}
+
+
+=== Fund Ace on devnet ===
+
+
+Running aptos CLI command: aptos account fund-with-faucet --account 0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a --faucet-url https://faucet.devnet.aptoslabs.com --url https://fullnode.devnet.aptoslabs.com/v1
+New balance: 100000000
+```
+
+Next incorporate Ace and Bee into a multisig account, proposing a rotation challenge to the multisig account:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_convert_multisig
+```
+
+Here, since the multisig account has a threshold of 1, only Ace needs to sign the rotation proof challenge.
+Then he can initiate the authentication key rotation transaction from his account:
+
+```zsh title=Output
+=== Incorporate to 1-of-2 multisig ===
+
+
+Multisig metafile now at initial.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Initial",
+    "address": null,
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+    "authentication_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+
+
+=== Propose rotation challenge for rotating to multisig ===
+
+
+Rotation proof challenge proposal now at initial.challenge_proposal:
+{
+    "filetype": "Rotation proof challenge proposal",
+    "description": "Initial",
+    "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+    "from_is_single_signer": true,
+    "to_is_single_signer": false,
+    "sequence_number": 0,
+    "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "current_auth_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+    "chain_id": 44,
+    "expiry": "2030-01-01T00:00:00"
+}
+
+
+=== Have Ace sign challenge proposal ===
+
+
+Using test password.
+Rotation proof challenge signature now at ace_initial.challenge_signature:
+{
+    "filetype": "Rotation proof challenge signature",
+    "description": "Ace initial",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Initial",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "from_is_single_signer": true,
+        "to_is_single_signer": false,
+        "sequence_number": 0,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+    },
+    "signature": "0x4e5fcde82936f9160c37234945e0dfb4ba8c4424242b4589e054136bcecc2c65f02f021fcd412a168825edd8d3ab69eb4dd2ccecba59328ffd6061af88a8af05"
+}
+
+
+=== Have Ace execute rotation from single-signer account ===
+
+
+Using test password.
+Transaction successful: 0xc4e0c3e2b3d3d2195cbc98c068b0619f5bb0020af8db1cac375eab5efce3b1a4
+Updating address in multisig metafile.
+Multisig metafile now at initial.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Initial",
+    "address": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+    "authentication_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+```
+
+Note that after the successful rotation transaction, the `"address"` field of the multisig metafile has been updated to the vanity address starting with `0xace`.
+
+Now, propose a threshold increase to 2 signatories:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_increase_propose
+```
+
+In this case, Ace and Bee both need to sign the rotation proof challenge since the account is rotating to a 2-of-2 multisig:
+
+```zsh title=Output
+=== Increase metafile threshold to two signatures ===
+
+
+Multisig metafile now at increased.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Increased",
+    "address": null,
+    "threshold": 2,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+    "authentication_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+
+
+=== Propose rotation challenge for increasing threshold ===
+
+
+Rotation proof challenge proposal now at increase.challenge_proposal:
+{
+    "filetype": "Rotation proof challenge proposal",
+    "description": "Increase",
+    "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+    "from_is_single_signer": false,
+    "to_is_single_signer": false,
+    "sequence_number": 1,
+    "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "current_auth_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+    "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+    "chain_id": 44,
+    "expiry": "2030-01-01T00:00:00"
+}
+
+
+=== Have Ace sign challenge proposal ===
+
+
+Using test password.
+Rotation proof challenge signature now at ace_increase.challenge_signature:
+{
+    "filetype": "Rotation proof challenge signature",
+    "description": "Ace increase",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Increase",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+        "from_is_single_signer": false,
+        "to_is_single_signer": false,
+        "sequence_number": 1,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+    },
+    "signature": "0x9e889c195507116c757336398e549d47216fa15612b4d36d06d3c7ad4107f87e7745a21874c8a7da2e78b299669170f574254731ace5dd2f7b9263d322f7d60e"
+}
+
+
+=== Have Bee sign challenge proposal ===
+
+
+Using test password.
+Rotation proof challenge signature now at bee_increase.challenge_signature:
+{
+    "filetype": "Rotation proof challenge signature",
+    "description": "Bee increase",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Increase",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+        "from_is_single_signer": false,
+        "to_is_single_signer": false,
+        "sequence_number": 1,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Bee",
+        "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+        "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+    },
+    "signature": "0xd8e2c539b8004979c4091ae0318e8c3441629133e3158d9de25a6c74bd6fba0c442757f4390f8f2207af23043604bb87c59c209db680e6186e0b848fcea46a0c"
+}
+```
+
+Now that the rotation proof challenge has been signed, the rotation transaction can be proposed.
+Note that even though Ace and Bee both needed to sign the challenge (since the account to rotate to requires two signatures), only one of them needs to sign the transaction proposal (since the account undergoing rotation is originally 1-of-2).
+Here, only Bee signs the transaction proposal, then the transaction can be executed.
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_increase_execute
+```
+
+```zsh title=Output
+=== Propose rotation transaction ===
+
+
+Rotation transaction proposal now at increase.rotation_transaction_proposal:
+{
+    "filetype": "Rotation transaction proposal",
+    "description": "Increase",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Increase",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+        "from_is_single_signer": false,
+        "to_is_single_signer": false,
+        "sequence_number": 1,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "challenge_from_signatures": [
+        {
+            "signatory": {
+                "signatory": "Ace",
+                "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+            },
+            "signature": "0x9e889c195507116c757336398e549d47216fa15612b4d36d06d3c7ad4107f87e7745a21874c8a7da2e78b299669170f574254731ace5dd2f7b9263d322f7d60e"
+        }
+    ],
+    "challenge_to_signatures": [
+        {
+            "signatory": {
+                "signatory": "Ace",
+                "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+            },
+            "signature": "0x9e889c195507116c757336398e549d47216fa15612b4d36d06d3c7ad4107f87e7745a21874c8a7da2e78b299669170f574254731ace5dd2f7b9263d322f7d60e"
+        },
+        {
+            "signatory": {
+                "signatory": "Bee",
+                "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+                "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+            },
+            "signature": "0xd8e2c539b8004979c4091ae0318e8c3441629133e3158d9de25a6c74bd6fba0c442757f4390f8f2207af23043604bb87c59c209db680e6186e0b848fcea46a0c"
+        }
+    ]
+}
+
+
+=== Have Bee only sign rotation transaction proposal ===
+
+
+Using test password.
+Rotation transaction signature now at bee_increase.rotation_transaction_signature:
+{
+    "filetype": "Rotation transaction signature",
+    "description": "Bee increase",
+    "transaction_proposal": {
+        "filetype": "Rotation transaction proposal",
+        "description": "Increase",
+        "challenge_proposal": {
+            "filetype": "Rotation proof challenge proposal",
+            "description": "Increase",
+            "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+            "from_is_single_signer": false,
+            "to_is_single_signer": false,
+            "sequence_number": 1,
+            "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+            "current_auth_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+            "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+            "chain_id": 44,
+            "expiry": "2030-01-01T00:00:00"
+        },
+        "challenge_from_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0x9e889c195507116c757336398e549d47216fa15612b4d36d06d3c7ad4107f87e7745a21874c8a7da2e78b299669170f574254731ace5dd2f7b9263d322f7d60e"
+            }
+        ],
+        "challenge_to_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0x9e889c195507116c757336398e549d47216fa15612b4d36d06d3c7ad4107f87e7745a21874c8a7da2e78b299669170f574254731ace5dd2f7b9263d322f7d60e"
+            },
+            {
+                "signatory": {
+                    "signatory": "Bee",
+                    "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+                    "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+                },
+                "signature": "0xd8e2c539b8004979c4091ae0318e8c3441629133e3158d9de25a6c74bd6fba0c442757f4390f8f2207af23043604bb87c59c209db680e6186e0b848fcea46a0c"
+            }
+        ]
+    },
+    "signatory": {
+        "signatory": "Bee",
+        "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+        "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+    },
+    "signature": "0xdd38f37d861d6bba653040e661295747744b3bfa952d266cb114114f68b2ae5b46af25483c20ec5a70f4774f6bb05d74be193d17970bf5e06e1282392e76070c"
+}
+
+
+=== Submit rotation transaction ===
+
+
+Transaction successful: 0x6e4675bdd5b4873c2d26797b39d44e0244182d2d11a979212b4e3d3f570cd0e1
+Updating address in multisig metafile.
+Multisig metafile now at initial.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Initial",
+    "address": null,
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b01",
+    "authentication_key": "0x4256f6a9293fd19642a5042c99dc772cac5afe6f4c1f5727794feb5aa324ac77",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+Updating address in multisig metafile.
+Multisig metafile now at increased.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Increased",
+    "address": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "threshold": 2,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+    "authentication_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+```
+
+Note that the `"address"` field of `initial.multisig` has been set to `null`, and `increased.multisig` now reflects the vanity address starting with `0xace`.
+
+Next, propose a rotation proof challenge for rotating the account back to have Ace as a single signer:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_convert_single_propose
+```
+
+Here, Ace and Bee both need to sign the proposal since the account undergoing rotation is a 2-of-2 multisig:
+
+```zsh title=Output
+=== Propose rotation challenge for rotating back to Ace ===
+
+Rotation proof challenge proposal now at return.challenge_proposal:
+{
+    "filetype": "Rotation proof challenge proposal",
+    "description": "Return",
+    "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+    "from_is_single_signer": false,
+    "to_is_single_signer": true,
+    "sequence_number": 2,
+    "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+    "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+    "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+    "chain_id": 44,
+    "expiry": "2030-01-01T00:00:00"
+}
+
+
+=== Have Ace sign challenge proposal ===
+
+
+Using test password.
+Rotation proof challenge signature now at ace_return.challenge_signature:
+{
+    "filetype": "Rotation proof challenge signature",
+    "description": "Ace return",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Return",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "from_is_single_signer": false,
+        "to_is_single_signer": true,
+        "sequence_number": 2,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+    },
+    "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+}
+
+
+=== Have Bee sign challenge proposal ===
+
+
+Using test password.
+Rotation proof challenge signature now at bee_return.challenge_signature:
+{
+    "filetype": "Rotation proof challenge signature",
+    "description": "Bee return",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Return",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "from_is_single_signer": false,
+        "to_is_single_signer": true,
+        "sequence_number": 2,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Bee",
+        "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+        "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+    },
+    "signature": "0xdbc73adcce8e942e11a5ae0d4f9db57ce7055a279b9a436d5ad98a458ace0f27fb95b52569b5b8f290a21e23bfbe3d6c2717217c92d1cdeeb2d7d68aed41660c"
+}
+```
+
+Now that both challenge signatures are available, a transaction from the multisig account can be proposed and executed:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh rotate_convert_single_execute
+```
+
+In this case, both Ace and Bee have to sign the transaction since the account undergoing rotation starts off as a 2-of-2 multisig:
+
+```zsh title=Output
+=== Propose rotation transaction ===
+
+
+Rotation transaction proposal now at return.rotation_transaction_proposal:
+{
+    "filetype": "Rotation transaction proposal",
+    "description": "Return",
+    "challenge_proposal": {
+        "filetype": "Rotation proof challenge proposal",
+        "description": "Return",
+        "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+        "from_is_single_signer": false,
+        "to_is_single_signer": true,
+        "sequence_number": 2,
+        "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+        "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+        "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "chain_id": 44,
+        "expiry": "2030-01-01T00:00:00"
+    },
+    "challenge_from_signatures": [
+        {
+            "signatory": {
+                "signatory": "Ace",
+                "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+            },
+            "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+        },
+        {
+            "signatory": {
+                "signatory": "Bee",
+                "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+                "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+            },
+            "signature": "0xdbc73adcce8e942e11a5ae0d4f9db57ce7055a279b9a436d5ad98a458ace0f27fb95b52569b5b8f290a21e23bfbe3d6c2717217c92d1cdeeb2d7d68aed41660c"
+        }
+    ],
+    "challenge_to_signatures": [
+        {
+            "signatory": {
+                "signatory": "Ace",
+                "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+            },
+            "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+        }
+    ]
+}
+
+
+=== Have Ace sign rotation transaction proposal ===
+
+
+Using test password.
+Rotation transaction signature now at ace_return.rotation_transaction_signature:
+{
+    "filetype": "Rotation transaction signature",
+    "description": "Ace return",
+    "transaction_proposal": {
+        "filetype": "Rotation transaction proposal",
+        "description": "Return",
+        "challenge_proposal": {
+            "filetype": "Rotation proof challenge proposal",
+            "description": "Return",
+            "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+            "from_is_single_signer": false,
+            "to_is_single_signer": true,
+            "sequence_number": 2,
+            "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+            "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+            "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "chain_id": 44,
+            "expiry": "2030-01-01T00:00:00"
+        },
+        "challenge_from_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+            },
+            {
+                "signatory": {
+                    "signatory": "Bee",
+                    "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+                    "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+                },
+                "signature": "0xdbc73adcce8e942e11a5ae0d4f9db57ce7055a279b9a436d5ad98a458ace0f27fb95b52569b5b8f290a21e23bfbe3d6c2717217c92d1cdeeb2d7d68aed41660c"
+            }
+        ],
+        "challenge_to_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+            }
+        ]
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+        "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+    },
+    "signature": "0xc0fe90d7274bfc9b1bea0e941dbbf4a11e28eabbefdd61b95e2e43ae4e2083eefa08f64c69938be5d58c1701f7850f3a1b493a7bf486799aaeba520d95c7f80e"
+}
+
+
+=== Have Bee sign rotation transaction proposal ===
+
+
+Using test password.
+Rotation transaction signature now at bee_return.rotation_transaction_signature:
+{
+    "filetype": "Rotation transaction signature",
+    "description": "Bee return",
+    "transaction_proposal": {
+        "filetype": "Rotation transaction proposal",
+        "description": "Return",
+        "challenge_proposal": {
+            "filetype": "Rotation proof challenge proposal",
+            "description": "Return",
+            "from_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+            "from_is_single_signer": false,
+            "to_is_single_signer": true,
+            "sequence_number": 2,
+            "originator": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a",
+            "current_auth_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+            "new_public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "chain_id": 44,
+            "expiry": "2030-01-01T00:00:00"
+        },
+        "challenge_from_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+            },
+            {
+                "signatory": {
+                    "signatory": "Bee",
+                    "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+                    "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+                },
+                "signature": "0xdbc73adcce8e942e11a5ae0d4f9db57ce7055a279b9a436d5ad98a458ace0f27fb95b52569b5b8f290a21e23bfbe3d6c2717217c92d1cdeeb2d7d68aed41660c"
+            }
+        ],
+        "challenge_to_signatures": [
+            {
+                "signatory": {
+                    "signatory": "Ace",
+                    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+                    "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+                },
+                "signature": "0xdb3e1c896703eedcbad0854ccbf5d87287c61885ea7490ed1f70560f23f9faf7a3278f04cf01ed9714236ab7e4fd0637889691dea197520cb28d5da0fbc4f401"
+            }
+        ]
+    },
+    "signatory": {
+        "signatory": "Bee",
+        "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+        "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+    },
+    "signature": "0xafec5c906b5800848f6bede2fc313cf2a7565d298d4fcb43c1bb31040a2e405ed7a0e2941ef0650d6efa30702f51b97a4c1e02b5584a4b1fc20d07136c28a70f"
+}
+
+
+=== Submit rotation transaction ===
+
+
+Transaction successful: 0x1c91d97ef2d9bfb9a09a0dbd1c34d272fa957d2468301d65e5e9d07068291373
+Updating address in multisig metafile.
+Multisig metafile now at increased.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Increased",
+    "address": null,
+    "threshold": 2,
+    "n_signatories": 2,
+    "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf75bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b02",
+    "authentication_key": "0x3894d1a4d7b3a59e6b86c4fff71d6531315199fdb873f87a5b9fe30cf3b50315",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0x6691a5a2bc421a3b3049614a30c506b1ce0ecbc2a780fb843bf5cfba2b386bf7",
+            "authentication_key": "0xace3e630afa569ce67bcb98de667d6a8323f02c4d5f77cead0cc41bedc172f1a"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0x5bb9f4793e76a2320aba7151706ff2ed79cb0a5a8254312dbdb15c042165e04b",
+            "authentication_key": "0xbeec0429e5e8afdd98d39fb5fbfcd608e438ea87d9d0dd1d5ba8fe23c2db21a3"
+        }
+    ]
+}
+
+```
+
+Note that after the rotation, the metafile has been updated with `"address": null`
+
+In practice, note that the consensus mechanism will probably entail something like the following:
+
+1. Ace and Bee independently generate single-signer keyfiles.
+2. One of them, for example Ace, acts as a "scribe", so Bee sends her keyfile to Ace
+3. Ace then uses the appropriate `metafile` and `rotate` subcommands to propose rotation proof challenges, rotation transactions, etc. (note that Bee's private key is encrypted so this is not a security threat).
+4. Ace sends proposals over to Bee, then Bee signs them and sends her signature files back to Ace.
+5. Ace signs locally, then executes transactions using his and Bee's signature files.
+
+Theoretically this can be scaled to as many as 32 independent signatories, but note that higher numbers of signatories introduce logistical complexities (e.g. sending signature files back and forth in a group chat, or running shell commands with 32 arguments).

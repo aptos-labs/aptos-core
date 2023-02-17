@@ -1704,6 +1704,7 @@ def rotate_execute_multisig(args):
     update_multisig_address(args.metafile, None)
     # If just rotated to a multisig account:
     if not proposal["challenge_proposal"]["to_is_single_signer"]:
+        assert args.to_metafile is not None, "Must specify to metafile."
         update_multisig_address(
             args.to_metafile, proposal["challenge_proposal"]["originator"]
         )  # Update metafile address for account just rotated to.
