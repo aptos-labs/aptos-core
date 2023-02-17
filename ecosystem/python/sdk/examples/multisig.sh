@@ -28,8 +28,16 @@ heading() {
     print_lines 2
 }
 
+# Wait for user to press Enter.
+wait() {
+    print_lines 2
+    read -p "Press Enter to continue..."
+}
+
 
 # Helper functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+# Demo scripts >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 # Return if no arguments passed
 if test "$#" = 0; then echo No subscript specified
@@ -114,11 +122,15 @@ elif test $1 = keyfiles; then
     poetry run python amee.py keyfile generate \
         The Aptos Foundation # <:!:generate_keyfile
 
+    wait
+
     heading Extract
     # :!:>extract_keyfile
     poetry run python amee.py k extract \
         the_aptos_foundation.keyfile \
         the_aptos_foundation.account_store # <:!:extract_keyfile
+
+    wait
 
     heading Generate from store
     # :!:>generate_from_store
@@ -127,15 +139,21 @@ elif test $1 = keyfiles; then
         --account-store the_aptos_foundation.account_store \
         --outfile from_store.keyfile # <:!:generate_from_store
 
+    wait
+
     heading Change password
     # :!:>change_password
     poetry run python amee.py keyfile change-password \
         from_store.keyfile # <:!:change_password
 
+    wait
+
     heading Verify
     # :!:>verify_password
     poetry run python amee.py keyfile verify \
         from_store.keyfile # <:!:verify_password
+
+    wait
 
     heading Deleting keyfiles and account store
 
@@ -164,6 +182,8 @@ elif test $1 = metafiles; then
         --vanity-prefix 0xbee \
         --use-test-password # <:!:metafiles_ace_bee
 
+    wait
+
     # :!:>metafiles_incorporate
     heading Incorporate Ace and Bee into 1-of-2 multisig
 
@@ -174,6 +194,8 @@ elif test $1 = metafiles; then
             ace.keyfile \
             bee.keyfile # <:!:metafiles_incorporate
 
+    wait
+
     # :!:>metafiles_threshold
     heading Increase threshold to two signatures
 
@@ -182,6 +204,7 @@ elif test $1 = metafiles; then
         2 \
         Ace and Bee increased # <:!:metafiles_threshold
 
+    wait
 
     # :!:>metafiles_cad_dee
     heading Generate vanity account for Cad
@@ -198,6 +221,8 @@ elif test $1 = metafiles; then
         --vanity-prefix 0xdee \
         --use-test-password # <:!:metafiles_cad_dee
 
+    wait
+
     # :!:>metafiles_append
     heading Append Cad and Dee to 3-of-4 multisig
 
@@ -209,6 +234,8 @@ elif test $1 = metafiles; then
             cad.keyfile \
             dee.keyfile # <:!:metafiles_append
 
+    wait
+
     # :!:>metafiles_remove
     heading Remove Ace and Dee for 1-of-2 multisig
 
@@ -217,6 +244,8 @@ elif test $1 = metafiles; then
         1 \
         Ace and Dee removed \
         --signatories 0 3 # <:!:metafiles_remove
+
+    wait
 
     heading Deleting keyfiles and metafiles
 
@@ -252,6 +281,8 @@ elif test $1 = rotate; then
 
     poetry run python amee.py keyfile fund \
         ace.keyfile # <:!:rotate_prep_accounts
+
+    wait
 
     # :!:>rotate_convert_multisig
     heading Incorporate to 1-of-2 multisig
@@ -289,6 +320,8 @@ elif test $1 = rotate; then
         --use-test-password \
         --network devnet # <:!:rotate_convert_multisig
 
+    wait
+
     # :!:>rotate_increase_propose
     heading Increase metafile threshold to two signatures
 
@@ -322,6 +355,8 @@ elif test $1 = rotate; then
         Bee increase \
         --use-test-password # <:!:rotate_increase_propose
 
+    wait
+
     # :!:>rotate_increase_execute
     heading Propose rotation transaction
 
@@ -350,6 +385,8 @@ elif test $1 = rotate; then
         --to-metafile \
             increased.multisig # <:!:rotate_increase_execute
 
+    wait
+
     # :!:>rotate_convert_single_propose
     heading Propose rotation challenge for rotating back to Ace
 
@@ -375,6 +412,8 @@ elif test $1 = rotate; then
         bee.keyfile \
         Bee return \
         --use-test-password # <:!:rotate_convert_single_propose
+
+    wait
 
     # :!:>rotate_convert_single_execute
     heading Propose rotation transaction
@@ -412,6 +451,8 @@ elif test $1 = rotate; then
             bee_return.rotation_transaction_signature \
         --network devnet # <:!:rotate_convert_single_execute
 
+    wait
+
     heading Deleting JSON files
 
     rm -f *.keyfile
@@ -447,6 +488,8 @@ elif test $1 = govern; then
         --vanity-prefix 0xbee \
         --use-test-password # <:!:govern_prep_accounts
 
+    wait
+
     # :!:>govern_prep_multisig
     heading Incorporate to 1-of-2 multisig
 
@@ -461,6 +504,8 @@ elif test $1 = govern; then
 
     poetry run python amee.py metafile fund \
         protocol.multisig # <:!:govern_prep_multisig
+
+    wait
 
     # :!:>govern_publish
     heading Propose publication
@@ -490,6 +535,8 @@ elif test $1 = govern; then
         genesis.publication_signature \
         --network devnet # <:!:govern_publish
 
+    wait
+
     # :!:>govern_upgrade
     heading Propose upgrade
 
@@ -517,6 +564,8 @@ elif test $1 = govern; then
     poetry run python amee.py publish execute \
         upgrade.publication_signature \
         --network devnet # <:!:govern_upgrade
+
+    wait
 
     # :!:>govern_script
     heading Propose script invocation
@@ -547,6 +596,8 @@ elif test $1 = govern; then
         invoke.script_signature \
         --network devnet # <:!:govern_script
 
+    wait
+
     heading Deleting JSON files
 
     rm -f *.keyfile
@@ -559,3 +610,5 @@ elif test $1 = govern; then
 else echo Invalid subscript name
 
 fi
+
+# Demo scripts <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
