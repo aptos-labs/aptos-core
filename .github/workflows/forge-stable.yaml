@@ -87,7 +87,7 @@ jobs:
       FORGE_NAMESPACE: forge-three-region
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: three_region_simulation
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-three-region-different-node-speed:
     if: ${{ github.event_name != 'pull_request' }}
@@ -100,7 +100,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 3600
       FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
       FORGE_ENABLE_FAILPOINTS: true
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-consensus-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -112,7 +112,7 @@ jobs:
       FORGE_NAMESPACE: forge-consensus-stress-test
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: consensus_stress_test
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-account-creation-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -124,7 +124,7 @@ jobs:
       FORGE_NAMESPACE: forge-account-creation-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: account_creation
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-fullnode-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -136,7 +136,7 @@ jobs:
       FORGE_NAMESPACE: forge-fullnode-reboot-stress
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: fullnode_reboot_stress_test
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-state-sync-failures-catching-up-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -149,7 +149,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_failures_catching_up
       FORGE_ENABLE_FAILPOINTS: true
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-state-sync-perf-fullnode-apply-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -161,7 +161,7 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-performance-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -174,4 +174,4 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200
       FORGE_TEST_SUITE: land_blocking
       FORGE_ENABLE_PERFORMANCE: true
-      POST_TO_SLACK: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
