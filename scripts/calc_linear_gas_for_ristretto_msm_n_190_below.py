@@ -9,7 +9,7 @@ import re
 
 def load_us_datapoints(bench_name):
     sampled_data_points = [load_data_point.main(path) for path in glob(f'target/criterion/{bench_name}/*')]
-    sampled_data_points = [p for p in sampled_data_points if p!=None]
+    sampled_data_points = [p for p in sampled_data_points if p!=None and p[0]<190]
     sampled_data_points.sort()
     return sampled_data_points
 
@@ -35,10 +35,9 @@ def main(bench_name, gas_per_us, should_also_plot):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bench_name', required=True)
     parser.add_argument('--gas_per_us', required=True, type=float)
     parser.add_argument('--plot', action='store_true')
     args = parser.parse_args()
-    k,b = main(args.bench_name, args.gas_per_us, args.plot)
+    k,b = main('ristretto255/vartime_multiscalar_mul', args.gas_per_us, args.plot)
     data = {'k': k, 'b': b}
     print(json.dumps(data))
