@@ -223,7 +223,7 @@ elif test $1 = metafiles; then
     rm -f *.keyfile
     rm -f *.multisig
 
-# Authentication key rotation examples.
+# Demo authentication key rotation operations.
 elif test $1 = rotate; then
 
     rm -f *.keyfile
@@ -415,11 +415,147 @@ elif test $1 = rotate; then
     heading Deleting JSON files
 
     rm -f *.keyfile
-    rm -f *.metafile
     rm -f *.multisig
     rm -f *.challenge_proposal
     rm -f *.challenge_signature
     rm -f *.rotation_transaction_proposal
     rm -f *.rotation_transaction_signature
+
+
+# Demo governance operations.
+elif test $1 = govern; then
+
+    rm -f *.keyfile
+    rm -f *.multisig
+    rm -f *.publication_proposal
+    rm -f *.publication_signature
+    rm -f *.script_proposal
+    rm -f *.script_signature
+
+    # :!:>govern_prep_accounts
+    heading Generate vanity account for Ace
+
+    poetry run python amee.py keyfile generate \
+        Ace \
+        --vanity-prefix 0xace \
+        --use-test-password
+
+    heading Generate vanity account for Bee
+
+    poetry run python amee.py keyfile generate \
+        Bee \
+        --vanity-prefix 0xbee \
+        --use-test-password # <:!:govern_prep_accounts
+
+    # :!:>govern_prep_multisig
+    heading Incorporate to 1-of-2 multisig
+
+    poetry run python amee.py metafile incorporate \
+        1 \
+        Protocol \
+        --keyfiles \
+            ace.keyfile \
+            bee.keyfile
+
+    heading Fund multisig
+
+    poetry run python amee.py metafile fund \
+        protocol.multisig # <:!:govern_prep_multisig
+
+    # :!:>govern_publish
+    heading Propose publication
+
+    poetry run python amee.py publish propose \
+        protocol.multisig \
+        alnoki \
+        aptos-core \
+        1c26076f5f \
+        aptos-move/move-examples/upgrade_and_govern/v1_0_0/Move.toml \
+        upgrade_and_govern \
+        2030-12-31 \
+        Genesis \
+        --network devnet
+
+    heading Sign publication proposal
+
+    poetry run python amee.py publish sign \
+        genesis.publication_proposal \
+        ace.keyfile \
+        Genesis \
+        --use-test-password
+
+    heading Execute publication
+
+    poetry run python amee.py publish execute \
+        genesis.publication_signature \
+        --network devnet # <:!:govern_publish
+
+    # :!:>govern_upgrade
+    heading Propose upgrade
+
+    poetry run python amee.py publish propose \
+        protocol.multisig \
+        alnoki \
+        aptos-core \
+        1c26076f5f \
+        aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
+        upgrade_and_govern \
+        2030-12-31 \
+        Upgrade \
+        --network devnet
+
+    heading Sign upgrade proposal
+
+    poetry run python amee.py publish sign \
+        upgrade.publication_proposal \
+        ace.keyfile \
+        Upgrade \
+        --use-test-password
+
+    heading Execute upgrade
+
+    poetry run python amee.py publish execute \
+        upgrade.publication_signature \
+        --network devnet # <:!:govern_upgrade
+
+    # :!:>govern_script
+    heading Propose script invocation
+
+    poetry run python amee.py script propose \
+        protocol.multisig \
+        alnoki \
+        aptos-core \
+        1c26076f5f \
+        aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml \
+        upgrade_and_govern \
+        set_only \
+        2030-12-31 \
+        Invoke \
+        --network devnet
+
+    heading Sign invocation proposal
+
+    poetry run python amee.py script sign \
+        invoke.script_proposal \
+        ace.keyfile \
+        Invoke \
+        --use-test-password
+
+    heading Execute script invocation
+
+    poetry run python amee.py script execute \
+        invoke.script_signature \
+        --network devnet # <:!:govern_script
+
+    heading Deleting JSON files
+
+    rm -f *.keyfile
+    rm -f *.multisig
+    rm -f *.publication_proposal
+    rm -f *.publication_signature
+    rm -f *.script_proposal
+    rm -f *.script_signature
+
+else echo Invalid subscript name
 
 fi

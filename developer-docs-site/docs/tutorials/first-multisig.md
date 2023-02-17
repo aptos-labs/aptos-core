@@ -362,10 +362,10 @@ As a result, there is a significant amount of overhead required to implement a b
 
 To expedite this process, the Python SDK thus provides the Aptos Multisig Execution Expeditor (AMEE), a command-line tool that facilitates general multisig workflows through straightforward data structures and function calls.
 
-To use AMEE, navigate to the Python SDK directory:
+To use AMEE, navigate to the Python SDK package directory:
 
 ```zsh
-cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk
+cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/aptos_sdk
 ```
 
 Then call up the help menu from the command line:
@@ -396,6 +396,10 @@ AMEE offers a rich collection of useful subcommands, and to access their all of 
 ```zsh title=Command
 sh ../examples/multisig.sh menus
 ```
+
+:::tip
+This shell script file will be used for several other examples throughout the remainder of this tutorial, so try running it now!
+:::
 
 ```zsh title=Output
 
@@ -478,6 +482,10 @@ New account store at the_aptos_foundation.account_store:
 ```
 
 Similarly, AMEE can generate keyfiles from an unprotected account store format. Note here the abbreviation of `generate` to `g` and the optional `outfile` positional argument:
+
+:::tip
+AMEE supports abbreviations for all commands and subcommands!
+:::
 
 ```zsh title=Command
 :!: static/sdks/python/examples/multisig.sh generate_from_store
@@ -872,7 +880,7 @@ New balance: 100000000
 
 </details>
 
-Next incorporate Ace and Bee into a multisig account, proposing a rotation challenge to the multisig account:
+Next incorporate Ace and Bee into a multisig account, proposing a rotation proof challenge for rotation to the multisig account:
 
 ```zsh title="multisig.sh snippet"
 :!: static/sdks/python/examples/multisig.sh rotate_convert_multisig
@@ -993,7 +1001,7 @@ Multisig metafile now at initial.multisig:
 
 </details>
 
-Note that after the successful rotation transaction, the `"address"` field of the multisig metafile has been updated to the vanity address starting with `0xace`.
+Note that after the successful rotation transaction, the `"address"` field of the multisig metafile has been updated to the vanity address starting with `0xace...`.
 
 Now, propose a threshold increase to 2 signatories:
 
@@ -1294,7 +1302,7 @@ Multisig metafile now at increased.multisig:
 
 </details>
 
-Note that the `"address"` field of `initial.multisig` has been set to `null`, and `increased.multisig` now reflects the vanity address starting with `0xace`.
+Note that the `"address"` field of `initial.multisig` has been set to `null`, and `increased.multisig` now reflects the vanity address starting with `0xace...`.
 
 Next, propose a rotation proof challenge for rotating the account back to have Ace as a single signer:
 
@@ -1612,9 +1620,562 @@ Note that after the rotation, the metafile has been updated with `"address": nul
 In practice, note that the consensus mechanism will probably entail something like the following:
 
 1. Ace and Bee independently generate single-signer keyfiles.
-2. One of them, for example Ace, acts as a "scribe", so Bee sends her keyfile to Ace
-3. Ace then uses the appropriate `metafile` and `rotate` subcommands to propose rotation proof challenges, rotation transactions, etc. (note that Bee's private key is encrypted so this is not a security threat).
-4. Ace sends proposals over to Bee, then Bee signs them and sends her signature files back to Ace.
-5. Ace signs locally, then executes transactions using his and Bee's signature files.
+2. One of them, for example Ace, acts as a "scribe", so Bee sends her keyfile to Ace.
+3. Ace uses the `metafile incorporate` command to generate a multisig metafile, and sends a copy to Bee for her records.
+4. Ace then uses the appropriate `metafile` and `rotate` subcommands to propose rotation proof challenges, rotation transactions, etc. (note that Bee's private key is encrypted so this is not a security threat).
+5. Ace sends proposals over to Bee, then Bee signs them and sends her signature files back to Ace.
+6. Ace signs locally, then executes transactions using his and Bee's signature files.
 
 Theoretically this can be scaled to as many as 32 independent signatories, but note that higher numbers of signatories introduce logistical complexities (e.g. sending signature files back and forth in a group chat, or running shell commands with 32 arguments).
+
+### Step 9.4 Protocol governance
+
+In this section AMEE will be used to [publish and upgrade the same `UpgradeAndGovern` package as above](#step-8-perform-move-package-governance), then to invoke a different governance script, all under the authority of a 1-of-2 multisig account:
+
+| Command                      | Use                                                              |
+|------------------------------|------------------------------------------------------------------|
+| `publish propose`            | Propose Move package publication                                 |
+| `publish sign`               | Sign a Move package publication proposal                         |
+| `publish execute`            | Execute Move package publication from proposal signature file(s) |
+| `script propose`             | Propose Move script invocation                                   |
+| `script sign`                | Sign a Move script invocation proposal                           |
+| `script execute`             | Execute Move script invocation from proposal signature file(s)   |
+
+```zsh title=Command
+sh ../examples/multisig.sh govern
+```
+
+As before, this example begins with a vanity account for both Ace and Bee:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh govern_prep_accounts
+```
+
+<details>
+<summary>Output</summary>
+
+```zsh
+=== Generate vanity account for Ace ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at ace.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Ace",
+    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+    "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0",
+    "encrypted_private_key": "0x674141414141426a37395f48354b3969446430325652686376687444694b6a317a57765645634365626d703956386a783969776658657932674d2d334c50694a6335394b765f413055487439515a6b6f7271316179625761533755755a33673567387a464e444f536d4c68426b425752584769745a64615f69395154786c57455854394b7472655259623430",
+    "salt": "0xce7e879ab2cf87d3b9131d8faef360b8"
+}
+
+
+=== Generate vanity account for Bee ===
+
+
+Mining vanity address...
+Using test password.
+Keyfile now at bee.keyfile:
+{
+    "filetype": "Keyfile",
+    "signatory": "Bee",
+    "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+    "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d",
+    "encrypted_private_key": "0x674141414141426a37395f496d2d6e4f61714544664a514b44764c786575315a65696a71644e4b344833334f54735263465778353362564145467254353355416e72412d67306251394f68556e7466626c5830794a69596961355469743962513462626d755454754a657244523338617347786544354f572d6d556457736e4d765a51594d757033564a552d",
+    "salt": "0x6ac34eaee7ca5edf0834bd85d7910b3d"
+}
+```
+
+</details>
+
+Ace and Bee are then incorporated in a multisig, which is funded on devnet.
+Note here that neither Ace nor Bee need to be funded, since the multisig account is linked with an on-chain account through direct funding, rather than through authentication key rotation.
+Here, the multisig account address is identical to its authentication key, so the devnet faucet can simply be used to fund the corresponding address.
+On testnet or mainnet, this process would probably entail sending `APT` to the account in question.
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh govern_prep_multisig
+```
+
+Note that the multisig metafile has `"address": null` before but not after the faucet funding operation:
+
+<details>
+<summary>Output</summary>
+
+```zsh
+=== Incorporate to 1-of-2 multisig ===
+
+
+Multisig metafile now at protocol.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Protocol",
+    "address": null,
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+    "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+            "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+            "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+        }
+    ]
+}
+
+
+=== Fund multisig ===
+
+
+Running aptos CLI command: aptos account fund-with-faucet --account 0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4 --faucet-url https://faucet.devnet.aptoslabs.com --url https://fullnode.devnet.aptoslabs.com/v1
+New balance: 100000000
+Updating address in multisig metafile.
+Multisig metafile now at protocol.multisig:
+{
+    "filetype": "Multisig metafile",
+    "multisig_name": "Protocol",
+    "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+    "threshold": 1,
+    "n_signatories": 2,
+    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+    "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+    "signatories": [
+        {
+            "signatory": "Ace",
+            "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+            "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+        },
+        {
+            "signatory": "Bee",
+            "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+            "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+        }
+    ]
+}
+```
+
+</details>
+
+Next a Move package publication proposal is constructed, signed, and the package is published. Here, only Ace's signature is necessary because the multisig threshold is 1:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh govern_publish
+```
+
+Note that the publication proposal includes information required to download and publish the package from GitHub:
+
+* GitHub user
+* GitHub project
+* Commit
+* Path to package's `Move.toml` inside the repository
+* Named address to substitute inside `Move.toml`
+
+For this example, the `Move.toml` file in question is as follows:
+
+```toml title="Move.toml"
+:!: static/move-examples/upgrade_and_govern/v1_0_0/Move.toml manifest
+```
+
+Here, `Move.toml` contains the named address `upgrade_and_govern`, which is defined generically as `_`:
+AMEE expects a named address of this format, corresponding to the multisig account address to publish under.
+
+Note that the repository is downloaded and recompiled before signing, and before transaction execution.
+This is to ensure that all signatories, as well as the transaction submitter, are referring to the same transaction payload (as defined by the GitHub information from the proposal file):
+
+<details>
+<summary>Output</summary>
+
+
+```zsh
+=== Propose publication ===
+
+
+Publication proposal now at genesis.publication_proposal:
+{
+    "filetype": "Publication proposal",
+    "description": "Genesis",
+    "github_user": "alnoki",
+    "github_project": "aptos-core",
+    "commit": "1c26076f5f",
+    "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_0_0/Move.toml",
+    "named_address": "upgrade_and_govern",
+    "multisig": {
+        "filetype": "Multisig metafile",
+        "multisig_name": "Protocol",
+        "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "threshold": 1,
+        "n_signatories": 2,
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+        "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "signatories": [
+            {
+                "signatory": "Ace",
+                "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+            },
+            {
+                "signatory": "Bee",
+                "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+            }
+        ]
+    },
+    "sequence_number": 0,
+    "chain_id": 44,
+    "expiry": "2030-12-31T00:00:00"
+}
+
+
+=== Sign publication proposal ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpce9b89_g.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpce9b89_g/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Using test password.
+Publication signature now at genesis.publication_signature:
+{
+    "filetype": "Publication signature",
+    "description": "Genesis",
+    "transaction_proposal": {
+        "filetype": "Publication proposal",
+        "description": "Genesis",
+        "github_user": "alnoki",
+        "github_project": "aptos-core",
+        "commit": "1c26076f5f",
+        "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_0_0/Move.toml",
+        "named_address": "upgrade_and_govern",
+        "multisig": {
+            "filetype": "Multisig metafile",
+            "multisig_name": "Protocol",
+            "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "threshold": 1,
+            "n_signatories": 2,
+            "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+            "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "signatories": [
+                {
+                    "signatory": "Ace",
+                    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                    "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+                },
+                {
+                    "signatory": "Bee",
+                    "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                    "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+                }
+            ]
+        },
+        "sequence_number": 0,
+        "chain_id": 44,
+        "expiry": "2030-12-31T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+        "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+    },
+    "signature": "0x160ad9b10e1596de7a00d54629553350d5e367049006ae703ee95662d7a8f7828bfc857f019ba7e159d7d3552903c71394c08c1ca72994b7a44eed90cbb6890b"
+}
+
+
+=== Execute publication ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmp65u5arbt.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmp65u5arbt/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Transaction successful: 0xb4c00306c8d9eaae505df987ab798628956632c6198f8ccf56fa1a8536e47366
+```
+
+</details>
+
+Next, the package is upgraded to `v1.1.0`, which involves the same workflow albeit with a different manifest path:
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh govern_upgrade
+```
+
+<details>
+<summary>Output</summary>
+
+```zsh
+=== Propose upgrade ===
+
+
+Publication proposal now at upgrade.publication_proposal:
+{
+    "filetype": "Publication proposal",
+    "description": "Upgrade",
+    "github_user": "alnoki",
+    "github_project": "aptos-core",
+    "commit": "1c26076f5f",
+    "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml",
+    "named_address": "upgrade_and_govern",
+    "multisig": {
+        "filetype": "Multisig metafile",
+        "multisig_name": "Protocol",
+        "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "threshold": 1,
+        "n_signatories": 2,
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+        "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "signatories": [
+            {
+                "signatory": "Ace",
+                "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+            },
+            {
+                "signatory": "Bee",
+                "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+            }
+        ]
+    },
+    "sequence_number": 1,
+    "chain_id": 44,
+    "expiry": "2030-12-31T00:00:00"
+}
+
+
+=== Sign upgrade proposal ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpw30v2ilx.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpw30v2ilx/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Using test password.
+Publication signature now at upgrade.publication_signature:
+{
+    "filetype": "Publication signature",
+    "description": "Upgrade",
+    "transaction_proposal": {
+        "filetype": "Publication proposal",
+        "description": "Upgrade",
+        "github_user": "alnoki",
+        "github_project": "aptos-core",
+        "commit": "1c26076f5f",
+        "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml",
+        "named_address": "upgrade_and_govern",
+        "multisig": {
+            "filetype": "Multisig metafile",
+            "multisig_name": "Protocol",
+            "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "threshold": 1,
+            "n_signatories": 2,
+            "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+            "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "signatories": [
+                {
+                    "signatory": "Ace",
+                    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                    "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+                },
+                {
+                    "signatory": "Bee",
+                    "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                    "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+                }
+            ]
+        },
+        "sequence_number": 1,
+        "chain_id": 44,
+        "expiry": "2030-12-31T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+        "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+    },
+    "signature": "0x0fa7bfb5ddc3da21067af14945c450c7e2c8713409f56db2c5c4f3a77bae290e7c16ef3f76865d2203b04c1b25a2f743c320a89f36dee316beb7b6d1199cf30c"
+}
+
+
+=== Execute upgrade ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpyms4ewjk.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpyms4ewjk/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Transaction successful: 0x19b94dc002477d9a956e7bf0bfecfd047aa29f2a5cf59e3bbc851ed2c326d748
+```
+
+</details>
+
+Lastly, the `set_only.move` governance script is invoked from the multisig account:
+
+```rust title=set_only.move
+:!: static/move-examples/upgrade_and_govern/v1_1_0/scripts/set_only.move script
+```
+
+Note here that the main function in this script, `set_only`, accepts only a `&signer` as an argument, with constants like `PARAMETER_1` and `PARAMETER_2` defined inside the script.
+AMEE expects scripts of this format, having only a single `&signer` argument in the main function call, such that all inner function arguments other than the governance signature can be easily inspected on GitHub.
+
+```zsh title="multisig.sh snippet"
+:!: static/sdks/python/examples/multisig.sh govern_script
+```
+
+Note here that a script proposal is almost identical in form to a publication proposal, except for an additional `script_name` field, which specifies the name of the main function call.
+Similarly, the Move script in question is downloaded and recompiled during signing and submission, to ensure the same transaction payload:
+
+<details>
+<summary>Output</summary>
+
+```zsh
+=== Propose script invocation ===
+
+
+Script proposal now at invoke.script_proposal:
+{
+    "filetype": "Script proposal",
+    "description": "Invoke",
+    "github_user": "alnoki",
+    "github_project": "aptos-core",
+    "commit": "1c26076f5f",
+    "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml",
+    "named_address": "upgrade_and_govern",
+    "script_name": "set_only",
+    "multisig": {
+        "filetype": "Multisig metafile",
+        "multisig_name": "Protocol",
+        "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "threshold": 1,
+        "n_signatories": 2,
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+        "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+        "signatories": [
+            {
+                "signatory": "Ace",
+                "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+            },
+            {
+                "signatory": "Bee",
+                "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+            }
+        ]
+    },
+    "sequence_number": 2,
+    "chain_id": 44,
+    "expiry": "2030-12-31T00:00:00"
+}
+
+
+=== Sign invocation proposal ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpgaj8g5ag.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpgaj8g5ag/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Using test password.
+Script signature now at invoke.script_signature:
+{
+    "filetype": "Script signature",
+    "description": "Invoke",
+    "transaction_proposal": {
+        "filetype": "Script proposal",
+        "description": "Invoke",
+        "github_user": "alnoki",
+        "github_project": "aptos-core",
+        "commit": "1c26076f5f",
+        "manifest_path": "aptos-move/move-examples/upgrade_and_govern/v1_1_0/Move.toml",
+        "named_address": "upgrade_and_govern",
+        "script_name": "set_only",
+        "multisig": {
+            "filetype": "Multisig metafile",
+            "multisig_name": "Protocol",
+            "address": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "threshold": 1,
+            "n_signatories": 2,
+            "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cbec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe01",
+            "authentication_key": "0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4",
+            "signatories": [
+                {
+                    "signatory": "Ace",
+                    "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+                    "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+                },
+                {
+                    "signatory": "Bee",
+                    "public_key": "0xec810f0a4bcc6668c81645a28b06adadac74124e165a677ca5742a07d209b0fe",
+                    "authentication_key": "0xbee7b9e50555f60bb89ad0b70af2450a38bc61e4008fcb2c06475e6f7f917a7d"
+                }
+            ]
+        },
+        "sequence_number": 2,
+        "chain_id": 44,
+        "expiry": "2030-12-31T00:00:00"
+    },
+    "signatory": {
+        "signatory": "Ace",
+        "public_key": "0xc37c3de5e6c19f7500a0b588555988c0fe6cbc13cf0203ec8d2c83d5227c18cb",
+        "authentication_key": "0xacee1a8eb4ba22d6988a9ea4332e7cfb5639c8ebe9310758c733490607729ac0"
+    },
+    "signature": "0x2f2bd4805dcde86cb31fc4b387b9c180d95cd34fe35ad0b29c4a2d69c880c82d53f2ffc7350b690c4e3d3734ca579e137d56bd42a57aae4a426d83551365a905"
+}
+
+
+=== Execute script invocation ===
+
+
+Extracting https://github.com/alnoki/aptos-core/archive/1c26076f5f.zip to temporary directory /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpkuhnuplr.
+Running aptos CLI command: aptos move compile --save-metadata --package-dir /var/folders/4c/rtts9qpj3yq0f5_f_gbl6cn40000gn/T/tmpkuhnuplr/aptos-core-1c26076f5f29f3e554393df6f6fb4851422755b9/aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xb13cbbb4c774c10cf8596047ed93192c0e41d520a32eaececfe49f3051f662b4
+
+Compiling, may take a little while to download git dependencies...
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING UpgradeAndGovern
+Transaction successful: 0x7dbec1a496bb454d54a758f0ce729ca8dbda485b9a8925076d2d65acf95e7b27
+```
+
+</details>
+
+Again, in practice note that the consensus mechanism will probably entail something like the following, in the case of a 2-of-2 multisig (unlike a 1-of-2 in the above example):
+
+1. Ace and Bee independently generate single-signer keyfiles.
+2. One of them, for example Bee, acts as a "scribe", so Ace sends his keyfile to Bee.
+3. Bee uses the `metafile incorporate` command to generate a multisig metafile, and sends a copy to Ace for his records.
+4. Bee then uses the appropriate `publish` and `script` subcommands to propose package publications, package upgrades, and script invocations from the multisig account.
+5. Bee sends proposals over to Ace, then Ace reviews the corresponding package on GitHub before signing and sending a signature files back to Bee.
+6. Bee signs locally, then executes transactions using her and Ace's signature files.
+
+Theoretically this can be scaled to as many as 32 independent signatories, but note that higher numbers of signatories introduce logistical complexities (e.g. sending signature files back and forth in a group chat, or running shell commands with 32 arguments).
+
+---
+
+Congratulations on completing the tutorial on K-of-N multi-signer authentication operations!

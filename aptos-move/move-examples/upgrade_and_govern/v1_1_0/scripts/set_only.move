@@ -1,3 +1,4 @@
+// :!:>script
 script {
     use upgrade_and_govern::parameters;
 
@@ -10,4 +11,4 @@ script {
         parameters::set_parameters(
             upgrade_and_govern, PARAMETER_1, PARAMETER_2);
     }
-}
+} // <:!:script
