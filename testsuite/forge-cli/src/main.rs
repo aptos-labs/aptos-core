@@ -982,7 +982,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(100)
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 5000 })
+                .mode(EmitJobMode::ConstTps { tps: 4500 })
                 .txn_expiration_time_secs(60 * 60),
         )
         .with_network_tests(vec![&ThreeRegionSimulationTest {
