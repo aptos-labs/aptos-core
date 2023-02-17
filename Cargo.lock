@@ -162,6 +162,7 @@ dependencies = [
  "chrono",
  "clap 3.2.23",
  "clap_complete",
+ "codespan-reporting",
  "dirs",
  "futures",
  "hex",

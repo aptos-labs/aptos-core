@@ -28,8 +28,8 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    docgen::DocgenOptions, natives::code::UpgradePolicy, prover::ProverOptions, BuildOptions,
-    BuiltPackage,
+    build_model, docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy,
+    prover::ProverOptions, BuildOptions, BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
@@ -40,6 +40,10 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
@@ -432,6 +436,24 @@ impl CliCommand<&'static str> for TestPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
+
+        // Build the Move model for extended checks
+        let model = &build_model(
+            self.move_options.get_package_path()?.as_path(),
+            self.move_options.named_addresses(),
+            None,
+        )?;
+        let _ = extended_checks::run_extended_checks(model);
+        if model.diag_count(Severity::Warning) > 0 {
+            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+            model.report_diag(&mut error_writer, Severity::Warning);
+            if model.has_errors() {
+                return Err(CliError::MoveCompilationError(
+                    "extended checks failed".to_string(),
+                ));
+            }
+        }
+
         let result = move_cli::base::test::run_move_unit_tests(
             self.move_options.get_package_path()?.as_path(),
             config,

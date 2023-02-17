@@ -45,6 +45,7 @@ bcs = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
+codespan-reporting = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
