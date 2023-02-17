@@ -422,13 +422,15 @@ impl BufferManager {
                 let commit_vote = signed_item.unwrap_signed_ref().commit_vote.clone();
 
                 self.buffer.set(&current_cursor, signed_item);
-                if let Some(proposer) = maybe_proposer {
-                    self.commit_msg_tx
-                        .send_commit_vote(commit_vote, proposer)
-                        .await;
-                } else {
-                    self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
-                }
+                // if let Some(proposer) = maybe_proposer {
+                //     self.commit_msg_tx
+                //         .send_commit_vote(commit_vote, proposer)
+                //         .await;
+                // } else {
+                //     self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
+                // }
+                // test unhappy path of all-to-all broadcasting randomness shares
+                self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
             } else {
                 self.buffer.set(&current_cursor, item);
             }
