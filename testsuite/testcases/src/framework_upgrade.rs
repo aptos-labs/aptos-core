@@ -17,7 +17,7 @@ pub struct FrameworkUpgrade;
 
 impl Test for FrameworkUpgrade {
     fn name(&self) -> &'static str {
-        "compatibility::framework-upgrade"
+        "framework_upgrade::framework-upgrade"
     }
 }
 
