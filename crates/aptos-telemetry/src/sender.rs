@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{self, increment_log_ingest_failures_by, increment_log_ingest_successes_by};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Error, Result};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::{
     noise::{self, NoiseConfig},
@@ -18,10 +18,13 @@ use aptos_telemetry_service::types::{
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
 use prometheus::{default_registry, Registry};
-use reqwest::{header::CONTENT_ENCODING, RequestBuilder, Response, StatusCode};
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest::{header::CONTENT_ENCODING, Response, StatusCode, Url};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, RequestBuilder};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::{io::Write, sync::Arc};
+use uuid::Uuid;
+
+pub const DEFAULT_VERSION_PATH_BASE: &str = "api/v1/";
 
 struct AuthContext {
     noise_config: Option<NoiseConfig>,
@@ -41,35 +44,50 @@ impl AuthContext {
 
 #[derive(Clone)]
 pub(crate) struct TelemetrySender {
-    base_url: String,
+    base_url: Url,
+    version_path_base: String,
     chain_id: ChainId,
     peer_id: PeerId,
     role_type: RoleType,
-    inner_client: reqwest::Client,
     client: ClientWithMiddleware,
     auth_context: Arc<AuthContext>,
+    uuid: Uuid,
 }
 
 impl TelemetrySender {
-    pub fn new(base_url: String, chain_id: ChainId, node_config: &NodeConfig) -> Self {
+    pub fn new(base_url: Url, chain_id: ChainId, node_config: &NodeConfig) -> Self {
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
-        // This is a workaround to enable us to clone RequestBuilder for retries.
-        // reqwest_middleware::RequestBuilder's try_clone moves self and returns a new Self, which defeats
-        // the purpose of cloning. We will use the reqwest::Client to create a reqwest::RequestBuilder,
-        // which is clonable and use the ClientWithMiddleware to actually send requests.
-        let inner_client = reqwest::Client::new();
-        let client = ClientBuilder::new(inner_client.clone())
+
+        let reqwest_client = reqwest::Client::new();
+        let client = ClientBuilder::new(reqwest_client)
             .with(RetryTransientMiddleware::new_with_policy(retry_policy))
             .build();
+
+        let version_path_base = match base_url.path() {
+            "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
+            path => {
+                if !path.ends_with('/') {
+                    format!("{}/", path)
+                } else {
+                    path.to_string()
+                }
+            },
+        };
+
         Self {
             base_url,
+            version_path_base,
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             role_type: node_config.base.role,
-            inner_client,
             client,
             auth_context: Arc::new(AuthContext::new(node_config)),
+            uuid: uuid::Uuid::new_v4(),
         }
+    }
+
+    pub fn build_path(&self, path: &str) -> Result<Url> {
+        Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
     }
 
     // sends an authenticated request to the telemetry service, automatically adding an auth token
@@ -114,8 +132,8 @@ impl TelemetrySender {
 
         let response = self
             .send_authenticated_request(
-                self.inner_client
-                    .post(format!("{}/api/v1/ingest/metrics", self.base_url))
+                self.client
+                    .post(self.build_path("ingest/metrics")?)
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -178,8 +196,8 @@ impl TelemetrySender {
         // Send the request and wait for a response
         let response = self
             .send_authenticated_request(
-                self.inner_client
-                    .post(format!("{}/api/v1/ingest/logs", self.base_url))
+                self.client
+                    .post(self.build_path("ingest/logs")?)
                     .header(CONTENT_ENCODING, "gzip")
                     .body(compressed_bytes),
             )
@@ -209,8 +227,8 @@ impl TelemetrySender {
         // Send the request and wait for a response
         let response = self
             .send_authenticated_request(
-                self.inner_client
-                    .post(format!("{}/api/v1/ingest/custom-event", self.base_url))
+                self.client
+                    .post(self.build_path("ingest/custom-event")?)
                     .json::<TelemetryDump>(telemetry_dump),
             )
             .await?;
@@ -231,12 +249,8 @@ impl TelemetrySender {
         }
     }
 
-    async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
-        let response = self
-            .client
-            .get(format!("{}/api/v1/", self.base_url))
-            .send()
-            .await?;
+    async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey> {
+        let response = self.client.get(self.build_path("")?).send().await?;
 
         match error_for_status_with_body(response).await {
             Ok(response) => {
@@ -247,7 +261,7 @@ impl TelemetrySender {
         }
     }
 
-    async fn server_public_key(&self) -> Result<x25519::PublicKey, anyhow::Error> {
+    async fn server_public_key(&self) -> Result<x25519::PublicKey> {
         let server_public_key = { *self.auth_context.server_public_key.lock() };
         match server_public_key {
             Some(key) => Ok(key),
@@ -302,11 +316,12 @@ impl TelemetrySender {
             role_type: self.role_type,
             server_public_key,
             handshake_msg: client_noise_msg,
+            run_uuid: self.uuid,
         };
 
         let response = self
             .client
-            .post(format!("{}/api/v1/auth", self.base_url))
+            .post(self.build_path("auth")?)
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;
@@ -333,16 +348,8 @@ impl TelemetrySender {
 
     pub(crate) async fn check_chain_access(&self, chain_id: ChainId) -> bool {
         debug!("checking chain access for chain id {}", chain_id);
-        let response = self
-            .client
-            .get(format!(
-                "{}/api/v1/chain-access/{}",
-                self.base_url, chain_id
-            ))
-            .send()
-            .await;
 
-        match response {
+        match self.try_check_chain_access(chain_id).await {
             Ok(response) => match error_for_status_with_body(response).await {
                 Ok(response) => response.json::<bool>().await.unwrap_or(true),
                 Err(e) => {
@@ -357,11 +364,21 @@ impl TelemetrySender {
         }
     }
 
+    async fn try_check_chain_access(&self, chain_id: ChainId) -> Result<Response> {
+        self.client
+            .get(self.build_path(&format!("chain-access/{}", chain_id))?)
+            .send()
+            .await
+            .map_err(|e| anyhow!("error sending request {}", e))
+    }
+
     pub(crate) async fn get_telemetry_log_env(&self) -> Option<String> {
         let response = self
             .send_authenticated_request(
-                self.inner_client
-                    .get(format!("{}/api/v1/config/env/telemetry-log", self.base_url)),
+                self.client.get(
+                    self.build_path("config/env/telemetry-log")
+                        .expect("unable to build telemetry path for config/env/telemetry-log"),
+                ),
             )
             .await;
 
@@ -409,10 +426,16 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
+            ChainId::default(),
+            &node_config,
+        );
 
         let result1 = client.server_public_key().await;
         let result2 = client.server_public_key().await;
+
+        mock.assert();
 
         // Should call the server once and cache the key
         assert_eq!(mock.hits(), 1);
@@ -459,7 +482,11 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
+            ChainId::default(),
+            &node_config,
+        );
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -498,7 +525,11 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
+            ChainId::default(),
+            &node_config,
+        );
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -556,7 +587,11 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
+            ChainId::default(),
+            &node_config,
+        );
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -587,7 +622,11 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
+            ChainId::default(),
+            &node_config,
+        );
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -606,7 +645,7 @@ mod tests {
         });
 
         let client = TelemetrySender::new(
-            server.base_url(),
+            Url::parse(&server.base_url()).expect("unable to parse base url"),
             ChainId::default(),
             &NodeConfig::default(),
         );

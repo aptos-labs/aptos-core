@@ -36,6 +36,8 @@ arc-swap = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
+claims = { workspace = true }
+clap = { workspace = true, optional = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
 lru = { workspace = true }
@@ -43,10 +45,13 @@ move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }
 num-derive = { workspace = true }
 once_cell = { workspace = true }
+owo-colors = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+static_assertions = { workspace = true }
+status-line = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
@@ -65,3 +70,9 @@ rand = { workspace = true }
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "aptos-schemadb/fuzzing", "aptos-scratchpad/fuzzing"]
 consensus-only-perf-test = []
+db-debugger = ["aptos-temppath", "clap", "owo-colors"]
+
+[[bin]]
+name = "db-debugger"
+path = "src/db_debugger/main.rs"
+required-features = ["db-debugger"]

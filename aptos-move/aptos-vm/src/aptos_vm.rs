@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -253,14 +253,21 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt + StateView>(
+    fn success_transaction_cleanup<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
-        user_txn_change_set_ext: ChangeSetExt,
+        user_txn_session: SessionExt<SS>,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+        let user_txn_change_set_ext = user_txn_session
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
+        // Charge gas for write set
+        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
+        // TODO(Gas): Charge for aggregator writes
+
         let storage_with_changes =
             DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
         // TODO: at this point we know that delta application failed
@@ -289,9 +296,8 @@ impl AptosVM {
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
 
         let epilogue_change_set_ext = session
-            .finish()
-            .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
@@ -317,7 +323,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_entry_function<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -325,6 +331,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
@@ -389,23 +396,13 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
-            self.resolve_pending_code_publish(&mut session, gas_meter)?;
-
-            let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-            let change_set_ext =
-                session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
-
-            // Charge gas for write set
-            gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
-            // TODO(Gas): Charge for aggregator writes
-
-            self.success_transaction_cleanup(
-                storage,
-                change_set_ext,
+            self.resolve_pending_code_publish(
+                &mut session,
                 gas_meter,
-                txn_data,
-                log_context,
-            )
+                new_published_modules_loaded,
+            )?;
+
+            self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
         }
     }
 
@@ -444,6 +441,7 @@ impl AptosVM {
         modules: &[CompiledModule],
         exists: BTreeSet<ModuleId>,
         senders: &[AccountAddress],
+        new_published_modules_loaded: &mut bool,
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
         for module in modules {
@@ -451,6 +449,7 @@ impl AptosVM {
                 // Call initializer only on first publish.
                 continue;
             }
+            *new_published_modules_loaded = true;
             let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
@@ -508,7 +507,7 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
+    fn execute_modules<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
         mut session: SessionExt<SS>,
@@ -516,6 +515,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
             return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
@@ -554,17 +554,10 @@ impl AptosVM {
             &self.deserialize_module_bundle(modules)?,
             BTreeSet::new(),
             &[txn_data.sender()],
+            new_published_modules_loaded,
         )?;
 
-        let session_output = session.finish().map_err(|e| e.into_vm_status())?;
-        let change_set_ext =
-            session_output.into_change_set(&mut (), gas_meter.change_set_configs())?;
-
-        // Charge gas for write set
-        gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
-        // TODO(Gas): Charge for aggregator writes
-
-        self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
+        self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -572,6 +565,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
+        new_published_modules_loaded: &mut bool,
     ) -> VMResult<()> {
         if let Some(PublishRequest {
             destination,
@@ -600,6 +594,8 @@ impl AptosVM {
             }
 
             // Publish the bundle and execute initializers
+            // publish_module_bundle doesn't actually load the published module into
+            // the loader cache. It only puts the module data in the data cache.
             session
                 .publish_module_bundle_with_compat_config(
                     bundle.into_inner(),
@@ -615,16 +611,14 @@ impl AptosVM {
                     ),
                 )
                 .and_then(|_| {
-                    self.execute_module_initialization(session, gas_meter, &modules, exists, &[
-                        destination,
-                    ])
-                })
-                .map_err(|e| {
-                    // Be sure to flash the loader cache to align storage with the cache.
-                    // None of the modules in the bundle will be committed to storage,
-                    // but some of them may have ended up in the cache.
-                    self.0.mark_loader_cache_as_invalid();
-                    e
+                    self.execute_module_initialization(
+                        session,
+                        gas_meter,
+                        &modules,
+                        exists,
+                        &[destination],
+                        new_published_modules_loaded,
+                    )
                 })
         } else {
             Ok(())
@@ -681,7 +675,7 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    pub(crate) fn execute_user_transaction<S: MoveResolverExt + StateView>(
+    pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
         &self,
         storage: &S,
         txn: &SignatureCheckedTransaction,
@@ -728,6 +722,10 @@ impl AptosVM {
             txn_data.max_gas_amount(),
         );
 
+        // We keep track of whether any newly published modules are loaded into the Vm's loader
+        // cache as part of executing transactions. This would allow us to decide whether the cache
+        // should be flushed later.
+        let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => self
@@ -738,10 +736,17 @@ impl AptosVM {
                     &txn_data,
                     payload,
                     log_context,
+                    &mut new_published_modules_loaded,
                 ),
-            TransactionPayload::ModuleBundle(m) => {
-                self.execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
-            },
+            TransactionPayload::ModuleBundle(m) => self.execute_modules(
+                storage,
+                session,
+                &mut gas_meter,
+                &txn_data,
+                m,
+                log_context,
+                &mut new_published_modules_loaded,
+            ),
         };
 
         let gas_usage = txn_data
@@ -753,6 +758,15 @@ impl AptosVM {
         match result {
             Ok(output) => output,
             Err(err) => {
+                // Invalidate the loader cache in case there was a new module loaded from a module
+                // publish request that failed.
+                // This ensures the loader cache is flushed later to align storage with the cache.
+                // None of the modules in the bundle will be committed to storage,
+                // but some of them may have ended up in the cache.
+                if new_published_modules_loaded {
+                    self.0.mark_loader_cache_as_invalid();
+                };
+
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
@@ -806,24 +820,15 @@ impl AptosVM {
                     )
                     .map_err(Err)?;
 
-                let execution_result = tmp_session
+                tmp_session
                     .execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
                         args,
                         &mut gas_meter,
                     )
-                    .and_then(|_| tmp_session.finish())
-                    .map_err(|e| e.into_vm_status());
-
-                match execution_result {
-                    Ok(session_out) => session_out
-                        .into_change_set(&mut (), &change_set_configs)
-                        .map_err(Err)?,
-                    Err(e) => {
-                        return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
-                    },
-                }
+                    .and_then(|_| tmp_session.finish(&mut (), &change_set_configs))
+                    .map_err(|e| Err(e.into_vm_status()))?
             },
         })
     }
@@ -837,7 +842,7 @@ impl AptosVM {
         // access path that the write set is going to update.
         for (state_key, _) in write_set.iter() {
             state_view
-                .get_state_value(state_key)
+                .get_state_value_bytes(state_key)
                 .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))?;
         }
         Ok(())
@@ -866,7 +871,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
+    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
@@ -1172,7 +1177,7 @@ impl VMAdapter for AptosVM {
             .any(|event| *event.key() == new_epoch_event_key)
     }
 
-    fn execute_single_transaction<S: MoveResolverExt + StateView>(
+    fn execute_single_transaction<S: MoveResolverExt>(
         &self,
         txn: &PreprocessedTransaction,
         data_cache: &S,
@@ -1278,7 +1283,7 @@ impl AptosSimulationVM {
     /*
     Executes a SignedTransaction without performing signature verification
      */
-    fn simulate_signed_transaction<S: MoveResolverExt + StateView>(
+    fn simulate_signed_transaction<S: MoveResolverExt>(
         &self,
         storage: &S,
         txn: &SignedTransaction,
@@ -1318,6 +1323,7 @@ impl AptosSimulationVM {
             txn_data.max_gas_amount(),
         );
 
+        let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => {
@@ -1328,17 +1334,31 @@ impl AptosSimulationVM {
                     &txn_data,
                     payload,
                     log_context,
+                    &mut new_published_modules_loaded,
                 )
             },
-            TransactionPayload::ModuleBundle(m) => {
-                self.0
-                    .execute_modules(storage, session, &mut gas_meter, &txn_data, m, log_context)
-            },
+            TransactionPayload::ModuleBundle(m) => self.0.execute_modules(
+                storage,
+                session,
+                &mut gas_meter,
+                &txn_data,
+                m,
+                log_context,
+                &mut new_published_modules_loaded,
+            ),
         };
 
         match result {
             Ok(output) => output,
             Err(err) => {
+                // Invalidate the loader cache in case there was a new module loaded from a module
+                // publish request that failed.
+                // This ensures the loader cache is flushed later to align storage with the cache.
+                // None of the modules in the bundle will be committed to storage,
+                // but some of them may have ended up in the cache.
+                if new_published_modules_loaded {
+                    self.0 .0.mark_loader_cache_as_invalid();
+                };
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)

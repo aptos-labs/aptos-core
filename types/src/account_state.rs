@@ -1,11 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     access_path::Path,
     account_config::{AccountResource, CoinStoreResource},
     account_view::AccountView,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
 };
 use anyhow::{anyhow, Error, Result};
 use move_core_types::{
@@ -189,11 +192,11 @@ impl TryFrom<(AccountAddress, &HashMap<StateKey, StateValue>)> for AccountState 
     ) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         for (key, value) in key_value_map {
-            match key {
-                StateKey::AccessPath(access_path) => {
+            match key.inner() {
+                StateKeyInner::AccessPath(access_path) => {
                     btree_map.insert(access_path.path.clone(), value.bytes().to_vec());
                 },
-                _ => return Err(anyhow!("Encountered unexpected key type {:?}", key)),
+                _ => return Err(anyhow!("Encountered unexpected key type {:?}", key.inner())),
             }
         }
         Ok(Self::new(account_address, btree_map))

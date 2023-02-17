@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
-    request_response::{ConsensusResponse, PayloadRequest},
+    request_response::{BlockProposalCommand, ConsensusResponse},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -21,14 +21,14 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 pub struct DirectMempoolQuorumStore {
-    consensus_receiver: Receiver<PayloadRequest>,
+    consensus_receiver: Receiver<BlockProposalCommand>,
     mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
 }
 
 impl DirectMempoolQuorumStore {
     pub fn new(
-        consensus_receiver: Receiver<PayloadRequest>,
+        consensus_receiver: Receiver<BlockProposalCommand>,
         mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -117,9 +117,9 @@ impl DirectMempoolQuorumStore {
         );
     }
 
-    async fn handle_consensus_request(&self, req: PayloadRequest) {
+    async fn handle_consensus_request(&self, req: BlockProposalCommand) {
         match req {
-            PayloadRequest::GetBlockRequest(
+            BlockProposalCommand::GetBlockRequest(
                 _round,
                 max_txns,
                 max_bytes,
@@ -128,9 +128,6 @@ impl DirectMempoolQuorumStore {
             ) => {
                 self.handle_block_request(max_txns, max_bytes, payload_filter, callback)
                     .await;
-            },
-            PayloadRequest::CleanRequest(..) => {
-                unreachable!()
             },
         }
     }

@@ -1,12 +1,12 @@
 ---
-title: "Typescript SDK Overview"
+title: "Typescript SDK Architecture"
 slug: "typescript-sdk-overview"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Typescript SDK Overview
+# Typescript SDK Architecture 
 
 This document describes the main features and components of the Aptos Typescript SDK.
 
@@ -115,7 +115,7 @@ The main read methods deserializing on-chain data to TS objects are:
 - Get TokenData
 - Get Token of an Account
 
-## Validation for Transaction Builder and BCS
+## Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 
@@ -129,7 +129,7 @@ The Aptos SDK validates the Transaction Builder and BCS in two ways:
 
 An example of unit tests for the BCS serializer can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/bcs/serializer.test.ts).
 
-An example of an e2e test for submitting a BCS transaction can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/aptos_client.test.ts#L88).
+An example of an e2e test for submitting a BCS transaction can be found in [aptos_client.test.ts](https://github.com/aptos-labs/aptos-core/blob/f4a7820a61f22ed8306219621402d96f70379d20/ecosystem/typescript/sdk/src/tests/e2e/aptos_client.test.ts#L78).
 
 :::
 

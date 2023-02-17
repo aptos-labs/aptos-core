@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
@@ -27,7 +27,8 @@ pub async fn generate_traffic(
         .collect::<Vec<_>>();
     let mut emit_job_request = EmitJobRequest::default();
     let chain_info = swarm.chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
+    let transaction_factory =
+        TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(gas_price);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
@@ -51,7 +52,7 @@ async fn test_txn_emmitter() {
         &mut swarm,
         &all_validators,
         Duration::from_secs(20),
-        1,
+        100,
         vec![
             vec![(
                 TransactionType::AccountGeneration {
@@ -66,7 +67,12 @@ async fn test_txn_emmitter() {
                 // // commenting this out given it consistently fails smoke test
                 // // and it seems to be called only from `test_txn_emmitter`
                 // (TransactionType::NftMintAndTransfer, 20),
-                (TransactionType::PublishPackage, 20),
+                (
+                    TransactionType::PublishPackage {
+                        use_account_pool: false,
+                    },
+                    20,
+                ),
             ],
             vec![
                 (TransactionType::default_call_different_modules(), 20),
@@ -85,7 +91,7 @@ async fn test_txn_emmitter() {
     )
     .await
     .unwrap();
-    println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
+    println!("{:?}", txn_stat.rate());
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);

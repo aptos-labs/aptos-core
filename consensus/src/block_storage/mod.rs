@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
@@ -56,4 +56,7 @@ pub trait BlockReader: Send + Sync {
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;
+
+    /// Return if the consensus is backpressured
+    fn back_pressure(&self) -> bool;
 }

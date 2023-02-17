@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, AptosPackageHooks};
@@ -386,7 +386,7 @@ impl MoveHarness {
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
         let path = AccessPath::resource_access_path(*addr, struct_tag);
-        self.read_state_value(&StateKey::AccessPath(path))
+        self.read_state_value(&StateKey::access_path(path))
     }
 
     /// Reads the resource data `T`.
@@ -408,7 +408,7 @@ impl MoveHarness {
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
         let path = AccessPath::resource_group_access_path(*addr, struct_tag);
-        self.read_state_value(&StateKey::AccessPath(path))
+        self.read_state_value(&StateKey::access_path(path))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 
@@ -439,7 +439,7 @@ impl MoveHarness {
         data: &T,
     ) {
         let path = AccessPath::resource_access_path(addr, struct_tag);
-        let state_key = StateKey::AccessPath(path);
+        let state_key = StateKey::access_path(path);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }

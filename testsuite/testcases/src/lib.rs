@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
@@ -104,6 +104,8 @@ pub enum LoadDestination {
     AllNodes,
     AllValidators,
     AllFullnodes,
+    // Send to AllFullnodes, if any exist, otherwise to AllValidators
+    FullnodesOtherwiseValidators,
     Peers(Vec<PeerId>),
 }
 
@@ -116,6 +118,13 @@ impl LoadDestination {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::FullnodesOtherwiseValidators => {
+                if all_fullnodes.is_empty() {
+                    all_validators
+                } else {
+                    all_fullnodes
+                }
+            },
             LoadDestination::Peers(peers) => peers,
         }
     }
@@ -123,7 +132,7 @@ impl LoadDestination {
 
 pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
@@ -151,14 +160,15 @@ impl NetworkTest for dyn NetworkLoadTest {
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let (txn_stat, actual_test_duration, _ledger_transactions) = self.network_load_test(
-            ctx,
-            emit_job_request,
-            duration,
-            WARMUP_DURATION_FRACTION,
-            COOLDOWN_DURATION_FRACTION,
-            rng,
-        )?;
+        let (txn_stat, actual_test_duration, _ledger_transactions, _stats_by_phase) = self
+            .network_load_test(
+                ctx,
+                emit_job_request,
+                duration,
+                WARMUP_DURATION_FRACTION,
+                COOLDOWN_DURATION_FRACTION,
+                rng,
+            )?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
 
@@ -196,7 +206,7 @@ impl dyn NetworkLoadTest {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
-    ) -> Result<(TxnStats, Duration, u64)> {
+    ) -> Result<(TxnStats, Duration, u64, Vec<(TxnStats, Duration)>)> {
         let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
@@ -217,7 +227,7 @@ impl dyn NetworkLoadTest {
             stats_tracking_phases = 3;
         }
 
-        let job = rt
+        let mut job = rt
             .block_on(emitter.start_job(
                 ctx.swarm().chain_info().root_account,
                 emit_job_request,
@@ -291,29 +301,24 @@ impl dyn NetworkLoadTest {
             "Emitting txns ran for {} secs, stopping job...",
             duration.as_secs()
         );
-        let txn_stats = rt.block_on(emitter.stop_job(job));
+        let stats_by_phase = rt.block_on(emitter.stop_job(job));
 
         info!("Stopped job");
-        info!("Warmup stats: {}", txn_stats[0].rate(warmup_duration));
+        info!("Warmup stats: {}", stats_by_phase[0].rate());
 
         let mut stats: Option<TxnStats> = None;
+        let mut stats_and_duration_by_phase_filtered = Vec::new();
         for i in 0..stats_tracking_phases - 2 {
-            let cur = &txn_stats[1 + i];
-            info!(
-                "Test stats [test phase {}]: {}",
-                i,
-                cur.rate(actual_phase_durations[i])
-            );
+            let cur = &stats_by_phase[1 + i];
+            info!("Test stats [test phase {}]: {}", i, cur.rate());
             stats = if let Some(previous) = stats {
                 Some(&previous + cur)
             } else {
                 Some(cur.clone())
             };
+            stats_and_duration_by_phase_filtered.push((cur.clone(), actual_phase_durations[i]));
         }
-        info!(
-            "Cooldown stats: {}",
-            txn_stats.last().unwrap().rate(cooldown_duration)
-        );
+        info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
             if let Some(start_t) = max_start_ledger_transactions {
@@ -324,6 +329,12 @@ impl dyn NetworkLoadTest {
         } else {
             0
         };
-        Ok((stats.unwrap(), actual_test_duration, ledger_transactions))
+
+        Ok((
+            stats.unwrap(),
+            actual_test_duration,
+            ledger_transactions,
+            stats_and_duration_by_phase_filtered,
+        ))
     }
 }

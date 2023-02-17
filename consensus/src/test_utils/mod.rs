@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::{BlockReader, BlockStore};
@@ -17,6 +17,7 @@ use tokio::{runtime, time::timeout};
 
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
+pub mod mock_quorum_store_sender;
 mod mock_state_computer;
 mod mock_storage;
 

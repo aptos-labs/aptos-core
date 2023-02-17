@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -32,7 +32,7 @@ use aptos_consensus_types::{
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
@@ -103,7 +103,7 @@ pub fn prepare_buffer_manager() -> (
         DIRECT_SEND.into(),
         RPC.into(),
         hashmap! {NetworkId::Validator => network_sender},
-        PeerMetadataStorage::new(&[NetworkId::Validator]),
+        PeersAndMetadata::new(&[NetworkId::Validator]),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 

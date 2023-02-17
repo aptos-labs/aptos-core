@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -21,7 +21,10 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
-    state_store::{state_key::StateKey, table::TableHandle},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        table::TableHandle,
+    },
     transaction::{
         EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
     },
@@ -230,15 +233,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<WriteSetChange> {
         let hash = state_key.hash().to_hex_literal();
-
+        let state_key = state_key.into_inner();
         match state_key {
-            StateKey::AccessPath(access_path) => {
+            StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_change(hash, access_path, op)
             },
-            StateKey::TableItem { handle, key } => {
+            StateKeyInner::TableItem { handle, key } => {
                 self.try_table_item_into_write_set_change(hash, handle, key, op)
             },
-            StateKey::Raw(_) => Err(format_err!(
+            StateKeyInner::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key
             )),

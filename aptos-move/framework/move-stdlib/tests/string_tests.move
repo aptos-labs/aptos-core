@@ -10,7 +10,7 @@ module std::string_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(abort_code = string::EINVALID_UTF8)]
     fun test_invalid_utf8() {
         let no_sparkle_heart = vector[0, 159, 146, 150];
         let s = string::utf8(no_sparkle_heart);
@@ -25,7 +25,7 @@ module std::string_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2, location = Self)]
+    #[expected_failure(abort_code = string::EINVALID_INDEX)]
     fun test_sub_string_invalid_boundary() {
         let sparkle_heart = vector[240, 159, 146, 150];
         let s = string::utf8(sparkle_heart);
@@ -33,7 +33,7 @@ module std::string_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2, location = Self)]
+    #[expected_failure(abort_code = string::EINVALID_INDEX)]
     fun test_sub_string_invalid_index() {
         let s = string::utf8(b"abcd");
         let _sub = string::sub_string(&s, 4, 5);

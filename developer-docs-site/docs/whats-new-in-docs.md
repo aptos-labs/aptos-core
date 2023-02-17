@@ -7,6 +7,37 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 17 February 2023
+
+- Recommended specific paths for starting up an Aptos node via [state synchronization](guides/state-sync.md) depending upon node type and network.
+
+## 14 February 2023
+
+- Added instructions for [working with `PropertyMap` off-chain](concepts/coin-and-token/propertymap-offchain) via the Aptos TypeScript SDK, enabling reading and writing of Binary Canonical Serialization (BCS) data in your app.
+
+- Provided an [example of a token airdrop](concepts/coin-and-token/airdrop-aptos-tokens) using the two-step transfer process.
+
+## 31 January 2023
+
+- Improved the new script for installing the Aptos CLI to [always fetch the latest version and seamlessly apply updates](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md#update).
+
+## 30 January 2023
+
+- Released [Aptos Node v1.2.4](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.4) to testnet with enhancements to state synchronization and features added for use of the Move programming language, including:
+  * New integer types (u16, u32, u256)
+  * [View functions](guides/aptos-apis.md#reading-state-with-the-view-function) to evaluate transactions before execution
+  * Compile-time checks for transaction arguments
+  * Various updates to smart contracts
+  * Several Aptos Improvement Proposals (AIPs)
+
+  See the [Aptos Releases](https://github.com/aptos-labs/aptos-core/releases) list for many more details. This release will be available on mainnet soon.
+
+- Created an entirely new tutorial that covers [building an end-to-end todo list dapp](tutorials/build-e2e-dapp/index.md), starting from the smart contract side through the front-end side and use of a wallet to interact with the two.
+
+## 26 January 2023
+
+- Developed and now recommend use of a script to [automate installation of the Aptos command line interface (CLI)](cli-tools/aptos-cli-tool/automated-install-aptos-cli.md) that works on Linux, macOS, Windows Subsystem for Linux (WSL), and Windows NT.
+
 ## 25 January 2023
 
 - Split up the sidebars of Aptos.dev into one left navigation menu per topic to ease use. As part of this:
@@ -37,11 +68,11 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 16 January 2023
 
-- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos command line interface (CLI).
+- Documented how to [create and fund accounts](guides/get-test-funds.md) using the Petra Wallet and Aptos CLI.
 
 ## 12 January 2023
 
-- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and Windows Subsystem for Linux (WSL) package manager.
+- Added [Homebrew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md) support for the Aptos CLI, enabling [easy installation](cli-tools/aptos-cli-tool/index.md) via the macOS, Linux, and WSL package manager.
 
 ## 11 January 2023
 
@@ -106,7 +137,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 08 December 2022
 
-- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to Mainnet:
+- Released [aptos-node-v1.1.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0) to mainnet:
 
   Framework upgrade through governance voting:
   - Testnet upgrade - Nov 30th

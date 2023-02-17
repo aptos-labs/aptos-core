@@ -1,13 +1,17 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::NetworkLoadTest;
 use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, Test};
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time::Instant};
 
-pub struct ValidatorRebootStressTest;
+pub struct ValidatorRebootStressTest {
+    pub num_simultaneously: usize,
+    pub down_time_secs: f32,
+    pub pause_secs: f32,
+}
 
 impl Test for ValidatorRebootStressTest {
     fn name(&self) -> &'static str {
@@ -16,10 +20,6 @@ impl Test for ValidatorRebootStressTest {
 }
 
 impl NetworkLoadTest for ValidatorRebootStressTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         let start = Instant::now();
         let runtime = Runtime::new().unwrap();
@@ -29,12 +29,26 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
         let mut rng = thread_rng();
 
         while start.elapsed() < duration {
-            let validator_to_reboot = swarm
-                .validator_mut(*all_validators.choose(&mut rng).unwrap())
-                .unwrap();
-            runtime.block_on(async { validator_to_reboot.stop().await })?;
-            runtime.block_on(async { validator_to_reboot.start().await })?;
-            std::thread::sleep(Duration::from_secs(10));
+            let addresses: Vec<_> = all_validators
+                .choose_multiple(&mut rng, self.num_simultaneously)
+                .cloned()
+                .collect();
+            for adr in &addresses {
+                let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
+                runtime.block_on(async { validator_to_reboot.stop().await })?;
+            }
+            if self.down_time_secs > 0.0 {
+                std::thread::sleep(Duration::from_secs_f32(self.down_time_secs));
+            }
+
+            for adr in &addresses {
+                let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
+                runtime.block_on(async { validator_to_reboot.start().await })?;
+            }
+
+            if self.pause_secs > 0.0 {
+                std::thread::sleep(Duration::from_secs_f32(self.pause_secs));
+            }
         }
 
         Ok(())

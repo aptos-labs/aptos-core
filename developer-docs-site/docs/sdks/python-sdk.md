@@ -21,7 +21,7 @@ pip3 install aptos-sdk
 
 The `aptos-sdk` will be installed in the local site packages directory. For example, on macOS, you will find the `aptos-sdk` in the `~/Library/Python/3.8/lib/python/site-packages/aptos_sdk` directory.
 
-### Install from the source
+### Install from the source code
 
 To install from source:
 
@@ -40,6 +40,6 @@ cd /path/to/python/project
 cp -r /path/to/aptos-core/ecosystem/python/sdk/aptos-sdk aptos-sdk
 ```
 
-## Using Python SDK
+## Using the Python SDK
 
 See the [Developer Tutorials](/tutorials/index.md) for code examples showing how to use the Python SDK.

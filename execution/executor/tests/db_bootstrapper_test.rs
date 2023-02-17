@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -221,11 +221,11 @@ fn test_new_genesis() {
         ChangeSet::new(
             WriteSetMut::new(vec![
                 (
-                    StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    StateKey::access_path(access_path_for_config(ValidatorSet::CONFIG_ID)),
                     WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         CORE_CODE_ADDRESS,
                         ConfigurationResource::resource_path(),
                     )),
@@ -234,7 +234,7 @@ fn test_new_genesis() {
                     ),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         account1,
                         CoinStoreResource::resource_path(),
                     )),

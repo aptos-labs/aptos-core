@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
@@ -35,6 +35,9 @@ pub enum Error {
 
     #[error("Received Empty Blocks")]
     EmptyBlocks,
+
+    #[error("request timeout")]
+    CouldNotGetData,
 }
 
 impl From<anyhow::Error> for Error {

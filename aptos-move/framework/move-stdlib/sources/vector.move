@@ -156,6 +156,112 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Apply the function to each element in the vector, consuming it.
+    public inline fun for_each<Element>(v: vector<Element>, f: |Element|) {
+        reverse(&mut v); // We need to reverse the vector to consume it efficiently
+        while (!is_empty(&v)) {
+            let e = pop_back(&mut v);
+            f(e);
+        };
+    }
+
+    /// Apply the function to a reference of each element in the vector.
+    public inline fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
+        let i = 0;
+        while (i < length(v)) {
+            f(borrow(v, i));
+            i = i + 1
+        }
+    }
+
+    /// Apply the function to a mutable reference to each element in the vector.
+    public inline fun for_each_mut<Element>(v: &mut vector<Element>, f: |&mut Element|) {
+        let i = 0;
+        while (i < length(v)) {
+            f(borrow_mut(v, i));
+            i = i + 1
+        }
+    }
+
+    /// Fold the function over the elements. For example, `fold(vector[1,2,3], 0, f)` will execute
+    /// `f(f(f(0, 1), 2), 3)`
+    public inline fun fold<Accumulator, Element>(
+        v: vector<Element>,
+        init: Accumulator,
+        f: |Accumulator,Element|Accumulator
+    ): Accumulator {
+        let accu = init;
+        for_each(v, |elem| accu = f(accu, elem));
+        accu
+    }
+
+    /// Map the function over the references of the elements of the vector, producing a new vector without modifying the
+    /// original map.
+    public inline fun map_ref<Element, NewElement>(
+        v: &vector<Element>,
+        f: |&Element|NewElement
+    ): vector<NewElement> {
+        let result = vector<NewElement>[];
+        for_each_ref(v, |elem| push_back(&mut result, f(elem)));
+        result
+    }
+
+    /// Map the function over the elements of the vector, producing a new vector.
+    public inline fun map<Element, NewElement>(
+        v: vector<Element>,
+        f: |Element|NewElement
+    ): vector<NewElement> {
+        let result = vector<NewElement>[];
+        for_each(v, |elem| push_back(&mut result, f(elem)));
+        result
+    }
+
+    /// Filter the vector using the boolean function, removing all elements for which `p(e)` is not true.
+    public inline fun filter<Element:drop>(
+        v: vector<Element>,
+        p: |&Element|bool
+    ): vector<Element> {
+        let result = vector<Element>[];
+        for_each(v, |elem| {
+            if (p(&elem)) push_back(&mut result, elem);
+        });
+        result
+    }
+
+    /// Return true if any element in the vector satisfies the predicate.
+    public inline fun any<Element>(
+        v: &vector<Element>,
+        p: |&Element|bool
+    ): bool {
+        let result = false;
+        let i = 0;
+        while (i < length(v)) {
+            result = p(borrow(v, i));
+            if (result) {
+                break
+            };
+            i = i + 1
+        };
+        result
+    }
+
+    /// Return true if all elements in the vector satisfy the predicate.
+    public inline fun all<Element>(
+        v: &vector<Element>,
+        p: |&Element|bool
+    ): bool {
+        let result = true;
+        let i = 0;
+        while (i < length(v)) {
+            result = p(borrow(v, i));
+            if (!result) {
+                break
+            };
+            i = i + 1
+        };
+        result
+    }
+
     // =================================================================
     // Module Specification
 

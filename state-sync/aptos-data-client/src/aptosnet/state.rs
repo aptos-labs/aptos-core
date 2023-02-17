@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,7 +11,7 @@ use aptos_config::{
 };
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::application::storage::PeerMetadataStorage;
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
@@ -113,14 +113,14 @@ pub(crate) struct PeerStates {
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
     in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
     in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl PeerStates {
     pub fn new(
         base_config: BaseConfig,
         storage_service_config: StorageServiceConfig,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             base_config,
@@ -128,7 +128,7 @@ impl PeerStates {
             peer_to_state: HashMap::new(),
             in_flight_priority_polls: HashSet::new(),
             in_flight_regular_polls: HashSet::new(),
-            peer_metadata_storage,
+            peers_and_metadata,
         }
     }
 
@@ -258,18 +258,31 @@ impl PeerStates {
 
         // VFNs should only prioritize validators
         if self
-            .peer_metadata_storage
-            .networks()
+            .peers_and_metadata
+            .get_registered_networks()
             .contains(&NetworkId::Vfn)
         {
             return peer_network_id.is_vfn_network();
         }
 
         // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
-        if let Some(peer_info) = self.peer_metadata_storage.read(*peer) {
-            if peer_info.active_connection.origin == ConnectionOrigin::Outbound {
-                return true;
-            }
+        match self.peers_and_metadata.get_metadata_for_peer(*peer) {
+            Ok(peer_metadata) => {
+                if peer_metadata.get_connection_medata().origin == ConnectionOrigin::Outbound {
+                    return true;
+                }
+            },
+            Err(error) => {
+                warn!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PriorityAndRegularPeers)
+                        .message(&format!(
+                            "Unable to locate metadata for peer! Error: {:?}",
+                            error
+                        ))
+                        .peer(peer))
+                );
+            },
         }
 
         false

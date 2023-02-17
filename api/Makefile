@@ -1,4 +1,4 @@
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 test: clean lint-v0 lint-v1 test-code-gen-v0 test-code-gen-v1 test-api-spec-v0 test-api-spec-v1 clean

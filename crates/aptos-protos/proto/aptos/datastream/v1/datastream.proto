@@ -1,35 +1,47 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
 package aptos.datastream.v1;
 
+import "aptos/util/timestamp/timestamp.proto";
+
+// Transaction data is transferred via 1 stream with batches until terminated.
+// One stream consists:
+//  StreamStatus: INIT with version x
+//  loop k:
+//    TransactionOutput data(size n)
+//    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
+
 message TransactionsOutput {
   repeated TransactionOutput transactions  = 1;
 }
 
 message TransactionOutput {
+  // Encoded aptos.proto.v1.Transaction proto data.
   string encoded_proto_data = 1;
   uint64 version = 2;
+  aptos.util.timestamp.Timestamp timestamp = 3;
 }
 
 message StreamStatus {
   enum StatusType {
-    BATCH_START = 0;
+    // Signal for the start of the stream.
+    INIT = 0;
+    // Signal for the end of the batch.
     BATCH_END = 1;
   }
   StatusType type = 1;
+  // Required. Start version of current batch/stream, inclusive.
   uint64 start_version = 2;
-  uint64 end_version = 3;
+  // End version of current *batch*, inclusive.
+  optional uint64 end_version = 3;
 }
 
 message RawDatastreamRequest {
+  // Required; start version of current stream.
   uint64 starting_version = 1;
-  uint64 processor_task_count = 3;
-  uint64 processor_batch_size = 2;
-  uint64 output_batch_size = 4;
-  uint32 chain_id = 5;
 }
 
 message RawDatastreamResponse {
@@ -41,6 +53,8 @@ message RawDatastreamResponse {
     StreamStatus status = 1;
     TransactionsOutput data = 2;
   }
+  // Making sure that all the responses include a chain id
+  uint32 chain_id = 3;
 }
 
 service IndexerStream {

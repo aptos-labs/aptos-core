@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub mod account_generator;
+pub mod accounts_pool_wrapper;
 pub mod call_custom_modules;
 pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
@@ -25,7 +26,10 @@ use self::{
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
-use crate::{emitter::stats::DynamicStatsTracking, TransactionType};
+use crate::{
+    emitter::stats::DynamicStatsTracking,
+    transaction_generator::accounts_pool_wrapper::AccountsPoolWrapperCreator, TransactionType,
+};
 pub use publishing::module_simple::EntryPoints;
 
 pub const SEND_AMOUNT: u64 = 1;
@@ -54,7 +58,7 @@ pub trait TransactionExecutor: Sync + Send {
     async fn execute_transactions_with_counter(
         &self,
         txns: &[SignedTransaction],
-        failure_counter: &AtomicUsize,
+        failure_counter: &[AtomicUsize],
     ) -> Result<()>;
 }
 
@@ -64,6 +68,7 @@ pub async fn create_txn_generator_creator(
     all_accounts: &mut [LocalAccount],
     txn_executor: &dyn TransactionExecutor,
     txn_factory: &TransactionFactory,
+    init_txn_factory: &TransactionFactory,
     stats: Arc<DynamicStatsTracking>,
 ) -> Box<dyn TransactionGeneratorCreator> {
     let all_addresses = Arc::new(RwLock::new(
@@ -75,6 +80,18 @@ pub async fn create_txn_generator_creator(
         Vec<(Box<dyn TransactionGeneratorCreator>, usize)>,
     > = Vec::new();
 
+    fn wrap_accounts_pool(
+        inner: Box<dyn TransactionGeneratorCreator>,
+        use_account_pool: bool,
+        accounts_pool: Arc<RwLock<Vec<LocalAccount>>>,
+    ) -> Box<dyn TransactionGeneratorCreator> {
+        if use_account_pool {
+            Box::new(AccountsPoolWrapperCreator::new(inner, accounts_pool))
+        } else {
+            inner
+        }
+    }
+
     for transaction_mix in transaction_mix_per_phase {
         let mut txn_generator_creator_mix: Vec<(Box<dyn TransactionGeneratorCreator>, usize)> =
             Vec::new();
@@ -83,12 +100,17 @@ pub async fn create_txn_generator_creator(
             {
                 TransactionType::CoinTransfer {
                     invalid_transaction_ratio,
-                } => Box::new(P2PTransactionGeneratorCreator::new(
-                    txn_factory.clone(),
-                    SEND_AMOUNT,
-                    all_addresses.clone(),
-                    *invalid_transaction_ratio,
-                )),
+                    sender_use_account_pool,
+                } => wrap_accounts_pool(
+                    Box::new(P2PTransactionGeneratorCreator::new(
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        all_addresses.clone(),
+                        *invalid_transaction_ratio,
+                    )),
+                    *sender_use_account_pool,
+                    accounts_pool.clone(),
+                ),
                 TransactionType::AccountGeneration {
                     add_created_accounts_to_pool,
                     max_account_working_set,
@@ -104,33 +126,36 @@ pub async fn create_txn_generator_creator(
                 TransactionType::NftMintAndTransfer => Box::new(
                     NFTMintAndTransferGeneratorCreator::new(
                         txn_factory.clone(),
+                        init_txn_factory.clone(),
                         all_accounts.get_mut(0).unwrap(),
                         txn_executor,
                         num_workers,
                     )
                     .await,
                 ),
-                TransactionType::PublishPackage => {
-                    Box::new(PublishPackageCreator::new(txn_factory.clone()))
-                },
+                TransactionType::PublishPackage { use_account_pool } => wrap_accounts_pool(
+                    Box::new(PublishPackageCreator::new(txn_factory.clone())),
+                    *use_account_pool,
+                    accounts_pool.clone(),
+                ),
                 TransactionType::CallCustomModules {
                     entry_point,
                     num_modules,
                     use_account_pool,
-                } => Box::new(
-                    CallCustomModulesCreator::new(
-                        txn_factory.clone(),
-                        all_accounts,
-                        txn_executor,
-                        if *use_account_pool {
-                            Some(accounts_pool.clone())
-                        } else {
-                            None
-                        },
-                        *entry_point,
-                        *num_modules,
-                    )
-                    .await,
+                } => wrap_accounts_pool(
+                    Box::new(
+                        CallCustomModulesCreator::new(
+                            txn_factory.clone(),
+                            init_txn_factory.clone(),
+                            all_accounts,
+                            txn_executor,
+                            *entry_point,
+                            *num_modules,
+                        )
+                        .await,
+                    ),
+                    *use_account_pool,
+                    accounts_pool.clone(),
                 ),
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -23,6 +23,14 @@ pub enum Commands {
         #[clap(short, long)]
         output_path: PathBuf,
     },
+    ValidateProposals {
+        #[clap(short, long)]
+        release_config: PathBuf,
+        #[clap(short, long)]
+        test_dir: PathBuf,
+        #[clap(short, long)]
+        endpoint: url::Url,
+    },
 }
 
 #[tokio::main]
@@ -38,6 +46,21 @@ async fn main() -> Result<()> {
             .generate_release_proposal_scripts(output_dir.as_path()),
         Commands::WriteDefault { output_path } => {
             aptos_release_builder::ReleaseConfig::default().save_config(output_path.as_path())
+        },
+        Commands::ValidateProposals {
+            release_config,
+            test_dir,
+            endpoint,
+        } => {
+            let config =
+                aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())?;
+
+            let network_config = aptos_release_builder::validate::NetworkConfig::new_from_dir(
+                endpoint,
+                test_dir.as_path(),
+            )?;
+
+            aptos_release_builder::validate::validate_config(config, network_config).await
         },
     }
 }

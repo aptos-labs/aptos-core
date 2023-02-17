@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::path_in_crate;
@@ -48,8 +48,13 @@ fn move_framework_unit_tests() {
 }
 
 #[test]
-fn move_stdlib_unit_tests() {
+fn move_aptos_stdlib_unit_tests() {
     run_tests_for_pkg("aptos-stdlib");
+}
+
+#[test]
+fn move_stdlib_unit_tests() {
+    run_tests_for_pkg("move-stdlib");
 }
 
 #[test]

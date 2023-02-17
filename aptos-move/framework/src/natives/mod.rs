@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
@@ -10,6 +10,7 @@ pub mod cryptography;
 pub mod event;
 pub mod hash;
 mod helpers;
+pub mod object;
 pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
@@ -46,6 +47,7 @@ pub struct GasParameters {
     pub state_storage: state_storage::GasParameters,
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
+    pub object: object::GasParameters,
 }
 
 impl GasParameters {
@@ -181,6 +183,11 @@ impl GasParameters {
             aggregator_factory: aggregator_factory::GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
+            object: object::GasParameters {
+                exists_at: object::ExistsAtGasParameters {
+                    base_cost: 0.into(),
+                },
+            },
         }
     }
 }
@@ -245,6 +252,7 @@ pub fn all_natives(
         "aggregator_factory",
         aggregator_factory::make_all(gas_params.aggregator_factory)
     );
+    add_natives_from_module!("object", object::make_all(gas_params.object));
 
     make_table_from_iter(framework_addr, natives)
 }

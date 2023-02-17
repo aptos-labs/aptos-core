@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{self as dl};
@@ -83,7 +83,7 @@ fn translate_metadata(metadata: &Metadata<'static>) -> Option<dl::Metadata> {
         level,
         metadata.target(),
         metadata.module_path().unwrap_or(""),
-        "",
+        metadata.file().unwrap_or(""),
     ))
 }
 

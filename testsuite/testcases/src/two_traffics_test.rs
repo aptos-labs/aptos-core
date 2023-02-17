@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,6 +18,7 @@ pub struct TwoTrafficsTest {
     // pub inner_emit_job_request: EmitJobRequest,
     pub inner_tps: usize,
     pub inner_gas_price: u64,
+    pub inner_init_gas_price_multiplier: u64,
 
     pub avg_tps: usize,
     pub latency_thresholds: &'static [(f32, LatencyType)],
@@ -30,10 +31,6 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",
@@ -48,7 +45,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
                 .mode(EmitJobMode::ConstTps {
                     tps: self.inner_tps,
                 })
-                .gas_price(self.inner_gas_price),
+                .gas_price(self.inner_gas_price)
+                .init_gas_price_multiplier(self.inner_init_gas_price_multiplier),
             &nodes_to_send_load_to,
             rng,
         )?;
@@ -64,8 +62,13 @@ impl NetworkLoadTest for TwoTrafficsTest {
         ))?;
 
         let actual_test_duration = test_start.elapsed();
+        info!(
+            "End to end duration: {}s, while txn emitter lasted: {}s",
+            actual_test_duration.as_secs(),
+            stats.lasted.as_secs()
+        );
 
-        let rate = stats.rate(actual_test_duration);
+        let rate = stats.rate();
         info!("Inner traffic: {:?}", rate);
 
         let avg_tps = rate.committed;

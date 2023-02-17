@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Test infrastructure for modeling Aptos accounts.
@@ -433,11 +433,11 @@ impl AccountData {
     pub fn to_writeset(&self) -> WriteSet {
         let write_set = vec![
             (
-                StateKey::AccessPath(self.make_account_access_path()),
+                StateKey::access_path(self.make_account_access_path()),
                 WriteOp::Modification(self.to_bytes()),
             ),
             (
-                StateKey::AccessPath(self.make_coin_store_access_path()),
+                StateKey::access_path(self.make_coin_store_access_path()),
                 WriteOp::Modification(self.coin_store.to_bytes()),
             ),
         ];

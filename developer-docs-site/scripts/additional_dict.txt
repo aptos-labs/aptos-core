@@ -12,6 +12,8 @@ APT's
 APTs
 AUTH
 AWS
+AIP
+AIPs
 Ait
 ApiExplorer
 Aptos
@@ -28,6 +30,7 @@ Bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
+bool
 Bundlr
 CANCELLED
 CDN
@@ -175,6 +178,7 @@ RTT
 Recategorized
 Reusability
 Ruleset
+serde
 SDK
 SDKs
 SHA
@@ -300,6 +304,7 @@ img
 init
 integrations
 integrators
+interoperable
 intra
 invariants
 io
@@ -338,6 +343,7 @@ nonfungible
 npmjs
 octa
 octas
+offchain
 onwards
 orderbook
 overline
@@ -357,6 +363,8 @@ precompiled
 preconfigure
 programmability
 programmatically
+PropertyMap
+propertymap
 prover
 pvc
 quickstart
@@ -430,3 +438,7 @@ WSL
 xlarge
 yaml
 yamls
+todo
+TodoList
+todolist
+npm

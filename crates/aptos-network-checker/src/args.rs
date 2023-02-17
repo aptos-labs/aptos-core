@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context, Result};
@@ -59,7 +59,7 @@ pub struct CheckEndpointArgs {
     pub handshake_args: HandshakeArgs,
 }
 
-fn validate_address(address: &str) -> Result<NetworkAddress> {
+pub fn validate_address(address: &str) -> Result<NetworkAddress> {
     let address = NetworkAddress::from_str(address)
         .with_context(|| format!("Invalid address: {}", address))?;
     if !address.is_aptosnet_addr() {

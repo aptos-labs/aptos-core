@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,10 +13,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block,
-    common::{Payload, Round},
-    executed_block::ExecutedBlock,
-    proof_of_store::LogicalTime,
+    block::Block, executed_block::ExecutedBlock, proof_of_store::LogicalTime,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
@@ -36,8 +33,6 @@ type NotificationType = (
     Vec<Transaction>,
     Vec<ContractEvent>,
 );
-
-type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
@@ -85,6 +80,7 @@ impl ExecutionProxy {
     }
 }
 
+// TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
     async fn compute(
@@ -123,6 +119,7 @@ impl StateComputer for ExecutionProxy {
             .await
         )
         .expect("spawn_blocking failed")?;
+
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction

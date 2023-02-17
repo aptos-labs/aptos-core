@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
@@ -38,7 +38,7 @@ fn test_genesis() {
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 
-    let account_resource_path = StateKey::AccessPath(AccessPath::new(
+    let account_resource_path = StateKey::access_path(AccessPath::new(
         CORE_CODE_ADDRESS,
         AccountResource::struct_tag().access_vector(),
     ));

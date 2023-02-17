@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -67,6 +67,14 @@ where
         }
     }
 
+    fn save_min_readable_version(
+        &self,
+        version: Version,
+        batch: &SchemaBatch,
+    ) -> anyhow::Result<()> {
+        batch.put::<DbMetadataSchema>(&S::tag(), &DbMetadataValue::Version(version))
+    }
+
     fn initialize_min_readable_version(&self) -> Result<Version> {
         Ok(self
             .state_merkle_db
@@ -129,6 +137,9 @@ where
         existing_schema_batch: Option<&mut SchemaBatch>,
     ) -> anyhow::Result<Version> {
         assert_ne!(batch_size, 0);
+        if target_version < min_readable_version {
+            return Ok(min_readable_version);
+        }
         let (indices, is_end_of_target_version) =
             self.get_stale_node_indices(min_readable_version, target_version, batch_size)?;
         if indices.is_empty() {
@@ -154,10 +165,7 @@ where
                     batch.delete::<S>(&index)
                 })?;
 
-                batch.put::<DbMetadataSchema>(
-                    &S::tag(),
-                    &DbMetadataValue::Version(new_min_readable_version),
-                )?;
+                self.save_min_readable_version(new_min_readable_version, &batch)?;
 
                 // Commit to DB.
                 self.state_merkle_db.write_schemas(batch)?;

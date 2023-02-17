@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -15,11 +15,12 @@ use aptos_logger::{
     LoggerFilterUpdater,
 };
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::{ChainId, NamedChain};
+use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
 use rand::Rng;
 use rand_core::OsRng;
+use reqwest::Url;
 use serde::Deserialize;
 use std::{
     collections::BTreeMap,
@@ -134,14 +135,24 @@ async fn spawn_telemetry_service(
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) {
     let telemetry_svc_url = env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| {
-        if chain_id == ChainId::mainnet() || chain_id == ChainId::new(NamedChain::PREMAINNET.id()) {
+        if chain_id == ChainId::mainnet() {
             MAINNET_TELEMETRY_SERVICE_URL.into()
         } else {
             TELEMETRY_SERVICE_URL.into()
         }
     });
 
-    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
+    let base_url = Url::parse(&telemetry_svc_url).unwrap_or_else(|err| {
+        warn!(
+            "Unable to parse telemetry service URL {}. Make sure {} is unset or is set properly: {}. Defaulting to {}.",
+            telemetry_svc_url,
+            ENV_TELEMETRY_SERVICE_URL, err, TELEMETRY_SERVICE_URL
+        );
+            Url::parse(TELEMETRY_SERVICE_URL)
+                .expect("unable to parse telemetry service default URL")
+    });
+
+    let telemetry_sender = TelemetrySender::new(base_url, chain_id, &node_config);
 
     if !force_enable_telemetry() && !telemetry_sender.check_chain_access(chain_id).await {
         warn!(

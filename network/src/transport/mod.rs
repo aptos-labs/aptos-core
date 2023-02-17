@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -65,6 +65,12 @@ impl<T> TSocket for T where T: AsyncRead + AsyncWrite + Send + fmt::Debug + Unpi
 /// Unique local identifier for a connection.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ConnectionId(u32);
+
+impl ConnectionId {
+    pub fn get_inner(&self) -> u32 {
+        self.0
+    }
+}
 
 impl From<u32> for ConnectionId {
     fn from(i: u32) -> ConnectionId {

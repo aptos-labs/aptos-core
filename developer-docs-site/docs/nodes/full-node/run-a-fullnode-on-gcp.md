@@ -8,7 +8,7 @@ slug: "run-a-fullnode-on-gcp"
 This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a public fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. **If you are looking to deploy a production grade public fullnode, we recommend you to deploy it on the cloud.**
 
 :::tip Alternative methods for running a public fullnode
-Read [Public Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment. Using cloud comes with a cost, and it varies depends on how you configure it.
+Read [Public Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment. Using cloud comes with a cost, and it varies depending on how you configure it.
 :::
 
 ## Prerequisites
@@ -19,7 +19,7 @@ The following packages are pre-installed with Cloud Shell. **Make sure to review
 
 However, if you are running the installation from your laptop or another machine, you need to install:
 
-* Terraform 1.1.7: https://www.terraform.io/downloads.html
+* Terraform 1.3.6: https://www.terraform.io/downloads.html
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
 
@@ -103,7 +103,7 @@ Example content for `main.tf`:
 
   ```rust
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.6"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/fullnode"

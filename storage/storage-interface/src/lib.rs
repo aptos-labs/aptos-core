@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, format_err, Result};
@@ -542,7 +542,7 @@ impl MoveStorage for &dyn DbReader {
         version: Version,
     ) -> Result<Vec<u8>> {
         let state_value =
-            self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
+            self.get_state_value_by_version(&StateKey::access_path(access_path), version)?;
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))
@@ -551,7 +551,7 @@ impl MoveStorage for &dyn DbReader {
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
         let config_value_option = self.get_state_value_by_version(
-            &StateKey::AccessPath(AccessPath::new(
+            &StateKey::access_path(AccessPath::new(
                 CORE_CODE_ADDRESS,
                 access_path_for_config(config_id).path,
             )),

@@ -12,7 +12,7 @@ on:
 jobs:
   # Performance test in an optimal setting
   run-forge-state-sync-perf-validator-test:
-    uses: ./.github/workflows/run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-state-sync-perf-validator

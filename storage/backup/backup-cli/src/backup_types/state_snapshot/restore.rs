@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -29,7 +29,10 @@ use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
     proof::TransactionInfoWithProof,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use aptos_vm::move_vm_ext::verifier_config;
@@ -220,7 +223,7 @@ impl StateSnapshotRestoreController {
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
         let config = verifier_config(false);
         for (key, value) in blob {
-            if let StateKey::AccessPath(p) = key {
+            if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {
                     if let Ok(module) = CompiledModule::deserialize(value.bytes()) {
                         if let Err(err) = verify_module_with_config(&config, &module) {

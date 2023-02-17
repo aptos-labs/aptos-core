@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ParsedTransactionOutput, ProofReader};
@@ -19,6 +19,7 @@ use aptos_types::{
     transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -45,7 +46,7 @@ pub struct InMemoryStateCalculator {
     proof_reader: ProofReader,
 
     //// These changes every time a new txn is added to the calculator.
-    state_cache: HashMap<StateKey, Option<StateValue>>,
+    state_cache: DashMap<StateKey, Option<StateValue>>,
     next_version: Version,
     updates_after_latest: HashMap<StateKey, Option<StateValue>>,
     usage: StateStorageUsage,
@@ -265,7 +266,7 @@ impl InMemoryStateCalculator {
 // Returns all state key-value pair touched.
 pub fn process_write_set(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
+    state_cache: &mut DashMap<StateKey, Option<StateValue>>,
     usage: &mut StateStorageUsage,
     write_set: WriteSet,
 ) -> Result<HashMap<StateKey, Option<StateValue>>> {
@@ -280,7 +281,7 @@ pub fn process_write_set(
 
 fn process_state_key_write_op(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
+    state_cache: &mut DashMap<StateKey, Option<StateValue>>,
     usage: &mut StateStorageUsage,
     state_key: StateKey,
     write_op: WriteOp,

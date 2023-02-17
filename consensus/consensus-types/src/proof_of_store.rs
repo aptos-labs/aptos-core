@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::Round;
@@ -9,6 +9,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
 };
+use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -81,6 +82,10 @@ impl SignedDigest {
         })
     }
 
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -88,6 +93,24 @@ impl SignedDigest {
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
     }
+
+    pub fn info(&self) -> &SignedDigestInfo {
+        &self.info
+    }
+
+    pub fn signature(self) -> bls12381::Signature {
+        self.signature
+    }
+
+    pub fn digest(&self) -> HashValue {
+        self.info.digest
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SignedDigestError {
+    WrongInfo,
+    DuplicatedSignature,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -120,6 +143,14 @@ impl ProofOfStore {
         validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
             .context("Failed to verify ProofOfStore")
+    }
+
+    pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
+        let mut ret: Vec<PeerId> = self
+            .multi_signature
+            .get_voter_addresses(&validator.get_ordered_account_addresses());
+        ret.shuffle(&mut thread_rng());
+        ret
     }
 
     pub fn epoch(&self) -> u64 {

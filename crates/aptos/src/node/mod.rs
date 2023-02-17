@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod analyze;
@@ -30,6 +30,9 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
+use aptos_network_checker::args::{
+    validate_address, CheckEndpointArgs, HandshakeArgs, NodeAddressArgs,
+};
 use aptos_rest_client::{aptos_api_types::VersionedEvent, Client, State};
 use aptos_types::{
     account_address::AccountAddress,
@@ -70,6 +73,7 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 /// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
+    CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
     InitializeValidator(InitializeValidator),
@@ -90,6 +94,7 @@ impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
+            CheckNetworkConnectivity(tool) => tool.execute_serialized().await,
             GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
             InitializeValidator(tool) => tool.execute_serialized().await,
@@ -1526,6 +1531,54 @@ impl CliCommand<()> for BootstrapDbFromBackup {
     }
 }
 
+/// Checks the network connectivity of a node
+///
+/// Checks network connectivity by dialing the node and attempting
+/// to establish a connection with a noise handshake.
+#[derive(Parser)]
+pub struct CheckNetworkConnectivity {
+    /// `NetworkAddress` of remote server interface.
+    /// Examples include:
+    /// - `/dns/example.com/tcp/6180/noise-ik/<x25519-pubkey>/handshake/1`
+    /// - `/ip4/<ip-address>/tcp/6182/noise-ik/<x25519-pubkey>/handshake/0`
+    #[clap(long, value_parser = validate_address)]
+    pub address: NetworkAddress,
+
+    /// `ChainId` of remote server.
+    /// Examples include:
+    /// - Chain numbers, e.g., `2`, `3` and `25`.
+    /// - Chain names, e.g., `devnet`, `testnet`, `mainnet` and `testing` (for local test networks).
+    #[clap(long)]
+    pub chain_id: ChainId,
+
+    #[clap(flatten)]
+    pub handshake_args: HandshakeArgs,
+}
+
+#[async_trait]
+impl CliCommand<String> for CheckNetworkConnectivity {
+    fn command_name(&self) -> &'static str {
+        "CheckNetworkConnectivity"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        // Create the check endpoint args for the checker
+        let node_address_args = NodeAddressArgs {
+            address: self.address,
+            chain_id: self.chain_id,
+        };
+        let check_endpoint_args = CheckEndpointArgs {
+            node_address_args,
+            handshake_args: self.handshake_args,
+        };
+
+        // Check the endpoint
+        aptos_network_checker::check_endpoint(&check_endpoint_args, None)
+            .await
+            .map_err(|error| CliError::UnexpectedError(error.to_string()))
+    }
+}
+
 /// Show Epoch information
 ///
 /// Displays the current epoch, the epoch length, and the estimated time of the next epoch
@@ -1590,7 +1643,8 @@ pub struct Time {
 
 impl Time {
     pub fn new(time: Duration) -> Self {
-        let date_time = NaiveDateTime::from_timestamp(time.as_secs() as i64, time.subsec_nanos());
+        let date_time =
+            NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
         let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time zone
         Self {
@@ -1605,5 +1659,59 @@ impl Time {
 
     pub fn new_seconds(seconds: u64) -> Self {
         Self::new(Duration::from_secs(seconds))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{CliResult, Tool};
+    use clap::Parser;
+
+    // TODO: there have to be cleaner ways to test things. Maybe a CLI test framework?
+
+    #[tokio::test]
+    // Verifies basic properties about the network connectivity checker
+    async fn test_check_network_connectivity() {
+        // Verify the help function works
+        let args = &["aptos", "node", "check-network-connectivity", "--help"];
+        let help_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(help_message, "USAGE:"); // We expect the command to return USAGE info
+
+        // Verify that an invalid address will return an error
+        let args = &[
+            "aptos",
+            "node",
+            "check-network-connectivity",
+            "--address",
+            "invalid-address",
+            "--chain-id",
+            "mainnet",
+        ];
+        let error_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(error_message, "Invalid address");
+
+        // Verify that an invalid chain-id will return an error
+        let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/34.70.116.169/tcp/6182/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "invalid-chain"];
+        let error_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(error_message, "Invalid value");
+
+        // Verify that a failure to connect will return a timeout
+        let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/31.71.116.169/tcp/0001/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "testnet"];
+        let error_message = run_tool_with_args(args).await.unwrap_err();
+        assert_contains(error_message, "Timed out while checking endpoint");
+    }
+
+    async fn run_tool_with_args(args: &[&str]) -> CliResult {
+        let tool: Tool = Tool::try_parse_from(args).map_err(|msg| msg.to_string())?;
+        tool.execute().await
+    }
+
+    fn assert_contains(message: String, expected_string: &str) {
+        if !message.contains(expected_string) {
+            panic!(
+                "Expected message to contain {:?}, but it did not! Message: {:?}",
+                expected_string, message
+            );
+        }
     }
 }

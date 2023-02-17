@@ -180,7 +180,7 @@ The Move VM verifies and executes transaction scripts written in Move bytecode.
 
 ### 1. Virtual Machine → Storage
 
-When mempool requests the VM to validate a transaction via `VM::ValidateTransaction()`, the VM loads the transaction sender's account from storage and performs verifications, some of which have been described in the list below. View the entire list of verifications [here](https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/move_adapter).
+When mempool requests the VM to validate a transaction via `VM::ValidateTransaction()`, the VM loads the transaction sender's account from storage and performs verifications, some of which have been described in the list below.
 
 * Checks that the input signature on the signed transaction is correct (to reject incorrectly signed transactions).
 * Checks that the sender's account authentication key is the same as the hash of the public key (corresponding to the private key used to sign the transaction).
@@ -234,9 +234,6 @@ Mempool is a shared buffer that holds the transactions that are “waiting” to
 
 When mempool receives a transaction from other validators, mempool invokes <code>VM::ValidateTransaction()</code> on the VM to validate the transaction.
 
-
-For implementation details refer to the [Mempool README](https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/mempool).
-
 ## Consensus
 
 <center>
@@ -269,9 +266,6 @@ If V<sub>X</sub> is a proposer/leader, its consensus component replicates the pr
 ### 4. Consensus → Execution
 
 If enough validators vote for the same execution result, the consensus component of V<sub>X</sub> informs execution via `Execution::CommitBlock()` that this block is ready to be committed.
-
-
-For implementation details refer to the [Consensus README](https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/consensus).
 
 ## Execution
 

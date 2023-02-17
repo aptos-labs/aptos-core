@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -18,7 +18,7 @@ pub mod natives;
 mod release_builder;
 pub use release_builder::*;
 pub mod docgen;
-mod extended_checks;
+pub mod extended_checks;
 pub use extended_checks::ResourceGroupScope;
 pub mod prover;
 mod release_bundle;

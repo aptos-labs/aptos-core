@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod db;
@@ -22,7 +22,7 @@ use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::StateKey,
+        state_key::{StateKey, StateKeyInner},
         table::{TableHandle, TableInfo},
     },
     transaction::{AtomicVersion, Version},
@@ -160,8 +160,8 @@ impl<'a> TableInfoParser<'a> {
 
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
         match write_op {
-            WriteOp::Modification(bytes) | WriteOp::Creation(bytes) => match state_key {
-                StateKey::AccessPath(access_path) => {
+            WriteOp::Modification(bytes) | WriteOp::Creation(bytes) => match state_key.inner() {
+                StateKeyInner::AccessPath(access_path) => {
                     let path: Path = (&access_path.path).try_into()?;
                     match path {
                         Path::Code(_) => (),
@@ -169,8 +169,8 @@ impl<'a> TableInfoParser<'a> {
                         Path::ResourceGroup(_struct_tag) => (),
                     }
                 },
-                StateKey::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
-                StateKey::Raw(_) => (),
+                StateKeyInner::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
+                StateKeyInner::Raw(_) => (),
             },
             WriteOp::Deletion => (),
         }

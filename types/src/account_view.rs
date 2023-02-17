@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -63,7 +63,10 @@ pub trait AccountView {
         let account_address = self
             .get_account_address()?
             .ok_or_else(|| anyhow!("Could not fetch account address"))?;
-        Ok(StateKey::AccessPath(AccessPath::new(account_address, path)))
+        Ok(StateKey::access_path(AccessPath::new(
+            account_address,
+            path,
+        )))
     }
 
     fn get_account_resource(&self) -> anyhow::Result<Option<AccountResource>> {

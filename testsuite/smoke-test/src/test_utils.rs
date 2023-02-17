@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
@@ -9,6 +9,10 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::random;
+
+pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
+pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
+pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes to become healthy
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let mut info = swarm.aptos_public_info();

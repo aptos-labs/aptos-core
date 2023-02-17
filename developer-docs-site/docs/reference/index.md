@@ -1,5 +1,5 @@
 ---
-title: "Aptos References"
+title: "Aptos Reference Documentation"
 slug: "aptos-ref-docs"
 hidden: false
 ---
@@ -25,7 +25,7 @@ Read [System Integrators Guide](../guides/system-integrators-guide.md) to integr
 - ### [Python SDK](../sdks/python-sdk.md)
 - ### [Rust SDK](../sdks/rust-sdk.md)
 
-## Aptos Move reference
+## Aptos Move reference 
 
 * *Aptos tokens* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-token/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-token/doc/overview.md)
 * *Aptos framework* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-framework/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/doc/overview.md)

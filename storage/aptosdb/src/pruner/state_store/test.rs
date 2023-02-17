@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -86,7 +86,7 @@ fn create_state_pruner_manager(
 
 #[test]
 fn test_state_store_pruner() {
-    let key = StateKey::Raw(String::from("test_key1").into_bytes());
+    let key = StateKey::raw(String::from("test_key1").into_bytes());
 
     let prune_batch_size = 10;
     let num_versions = 25;
@@ -162,9 +162,9 @@ fn test_state_store_pruner_partial_version() {
     // ```
     // On version 1, there are two entries, one changes address2 and the other changes the root node.
     // On version 2, there are two entries, one changes address3 and the other changes the root node.
-    let key1 = StateKey::Raw(String::from("test_key1").into_bytes());
-    let key2 = StateKey::Raw(String::from("test_key2").into_bytes());
-    let key3 = StateKey::Raw(String::from("test_key3").into_bytes());
+    let key1 = StateKey::raw(String::from("test_key1").into_bytes());
+    let key2 = StateKey::raw(String::from("test_key2").into_bytes());
+    let key3 = StateKey::raw(String::from("test_key3").into_bytes());
 
     let value1 = StateValue::from(String::from("test_val1").into_bytes());
     let value2 = StateValue::from(String::from("test_val2").into_bytes());
@@ -256,7 +256,7 @@ fn test_state_store_pruner_partial_version() {
 
 #[test]
 fn test_state_store_pruner_disabled() {
-    let key = StateKey::Raw(String::from("test_key1").into_bytes());
+    let key = StateKey::raw(String::from("test_key1").into_bytes());
 
     let prune_batch_size = 10;
     let num_versions = 25;
@@ -309,7 +309,7 @@ fn test_state_store_pruner_disabled() {
 
 #[test]
 fn test_worker_quit_eagerly() {
-    let key = StateKey::Raw(String::from("test_key1").into_bytes());
+    let key = StateKey::raw(String::from("test_key1").into_bytes());
 
     let value0 = StateValue::from(String::from("test_val1").into_bytes());
     let value1 = StateValue::from(String::from("test_val2").into_bytes());

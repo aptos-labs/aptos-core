@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -126,7 +126,7 @@ impl CoinInfoResource {
         // We store CoinInfo and aggregatable value separately.
         let write_set = vec![
             (
-                StateKey::AccessPath(ap),
+                StateKey::access_path(ap),
                 WriteOp::Modification(bcs::to_bytes(&self).unwrap()),
             ),
             (

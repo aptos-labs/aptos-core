@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use aptos_network::application::types::PeerInfo;
+use aptos_network::application::metadata::PeerMetadata;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom};
 use thiserror::Error;
@@ -84,7 +84,7 @@ impl PeerMonitoringServiceResponse {
 /// A response for the connected peers request
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectedPeersResponse {
-    pub connected_peers: HashMap<PeerNetworkId, PeerInfo>,
+    pub connected_peers: HashMap<PeerNetworkId, PeerMetadata>,
 }
 
 /// A response for the depth from validators request

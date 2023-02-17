@@ -1,9 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
+    test_utils::{
+        assert_balance, create_and_fund_account, transfer_coins, MAX_CATCH_UP_WAIT_SECS,
+        MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+    },
 };
 use aptos_config::config::NodeConfig;
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
@@ -11,8 +14,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-
-const MAX_WAIT_SECS: u64 = 60;
 
 /// Checks txn goes through consensus even if the local validator is not creating proposals.
 /// This behavior should be true with both mempool and quorum store.
@@ -40,11 +41,11 @@ async fn test_txn_broadcast() {
 
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
             .unwrap();
         fullnode
-            .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+            .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))
             .await
             .unwrap();
     }
@@ -54,7 +55,7 @@ async fn test_txn_broadcast() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -64,7 +65,10 @@ async fn test_txn_broadcast() {
     // set up validator_client. proposals not sent from this validator. txn should still go through.
     let validator_client = swarm.validator(validator).unwrap().rest_client();
     validator_client
-        .set_failpoint("consensus::send_proposal".to_string(), "return".to_string())
+        .set_failpoint(
+            "consensus::send::proposal".to_string(),
+            "return".to_string(),
+        )
         .await
         .unwrap();
 

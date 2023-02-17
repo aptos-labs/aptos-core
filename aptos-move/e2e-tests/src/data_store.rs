@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Support for mocking the Aptos data store.
@@ -9,7 +9,9 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
@@ -93,7 +95,7 @@ impl FakeDataStore {
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
         let access_path = AccessPath::from(module_id);
-        self.set(StateKey::AccessPath(access_path), blob);
+        self.set(StateKey::access_path(access_path), blob);
     }
 
     /// Yields a reference to the internal data structure of the global state
@@ -106,8 +108,8 @@ impl FakeDataStore {
 impl TStateView for FakeDataStore {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
-        Ok(self.state_data.get(state_key).cloned())
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        Ok(self.state_data.get(state_key).cloned().map(StateValue::new))
     }
 
     fn is_genesis(&self) -> bool {

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod auth;
@@ -11,10 +11,12 @@ pub mod common {
     use aptos_types::{chain_id::ChainId, PeerId};
     use serde::{Deserialize, Serialize};
     use std::{collections::HashMap, fmt};
+    use uuid::Uuid;
 
     pub type EpochNum = u64;
     pub type EpochedPeerStore = HashMap<ChainId, (EpochNum, PeerSet)>;
     pub type PeerStore = HashMap<ChainId, PeerSet>;
+    pub type ChainCommonName = String;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct EventIdentity {
@@ -22,6 +24,7 @@ pub mod common {
         pub chain_id: ChainId,
         pub role_type: NodeType,
         pub epoch: u64,
+        pub uuid: Uuid,
     }
 
     impl From<Claims> for EventIdentity {
@@ -31,6 +34,7 @@ pub mod common {
                 chain_id: claims.chain_id,
                 role_type: claims.node_type,
                 epoch: claims.epoch,
+                uuid: claims.run_uuid,
             }
         }
     }
@@ -41,6 +45,8 @@ pub mod common {
         ValidatorFullNode,
         PublicFullNode,
         Unknown,
+        UnknownValidator,
+        UnknownFullNode,
     }
 
     impl NodeType {
@@ -50,6 +56,8 @@ pub mod common {
                 NodeType::ValidatorFullNode => "validator_fullnode",
                 NodeType::PublicFullNode => "public_fullnode",
                 NodeType::Unknown => "unknown_peer",
+                NodeType::UnknownValidator => "unknown_validator",
+                NodeType::UnknownFullNode => "unknown_fullnode",
             }
         }
     }

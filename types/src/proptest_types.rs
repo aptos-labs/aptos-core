@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -90,7 +90,7 @@ impl Arbitrary for WriteSet {
             .prop_map(|write_set| {
                 let write_set_mut =
                     WriteSetMut::new(write_set.iter().map(|(access_path, write_op)| {
-                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
+                        (StateKey::access_path(access_path.clone()), write_op.clone())
                     }));
                 write_set_mut
                     .freeze()
@@ -786,7 +786,7 @@ impl TransactionToCommitGen {
                     .materialize(index, universe)
                     .into_resource_iter()
                     .map(move |(key, value)| {
-                        let state_key = StateKey::AccessPath(AccessPath::new(address, key));
+                        let state_key = StateKey::access_path(AccessPath::new(address, key));
                         (
                             (state_key.clone(), Some(StateValue::from(value.clone()))),
                             (state_key, WriteOp::Modification(value)),

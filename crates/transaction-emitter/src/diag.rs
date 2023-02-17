@@ -1,14 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 use futures::future::join_all;
-use itertools::zip;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     cmp::min,
+    iter::zip,
     time::{Duration, Instant},
 };
 

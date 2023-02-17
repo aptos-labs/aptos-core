@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines the state merkle snapshot committer running in background thread.
@@ -44,16 +44,12 @@ impl StateMerkleBatchCommitter {
     pub fn run(self) {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             match msg {
-                CommitMessage::Data {
-                    data,
-                    snapshot_ready_sender,
-                    ..
-                } => {
+                CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
                         batch,
                         root_hash,
                         state_delta,
-                    } = data;
+                    } = state_merkle_batch;
                     // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
@@ -68,9 +64,6 @@ impl StateMerkleBatchCommitter {
                             .version_cache()
                             .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
                     }
-                    // TODO(grao): Consider remove the following sender once we verified the
-                    // version cache correctly cached all nodes we need.
-                    snapshot_ready_sender.send(()).unwrap();
                     info!(
                         version = state_delta.current_version,
                         base_version = state_delta.base_version,

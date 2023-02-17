@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects of the Rosetta spec
@@ -29,7 +29,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::StateKey,
+    state_store::state_key::{StateKey, StateKeyInner},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };
@@ -831,8 +831,8 @@ async fn parse_operations_from_write_set(
     operation_index: u64,
     changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
-    let (struct_tag, address) = match state_key {
-        StateKey::AccessPath(path) => {
+    let (struct_tag, address) = match state_key.inner() {
+        StateKeyInner::AccessPath(path) => {
             if let Some(struct_tag) = path.get_struct_tag() {
                 (struct_tag, path.address)
             } else {
@@ -1165,7 +1165,7 @@ async fn parse_staking_contract_resource_changes(
                 };
 
                 let mut ret = None;
-                if let (StateKey::AccessPath(path), Some(data)) = (state_key, data) {
+                if let (StateKeyInner::AccessPath(path), Some(data)) = (state_key.inner(), data) {
                     if let Some(struct_tag) = path.get_struct_tag() {
                         if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
                             struct_tag.address,
