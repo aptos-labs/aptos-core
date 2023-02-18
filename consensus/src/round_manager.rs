@@ -690,7 +690,13 @@ impl RoundManager {
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
-            // same proposal to self after some time.
+            // same proposal to self after some time. Even if processing proposal is delayed, we add
+            // the block to the block store so that we don't need to fetch it from remote once we
+            // are out of the backpressure.
+            self.block_store
+                .execute_and_insert_block(proposal.clone())
+                .await
+                .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
                 proposal,
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
