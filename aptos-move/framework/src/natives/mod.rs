@@ -199,12 +199,18 @@ pub fn all_natives(
         };
     }
 
-    add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
+    add_natives_from_module!(
+        "account",
+        account::make_all(gas_params.account.clone(), timed_features.clone())
+    );
     add_natives_from_module!(
         "ed25519",
         ed25519::make_all(gas_params.ed25519.clone(), timed_features.clone())
     );
-    add_natives_from_module!("genesis", account::make_all(gas_params.account));
+    add_natives_from_module!(
+        "genesis",
+        account::make_all(gas_params.account, timed_features.clone())
+    );
     add_natives_from_module!(
         "multi_ed25519",
         multi_ed25519::make_all(gas_params.ed25519, timed_features.clone())
