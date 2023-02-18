@@ -31,8 +31,11 @@ pool.
 55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
 
 
+-  [Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
 -  [Struct `StakingContract`](#0x1_staking_contract_StakingContract)
 -  [Resource `Store`](#0x1_staking_contract_Store)
+-  [Struct `UpdateCommissionEvent`](#0x1_staking_contract_UpdateCommissionEvent)
+-  [Resource `StakingGroupUpdateCommissionEvent`](#0x1_staking_contract_StakingGroupUpdateCommissionEvent)
 -  [Struct `CreateStakingContractEvent`](#0x1_staking_contract_CreateStakingContractEvent)
 -  [Struct `UpdateVoterEvent`](#0x1_staking_contract_UpdateVoterEvent)
 -  [Struct `ResetLockupEvent`](#0x1_staking_contract_ResetLockupEvent)
@@ -87,6 +90,33 @@ pool.
 </code></pre>
 
 
+
+<a name="0x1_staking_contract_StakingGroupContainer"></a>
+
+## Struct `StakingGroupContainer`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupContainer">StakingGroupContainer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a name="0x1_staking_contract_StakingContract"></a>
 
@@ -217,6 +247,78 @@ pool.
 </dd>
 <dt>
 <code>distribute_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_DistributeEvent">staking_contract::DistributeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_staking_contract_UpdateCommissionEvent"></a>
+
+## Struct `UpdateCommissionEvent`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>staker: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_staking_contract_StakingGroupUpdateCommissionEvent"></a>
+
+## Resource `StakingGroupUpdateCommissionEvent`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>update_commission_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">staking_contract::UpdateCommissionEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -1125,6 +1227,7 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
 ## Function `update_commision`
 
+Convenience function to allow a staker to update the commision percentage paid to the operator.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)
@@ -1136,7 +1239,7 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> {
     <b>assert</b>!(
         new_commission_percentage &gt;= 0 && new_commission_percentage &lt;= 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>),
@@ -1154,7 +1257,15 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
         &<b>mut</b> store.add_distribution_events,
         &<b>mut</b> store.request_commission_events,
     );
+    <b>let</b> old_commission_percentage = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage;
     <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage = new_commission_percentage;
+    <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address)) {
+        <b>move_to</b>(staker, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> { update_commission_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a>&gt;(staker)})
+    };
+    emit_event(
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address).update_commission_events,
+        <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
+    );
 }
 </code></pre>
 

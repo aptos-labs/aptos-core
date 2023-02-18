@@ -445,6 +445,7 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Convenience function to allow a staker to update the commision percentage paid to the operator.
     StakingContractUpdateCommision {
         operator: AccountAddress,
         new_commission_percentage: u64,
@@ -2103,6 +2104,7 @@ pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> T
     ))
 }
 
+/// Convenience function to allow a staker to update the commision percentage paid to the operator.
 pub fn staking_contract_update_commision(
     operator: AccountAddress,
     new_commission_percentage: u64,
