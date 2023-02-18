@@ -1254,16 +1254,16 @@ module aptos_framework::staking_contract {
         // Fast forward to generate rewards.
         stake::end_epoch();
         let balance_1epoch = with_rewards(initial_balance);
+        let unpaid_commission = (balance_1epoch - initial_balance) / 10;
         debug::print(&balance_1epoch);
         stake::assert_stake_pool(pool_address, balance_1epoch, 0, 0, 0);
 
         update_commision(staker, operator_address, 5);
         stake::end_epoch();
-        let balance_2epoch = with_rewards(balance_1epoch);
-        let commission = (balance_2epoch - balance_1epoch) / 10;
-        debug::print(&commission);
-        debug::print(&(balance_2epoch - commission));
-        stake::assert_stake_pool(pool_address, balance_2epoch - commission, commission, 0, 0);
+        let balance_2epoch = with_rewards(balance_1epoch - unpaid_commission);
+        debug::print(&unpaid_commission);
+        debug::print(&(balance_2epoch - unpaid_commission));
+        stake::assert_stake_pool(pool_address, balance_2epoch, 0, 0, with_rewards(unpaid_commission));
         let new_balance = with_rewards(initial_balance);
         debug::print(&new_balance);
 

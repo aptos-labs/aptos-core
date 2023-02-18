@@ -2560,7 +2560,7 @@ module aptos_framework::stake {
     ) acquires StakePool {
         let stake_pool = borrow_global<StakePool>(pool_address);
         let actual_active_stake = coin::value(&stake_pool.active);
-        std::debug::print(&actual_active_stake);
+        assert!(actual_active_stake == active_stake, actual_active_stake);
         let actual_inactive_stake = coin::value(&stake_pool.inactive);
         assert!(actual_inactive_stake == inactive_stake, actual_inactive_stake);
         let actual_pending_active_stake = coin::value(&stake_pool.pending_active);
