@@ -229,9 +229,9 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "ristretto255",
-        cryptography::ristretto255::make_all(gas_params.ristretto255, timed_features)
+        cryptography::ristretto255::make_all(gas_params.ristretto255, timed_features.clone())
     );
-    add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
+    add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info, timed_features));
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
     add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
     add_natives_from_module!(
