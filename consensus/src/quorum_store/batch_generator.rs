@@ -111,7 +111,7 @@ impl BatchGenerator {
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
         end_batch_when_back_pressure: bool,
-    ) -> Option<ProofCompletedChannel> {
+    ) -> (Option<(ProofCompletedChannel, bool)>) {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
@@ -221,7 +221,7 @@ impl BatchGenerator {
 
             self.last_end_batch_time = Instant::now();
 
-            Some(proof_rx)
+            Some((proof_rx, end_batch))
         }
     }
 
@@ -263,27 +263,34 @@ impl BatchGenerator {
 
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
         let mut back_pressure_in_last_pull = false;
+        let mut end_batch_in_last_pull = false;
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
+                biased;
+                Some(updated_back_pressure) = back_pressure_rx.recv() => {
+                    self.qs_back_pressure = updated_back_pressure;
+                },
                 _ = interval.tick() => {
-                    if self.qs_back_pressure || self.block_store.back_pressure() {
+                    if self.qs_back_pressure {
                         counters::QS_BACKPRESSURE.set(1);
                         // quorum store needs to be back pressured
                         // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
-                        if !back_pressure_in_last_pull {
-                            if let Some(proof_rx) = self.handle_scheduled_pull(true).await {
+                        if !back_pressure_in_last_pull && !end_batch_in_last_pull {
+                            if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(true).await {
                                 proofs_in_progress.push(Box::pin(proof_rx));
+                                end_batch_in_last_pull = end_batch;
                             }
                         }
                         back_pressure_in_last_pull = true;
                     } else {
                         counters::QS_BACKPRESSURE.set(0);
                         // no back pressure
-                        if let Some(proof_rx) = self.handle_scheduled_pull(false).await {
+                        if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(false).await {
                             proofs_in_progress.push(Box::pin(proof_rx));
+                            end_batch_in_last_pull = end_batch;
                         }
                         back_pressure_in_last_pull = false;
                     }
@@ -329,10 +336,7 @@ impl BatchGenerator {
                             break;
                         },
                     }
-                },
-                Some(updated_back_pressure) = back_pressure_rx.recv() => {
-                    self.qs_back_pressure = updated_back_pressure;
-                },
+                }
             }
         }
     }

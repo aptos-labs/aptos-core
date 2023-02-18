@@ -92,6 +92,9 @@ impl ProofManager {
                     max_txns,
                     max_bytes,
                 );
+                self.remaining_local_proof_num = self
+                    .proofs_for_consensus
+                    .clean_local_proofs(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
                 let res = ConsensusResponse::GetBlockResponse(
                     if proof_block.is_empty() {
@@ -134,6 +137,14 @@ impl ProofManager {
             tokio::select! {
                 Some(msg) = proposal_rx.next() => {
                     self.handle_proposal_request(msg);
+
+                    let updated_back_pressure = self.qs_back_pressure();
+                    if updated_back_pressure != back_pressure {
+                        back_pressure = updated_back_pressure;
+                        if back_pressure_tx.send(back_pressure).await.is_err() {
+                            debug!("Failed to send back_pressure for proposal");
+                        }
+                    }
                 },
                 Some(msg) = proof_rx.recv() => {
                     match msg {
