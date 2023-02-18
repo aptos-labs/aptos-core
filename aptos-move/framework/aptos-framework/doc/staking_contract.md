@@ -31,8 +31,11 @@ pool.
 55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
 
 
+-  [Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
 -  [Struct `StakingContract`](#0x1_staking_contract_StakingContract)
 -  [Resource `Store`](#0x1_staking_contract_Store)
+-  [Struct `UpdateCommissionEvent`](#0x1_staking_contract_UpdateCommissionEvent)
+-  [Resource `StakingGroupUpdateCommissionEvent`](#0x1_staking_contract_StakingGroupUpdateCommissionEvent)
 -  [Struct `CreateStakingContractEvent`](#0x1_staking_contract_CreateStakingContractEvent)
 -  [Struct `UpdateVoterEvent`](#0x1_staking_contract_UpdateVoterEvent)
 -  [Struct `ResetLockupEvent`](#0x1_staking_contract_ResetLockupEvent)
@@ -54,6 +57,7 @@ pool.
 -  [Function `add_stake`](#0x1_staking_contract_add_stake)
 -  [Function `update_voter`](#0x1_staking_contract_update_voter)
 -  [Function `reset_lockup`](#0x1_staking_contract_reset_lockup)
+-  [Function `update_commision`](#0x1_staking_contract_update_commision)
 -  [Function `request_commission`](#0x1_staking_contract_request_commission)
 -  [Function `request_commission_internal`](#0x1_staking_contract_request_commission_internal)
 -  [Function `unlock_stake`](#0x1_staking_contract_unlock_stake)
@@ -86,6 +90,33 @@ pool.
 </code></pre>
 
 
+
+<a name="0x1_staking_contract_StakingGroupContainer"></a>
+
+## Struct `StakingGroupContainer`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupContainer">StakingGroupContainer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a name="0x1_staking_contract_StakingContract"></a>
 
@@ -216,6 +247,78 @@ pool.
 </dd>
 <dt>
 <code>distribute_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_DistributeEvent">staking_contract::DistributeEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_staking_contract_UpdateCommissionEvent"></a>
+
+## Struct `UpdateCommissionEvent`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>staker: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>operator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_commission_percentage: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_staking_contract_StakingGroupUpdateCommissionEvent"></a>
+
+## Resource `StakingGroupUpdateCommissionEvent`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>update_commission_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">staking_contract::UpdateCommissionEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -1113,6 +1216,56 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
     <a href="stake.md#0x1_stake_increase_lockup_with_cap">stake::increase_lockup_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap);
 
     emit_event(&<b>mut</b> store.reset_lockup_events, <a href="staking_contract.md#0x1_staking_contract_ResetLockupEvent">ResetLockupEvent</a> { operator, pool_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_contract_update_commision"></a>
+
+## Function `update_commision`
+
+Convenience function to allow a staker to update the commision percentage paid to the operator.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> {
+    <b>assert</b>!(
+        new_commission_percentage &gt;= 0 && new_commission_percentage &lt;= 100,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>),
+    );
+
+    <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>));
+
+    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> store.staking_contracts, &operator);
+    <a href="staking_contract.md#0x1_staking_contract_distribute_internal">distribute_internal</a>(staker_address, operator, <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>, &<b>mut</b> store.distribute_events);
+    <a href="staking_contract.md#0x1_staking_contract_request_commission_internal">request_commission_internal</a>(
+        operator,
+        <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>,
+        &<b>mut</b> store.add_distribution_events,
+        &<b>mut</b> store.request_commission_events,
+    );
+    <b>let</b> old_commission_percentage = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage;
+    <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage = new_commission_percentage;
+    <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address)) {
+        <b>move_to</b>(staker, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> { update_commission_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a>&gt;(staker)})
+    };
+    emit_event(
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address).update_commission_events,
+        <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
+    );
 }
 </code></pre>
 
