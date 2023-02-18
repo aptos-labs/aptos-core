@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+use crate::{
+    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
+    safely_pop_arg,
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use aptos_types::on_chain_config::TimedFeatures;
+use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun create_signer
@@ -16,25 +18,19 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-fn native_create_signer(
+pub(crate) fn native_create_signer(
     gas_params: &CreateSignerGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let address = pop_arg!(arguments, AccountAddress);
-    Ok(NativeResult::ok(gas_params.base, smallvec![Value::signer(
-        address
-    )]))
-}
+    context.charge(gas_params.base)?;
 
-pub fn make_native_create_signer(gas_params: CreateSignerGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| {
-        native_create_signer(&gas_params, context, ty_args, args)
-    })
+    let address = safely_pop_arg!(arguments, AccountAddress);
+    Ok(smallvec![Value::signer(address)])
 }
 
 /***************************************************************************************************
@@ -48,8 +44,12 @@ pub struct CreateSignerGasParameters {
 
 pub fn make_all(
     gas_param: CreateSignerGasParameters,
+    timed_features: TimedFeatures,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [("create_signer", make_native_create_signer(gas_param))];
+    let natives = [(
+        "create_signer",
+        make_safe_native(gas_param, timed_features, native_create_signer),
+    )];
 
     crate::natives::helpers::make_module_natives(natives)
 }

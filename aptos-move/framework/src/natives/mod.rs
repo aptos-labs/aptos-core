@@ -211,10 +211,16 @@ pub fn all_natives(
         };
     }
 
-    add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
+    add_natives_from_module!(
+        "account",
+        account::make_all(gas_params.account.clone(), timed_features.clone())
+    );
     add_natives_from_module!(
         "create_signer",
-        create_signer::make_all(gas_params.account.create_signer.clone())
+        create_signer::make_all(
+            gas_params.account.create_signer.clone(),
+            timed_features.clone()
+        )
     );
     add_natives_from_module!(
         "ed25519",
@@ -222,7 +228,7 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "genesis",
-        create_signer::make_all(gas_params.account.create_signer)
+        create_signer::make_all(gas_params.account.create_signer, timed_features.clone())
     );
     add_natives_from_module!(
         "multi_ed25519",
