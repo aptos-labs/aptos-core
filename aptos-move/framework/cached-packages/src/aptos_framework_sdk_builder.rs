@@ -295,6 +295,8 @@ pub enum EntryFunctionCall {
     /// Creates a new multisig account and add the signer as a single owner.
     MultisigAccountCreate {
         num_signatures_required: u64,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
     },
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
@@ -330,6 +332,8 @@ pub enum EntryFunctionCall {
         account_scheme: u8,
         account_public_key: Vec<u8>,
         create_multisig_account_signed_message: Vec<u8>,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
     },
 
     /// Creates a new multisig account with the specified additional owner list and signatures required.
@@ -341,6 +345,8 @@ pub enum EntryFunctionCall {
     MultisigAccountCreateWithOwners {
         additional_owners: Vec<AccountAddress>,
         num_signatures_required: u64,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
     },
 
     /// Remove the next transaction if it has sufficient owner rejections.
@@ -862,7 +868,9 @@ impl EntryFunctionCall {
             } => multisig_account_approve_transaction(multisig_account, sequence_number),
             MultisigAccountCreate {
                 num_signatures_required,
-            } => multisig_account_create(num_signatures_required),
+                metadata_keys,
+                metadata_values,
+            } => multisig_account_create(num_signatures_required, metadata_keys, metadata_values),
             MultisigAccountCreateTransaction {
                 multisig_account,
                 payload,
@@ -878,6 +886,8 @@ impl EntryFunctionCall {
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
+                metadata_keys,
+                metadata_values,
             } => multisig_account_create_with_existing_account(
                 multisig_address,
                 owners,
@@ -885,11 +895,20 @@ impl EntryFunctionCall {
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
+                metadata_keys,
+                metadata_values,
             ),
             MultisigAccountCreateWithOwners {
                 additional_owners,
                 num_signatures_required,
-            } => multisig_account_create_with_owners(additional_owners, num_signatures_required),
+                metadata_keys,
+                metadata_values,
+            } => multisig_account_create_with_owners(
+                additional_owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+            ),
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
@@ -1816,7 +1835,11 @@ pub fn multisig_account_approve_transaction(
 }
 
 /// Creates a new multisig account and add the signer as a single owner.
-pub fn multisig_account_create(num_signatures_required: u64) -> TransactionPayload {
+pub fn multisig_account_create(
+    num_signatures_required: u64,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
+) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1827,7 +1850,11 @@ pub fn multisig_account_create(num_signatures_required: u64) -> TransactionPaylo
         ),
         ident_str!("create").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&num_signatures_required).unwrap()],
+        vec![
+            bcs::to_bytes(&num_signatures_required).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
+        ],
     ))
 }
 
@@ -1896,6 +1923,8 @@ pub fn multisig_account_create_with_existing_account(
     account_scheme: u8,
     account_public_key: Vec<u8>,
     create_multisig_account_signed_message: Vec<u8>,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1914,6 +1943,8 @@ pub fn multisig_account_create_with_existing_account(
             bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key).unwrap(),
             bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
         ],
     ))
 }
@@ -1927,6 +1958,8 @@ pub fn multisig_account_create_with_existing_account(
 pub fn multisig_account_create_with_owners(
     additional_owners: Vec<AccountAddress>,
     num_signatures_required: u64,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1941,6 +1974,8 @@ pub fn multisig_account_create_with_owners(
         vec![
             bcs::to_bytes(&additional_owners).unwrap(),
             bcs::to_bytes(&num_signatures_required).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
         ],
     ))
 }
@@ -3536,6 +3571,8 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreate {
                 num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_keys: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_values: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -3583,6 +3620,8 @@ mod decoder {
                     account_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
                     create_multisig_account_signed_message: bcs::from_bytes(script.args().get(5)?)
                         .ok()?,
+                    metadata_keys: bcs::from_bytes(script.args().get(6)?).ok()?,
+                    metadata_values: bcs::from_bytes(script.args().get(7)?).ok()?,
                 },
             )
         } else {
@@ -3597,6 +3636,8 @@ mod decoder {
             Some(EntryFunctionCall::MultisigAccountCreateWithOwners {
                 additional_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
                 num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
+                metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None

@@ -22,16 +22,9 @@ async fn test_gen_resource_group() {
     let mut context = new_test_context(current_function_name!());
 
     // Prepare accounts
-<<<<<<< HEAD
     let mut admin0 = context.create_account().await;
     let mut admin1 = context.create_account().await;
     let mut user = context.create_account().await;
-=======
-    let mut root = context.root_account().await;
-    let mut admin0 = create_account(&mut context, &mut root).await;
-    let mut admin1 = create_account(&mut context, &mut root).await;
-    let mut user = create_account(&mut context, &mut root).await;
->>>>>>> fa43fea42e ([API][VM] Make the inner payload of multisig tx extensible)
 
     // Publish packages
     let named_addresses = vec![

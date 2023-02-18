@@ -176,6 +176,8 @@ impl TransactionFactory {
         self.payload(aptos_stdlib::multisig_account_create_with_owners(
             additional_owners,
             signatures_required,
+            vec![],
+            vec![],
         ))
     }
 

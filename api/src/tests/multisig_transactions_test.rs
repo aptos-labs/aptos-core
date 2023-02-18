@@ -16,9 +16,9 @@ use move_core_types::{
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_succeeds() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account_1 = &mut context.create_and_fund_account().await;
-    let owner_account_2 = &mut context.create_and_fund_account().await;
-    let owner_account_3 = &mut context.create_and_fund_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(
             owner_account_1,
@@ -53,18 +53,19 @@ async fn test_multisig_transaction_with_payload_succeeds() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_to_update_owners() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account_1 = &mut context.create_and_fund_account().await;
-    let owner_account_2 = &mut context.create_and_fund_account().await;
-    let owner_account_3 = &mut context.create_and_fund_account().await;
-    let owner_account_4 = &mut context.create_and_fund_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let owner_account_4 = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(
             owner_account_1,
             vec![owner_account_2.address()],
             2,
-            1000, /* initial balance */
+            0, /* initial balance */
         )
         .await;
+    assert_eq!(0, context.get_apt_balance(multisig_account).await);
 
     // Add owners 3 and 4.
     let add_owners_payload =
@@ -138,8 +139,8 @@ async fn test_multisig_transaction_to_update_owners() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_update_signature_threshold() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account_1 = &mut context.create_and_fund_account().await;
-    let owner_account_2 = &mut context.create_and_fund_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(
             owner_account_1,
@@ -186,7 +187,7 @@ async fn test_multisig_transaction_update_signature_threshold() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_insufficient_balance_to_cover_gas() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account_1 = &mut context.create_and_fund_account().await;
+    let owner_account_1 = &mut context.create_account().await;
     // Owner 2 has no APT balance.
     let owner_account_2 = &mut context.gen_account();
     let multisig_account = context
@@ -211,7 +212,7 @@ async fn test_multisig_transaction_with_insufficient_balance_to_cover_gas() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_and_failing_execution() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account = &mut context.create_and_fund_account().await;
+    let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
         .await;
@@ -235,7 +236,7 @@ async fn test_multisig_transaction_with_payload_and_failing_execution() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_hash() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account = &mut context.create_and_fund_account().await;
+    let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
         .await;
@@ -267,7 +268,7 @@ async fn test_multisig_transaction_with_payload_hash() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_hash_and_failing_execution() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account = &mut context.create_and_fund_account().await;
+    let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
         .await;
@@ -302,7 +303,7 @@ async fn test_multisig_transaction_with_payload_hash_and_failing_execution() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_with_payload_not_matching_hash() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account = &mut context.create_and_fund_account().await;
+    let owner_account = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(owner_account, vec![], 1, 1000)
         .await;
@@ -332,9 +333,9 @@ async fn test_multisig_transaction_with_payload_not_matching_hash() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multisig_transaction_simulation() {
     let mut context = new_test_context(current_function_name!());
-    let owner_account_1 = &mut context.create_and_fund_account().await;
-    let owner_account_2 = &mut context.create_and_fund_account().await;
-    let owner_account_3 = &mut context.create_and_fund_account().await;
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
     let multisig_account = context
         .create_multisig_account(
             owner_account_1,
@@ -386,6 +387,36 @@ async fn test_multisig_transaction_simulation() {
         .await;
     let simulation_resp = &simulation_resp.as_array().unwrap()[0];
     assert!(!simulation_resp["success"].as_bool().unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulate_multisig_transaction_should_charge_gas_against_sender() {
+    let mut context = new_test_context(current_function_name!());
+    let owner_account = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account,
+            vec![],
+            1,  /* 1-of-1 */
+            10, /* initial balance */
+        )
+        .await;
+    assert_eq!(10, context.get_apt_balance(multisig_account).await);
+
+    // This simulation should succeed because gas should be paid out of the sender account (owner),
+    // not the multisig account itself.
+    let simulation_resp = context
+        .simulate_multisig_transaction(
+            owner_account,
+            multisig_account,
+            "0x1::aptos_account::transfer",
+            &[],
+            &[&owner_account.address().to_hex_literal(), "10"],
+            200,
+        )
+        .await;
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(simulation_resp["success"].as_bool().unwrap());
 }
 
 async fn assert_owners(

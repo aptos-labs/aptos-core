@@ -28,12 +28,8 @@ pub struct TransactionMetadata {
 
 impl TransactionMetadata {
     pub fn new(txn: &SignedTransaction) -> Self {
-        Self::new_with_sender(txn, txn.sender())
-    }
-
-    pub fn new_with_sender(txn: &SignedTransaction, sender: AccountAddress) -> Self {
         Self {
-            sender,
+            sender: txn.sender(),
             authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
             secondary_signers: txn.authenticator().secondary_signer_addreses(),
             secondary_authentication_keys: txn

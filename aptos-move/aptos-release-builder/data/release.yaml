@@ -14,6 +14,7 @@ feature_flags:
     - multi_ed25519_pk_validate_v2_natives
     - blake2b256_native
     - resource_groups
+    - multisig_accounts
   disabled: []
 is_multi_step: true
 framework_release_at_end: true

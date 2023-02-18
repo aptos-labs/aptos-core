@@ -36,11 +36,15 @@ hash is stored. Transaction execution will first check with this module that the
 enough signatures. If so, it will be executed as the multisig account. The owner who executes will pay for gas.
 6. If there are enough rejections, any owner can finalize the rejection by calling execute_rejected_transaction().
 
+Note that this multisig account model is not designed to use with a large number of owners. The more owners there
+are, the more expensive voting on transactions will become. If a large number of owners is designed, such as in a
+flat governance structure, clients are encouraged to write their own modules on top of this multisig account module
+and implement the governance voting logic on top.
+
 
 -  [Resource `MultisigAccount`](#0x1_multisig_account_MultisigAccount)
 -  [Struct `MultisigTransaction`](#0x1_multisig_account_MultisigTransaction)
 -  [Struct `ExecutionError`](#0x1_multisig_account_ExecutionError)
--  [Resource `OwnedMultisigAccounts`](#0x1_multisig_account_OwnedMultisigAccounts)
 -  [Struct `MultisigAccountCreationMessage`](#0x1_multisig_account_MultisigAccountCreationMessage)
 -  [Struct `AddOwnersEvent`](#0x1_multisig_account_AddOwnersEvent)
 -  [Struct `RemoveOwnersEvent`](#0x1_multisig_account_RemoveOwnersEvent)
@@ -63,7 +67,7 @@ enough signatures. If so, it will be executed as the multisig account. The owner
 -  [Function `get_next_multisig_account_address`](#0x1_multisig_account_get_next_multisig_account_address)
 -  [Function `last_resolved_sequence_number`](#0x1_multisig_account_last_resolved_sequence_number)
 -  [Function `next_sequence_number`](#0x1_multisig_account_next_sequence_number)
--  [Function `owned_multisig_accounts`](#0x1_multisig_account_owned_multisig_accounts)
+-  [Function `vote`](#0x1_multisig_account_vote)
 -  [Function `create_with_existing_account`](#0x1_multisig_account_create_with_existing_account)
 -  [Function `create`](#0x1_multisig_account_create)
 -  [Function `create_with_owners`](#0x1_multisig_account_create_with_owners)
@@ -74,6 +78,7 @@ enough signatures. If so, it will be executed as the multisig account. The owner
 -  [Function `remove_owners`](#0x1_multisig_account_remove_owners)
 -  [Function `update_signatures_required`](#0x1_multisig_account_update_signatures_required)
 -  [Function `update_metadata`](#0x1_multisig_account_update_metadata)
+-  [Function `update_metadata_internal`](#0x1_multisig_account_update_metadata_internal)
 -  [Function `create_transaction`](#0x1_multisig_account_create_transaction)
 -  [Function `create_transaction_with_hash`](#0x1_multisig_account_create_transaction_with_hash)
 -  [Function `approve_transaction`](#0x1_multisig_account_approve_transaction)
@@ -91,8 +96,6 @@ enough signatures. If so, it will be executed as the multisig account. The owner
 -  [Function `assert_is_owner`](#0x1_multisig_account_assert_is_owner)
 -  [Function `num_approvals_and_rejections`](#0x1_multisig_account_num_approvals_and_rejections)
 -  [Function `assert_multisig_account_exists`](#0x1_multisig_account_assert_multisig_account_exists)
--  [Function `add_multisig_account_references`](#0x1_multisig_account_add_multisig_account_references)
--  [Function `remove_multisig_account_references`](#0x1_multisig_account_remove_multisig_account_references)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -328,34 +331,6 @@ Contains information about execution failure.
 
 </details>
 
-<a name="0x1_multisig_account_OwnedMultisigAccounts"></a>
-
-## Resource `OwnedMultisigAccounts`
-
-A convenient resource to track which multisig accounts a given user account is an owner of.
-
-
-<pre><code><b>struct</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> <b>has</b> key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>multisig_accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a name="0x1_multisig_account_MultisigAccountCreationMessage"></a>
 
 ## Struct `MultisigAccountCreationMessage`
@@ -387,6 +362,18 @@ Used only for verifying multisig account creation on top of existing accounts.
 </dd>
 <dt>
 <code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>num_signatures_required: u64</code>
 </dt>
 <dd>
 
@@ -796,6 +783,16 @@ Payload hash must be exactly 32 bytes (sha3-256).
 
 
 
+<a name="0x1_multisig_account_EINVALID_SEQUENCE_NUMBER"></a>
+
+The sequence number provided is invalid. It must be between [1, next pending transaction - 1].
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>: u64 = 17;
+</code></pre>
+
+
+
 <a name="0x1_multisig_account_EINVALID_SIGNATURES_REQUIRED"></a>
 
 Number of signatures required must be more than zero and at most the total number of owners.
@@ -892,16 +889,6 @@ Provided target function does not match the hash stored in the on-chain transact
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH">EPAYLOAD_DOES_NOT_MATCH_HASH</a>: u64 = 2008;
-</code></pre>
-
-
-
-<a name="0x1_multisig_account_EPAYLOAD_NOT_STORED"></a>
-
-Cannot execute the specified transaction simply via transaction_id as the full payload is not stored on chain.
-
-
-<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EPAYLOAD_NOT_STORED">EPAYLOAD_NOT_STORED</a>: u64 = 7;
 </code></pre>
 
 
@@ -1012,7 +999,12 @@ Return the transaction with the given transaction id.
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
     sequence_number: u64,
 ): <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a> <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
-    *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&<b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>).transactions, sequence_number)
+    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>assert</b>!(
+        sequence_number &gt; 0 && sequence_number &lt; multisig_account_resource.next_sequence_number,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>),
+    );
+    *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number)
 }
 </code></pre>
 
@@ -1039,7 +1031,7 @@ Return all pending transactions.
 <pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_pending_transactions">get_pending_transactions</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>&gt; <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> pending_transactions: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> <a href="multisig_account.md#0x1_multisig_account">multisig_account</a> = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> i = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.last_executed_sequence_number;
+    <b>let</b> i = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.last_executed_sequence_number + 1;
     <b>let</b> next_sequence_number = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number;
     <b>while</b> (i &lt; next_sequence_number) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> pending_transactions, *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.transactions, i));
@@ -1105,8 +1097,12 @@ Return true if the transaction with given transaction id can be executed now.
 
 <pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_can_be_executed">can_be_executed</a>(
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64): bool <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
-    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&<b>mut</b> multisig_account_resource.transactions, sequence_number);
+    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>assert</b>!(
+        sequence_number &gt; 0 && sequence_number &lt; multisig_account_resource.next_sequence_number,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>),
+    );
+    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(&multisig_account_resource.owners, transaction);
     sequence_number == multisig_account_resource.last_executed_sequence_number + 1 &&
         num_approvals &gt;= multisig_account_resource.num_signatures_required
@@ -1135,8 +1131,12 @@ Return true if the transaction with given transaction id can be officially rejec
 
 <pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_can_be_rejected">can_be_rejected</a>(
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64): bool <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
-    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&<b>mut</b> multisig_account_resource.transactions, sequence_number);
+    <b>let</b> multisig_account_resource = <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>assert</b>!(
+        sequence_number &gt; 0 && sequence_number &lt; multisig_account_resource.next_sequence_number,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>),
+    );
+    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
     <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(&multisig_account_resource.owners, transaction);
     sequence_number == multisig_account_resource.last_executed_sequence_number + 1 &&
         num_rejections &gt;= multisig_account_resource.num_signatures_required
@@ -1225,14 +1225,14 @@ Return the id of the next transaction created.
 
 </details>
 
-<a name="0x1_multisig_account_owned_multisig_accounts"></a>
+<a name="0x1_multisig_account_vote"></a>
 
-## Function `owned_multisig_accounts`
+## Function `vote`
 
-Return the list of all the multisig accounts a given address is one of the owners of.
+Return a bool tuple indicating whether an owner has voted and if so, whether they voted yes or no.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_owned_multisig_accounts">owned_multisig_accounts</a>(owner: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote">vote</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, owner: <b>address</b>): (bool, bool)
 </code></pre>
 
 
@@ -1241,12 +1241,18 @@ Return the list of all the multisig accounts a given address is one of the owner
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_owned_multisig_accounts">owned_multisig_accounts</a>(owner: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-    <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner)) {
-        <b>borrow_global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner).multisig_accounts
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
-    }
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote">vote</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, owner: <b>address</b>): (bool, bool) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>assert</b>!(
+        sequence_number &gt; 0 && sequence_number &lt; multisig_account_resource.next_sequence_number,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>),
+    );
+    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&multisig_account_resource.transactions, sequence_number);
+    <b>let</b> votes = &transaction.votes;
+    <b>let</b> voted = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(votes, &owner);
+    <b>let</b> vote = voted && *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(votes, &owner);
+    (voted, vote)
 }
 </code></pre>
 
@@ -1265,7 +1271,7 @@ In order to ensure a malicious module cannot obtain backdoor control over an exi
 with a valid signature from the account's auth key is required.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account">create_with_existing_account</a>(multisig_address: <b>address</b>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, account_scheme: u8, account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_existing_account">create_with_existing_account</a>(multisig_address: <b>address</b>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, account_scheme: u8, account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 </code></pre>
 
 
@@ -1281,13 +1287,17 @@ with a valid signature from the account's auth key is required.
     account_scheme: u8,
     account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     create_multisig_account_signed_message: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     // Verify that the `<a href="multisig_account.md#0x1_multisig_account_MultisigAccountCreationMessage">MultisigAccountCreationMessage</a>` <b>has</b> the right information and is signed by the <a href="account.md#0x1_account">account</a>
     // owner's key.
     <b>let</b> proof_challenge = <a href="multisig_account.md#0x1_multisig_account_MultisigAccountCreationMessage">MultisigAccountCreationMessage</a> {
         <a href="chain_id.md#0x1_chain_id">chain_id</a>: <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>(),
         account_address: multisig_address,
         sequence_number: <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(multisig_address),
+        owners,
+        num_signatures_required,
     };
     <a href="account.md#0x1_account_verify_signed_message">account::verify_signed_message</a>(
         multisig_address,
@@ -1306,6 +1316,8 @@ with a valid signature from the account's auth key is required.
         owners,
         num_signatures_required,
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;SignerCapability&gt;(),
+        metadata_keys,
+        metadata_values,
     );
 }
 </code></pre>
@@ -1321,7 +1333,7 @@ with a valid signature from the account's auth key is required.
 Creates a new multisig account and add the signer as a single owner.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create">create</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, num_signatures_required: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create">create</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, num_signatures_required: u64, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 </code></pre>
 
 
@@ -1330,8 +1342,13 @@ Creates a new multisig account and add the signer as a single owner.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create">create</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, num_signatures_required: u64) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-    <a href="multisig_account.md#0x1_multisig_account_create_with_owners">create_with_owners</a>(owner, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], num_signatures_required);
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create">create</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    num_signatures_required: u64,
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_create_with_owners">create_with_owners</a>(owner, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], num_signatures_required, metadata_keys, metadata_values);
 }
 </code></pre>
 
@@ -1351,7 +1368,7 @@ cannot be any duplicate owners in the list.
 at most the total number of owners.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_owners">create_with_owners</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, additional_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_owners">create_with_owners</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, additional_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 </code></pre>
 
 
@@ -1361,7 +1378,12 @@ at most the total number of owners.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_owners">create_with_owners</a>(
-    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, additional_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    additional_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    num_signatures_required: u64,
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> (<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, multisig_signer_cap) = <a href="multisig_account.md#0x1_multisig_account_create_multisig_account">create_multisig_account</a>(owner);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> additional_owners, address_of(owner));
     <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(
@@ -1369,6 +1391,8 @@ at most the total number of owners.
         additional_owners,
         num_signatures_required,
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(multisig_signer_cap),
+        metadata_keys,
+        metadata_values,
     );
 }
 </code></pre>
@@ -1383,7 +1407,7 @@ at most the total number of owners.
 
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, multisig_account_signer_cap: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>&gt;)
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_with_owners_internal">create_with_owners_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, num_signatures_required: u64, multisig_account_signer_cap: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>&gt;, metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 </code></pre>
 
 
@@ -1397,7 +1421,9 @@ at most the total number of owners.
     owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     num_signatures_required: u64,
     multisig_account_signer_cap: Option&lt;SignerCapability&gt;,
-) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    metadata_keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    metadata_values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_accounts_enabled">features::multisig_accounts_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="multisig_account.md#0x1_multisig_account_EMULTISIG_ACCOUNTS_NOT_ENABLED_YET">EMULTISIG_ACCOUNTS_NOT_ENABLED_YET</a>));
     <b>assert</b>!(
         num_signatures_required &gt; 0 && <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a> &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&owners),
@@ -1426,7 +1452,7 @@ at most the total number of owners.
         metadata_updated_events: new_event_handle&lt;<a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>),
     });
 
-    <a href="multisig_account.md#0x1_multisig_account_add_multisig_account_references">add_multisig_account_references</a>(&owners, multisig_address);
+    <a href="multisig_account.md#0x1_multisig_account_update_metadata_internal">update_metadata_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, metadata_keys, metadata_values, <b>false</b>);
 }
 </code></pre>
 
@@ -1450,7 +1476,7 @@ Similar to add_owners, but only allow adding one owner.
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owner">add_owner</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owner: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owner">add_owner</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owner: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <a href="multisig_account.md#0x1_multisig_account_add_owners">add_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[new_owner]);
 }
 </code></pre>
@@ -1481,7 +1507,7 @@ maliciously alter the owners list.
 
 
 <pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owners">add_owners</a>(
-    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     // Short circuit <b>if</b> new owners list is empty.
     // This avoids emitting an <a href="event.md#0x1_event">event</a> <b>if</b> no changes happen, which is confusing <b>to</b> off-chain components.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&new_owners) == 0) {
@@ -1495,7 +1521,6 @@ maliciously alter the owners list.
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> multisig_account_resource.owners, new_owners);
     // This will fail <b>if</b> an existing owner is added again.
     <a href="multisig_account.md#0x1_multisig_account_validate_owners">validate_owners</a>(&multisig_account_resource.owners, multisig_address);
-    <a href="multisig_account.md#0x1_multisig_account_add_multisig_account_references">add_multisig_account_references</a>(&new_owners, multisig_address);
     emit_event(&<b>mut</b> multisig_account_resource.add_owners_events, <a href="multisig_account.md#0x1_multisig_account_AddOwnersEvent">AddOwnersEvent</a> {
         owners_added: new_owners,
     });
@@ -1523,7 +1548,7 @@ Similar to remove_owners, but only allow removing one owner.
 
 
 <pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owner">remove_owner</a>(
-    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owner_to_remove: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owner_to_remove: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <a href="multisig_account.md#0x1_multisig_account_remove_owners">remove_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[owner_to_remove]);
 }
 </code></pre>
@@ -1555,7 +1580,7 @@ maliciously alter the owners list.
 
 
 <pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owners">remove_owners</a>(
-    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     // Short circuit <b>if</b> the list of owners <b>to</b> remove is empty.
     // This avoids emitting an <a href="event.md#0x1_event">event</a> <b>if</b> no changes happen, which is confusing <b>to</b> off-chain components.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&owners_to_remove) == 0) {
@@ -1585,7 +1610,6 @@ maliciously alter the owners list.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_OWNERS">ENOT_ENOUGH_OWNERS</a>),
     );
 
-    <a href="multisig_account.md#0x1_multisig_account_remove_multisig_account_references">remove_multisig_account_references</a>(&owners_removed, multisig_address);
     emit_event(&<b>mut</b> multisig_account_resource.remove_owners_events, <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed });
 }
 </code></pre>
@@ -1671,6 +1695,35 @@ maliciously alter the number of signatures required.
 
 <pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_update_metadata">update_metadata</a>(
     <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_update_metadata_internal">update_metadata_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, keys, values, <b>true</b>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_multisig_account_update_metadata_internal"></a>
+
+## Function `update_metadata_internal`
+
+
+
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_update_metadata_internal">update_metadata_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, emit_event: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_update_metadata_internal">update_metadata_internal</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    keys: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
+    values: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    emit_event: bool,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> num_attributes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&keys);
     <b>assert</b>!(
         num_attributes == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&values),
@@ -1696,13 +1749,15 @@ maliciously alter the number of signatures required.
         i = i + 1;
     };
 
-    emit_event(
-        &<b>mut</b> multisig_account_resource.metadata_updated_events,
-        <a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a> {
-            old_metadata,
-            new_metadata: multisig_account_resource.metadata,
-        }
-    );
+    <b>if</b> (emit_event) {
+        emit_event(
+            &<b>mut</b> multisig_account_resource.metadata_updated_events,
+            <a href="multisig_account.md#0x1_multisig_account_MetadataUpdatedEvent">MetadataUpdatedEvent</a> {
+                old_metadata,
+                new_metadata: multisig_account_resource.metadata,
+            }
+        );
+    };
 }
 </code></pre>
 
@@ -2206,7 +2261,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_multisig_account_seed">create_multisig_account_seed</a>(seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    // Generate a seed that will be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> that hosts the staking contract.
+    // Generate a seed that will be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> that hosts the multisig <a href="account.md#0x1_account">account</a>.
     <b>let</b> multisig_account_seed = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> multisig_account_seed, <a href="multisig_account.md#0x1_multisig_account_DOMAIN_SEPARATOR">DOMAIN_SEPARATOR</a>);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> multisig_account_seed, seed);
@@ -2235,15 +2290,13 @@ This function is private so no other code can call this beside the VM itself as 
 
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_validate_owners">validate_owners</a>(owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) {
-    <b>let</b> distinct_owners = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_create">simple_map::create</a>&lt;<b>address</b>, bool&gt;();
+    <b>let</b> distinct_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     vector::for_each_ref(owners, |owner| {
         <b>let</b> owner = *owner;
         <b>assert</b>!(owner != <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF">EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF</a>));
-        <b>assert</b>!(
-            !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&distinct_owners, &owner),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EDUPLICATE_OWNER">EDUPLICATE_OWNER</a>),
-        );
-        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> distinct_owners, owner, <b>true</b>);
+        <b>let</b> (found, _) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&distinct_owners, &owner);
+        <b>assert</b>!(!found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EDUPLICATE_OWNER">EDUPLICATE_OWNER</a>));
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> distinct_owners, owner);
     });
 }
 </code></pre>
@@ -2334,78 +2387,6 @@ This function is private so no other code can call this beside the VM itself as 
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_assert_multisig_account_exists">assert_multisig_account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) {
     <b>assert</b>!(<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EACCOUNT_NOT_MULTISIG">EACCOUNT_NOT_MULTISIG</a>));
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_multisig_account_add_multisig_account_references"></a>
-
-## Function `add_multisig_account_references`
-
-
-
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_multisig_account_references">add_multisig_account_references</a>(owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_multisig_account_references">add_multisig_account_references</a>(
-    owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-    vector::for_each_ref(owners, |owner| {
-        <b>let</b> owner = *owner;
-        <b>if</b> (!<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner)) {
-            <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(owner), <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-                multisig_accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>],
-            });
-        } <b>else</b> {
-            <b>let</b> owned_multisig_accounts =
-                &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner).multisig_accounts;
-            // There should be no duplicate <b>as</b> an owner cannot be added twice <b>to</b> the same multisig <a href="account.md#0x1_account">account</a>.
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(owned_multisig_accounts, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-        };
-    });
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_multisig_account_remove_multisig_account_references"></a>
-
-## Function `remove_multisig_account_references`
-
-
-
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_multisig_account_references">remove_multisig_account_references</a>(owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_multisig_account_references">remove_multisig_account_references</a>(
-    owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a> {
-    vector::for_each_ref(owners, |owner| {
-        <b>let</b> owner = *owner;
-        <b>if</b> (<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner)) {
-            <b>let</b> owned_multisig_accounts =
-                &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_OwnedMultisigAccounts">OwnedMultisigAccounts</a>&gt;(owner).multisig_accounts;
-            <b>let</b> (found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(owned_multisig_accounts, &<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-            <b>if</b> (found) {
-                <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(owned_multisig_accounts, index);
-            };
-        };
-    });
 }
 </code></pre>
 

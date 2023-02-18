@@ -5,13 +5,8 @@ dotenv.config();
 
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { aptosCoinStore } from "./common";
+import { aptosCoinStore, FAUCET_URL, NODE_URL } from "./common";
 import assert from "assert";
-import { getAddressFromAccountOrAddress, MaybeHexString } from "../../src";
-import { APTOS_COIN } from "../../src/utils";
-
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
 const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, TransactionPayloadMultisig } =
   TxnBuilderTypes;
@@ -27,6 +22,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const owner1 = new AptosAccount();
   const owner2 = new AptosAccount();
   const owner3 = new AptosAccount();
+  const owner4 = new AptosAccount();
   await faucetClient.fundAccount(owner1.address(), 100_000_000);
   await faucetClient.fundAccount(owner2.address(), 100_000_000);
   await faucetClient.fundAccount(owner3.address(), 100_000_000);
@@ -36,7 +32,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const createMultisig = await client.generateTransaction(owner1.address(), {
     function: "0x1::multisig_account::create_with_owners",
     type_arguments: [],
-    arguments: [[owner2.address().hex(), owner3.address().hex()], 2],
+    arguments: [[owner2.address().hex(), owner3.address().hex()], 2, ["Shaka"], [BCS.bcsSerializeStr("Bruh")]],
   });
   await client.generateSignSubmitWaitForTransaction(owner1, createMultisig.payload);
   // Find the multisig account address.
@@ -63,12 +59,14 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
       [BCS.bcsToBytes(AccountAddress.fromHex(recipient.address())), BCS.bcsSerializeUint64(1_000_000)],
     ),
   );
-  const multisigTxExecution = new TransactionPayloadMultisig(new MultiSig(AccountAddress.fromHex(multisigAddress)));
-  // We're not doing anything with the simulation response. This is just for demo purposes.
-  const [_simulationResp] = await client.simulateTransaction(
+  const multisigTxExecution = new TransactionPayloadMultisig(
+    new MultiSig(AccountAddress.fromHex(multisigAddress), transferTxPayload),
+  );
+  const [simulationResp] = await client.simulateTransaction(
     owner2,
     await client.generateRawTransaction(owner2.address(), multisigTxExecution),
   );
+  assert(simulationResp.success);
 
   // Create the multisig tx on chain.
   const createMultisigTx = await client.generateTransaction(owner2.address(), {
@@ -82,7 +80,6 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   await rejectAndApprove(client, owner1, owner3, multisigAddress, 1);
 
   // Owner 2 can now execute the transactions as it already has 2 approvals (from owners 2 and 3).
-  // We'll simulate the tx first just to try it out.
   await client.generateSignSubmitWaitForTransaction(owner2, multisigTxExecution);
   let accountResource = await client.getAccountResource(recipient.address(), aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);

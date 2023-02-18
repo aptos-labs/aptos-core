@@ -255,21 +255,14 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt, SS: MoveResolverExt>(
+    fn success_transaction_cleanup<S: MoveResolverExt>(
         &self,
         storage: &S,
-        user_txn_session: SessionExt<SS>,
+        user_txn_change_set_ext: ChangeSetExt,
         gas_meter: &mut AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let user_txn_change_set_ext = user_txn_session
-            .finish(&mut (), gas_meter.change_set_configs())
-            .map_err(|e| e.into_vm_status())?;
-        // Charge gas for write set
-        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
-        // TODO(Gas): Charge for aggregator writes
-
         let storage_with_changes =
             DeltaStateView::new(storage, user_txn_change_set_ext.write_set());
         // TODO: at this point we know that delta application failed
@@ -407,7 +400,20 @@ impl AptosVM {
                 new_published_modules_loaded,
             )?;
 
-            self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
+            let change_set_ext = session
+                .finish(&mut (), gas_meter.change_set_configs())
+                .map_err(|e| e.into_vm_status())?;
+            // Charge gas for write set
+            gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+            // TODO(Gas): Charge for aggregator writes
+
+            self.success_transaction_cleanup(
+                storage,
+                change_set_ext,
+                gas_meter,
+                txn_data,
+                log_context,
+            )
         }
     }
 
@@ -583,9 +589,8 @@ impl AptosVM {
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
         let inner_function_change_set_ext = session
-            .finish()
-            .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
         gas_meter.charge_write_set_gas(inner_function_change_set_ext.write_set().iter())?;
 
         let storage_with_changes =
@@ -610,9 +615,8 @@ impl AptosVM {
             &mut UnmeteredGasMeter,
         )?;
         let cleanup_change_set_ext = cleanup_session
-            .finish()
-            .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.change_set_configs())?;
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
         // Merge the inner function writeset with cleanup writeset.
         inner_function_change_set_ext
             .squash(cleanup_change_set_ext)
@@ -645,9 +649,8 @@ impl AptosVM {
             &mut UnmeteredGasMeter,
         )?;
         cleanup_session
-            .finish()
-            .map_err(|e| e.into_vm_status())?
-            .into_change_set(&mut (), gas_meter.change_set_configs())
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())
     }
 
     fn verify_module_bundle<S: MoveResolverExt>(
@@ -801,7 +804,14 @@ impl AptosVM {
             new_published_modules_loaded,
         )?;
 
-        self.success_transaction_cleanup(storage, session, gas_meter, txn_data, log_context)
+        let change_set_ext = session
+            .finish(&mut (), gas_meter.change_set_configs())
+            .map_err(|e| e.into_vm_status())?;
+        // Charge gas for write set
+        gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+        // TODO(Gas): Charge for aggregator writes
+
+        self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -1618,21 +1628,32 @@ impl AptosSimulationVM {
                 if let Some(payload) = multisig.transaction_payload.clone() {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {
-                            // Simulate executing the inner (underlying) entry function transaction in the
-                            // multisig tx payload as if it's coming from the multisig account signer.
-                            let modified_txn_data = TransactionMetadata::new_with_sender(
-                                txn,
-                                multisig.multisig_address,
-                            );
-                            self.0.execute_script_or_entry_function(
-                                storage,
-                                session,
-                                &mut gas_meter,
-                                &modified_txn_data,
-                                &TransactionPayload::EntryFunction(entry_function),
-                                log_context,
-                                &mut new_published_modules_loaded,
-                            )
+                            self.0
+                                .execute_multisig_entry_function(
+                                    &mut session,
+                                    &mut gas_meter,
+                                    multisig.multisig_address,
+                                    &entry_function,
+                                    &mut new_published_modules_loaded,
+                                )
+                                .and_then(|_| {
+                                    // TODO: Deduplicate this against execute_multisig_transaction
+                                    // A bit tricky since we need to skip success/failure cleanups,
+                                    // which is in the middle. Introducing a boolean would make the code
+                                    // messier.
+                                    let change_set_ext = session
+                                        .finish(&mut (), gas_meter.change_set_configs())
+                                        .map_err(|e| e.into_vm_status())?;
+                                    gas_meter
+                                        .charge_write_set_gas(change_set_ext.write_set().iter())?;
+                                    self.0.success_transaction_cleanup(
+                                        storage,
+                                        change_set_ext,
+                                        &mut gas_meter,
+                                        &txn_data,
+                                        log_context,
+                                    )
+                                })
                         },
                     }
                 } else {
