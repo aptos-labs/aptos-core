@@ -67,7 +67,7 @@ impl BatchBuilder {
             });
             self.data.push(serialized_txn);
 
-            true
+            self.num_txns < self.max_txns && self.num_bytes < self.max_bytes
         } else {
             false
         }
