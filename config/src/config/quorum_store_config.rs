@@ -39,9 +39,9 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
-            mempool_pulling_interval: 200,
-            end_batch_ms: 500,
-            max_batch_counts: 80,
+            mempool_pulling_interval: 100,
+            end_batch_ms: 200,
+            max_batch_counts: 125,
             max_batch_bytes: 1000000,
             batch_request_timeout_ms: 10000,
             batch_expiry_round_gap_when_init: 100,
@@ -50,10 +50,10 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 100000000,
             db_quota: 10000000000,
-            mempool_txn_pull_max_count: 80,
-            mempool_txn_pull_max_bytes: 2 * 1024 * 1024,
+            mempool_txn_pull_max_count: 125,
+            mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             // QS will be backpressured if the remaining local batches is more than this number
-            back_pressure_local_batch_num: 1,
+            back_pressure_local_batch_num: 3,
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
             num_workers_for_remote_fragments: 10,
         }
