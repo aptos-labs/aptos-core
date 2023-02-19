@@ -252,7 +252,7 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "type_info",
-        type_info::make_all(gas_params.type_info, timed_features)
+        type_info::make_all(gas_params.type_info, timed_features.clone())
     );
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
     add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
@@ -270,10 +270,13 @@ pub fn all_natives(
         "state_storage",
         state_storage::make_all(gas_params.state_storage)
     );
-    add_natives_from_module!("aggregator", aggregator::make_all(gas_params.aggregator));
+    add_natives_from_module!(
+        "aggregator",
+        aggregator::make_all(gas_params.aggregator, timed_features.clone())
+    );
     add_natives_from_module!(
         "aggregator_factory",
-        aggregator_factory::make_all(gas_params.aggregator_factory)
+        aggregator_factory::make_all(gas_params.aggregator_factory, timed_features)
     );
     add_natives_from_module!("object", object::make_all(gas_params.object));
 
