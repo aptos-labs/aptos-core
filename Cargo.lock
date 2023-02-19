@@ -2465,6 +2465,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-speculative-state-helper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-infallible",
+ "claims",
+ "crossbeam",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-state-sync-driver"
 version = "0.1.0"
 dependencies = [
