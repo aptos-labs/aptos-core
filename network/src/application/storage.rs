@@ -10,7 +10,10 @@ use crate::{
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_config::{
+    config::PeerSet,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_infallible::RwLock;
 use aptos_types::PeerId;
 use std::{
@@ -25,6 +28,7 @@ use std::{
 #[derive(Debug)]
 pub struct PeersAndMetadata {
     peers_and_metadata: HashMap<NetworkId, RwLock<HashMap<PeerId, PeerMetadata>>>,
+    trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
 }
 
 impl PeersAndMetadata {
@@ -32,13 +36,18 @@ impl PeersAndMetadata {
         // Create the container
         let mut peers_and_metadata = PeersAndMetadata {
             peers_and_metadata: HashMap::new(),
+            trusted_peers: HashMap::new(),
         };
 
-        // Initialize each network mapping
+        // Initialize each network mapping and trusted peer set
         network_ids.iter().for_each(|network_id| {
             peers_and_metadata
                 .peers_and_metadata
                 .insert(*network_id, RwLock::new(HashMap::new()));
+
+            peers_and_metadata
+                .trusted_peers
+                .insert(*network_id, Arc::new(RwLock::new(PeerSet::new())));
         });
 
         Arc::new(peers_and_metadata)
@@ -102,6 +111,16 @@ impl PeersAndMetadata {
             .get(&peer_network_id.peer_id())
             .cloned()
             .ok_or_else(|| missing_metadata_error(&peer_network_id))
+    }
+
+    /// Returns the trusted peer set for the given network ID
+    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<Arc<RwLock<PeerSet>>, Error> {
+        self.trusted_peers.get(network_id).cloned().ok_or_else(|| {
+            Error::UnexpectedError(format!(
+                "No trusted peers were found for the given network id: {:?}",
+                network_id
+            ))
+        })
     }
 
     /// Updates the connection metadata associated with the given peer.

@@ -4,12 +4,10 @@
 
 use crate::{
     protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+    testutils,
     transport::*,
 };
-use aptos_config::{
-    config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
-    network_id::NetworkContext,
-};
+use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
 use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform, x25519};
 use aptos_infallible::RwLock;
 use aptos_netcore::{
@@ -25,28 +23,19 @@ use aptos_types::{
 use bytes::{Bytes, BytesMut};
 use futures::{future, io::AsyncWriteExt, stream::StreamExt};
 use rand::{rngs::StdRng, SeedableRng};
-use std::{collections::HashMap, io, iter::FromIterator, sync::Arc};
+use std::{io, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
 
-/// helper to build trusted peer map
-fn build_trusted_peers(
-    id1: PeerId,
-    key1: &x25519::PrivateKey,
-    role1: PeerRole,
-    id2: PeerId,
-    key2: &x25519::PrivateKey,
-    role2: PeerRole,
-) -> Arc<RwLock<PeerSet>> {
-    let pubkey_set1 = [key1.public_key()].iter().copied().collect();
-    let pubkey_set2 = [key2.public_key()].iter().copied().collect();
-    Arc::new(RwLock::new(
-        vec![
-            (id1, Peer::new(Vec::new(), pubkey_set1, role1)),
-            (id2, Peer::new(Vec::new(), pubkey_set2, role2)),
-        ]
-        .into_iter()
-        .collect(),
-    ))
+/// Helper to add the trusted peer to the set
+fn add_trusted_peer(
+    trusted_peers: Arc<RwLock<PeerSet>>,
+    peer_id: PeerId,
+    private_key: &x25519::PrivateKey,
+    role: PeerRole,
+) {
+    let pubkey_set = [private_key.public_key()].iter().copied().collect();
+    let peer = Peer::new(Vec::new(), pubkey_set, role);
+    trusted_peers.write().insert(peer_id, peer);
 }
 
 enum Auth {
@@ -80,76 +69,102 @@ where
     let listener_key = x25519::PrivateKey::generate(&mut rng);
     let dialer_key = x25519::PrivateKey::generate(&mut rng);
 
-    let (listener_peer_id, dialer_peer_id, listener_auth_mode, dialer_auth_mode, trusted_peers) =
-        match auth {
-            Auth::Mutual => {
-                let listener_peer_id = PeerId::random();
-                let dialer_peer_id = PeerId::random();
+    let (
+        listener_network_context,
+        dialer_network_context,
+        listener_auth_mode,
+        dialer_auth_mode,
+        trusted_peers,
+    ) = match auth {
+        Auth::Mutual => {
+            // Create the dialer and listener network contexts
+            let (dialer_network_context, listener_network_context, peers_and_metadata) =
+                testutils::create_client_server_network_context(None, None);
 
-                let trusted_peers = build_trusted_peers(
-                    dialer_peer_id,
-                    &dialer_key,
-                    PeerRole::Validator,
-                    listener_peer_id,
-                    &listener_key,
-                    PeerRole::Validator,
+            // Add the trusted peers
+            let network_id = listener_network_context.network_id();
+            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+            add_trusted_peer(
+                trusted_peers.clone(),
+                dialer_network_context.peer_id(),
+                &dialer_key,
+                PeerRole::Validator,
+            );
+            add_trusted_peer(
+                trusted_peers.clone(),
+                listener_network_context.peer_id(),
+                &listener_key,
+                PeerRole::Validator,
+            );
+
+            (
+                listener_network_context,
+                dialer_network_context,
+                HandshakeAuthMode::mutual(peers_and_metadata.clone()),
+                HandshakeAuthMode::mutual(peers_and_metadata),
+                trusted_peers,
+            )
+        },
+        Auth::MaybeMutual => {
+            // Create the dialer and listener network contexts
+            let (dialer_network_context, listener_network_context, peers_and_metadata) =
+                testutils::create_client_server_network_context(
+                    Some(dialer_key.public_key()),
+                    Some(listener_key.public_key()),
                 );
 
-                (
-                    listener_peer_id,
-                    dialer_peer_id,
-                    HandshakeAuthMode::mutual(trusted_peers.clone()),
-                    HandshakeAuthMode::mutual(trusted_peers.clone()),
-                    trusted_peers,
-                )
-            },
-            Auth::MaybeMutual => {
-                let listener_peer_id = aptos_types::account_address::from_identity_public_key(
-                    listener_key.public_key(),
-                );
-                let dialer_peer_id =
-                    aptos_types::account_address::from_identity_public_key(dialer_key.public_key());
-                let trusted_peers = build_trusted_peers(
-                    dialer_peer_id,
-                    &dialer_key,
-                    PeerRole::Validator,
-                    listener_peer_id,
-                    &listener_key,
-                    PeerRole::Validator,
+            // Add the trusted peers
+            let network_id = listener_network_context.network_id();
+            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+            add_trusted_peer(
+                trusted_peers.clone(),
+                dialer_network_context.peer_id(),
+                &dialer_key,
+                PeerRole::Validator,
+            );
+            add_trusted_peer(
+                trusted_peers.clone(),
+                listener_network_context.peer_id(),
+                &listener_key,
+                PeerRole::Validator,
+            );
+
+            (
+                listener_network_context,
+                dialer_network_context,
+                HandshakeAuthMode::maybe_mutual(peers_and_metadata.clone()),
+                HandshakeAuthMode::maybe_mutual(peers_and_metadata),
+                trusted_peers,
+            )
+        },
+        Auth::ServerOnly => {
+            // Create the dialer and listener network contexts
+            let (dialer_network_context, listener_network_context, peers_and_metadata) =
+                testutils::create_client_server_network_context(
+                    Some(dialer_key.public_key()),
+                    Some(listener_key.public_key()),
                 );
 
-                (
-                    listener_peer_id,
-                    dialer_peer_id,
-                    HandshakeAuthMode::maybe_mutual(trusted_peers.clone()),
-                    HandshakeAuthMode::maybe_mutual(trusted_peers.clone()),
-                    trusted_peers,
-                )
-            },
-            Auth::ServerOnly => {
-                let listener_peer_id = aptos_types::account_address::from_identity_public_key(
-                    listener_key.public_key(),
-                );
-                let dialer_peer_id =
-                    aptos_types::account_address::from_identity_public_key(dialer_key.public_key());
-                let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
+            // Get the trusted peers
+            let network_id = listener_network_context.network_id();
+            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
 
-                (
-                    listener_peer_id,
-                    dialer_peer_id,
-                    HandshakeAuthMode::server_only(),
-                    HandshakeAuthMode::server_only(),
-                    trusted_peers,
-                )
-            },
-        };
+            (
+                listener_network_context,
+                dialer_network_context,
+                HandshakeAuthMode::server_only(&[network_id]),
+                HandshakeAuthMode::server_only(&[network_id]),
+                trusted_peers,
+            )
+        },
+    };
 
     let supported_protocols =
         ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::DiscoveryDirectSend]);
     let chain_id = ChainId::default();
     let listener_transport = AptosNetTransport::new(
         base_transport.clone(),
-        NetworkContext::mock_with_peer_id(listener_peer_id),
+        listener_network_context,
         time_service.clone(),
         listener_key,
         listener_auth_mode,
@@ -161,7 +176,7 @@ where
 
     let dialer_transport = AptosNetTransport::new(
         base_transport,
-        NetworkContext::mock_with_peer_id(dialer_peer_id),
+        dialer_network_context,
         time_service.clone(),
         dialer_key,
         dialer_auth_mode,
@@ -174,8 +189,8 @@ where
     (
         rt,
         time_service.into_mock(),
-        (listener_peer_id, listener_transport),
-        (dialer_peer_id, dialer_transport),
+        (listener_network_context.peer_id(), listener_transport),
+        (dialer_network_context.peer_id(), dialer_transport),
         trusted_peers,
         supported_protocols,
     )
@@ -227,7 +242,7 @@ fn test_transport_success<TTransport>(
         _mock_time,
         (listener_peer_id, listener_transport),
         (dialer_peer_id, dialer_transport),
-        _trusted_peers,
+        _peers_and_metadata,
         supported_protocols,
     ) = setup(base_transport, auth);
 
