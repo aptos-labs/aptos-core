@@ -62,7 +62,7 @@ module aptos_framework::staking_contract {
     /// Maximum number of distributions a stake pool can support.
     const MAXIMUM_PENDING_DISTRIBUTIONS: u64 = 20;
 
-    #[resource_group(scope=global)]
+    #[resource_group(scope=module_)]
     struct StakingGroupContainer {}
 
     struct StakingContract has store {
