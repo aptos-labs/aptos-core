@@ -37,6 +37,7 @@ impl LogicalTime {
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedDigestInfo {
+    pub batch_author: PeerId,
     pub digest: HashValue,
     pub expiration: LogicalTime,
     pub num_txns: u64,
@@ -44,8 +45,15 @@ pub struct SignedDigestInfo {
 }
 
 impl SignedDigestInfo {
-    pub fn new(digest: HashValue, expiration: LogicalTime, num_txns: u64, num_bytes: u64) -> Self {
+    pub fn new(
+        batch_author: PeerId,
+        digest: HashValue,
+        expiration: LogicalTime,
+        num_txns: u64,
+        num_bytes: u64,
+    ) -> Self {
         Self {
+            batch_author,
             digest,
             expiration,
             num_txns,
@@ -64,6 +72,7 @@ pub struct SignedDigest {
 
 impl SignedDigest {
     pub fn new(
+        batch_author: PeerId,
         epoch: u64,
         digest: HashValue,
         expiration: LogicalTime,
@@ -71,7 +80,7 @@ impl SignedDigest {
         num_bytes: u64,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Result<Self, CryptoMaterialError> {
-        let info = SignedDigestInfo::new(digest, expiration, num_txns, num_bytes);
+        let info = SignedDigestInfo::new(batch_author, digest, expiration, num_txns, num_bytes);
         let signature = validator_signer.sign(&info)?;
 
         Ok(Self {
