@@ -239,7 +239,7 @@ pub fn all_natives(
     add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
     add_natives_from_module!(
         "transaction_context",
-        transaction_context::make_all(gas_params.transaction_context)
+        transaction_context::make_all(gas_params.transaction_context, timed_features.clone())
     );
     add_natives_from_module!("code", code::make_all(gas_params.code));
     add_natives_from_module!(
@@ -248,7 +248,7 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "state_storage",
-        state_storage::make_all(gas_params.state_storage)
+        state_storage::make_all(gas_params.state_storage, timed_features)
     );
     add_natives_from_module!(
         "aggregator",
