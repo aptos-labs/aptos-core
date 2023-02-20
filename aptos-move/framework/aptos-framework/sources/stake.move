@@ -2566,7 +2566,6 @@ module aptos_framework::stake {
         let actual_pending_active_stake = coin::value(&stake_pool.pending_active);
         assert!(actual_pending_active_stake == pending_active_stake, actual_pending_active_stake);
         let actual_pending_inactive_stake = coin::value(&stake_pool.pending_inactive);
-        std::debug::print(&actual_pending_inactive_stake);
         assert!(actual_pending_inactive_stake == pending_inactive_stake, actual_pending_inactive_stake);
     }
 
