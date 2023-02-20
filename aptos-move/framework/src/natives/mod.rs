@@ -233,7 +233,7 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "type_info",
-        type_info::make_all(gas_params.type_info, timed_features.clone())
+        type_info::make_all(gas_params.type_info, timed_features)
     );
     add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
     add_natives_from_module!("from_bcs", util::make_all(gas_params.util));

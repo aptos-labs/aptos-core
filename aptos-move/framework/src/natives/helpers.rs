@@ -126,7 +126,7 @@ macro_rules! safely_pop_arg {
     }};
 }
 
-/// Like `safe_assert_eq!` but for safe natives that return `SafeNativeResult<T>`. Instead of panicking,
+/// Like `assert_eq!` but for safe natives that return `SafeNativeResult<T>`. Instead of panicking,
 /// will return a `SafeNativeError::InvariantViolation(UNKNOWN_INVARIANT_VIOLATION_ERROR)`.
 #[macro_export]
 macro_rules! safely_assert_eq {
