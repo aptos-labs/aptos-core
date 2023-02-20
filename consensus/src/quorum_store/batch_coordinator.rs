@@ -65,7 +65,7 @@ impl BatchCoordinator {
             proof_coordinator_tx,
             max_batch_bytes,
             remote_batch_aggregators: HashMap::new(),
-            local_batch_aggregator: BatchAggregator::new(max_batch_bytes),
+            local_batch_aggregator: BatchAggregator::new(my_peer_id, max_batch_bytes),
             local_fragment_id: 0,
         }
     }
@@ -158,7 +158,7 @@ impl BatchCoordinator {
         let entry = self
             .remote_batch_aggregators
             .entry(source)
-            .or_insert_with(|| BatchAggregator::new(self.max_batch_bytes));
+            .or_insert_with(|| BatchAggregator::new(source, self.max_batch_bytes));
         if let Some(expiration) = fragment.maybe_expiration() {
             counters::DELIVERED_END_BATCH_COUNT.inc();
             // end batch message

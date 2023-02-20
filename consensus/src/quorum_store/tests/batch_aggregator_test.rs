@@ -6,7 +6,7 @@ use crate::quorum_store::{
     tests::utils::create_vec_serialized_transactions,
     types::{BatchId, SerializedTransaction},
 };
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use claims::{assert_ge, assert_matches, assert_ok, assert_ok_eq};
 
 fn split_vec(txns: &[SerializedTransaction], size: usize) -> Vec<Vec<SerializedTransaction>> {
@@ -29,6 +29,7 @@ fn append_fragments(
 
 #[test]
 fn test_batch_state_fragments() {
+    let peer_id = PeerId::random();
     let num_txns = 10;
 
     let all_txns = create_vec_serialized_transactions(num_txns);
@@ -36,9 +37,9 @@ fn test_batch_state_fragments() {
     let fragmented_txns1 = split_vec(&all_txns, 5);
     let fragmented_txns2 = split_vec(&all_txns, 3);
 
-    let mut state_whole = IncrementalBatchState::new(txns_size * 2);
-    let mut state_fragments1 = IncrementalBatchState::new(txns_size);
-    let mut state_fragments2 = IncrementalBatchState::new(txns_size);
+    let mut state_whole = IncrementalBatchState::new(peer_id, txns_size * 2);
+    let mut state_fragments1 = IncrementalBatchState::new(peer_id, txns_size);
+    let mut state_fragments2 = IncrementalBatchState::new(peer_id, txns_size);
 
     assert_eq!(state_whole.num_fragments(), 0);
     assert_eq!(state_fragments1.num_fragments(), 0);
@@ -71,7 +72,7 @@ fn test_batch_state_size_limit() {
     let txns_size = all_txns[0].len() * (num_txns as usize);
 
     assert_ge!(txns_size, 1500);
-    let mut state_small = IncrementalBatchState::new(1500);
+    let mut state_small = IncrementalBatchState::new(PeerId::random(), 1500);
     assert_eq!(
         state_small.append_transactions(all_txns).unwrap_err(),
         BatchAggregationError::SizeLimitExceeded
@@ -93,7 +94,7 @@ fn test_batch_state_size_limit() {
 
 #[test]
 fn test_batch_state_deserialization() {
-    let mut state = IncrementalBatchState::new(1000);
+    let mut state = IncrementalBatchState::new(PeerId::random(), 1000);
     let txns = vec![SerializedTransaction::from_bytes(vec![8, 2, 0])];
 
     assert_eq!(state.num_fragments(), 0);
@@ -143,7 +144,8 @@ fn check_outdated_fragments(aggregator: &mut BatchAggregator, pairs: Vec<(BatchI
 
 #[test]
 fn test_batch_aggregator_ids() {
-    let mut aggregator = BatchAggregator::new(1000);
+    let peer_id = PeerId::random();
+    let mut aggregator = BatchAggregator::new(peer_id, 1000);
 
     // Forwards batch_id to 3, realizes fragment 0 is skipped.
     assert_eq!(
@@ -186,7 +188,7 @@ fn test_batch_aggregator_ids() {
     );
 
     // Starting with (3,0) should work for a newly created aggregator.
-    aggregator = BatchAggregator::new(1000);
+    aggregator = BatchAggregator::new(peer_id, 1000);
     assert_ok!(aggregator.append_transactions(BatchId::new_for_test(3), 0, Vec::new()));
 
     check_outdated_fragments(&mut aggregator, vec![
@@ -203,6 +205,7 @@ fn test_batch_aggregator_ids() {
 
 #[test]
 fn test_batch_aggregator() {
+    let peer_id = PeerId::random();
     let num_txns = 10;
     let all_txns = create_vec_serialized_transactions(num_txns);
     let all_txns_clone = all_txns.clone();
@@ -210,12 +213,12 @@ fn test_batch_aggregator() {
     let fragmented_txns1 = split_vec(&all_txns, 5);
     let fragmented_txns2 = split_vec(&all_txns, 3);
 
-    let mut base_state = IncrementalBatchState::new(txns_size);
+    let mut base_state = IncrementalBatchState::new(peer_id, txns_size);
     assert_ok!(base_state.append_transactions(all_txns));
     let base_res = base_state.finalize_batch().unwrap();
     assert_eq!(base_res.0, txns_size);
 
-    let mut aggregator = BatchAggregator::new(txns_size);
+    let mut aggregator = BatchAggregator::new(peer_id, txns_size);
     assert_ok!(aggregator.append_transactions(
         BatchId::new_for_test(4),
         0,

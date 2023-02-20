@@ -10,7 +10,7 @@ use crate::quorum_store::{
 };
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_logger::{error, warn};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::from_bytes;
 use std::result::Result;
 
@@ -27,6 +27,7 @@ pub enum BatchAggregationError {
 }
 
 pub(crate) struct IncrementalBatchState {
+    peer_id: PeerId,
     num_fragments: usize,
     status: Result<(), BatchAggregationError>,
     txns: Vec<SignedTransaction>,
@@ -36,12 +37,15 @@ pub(crate) struct IncrementalBatchState {
 }
 
 impl IncrementalBatchState {
-    pub(crate) fn new(max_bytes: usize) -> Self {
+    pub(crate) fn new(peer_id: PeerId, max_bytes: usize) -> Self {
+        let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
+        hasher.update(&peer_id.into_bytes());
         Self {
+            peer_id,
             num_fragments: 0,
             status: Ok(()),
             txns: Vec::new(),
-            hasher: DefaultHasher::new(b"QuorumStoreBatch"),
+            hasher,
             num_bytes: 0,
             max_bytes,
         }
@@ -94,14 +98,16 @@ impl IncrementalBatchState {
 
 /// Aggregates batches and computes digest for a given validator.
 pub(crate) struct BatchAggregator {
+    peer_id: PeerId,
     batch_id: Option<BatchId>,
     batch_state: Option<IncrementalBatchState>,
     max_batch_bytes: usize,
 }
 
 impl BatchAggregator {
-    pub(crate) fn new(max_batch_bytes: usize) -> Self {
+    pub(crate) fn new(peer_id: PeerId, max_batch_bytes: usize) -> Self {
         Self {
+            peer_id,
             batch_id: None,
             batch_state: None,
             max_batch_bytes,
@@ -204,7 +210,10 @@ impl BatchAggregator {
                 // above, and otherwise, it must be cleared by end_batch.
                 error!("Batch state not cleared for a new batch");
             }
-            self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
+            self.batch_state = Some(IncrementalBatchState::new(
+                self.peer_id,
+                self.max_batch_bytes,
+            ));
         }
 
         if self.batch_state.is_some() {
