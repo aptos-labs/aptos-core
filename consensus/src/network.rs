@@ -305,19 +305,19 @@ impl NetworkSender {
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
     async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
-        fail_point!("consensus::send_batch_request", |_| ());
+        fail_point!("consensus::send::batch_request", |_| ());
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         self.send(msg, recipients).await
     }
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send_batch", |_| ());
+        fail_point!("consensus::send::batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(batch));
         self.send(msg, recipients).await
     }
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
-        fail_point!("consensus::send_signed_digest", |_| ());
+        fail_point!("consensus::send::signed_digest", |_| ());
         let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
         self.send(msg, recipients).await
     }

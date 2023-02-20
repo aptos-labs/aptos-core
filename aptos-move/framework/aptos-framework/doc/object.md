@@ -61,6 +61,8 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `verify_ungated_and_descendant`](#0x1_object_verify_ungated_and_descendant)
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
+-  [Specification](#@Specification_1)
+    -  [Function `exists_at`](#@Specification_1_exists_at)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1376,6 +1378,26 @@ Return true if the provided address is the current owner.
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_exists_at"></a>
+
+### Function `exists_at`
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

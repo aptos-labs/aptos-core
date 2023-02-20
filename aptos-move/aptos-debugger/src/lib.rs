@@ -187,15 +187,14 @@ impl AptosDebugger {
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        session
-            .finish()
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?
-            .into_change_set(
+        let change_set_ext = session
+            .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-            .map(|res| res.into_inner().1)
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+        let (_delta_change_set, change_set) = change_set_ext.into_inner();
+        Ok(change_set)
     }
 }
 

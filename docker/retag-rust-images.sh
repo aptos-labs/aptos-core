@@ -9,6 +9,7 @@ IMAGES=(
   faucet
   forge
   telemetry-service
+  indexer-grpc
 )
 
 for IMAGE in "${IMAGES[@]}"

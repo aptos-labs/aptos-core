@@ -12,7 +12,7 @@ use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    state_store::state_storage_usage::StateStorageUsage,
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
@@ -182,22 +182,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
     type Key = T::Key;
 
-    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match map.read(state_key, self.txn_idx) {
-                ReadResult::Value(v) => Ok(v.extract_raw_bytes()),
-                ReadResult::U128(v) => Ok(Some(serialize(&v))),
+                ReadResult::Value(v) => Ok(v.extract_raw_bytes().map(StateValue::new)),
+                ReadResult::U128(v) => Ok(Some(StateValue::new(serialize(&v)))),
                 ReadResult::Unresolved(delta) => {
                     let from_storage = self
                         .base_view
-                        .get_state_value(state_key)?
+                        .get_state_value_bytes(state_key)?
                         .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR)), |bytes| {
                             Ok(deserialize(&bytes))
                         })?;
                     let result = delta
                         .apply_to(from_storage)
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
-                    Ok(Some(serialize(&result)))
+                    Ok(Some(StateValue::new(serialize(&result))))
                 },
                 ReadResult::None => self.base_view.get_state_value(state_key),
             },
@@ -218,7 +218,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     // log_context.alert();
                     // ret
                 },
-                |v| Ok(v.extract_raw_bytes()),
+                |v| Ok(v.extract_raw_bytes().map(StateValue::new)),
             ),
         }
     }

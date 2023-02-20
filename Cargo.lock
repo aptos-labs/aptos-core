@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.5"
+version = "1.0.6"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -162,6 +162,7 @@ dependencies = [
  "chrono",
  "clap 3.2.23",
  "clap_complete",
+ "codespan-reporting",
  "dirs",
  "futures",
  "hex",
@@ -2461,6 +2462,21 @@ dependencies = [
  "serde 1.0.149",
  "static_assertions",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-speculative-state-helper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-infallible",
+ "claims",
+ "crossbeam",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
+ "rayon",
 ]
 
 [[package]]

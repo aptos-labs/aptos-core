@@ -91,7 +91,7 @@ pub struct BuiltPackage {
     package: CompiledPackage,
 }
 
-pub(crate) fn build_model(
+pub fn build_model(
     package_path: &Path,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,

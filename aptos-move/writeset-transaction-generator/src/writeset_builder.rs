@@ -119,7 +119,7 @@ where
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
-    let session_out = {
+    let change_set_ext = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session = GenesisSession(
@@ -130,19 +130,15 @@ where
         session.enable_reconfiguration();
         session
             .0
-            .finish()
+            .finish(
+                &mut (),
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };
 
     // Genesis never produces the delta change set.
-    let (_, change_set) = session_out
-        .into_change_set(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-        .unwrap()
-        .into_inner();
+    let (_delta_change_set, change_set) = change_set_ext.into_inner();
     change_set
 }
