@@ -1467,8 +1467,8 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
     <b>spec</b> {
         <b>assume</b> dst_coin.value + source_coin.<a href="coin.md#0x1_coin_value">value</a> &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
     };
-    dst_coin.value = dst_coin.value + source_coin.value;
-    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value: _ } = source_coin;
+    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value } = source_coin;
+    dst_coin.value = dst_coin.value + value;
 }
 </code></pre>
 
