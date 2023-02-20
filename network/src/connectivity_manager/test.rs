@@ -70,7 +70,8 @@ fn update_peer_with_address(mut peer: Peer, addr_str: &'static str) -> (Peer, Ne
 }
 
 struct TestHarness {
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    network_context: NetworkContext,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     mock_time: MockTimeService,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
@@ -85,12 +86,12 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
         let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(0);
-        let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
+        let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
 
         let conn_mgr = ConnectivityManager::new(
             network_context,
             time_service.clone(),
-            trusted_peers.clone(),
+            peers_and_metadata.clone(),
             seeds,
             ConnectionRequestSender::new(connection_reqs_tx),
             connection_notifs_rx,
@@ -102,7 +103,8 @@ impl TestHarness {
             true, /* mutual_authentication */
         );
         let mock = Self {
-            trusted_peers,
+            network_context,
+            peers_and_metadata,
             mock_time: time_service.into_mock(),
             connection_reqs_rx,
             connection_notifs_tx,
@@ -744,7 +746,10 @@ fn public_connection_limit() {
 fn basic_update_discovered_peers() {
     let mut rng = StdRng::from_seed(TEST_SEED);
     let (mock, mut conn_mgr) = TestHarness::new(HashMap::new());
-    let trusted_peers = mock.trusted_peers;
+    let trusted_peers = mock
+        .peers_and_metadata
+        .get_trusted_peers(&mock.network_context.network_id())
+        .unwrap();
 
     // sample some example data
     let peer_id_a = AccountAddress::ZERO;

@@ -11,10 +11,13 @@
 //!
 //! [stream]: crate::noise::stream
 
-use crate::noise::{error::NoiseHandshakeError, stream::NoiseStream};
+use crate::{
+    application::storage::PeersAndMetadata,
+    noise::{error::NoiseHandshakeError, stream::NoiseStream},
+};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet},
-    network_id::NetworkContext,
+    config::{Peer, PeerRole},
+    network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::{duration_since_epoch, RwLock};
@@ -88,28 +91,29 @@ pub enum HandshakeAuthMode {
         // mutual-auth scenarios because we have a bounded set of trusted peers
         // that rarely changes.
         anti_replay_timestamps: RwLock<AntiReplayTimestamps>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     },
     /// In `MaybeMutual` mode, the dialer authenticates the server and the server will allow all
     /// inbound connections from any peer but will mark connections as `Trusted` if the incoming
     /// connection is apart of its trusted peers set.
-    MaybeMutual(Arc<RwLock<PeerSet>>),
+    MaybeMutual(Arc<PeersAndMetadata>),
 }
 
 impl HandshakeAuthMode {
-    pub fn mutual(trusted_peers: Arc<RwLock<PeerSet>>) -> Self {
+    pub fn mutual(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
         HandshakeAuthMode::Mutual {
             anti_replay_timestamps: RwLock::new(AntiReplayTimestamps::default()),
-            trusted_peers,
+            peers_and_metadata,
         }
     }
 
-    pub fn maybe_mutual(trusted_peers: Arc<RwLock<PeerSet>>) -> Self {
-        HandshakeAuthMode::MaybeMutual(trusted_peers)
+    pub fn maybe_mutual(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
+        HandshakeAuthMode::MaybeMutual(peers_and_metadata)
     }
 
-    pub fn server_only() -> Self {
-        HandshakeAuthMode::maybe_mutual(Arc::new(RwLock::new(HashMap::default())))
+    pub fn server_only(network_ids: &[NetworkId]) -> Self {
+        let peers_and_metadata = PeersAndMetadata::new(network_ids);
+        HandshakeAuthMode::maybe_mutual(peers_and_metadata)
     }
 
     fn anti_replay_timestamps(&self) -> Option<&RwLock<AntiReplayTimestamps>> {
@@ -346,11 +350,16 @@ impl NoiseUpgrader {
             .map_err(|err| NoiseHandshakeError::ServerParseClient(remote_peer_short, err))?;
 
         // if mutual auth mode, verify the remote pubkey is in our set of trusted peers
+        let network_id = self.network_context.network_id();
         let peer_role = match &self.auth_mode {
-            HandshakeAuthMode::Mutual { trusted_peers, .. } => {
-                match trusted_peers.read().get(&remote_peer_id) {
+            HandshakeAuthMode::Mutual {
+                peers_and_metadata, ..
+            } => {
+                let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id)?;
+                let trusted_peer = trusted_peers.read().get(&remote_peer_id).cloned();
+                match trusted_peer {
                     Some(peer) => {
-                        Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
+                        Self::authenticate_inbound(remote_peer_short, &peer, &remote_public_key)
                     },
                     None => Err(NoiseHandshakeError::UnauthenticatedClient(
                         remote_peer_short,
@@ -358,10 +367,12 @@ impl NoiseUpgrader {
                     )),
                 }
             },
-            HandshakeAuthMode::MaybeMutual(trusted_peers) => {
-                match trusted_peers.read().get(&remote_peer_id) {
+            HandshakeAuthMode::MaybeMutual(peers_and_metadata) => {
+                let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id)?;
+                let trusted_peer = trusted_peers.read().get(&remote_peer_id).cloned();
+                match trusted_peer {
                     Some(peer) => {
-                        Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
+                        Self::authenticate_inbound(remote_peer_short, &peer, &remote_public_key)
                     },
                     None => {
                         // if not, verify that their peerid is constructed correctly from their public key
@@ -463,12 +474,16 @@ impl NoiseUpgrader {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutils::fake_socket::ReadWriteTestSocket;
+    use crate::{testutils, testutils::fake_socket::ReadWriteTestSocket};
     use aptos_config::config::{Peer, PeerRole};
-    use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform as _};
+    use aptos_crypto::{
+        test_utils::TEST_SEED,
+        traits::Uniform as _,
+        x25519::{PrivateKey, PublicKey},
+    };
     use aptos_memsocket::MemorySocket;
     use futures::{executor::block_on, future::join};
-    use rand::SeedableRng as _;
+    use rand::{prelude::StdRng, SeedableRng as _};
 
     const TEST_SEED_2: [u8; 32] = [42; 32];
 
@@ -479,61 +494,64 @@ mod test {
         (NoiseUpgrader, x25519::PublicKey),
         (NoiseUpgrader, x25519::PublicKey),
     ) {
+        // Create a client and server keypair
         let mut rng = ::rand::rngs::StdRng::from_seed(TEST_SEED);
+        let (client_private_key, client_public_key) = create_key_pair(&mut rng);
+        let (server_private_key, server_public_key) = create_key_pair(&mut rng);
 
-        let client_private_key = x25519::PrivateKey::generate(&mut rng);
-        let client_public_key = client_private_key.public_key();
+        let (client_auth, server_auth, client_network_context, server_network_context) =
+            if is_mutual_auth {
+                // Create the client and server network context
+                let (client_network_context, server_network_context, peers_and_metadata) =
+                    testutils::create_client_server_network_context(None, None);
 
-        let server_private_key = x25519::PrivateKey::generate(&mut rng);
-        let server_public_key = server_private_key.public_key();
+                // Update the trusted peers with the client and server
+                let peer_role = PeerRole::Validator;
+                let trusted_peers = peers_and_metadata
+                    .get_trusted_peers(&client_network_context.network_id())
+                    .unwrap();
+                trusted_peers.write().insert(
+                    client_network_context.peer_id(),
+                    Peer::new(vec![], [client_public_key].into_iter().collect(), peer_role),
+                );
+                trusted_peers.write().insert(
+                    server_network_context.peer_id(),
+                    Peer::new(vec![], [server_public_key].into_iter().collect(), peer_role),
+                );
 
-        let (client_auth, server_auth, client_peer_id, server_peer_id) = if is_mutual_auth {
-            let client_peer_id = PeerId::random();
-            let client_pubkey_set = [client_public_key].iter().copied().collect();
-            let server_peer_id = PeerId::random();
-            let server_pubkey_set = [server_public_key].iter().copied().collect();
-            let trusted_peers = Arc::new(RwLock::new(
-                vec![
-                    (
-                        client_peer_id,
-                        Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator),
-                    ),
-                    (
-                        server_peer_id,
-                        Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator),
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            ));
-            let client_auth = HandshakeAuthMode::mutual(trusted_peers.clone());
-            let server_auth = HandshakeAuthMode::mutual(trusted_peers);
-            (client_auth, server_auth, client_peer_id, server_peer_id)
-        } else {
-            let client_peer_id =
-                aptos_types::account_address::from_identity_public_key(client_public_key);
-            let server_peer_id =
-                aptos_types::account_address::from_identity_public_key(server_public_key);
-            (
-                HandshakeAuthMode::server_only(),
-                HandshakeAuthMode::server_only(),
-                client_peer_id,
-                server_peer_id,
-            )
-        };
+                (
+                    HandshakeAuthMode::mutual(peers_and_metadata.clone()),
+                    HandshakeAuthMode::mutual(peers_and_metadata),
+                    client_network_context,
+                    server_network_context,
+                )
+            } else {
+                // Create the client and server network context
+                let (client_network_context, server_network_context, _) =
+                    testutils::create_client_server_network_context(
+                        Some(client_public_key),
+                        Some(server_public_key),
+                    );
 
-        let client = NoiseUpgrader::new(
-            NetworkContext::mock_with_peer_id(client_peer_id),
-            client_private_key,
-            client_auth,
-        );
-        let server = NoiseUpgrader::new(
-            NetworkContext::mock_with_peer_id(server_peer_id),
-            server_private_key,
-            server_auth,
-        );
+                (
+                    HandshakeAuthMode::server_only(&[client_network_context.network_id()]),
+                    HandshakeAuthMode::server_only(&[server_network_context.network_id()]),
+                    client_network_context,
+                    server_network_context,
+                )
+            };
+
+        let client = NoiseUpgrader::new(client_network_context, client_private_key, client_auth);
+        let server = NoiseUpgrader::new(server_network_context, server_private_key, server_auth);
 
         ((client, client_public_key), (server, server_public_key))
+    }
+
+    /// Creates a key pair using the given RNG
+    fn create_key_pair(mut rng: &mut StdRng) -> (PrivateKey, PublicKey) {
+        let client_private_key = x25519::PrivateKey::generate(&mut rng);
+        let client_public_key = client_private_key.public_key();
+        (client_private_key, client_public_key)
     }
 
     /// helper to perform a noise handshake with two peers
@@ -675,7 +693,7 @@ mod test {
         let client = NoiseUpgrader::new(
             NetworkContext::mock_with_peer_id(client_peer_id),
             client_private_key,
-            HandshakeAuthMode::mutual(Arc::new(RwLock::new(HashMap::new()))),
+            HandshakeAuthMode::mutual(PeersAndMetadata::new(&[])),
         );
 
         let (_, (server, server_public_key)) = build_peers(true /* is_mutual_auth */);

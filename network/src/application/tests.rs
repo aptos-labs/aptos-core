@@ -21,12 +21,21 @@ use crate::{
     transport::ConnectionMetadata,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_config::{
+    config::{Peer, PeerRole},
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_types::PeerId;
 use futures::channel::oneshot;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::time::timeout;
 
 // Useful test constants for timeouts
@@ -190,6 +199,71 @@ fn test_peers_and_metadata_simple_errors() {
     peers_and_metadata
         .get_metadata_for_peer(invalid_peer_network)
         .unwrap_err();
+}
+
+#[test]
+fn test_peers_and_metadata_trusted_peers() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Verify that an error is returned for trusted peers in a non-existent network
+    peers_and_metadata
+        .get_trusted_peers(&NetworkId::Public)
+        .unwrap_err();
+
+    // Verify that we get an empty trusted peer set for the validator and VFN network
+    for network_id in network_ids {
+        let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+        assert!(trusted_peers.read().is_empty());
+    }
+
+    // Update the trusted peer set for the validator network
+    let peer_id_1 = PeerId::random();
+    let peer_id_2 = PeerId::random();
+    let peer_1 = Peer::new(vec![], HashSet::new(), PeerRole::Validator);
+    let peer_2 = Peer::new(vec![], HashSet::new(), PeerRole::Unknown);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_1, peer_1);
+    trusted_peers.write().insert(peer_id_2, peer_2);
+
+    // Verify the validator network contains the expected trusted peers
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    assert!(trusted_peers.read().contains_key(&peer_id_1));
+    assert!(trusted_peers.read().contains_key(&peer_id_2));
+    assert!(!trusted_peers.read().contains_key(&PeerId::random()));
+
+    // Update the trusted peer set for the VFN network
+    let peer_id_3 = PeerId::random();
+    let peer_3 = Peer::new(vec![], HashSet::new(), PeerRole::ValidatorFullNode);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Vfn)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_3, peer_3.clone());
+
+    // Verify the VFN network contains the expected trusted peers
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Vfn)
+        .unwrap();
+    let trusted_peers = trusted_peers.read();
+    let vfn_peer = trusted_peers.get(&peer_id_3).unwrap();
+    assert_eq!(vfn_peer, &peer_3);
+
+    // Clear the validator network trusted peer set
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    trusted_peers.write().clear();
+
+    // Verify that we get an empty trusted peer set for the validator network
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    assert!(trusted_peers.read().is_empty());
 }
 
 #[test]

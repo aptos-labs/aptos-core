@@ -21,6 +21,7 @@
 //! use rand::{rngs::StdRng, SeedableRng};
 //! use aptos_types::PeerId;
 //! use std::{collections::{HashSet, HashMap}, io, sync::Arc};
+//! use aptos_network::application::storage::PeersAndMetadata;
 //!
 //! fn example() -> io::Result<()> {
 //! // create client and server NoiseUpgrader
@@ -34,26 +35,27 @@
 //! let server_peer_id = PeerId::random();
 //!
 //! // create list of trusted peers
+//! let network_id = NetworkId::Validator;
 //! let client_pubkey_set: HashSet<_> = vec![client_public].into_iter().collect();
 //! let server_pubkey_set: HashSet<_> = vec![server_public].into_iter().collect();
-//! let trusted_peers: HashMap<_, _> = vec![
-//!     (client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator)),
-//!     (server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator))
-//! ].into_iter().collect();
-//! let trusted_peers = Arc::new(RwLock::new(trusted_peers));
 //!
-//! let client_auth = HandshakeAuthMode::mutual(trusted_peers.clone());
+//! let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
+//! let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+//! trusted_peers.write().insert(client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator));
+//! trusted_peers.write().insert(server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator));
+//!
+//! let client_auth = HandshakeAuthMode::mutual(peers_and_metadata.clone());
 //! let client_context = NetworkContext::new(
 //!     RoleType::Validator,
-//!     NetworkId::Validator,
+//!     network_id,
 //!     client_peer_id,
 //! );
 //! let client = NoiseUpgrader::new(client_context, client_private, client_auth);
 //!
-//! let server_auth = HandshakeAuthMode::mutual(trusted_peers);
+//! let server_auth = HandshakeAuthMode::mutual(peers_and_metadata);
 //! let server_context = NetworkContext::new(
 //!     RoleType::Validator,
-//!     NetworkId::Validator,
+//!     network_id,
 //!     server_peer_id,
 //! );
 //! let server = NoiseUpgrader::new(server_context, server_private, server_auth);
