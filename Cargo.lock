@@ -1962,6 +1962,7 @@ dependencies = [
  "aptos-network",
  "aptos-network-builder",
  "aptos-node-identity",
+ "aptos-peer-monitoring-service-client",
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
@@ -2101,11 +2102,21 @@ version = "0.1.0"
 dependencies = [
  "aptos-channels",
  "aptos-config",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
+ "aptos-time-service",
  "aptos-types",
  "async-trait",
+ "enum_dispatch",
+ "futures",
+ "once_cell",
+ "serde 1.0.149",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

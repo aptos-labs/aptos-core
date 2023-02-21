@@ -156,6 +156,10 @@ impl fmt::Display for NetworkId {
 const VFN_NETWORK: &str = "vfn";
 
 impl NetworkId {
+    pub fn is_public_network(&self) -> bool {
+        self == &NetworkId::Public
+    }
+
     pub fn is_vfn_network(&self) -> bool {
         self == &NetworkId::Vfn
     }

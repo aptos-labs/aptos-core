@@ -70,6 +70,7 @@ fn test_peers_and_metadata_simple_interface() {
 
     // Verify the registered networks and that there are no available peers
     check_registered_networks(&peers_and_metadata, network_ids);
+    check_all_peers(&peers_and_metadata, vec![]);
     check_connected_peers_and_metadata(&peers_and_metadata, vec![]);
 
     // Create two peers and initialize the connection metadata
@@ -84,17 +85,19 @@ fn test_peers_and_metadata_simple_interface() {
         peers_and_metadata.clone(),
     );
 
+    // Verify all peers
+    let all_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
     // Verify the number of connected peers
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_peers_and_metadata(&peers_and_metadata, all_peers.clone());
 
     // Verify the supported peers by protocol type
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        all_peers.clone(),
+    );
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::StorageServiceRpc], vec![
         peer_network_id_1,
     ]);
@@ -107,8 +110,13 @@ fn test_peers_and_metadata_simple_interface() {
         vec![],
     );
 
-    // Mark peer 1 as disconnected and verify it is no longer included
+    // Mark peer 1 as disconnected
     mark_peer_disconnecting(&peers_and_metadata, peer_network_id_1);
+
+    // Verify all peers
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
+    // Verify peer 1 is no longer connected or supported
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_2]);
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
         peer_network_id_2,
@@ -119,8 +127,13 @@ fn test_peers_and_metadata_simple_interface() {
         vec![],
     );
 
-    // Mark peer 2 as disconnected and verify it is no longer included
+    // Mark peer 2 as disconnected
     mark_peer_disconnecting(&peers_and_metadata, peer_network_id_2);
+
+    // Verify all peers
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
+    // Verify peer 2 is no longer connected or supported
     check_connected_peers_and_metadata(&peers_and_metadata, vec![]);
     check_connected_supported_peers(
         &peers_and_metadata,
@@ -131,6 +144,7 @@ fn test_peers_and_metadata_simple_interface() {
     // Reconnect both peers
     connect_peer(&peers_and_metadata, peer_network_id_1);
     connect_peer(&peers_and_metadata, peer_network_id_2);
+    check_all_peers(&peers_and_metadata, all_peers.clone());
 
     // Verify that removing a connection with a different connection id doesn't remove the peer
     remove_peer_metadata(
@@ -139,14 +153,12 @@ fn test_peers_and_metadata_simple_interface() {
         connection_1.connection_id.get_inner() + 9879,
     )
     .unwrap_err();
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_peers_and_metadata(&peers_and_metadata, all_peers.clone());
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        all_peers,
+    );
 
     // Verify that removing a connection with the same connection id works
     remove_peer_metadata(
@@ -155,6 +167,7 @@ fn test_peers_and_metadata_simple_interface() {
         connection_2.connection_id.get_inner(),
     )
     .unwrap();
+    check_all_peers(&peers_and_metadata, vec![peer_network_id_1]);
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_1]);
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
         peer_network_id_1,
@@ -681,6 +694,12 @@ fn check_registered_networks(
     // Get the registered networks
     let registered_networks = peers_and_metadata.get_registered_networks().collect();
     compare_vectors_ignore_order(registered_networks, expected_networks);
+}
+
+/// Verifies that all returned peers are correct
+fn check_all_peers(peers_and_metadata: &Arc<PeersAndMetadata>, expected_peers: Vec<PeerNetworkId>) {
+    let all_peers = peers_and_metadata.get_all_peers().unwrap();
+    compare_vectors_ignore_order(all_peers, expected_peers);
 }
 
 /// Verifies that the connected peers and metadata are correct

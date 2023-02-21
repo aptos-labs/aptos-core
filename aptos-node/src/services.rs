@@ -17,6 +17,7 @@ use aptos_peer_monitoring_service_server::{
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
+use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, thread, time::Instant};
@@ -148,8 +149,6 @@ pub fn start_peer_monitoring_service(
     let peer_monitoring_service_runtime =
         aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
 
-    // TODO: spawn the client
-
     // Create and spawn the peer monitoring server
     let peer_monitoring_network_events =
         PeerMonitoringServiceNetworkEvents::new(network_service_events);
@@ -160,6 +159,21 @@ pub fn start_peer_monitoring_service(
         network_client.get_peers_and_metadata(),
     );
     peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
+
+    // Spawn the peer monitoring client
+    if node_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client
+    {
+        peer_monitoring_service_runtime.spawn(
+            aptos_peer_monitoring_service_client::start_peer_monitor(
+                node_config.clone(),
+                network_client,
+                TimeService::real(),
+                Some(peer_monitoring_service_runtime.handle().clone()),
+            ),
+        );
+    }
 
     // Return the runtime
     peer_monitoring_service_runtime
