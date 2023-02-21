@@ -20,6 +20,8 @@ mod storage;
 
 pub use storage::{ChangeSetConfigs, StorageGasParameters};
 
+const GAS_SCALING_FACTOR: u64 = 10_000;
+
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
@@ -51,7 +53,7 @@ crate::params::define_gas_parameters!(
         [
             maximum_number_of_gas_units: Gas,
             "maximum_number_of_gas_units",
-            2_000_000
+            aptos_global_constants::MAX_GAS_AMOUNT
         ],
         // The minimum gas price that a transaction can be submitted with.
         // TODO(Gas): should probably change this to something > 0
@@ -74,7 +76,7 @@ crate::params::define_gas_parameters!(
         [
             gas_unit_scaling_factor: GasScalingFactor,
             "gas_unit_scaling_factor",
-            10_000
+            GAS_SCALING_FACTOR
         ],
         // Gas Parameters for reading data from storage.
         [load_data_base: InternalGas, "load_data.base", 16_000],
@@ -144,14 +146,28 @@ crate::params::define_gas_parameters!(
         [
             storage_fee_per_event_byte: FeePerByte,
             { 7.. => "storage_fee_per_event_byte" },
-            1,
+            20,
         ],
         [
             storage_fee_per_transaction_byte: FeePerByte,
             { 7.. => "storage_fee_per_transaction_byte" },
-            1,
+            20,
         ],
-
+        [
+            max_execution_gas: InternalGas,
+            { 7.. => "max_execution_gas" },
+            2_000_000 * GAS_SCALING_FACTOR,
+        ],
+        [
+            max_io_gas: InternalGas,
+            { 7.. => "max_io_gas" },
+            1_000_000 * GAS_SCALING_FACTOR,
+        ],
+        [
+            max_storage_fee: Fee,
+            { 7.. => "max_storage_fee" },
+            2_0000_0000, // 2 APT
+        ]
     ]
 );
 

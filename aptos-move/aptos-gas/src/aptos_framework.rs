@@ -104,7 +104,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 2 * MUL],
 
     // Note(Gas): These are storage operations so the values should not be multiplied.
-    [.event.write_to_event_store.base, "event.write_to_event_store.base", 500_000],
+    [.event.write_to_event_store.base, "event.write_to_event_store.base", 300_000],
     // TODO(Gas): the on-chain name is wrong...
     [.event.write_to_event_store.per_abstract_value_unit, "event.write_to_event_store.per_abstract_memory_unit", 5_000],
 
