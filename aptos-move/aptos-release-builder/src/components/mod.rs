@@ -113,7 +113,7 @@ impl ReleaseConfig {
             script_path.push(&proposal_name);
             script_path.set_extension("move");
 
-            std::fs::write(script_path.as_path(), script.as_bytes())
+            std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
                 .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
         }
 
@@ -366,4 +366,28 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
         .unwrap();
         hash.to_vec()
     }
+}
+
+fn append_script_hash(raw_script: String) -> String {
+    let temp_script_path = TempPath::new();
+    temp_script_path.create_as_file().unwrap();
+
+    let mut move_script_path = temp_script_path.path().to_path_buf();
+    move_script_path.set_extension("move");
+    std::fs::write(move_script_path.as_path(), raw_script.as_bytes())
+        .map_err(|err| {
+            anyhow!(
+                "Failed to get execution hash: failed to write to file: {:?}",
+                err
+            )
+        })
+        .unwrap();
+
+    let (_, hash) = GenerateExecutionHash {
+        script_path: Option::from(move_script_path),
+    }
+    .generate_hash()
+    .unwrap();
+
+    format!("// Script hash: {} \n{}", hash, raw_script)
 }
