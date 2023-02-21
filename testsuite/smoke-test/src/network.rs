@@ -4,6 +4,7 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    state_sync::test_all_validator_failures,
     test_utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
 use aptos::{common::types::EncodingType, test::CliTestFramework};
@@ -194,6 +195,30 @@ async fn test_file_discovery() {
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     // TODO: Check connection
+}
+
+// TODO: add more complex tests for the peer monitoring service.
+// TODO: move the state sync functions to a utility file (instead of importing directly).
+
+#[tokio::test]
+async fn test_peer_monitoring_service_enabled() {
+    // Create a swarm of 4 validators with peer monitoring enabled
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.peer_monitoring_service.enable_peer_monitoring_client = true;
+        }))
+        .build()
+        .await;
+
+    // Create a fullnode config that with peer monitoring enabled
+    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    vfn_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client = true;
+
+    // Test the ability of the validators to sync
+    test_all_validator_failures(swarm).await;
 }
 
 /// Creates a discovery file with the given `PeerSet`

@@ -42,6 +42,7 @@ aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
 aptos-network-builder = { workspace = true }
 aptos-node-identity = { workspace = true }
+aptos-peer-monitoring-service-client = { workspace = true }
 aptos-peer-monitoring-service-server = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-runtimes = { workspace = true }

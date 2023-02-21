@@ -268,7 +268,7 @@ impl PeerStates {
         // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
         match self.peers_and_metadata.get_metadata_for_peer(*peer) {
             Ok(peer_metadata) => {
-                if peer_metadata.get_connection_medata().origin == ConnectionOrigin::Outbound {
+                if peer_metadata.get_connection_metadata().origin == ConnectionOrigin::Outbound {
                     return true;
                 }
             },
