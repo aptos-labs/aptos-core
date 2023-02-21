@@ -120,6 +120,75 @@ async fn test_onchain_config_quorum_store_enabled() {
     generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
 }
 
+// TODO: remove when quorum store becomes the in-code default
+/// Test in case of disaster whether we can roll back to non-quorum store
+#[tokio::test]
+async fn test_onchain_config_quorum_store_disabled() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_aptos()
+        // Start with V2
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.consensus_config =
+                OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        }))
+        .build_with_cli(0)
+        .await;
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    let root_cli_index = cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+    let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap();
+
+    let inner = match current_consensus_config {
+        OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
+        OnChainConsensusConfig::V2(inner) => inner,
+    };
+
+    // Disaster rollback to V1
+    let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 { ..inner });
+
+    let update_consensus_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+    );
+    cli.run_script(root_cli_index, &update_consensus_config_script)
+        .await
+        .unwrap();
+
+    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
+}
+
 /// Checks progress even if half the nodes are not actually writing batches to the DB.
 /// Shows that remote reading of batches is working.
 /// Note this is more than expected (f) byzantine behavior.
