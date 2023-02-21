@@ -23,7 +23,7 @@ const sidebars = {
       className: "sidebar-title",
     },
     "whats-new-in-docs",
-        {
+    {
       type: "category",
       label: "Latest Releases",
       collapsible: true,
@@ -31,14 +31,14 @@ const sidebars = {
       link: { type: "doc", id: "releases" },
       items: [
         {
-      type: 'link',
-      label: 'aptos-node-v1.2.5',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.5',
+          type: "link",
+          label: "aptos-node-v1.2.5",
+          href: "https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.5",
         },
         {
-      type: 'link',
-      label: 'aptos-cli-v1.0.6',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.6',
+          type: "link",
+          label: "aptos-cli-v1.0.6",
+          href: "https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.6",
         },
       ],
     },
