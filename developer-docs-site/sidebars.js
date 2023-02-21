@@ -25,29 +25,20 @@ const sidebars = {
     "whats-new-in-docs",
         {
       type: "category",
-      label: "Aptos Releases",
+      label: "Latest Releases",
       collapsible: true,
       collapsed: false,
+      link: { type: "doc", id: "releases" },
       items: [
         {
       type: 'link',
-      label: 'aptos-node-v1.2.4',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.4',
+      label: 'aptos-node-v1.2.5',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.5',
         },
         {
       type: 'link',
-      label: 'aptos-node-v1.1.0',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.1.0',
-        },
-        {
-      type: 'link',
-      label: 'aptos-cli-v1.0.5',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.5',
-        },
-        {
-      type: 'link',
-      label: 'ptos-cli-v1.0.4',
-      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.4',
+      label: 'aptos-cli-v1.0.6',
+      href: 'https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.6',
         },
       ],
     },

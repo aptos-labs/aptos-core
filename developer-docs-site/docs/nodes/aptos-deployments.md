@@ -10,6 +10,7 @@ You can connect to the Aptos blockchain in a few ways. See the below table:
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|
+|<div style={{width: 120}}>**Latest Release**</div>| [aptos-node-v1.2.5](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.5) | ? | ?| ? |
 |<div style={{width: 120}}>**Chain ID**</div>| 1 |[On Aptos Explorer **select Devnet from top right**](https://explorer.aptoslabs.com/?network=Devnet).| 2|  Available during AIT program.|
 |**REST API URL**| <div style={{width: 220}}>https://fullnode.mainnet.aptoslabs.com/v1</div> |<div style={{width: 220}}>https://fullnode.devnet.aptoslabs.com/v1</div> | <div style={{width: 220}}>https://fullnode.testnet.aptoslabs.com/v1</div> | <div style={{width: 110}}>Available during AIT program. </div>|
 |**Genesis blob and Waypoint**| In the `mainnet` directory on https://github.com/aptos-labs/aptos-networks |In the `devnet` directory on https://github.com/aptos-labs/aptos-networks  | <div style={{width: 200}}>In the `testnet` directory on https://github.com/aptos-labs/aptos-networks </div>| Available during AIT program.  |
