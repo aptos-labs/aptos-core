@@ -215,7 +215,7 @@ impl BatchCoordinator {
                     break;
                 },
                 BatchCoordinatorCommand::AppendToBatch(fragment_payload, batch_id) => {
-                    debug!("QS: end batch cmd received, batch id {}", batch_id);
+                    debug!("QS: append to batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 

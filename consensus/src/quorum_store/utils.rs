@@ -35,28 +35,33 @@ pub(crate) struct BatchBuilder {
     summaries: Vec<TransactionSummary>,
     data: Vec<SerializedTransaction>,
     num_txns: usize,
-    max_txns: usize,
     num_bytes: usize,
+    // TODO: remove
     max_bytes: usize,
 }
 
 impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_txns: usize, max_bytes: usize) -> Self {
+    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
         Self {
             id: batch_id,
             summaries: Vec::new(),
             data: Vec::new(),
             num_txns: 0,
-            max_txns,
             num_bytes: 0,
             max_bytes,
         }
     }
 
-    pub(crate) fn append_transaction(&mut self, txn: &SignedTransaction) -> bool {
+    pub(crate) fn append_transaction(
+        &mut self,
+        txn: &SignedTransaction,
+        max_txns_override: usize,
+    ) -> bool {
         let serialized_txn = SerializedTransaction::from_signed_txn(txn);
 
-        if self.num_bytes + serialized_txn.len() <= self.max_bytes && self.num_txns < self.max_txns
+        // TODO: bytes, off-by-one?
+        if self.num_bytes + serialized_txn.len() <= self.max_bytes
+            && self.num_txns < max_txns_override
         {
             self.num_txns += 1;
             self.num_bytes += serialized_txn.len();
@@ -67,7 +72,7 @@ impl BatchBuilder {
             });
             self.data.push(serialized_txn);
 
-            self.num_txns < self.max_txns && self.num_bytes < self.max_bytes
+            self.num_txns < max_txns_override && self.num_bytes < self.max_bytes
         } else {
             false
         }
@@ -323,8 +328,23 @@ impl ProofQueue {
         ret
     }
 
+    pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
+        let mut remaining_txns = 0;
+        for (digest, expiration) in self.digest_queue.iter() {
+            // Not expired
+            if *expiration >= current_time {
+                // Not committed
+                if let Some(Some(proof)) = self.digest_proof.get(digest) {
+                    remaining_txns += proof.info().num_txns;
+                }
+            }
+        }
+        counters::NUM_TOTAL_TXNS_LEFT_ON_COMMIT.observe(remaining_txns as f64);
+        remaining_txns
+    }
+
     // returns the number of unexpired local proofs
-    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> usize {
+    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> Option<Round> {
         let num_expired = self
             .local_digest_queue
             .iter()
@@ -346,10 +366,13 @@ impl ProofQueue {
                 }
             }
         }
-        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
-            .observe(remaining_local_proof_size as f64);
+        counters::NUM_LOCAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_local_proof_size as f64);
 
-        remaining_local_proof_size
+        if let Some(&(_, time)) = self.local_digest_queue.iter().next() {
+            Some(time.round())
+        } else {
+            None
+        }
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire
