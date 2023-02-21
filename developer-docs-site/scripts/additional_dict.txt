@@ -35,6 +35,7 @@ CANCELLED
 CDN
 CLI
 CMake
+cn
 CPU
 CPUs
 ChainID
@@ -273,6 +274,8 @@ const
 copyable
 cryptographic
 cryptographically
+DAO
+DAOs
 dApp
 dApps
 dapp
@@ -371,6 +374,8 @@ parallelization
 param
 pdf
 performant
+permissioned
+permissionless
 persistency
 petra
 pipelined
@@ -381,6 +386,7 @@ pre
 prebuilt
 precompiled
 preconfigure
+presale
 programmability
 programmatically
 propertymap

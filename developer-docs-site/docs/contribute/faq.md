@@ -11,7 +11,7 @@ This page answers common questions by subject. To add your own answers, create p
 
 ### What is Aptos Labs?
 
-Aptos Labs is a startup that is building the safest and most production-ready blockchain. Our goal is to create universal and fair access to decentralized assets. The founding team at Aptos consists of an impressive group of PhDs, researchers, engineers, designers and strategists.
+Aptos Labs is a startup that is building the safest and most production-ready blockchain. Our goal is to create universal and fair access to decentralized assets. The founding team at Aptos consists of an impressive group of researchers, engineers, designers and strategists.
 
 Read this blog post, “[The Genesis of Aptos](https://medium.com/aptoslabs/the-genesis-of-aptos-ff98d86e9445)” by our co-founder and CEO.
 
@@ -40,7 +40,7 @@ See: https://aptos.dev/
 
 ### What makes Aptos unique compared to alternative blockchains?
 
-We have a specific focus on building a safe, scalable and upgradable blockchain with credible neutrality.  [](https://aptos.dev/transactions/interacting-with-the-aptos-blockchain)
+We have a specific focus on building a safe, scalable and upgradeable blockchain with credible neutrality.  [](https://aptos.dev/transactions/interacting-with-the-aptos-blockchain)
 
 We have a head start, as we are the original creators, researchers, designers, and builders of Diem, the blockchain that was first built to serve this purpose. We use the Move language, the safe and reliable language originally developed for Diem.
 
@@ -50,7 +50,7 @@ Also see [Interacting with Aptos Blockchain](https://aptos.dev/guides/interactin
 
 What types of projects would be interesting and uniquely suited for Aptos blockchain platform?
 
-We are building a general purpose blockchain development platform, so the many use cases range from decentralized finance to gaming, NFTs, DAOs, and beyond!
+We are building a general purpose blockchain development platform, so the many use cases range from decentralized finance to gaming, NFTs, Decentralized autonomous organizations (DAOs), and beyond!
 
 ### *What changed from Diem to Aptos?*
 
