@@ -233,12 +233,15 @@ pub type SafeNativeResult<T> = Result<T, SafeNativeError>;
 pub fn make_safe_native<G>(
     gas_params: G,
     timed_features: TimedFeatures,
-    func: fn(
-        &G,
-        &mut SafeNativeContext,
-        Vec<Type>,
-        VecDeque<Value>,
-    ) -> SafeNativeResult<SmallVec<[Value; 1]>>,
+    func: impl Fn(
+            &G,
+            &mut SafeNativeContext,
+            Vec<Type>,
+            VecDeque<Value>,
+        ) -> SafeNativeResult<SmallVec<[Value; 1]>>
+        + Sync
+        + Send
+        + 'static,
 ) -> NativeFunction
 where
     G: Send + Sync + 'static,

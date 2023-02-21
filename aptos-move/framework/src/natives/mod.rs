@@ -266,11 +266,17 @@ pub fn all_natives(
         "transaction_context",
         transaction_context::make_all(gas_params.transaction_context, timed_features.clone())
     );
-
-    add_natives_from_module!("code", code::make_all(gas_params.code));
+    add_natives_from_module!(
+        "code",
+        code::make_all(gas_params.code, timed_features.clone())
+    );
     add_natives_from_module!(
         "event",
-        event::make_all(gas_params.event, calc_abstract_val_size)
+        event::make_all(
+            gas_params.event,
+            calc_abstract_val_size,
+            timed_features.clone()
+        )
     );
     add_natives_from_module!(
         "state_storage",
