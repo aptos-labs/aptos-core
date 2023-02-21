@@ -1,5 +1,6 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::{assert_success, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
