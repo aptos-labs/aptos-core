@@ -161,7 +161,6 @@ module aptos_std::algebra {
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_compressed_format(): vector<u8> { x"0601" }
 
-
     /// A group constructed by the points on a curve $E(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
     /// $E(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
     /// The identity of `BLS12_381_G2` is the point at infinity.
@@ -239,6 +238,12 @@ module aptos_std::algebra {
     public fun bls12_381_fr_bendian_format(): vector<u8> { x"0a01" }
 
     // Marker types (and their serialization schemes) end.
+
+    // Hash-to-structure suites begin.
+    /// A ciphersuite for hashing bytes to a `BLS12_381_G1` element.
+    /// Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
+    struct HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_ {}
+    // Hash-to-structure suites end.
 
     /// This struct represents an element of an algebraic structure `S`.
     struct Element<phantom S> has copy, drop {
@@ -414,6 +419,44 @@ module aptos_std::algebra {
         }
     }
 
+    /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` where `P[]` are `n` elements of group `G`,
+    /// and `k[]` are `n` scalars represented by a byte array `scalars`.
+    /// `k[]` will be parsed assuming `bin(k[0]) || ... || bin(k[n-1]) == scalar_bin[0..w*n]`, where
+    /// `w` is the scalar bit length, specified by parameter `scalar_size_in_bits`,
+    /// `bin(x)` is the least-significant-bit-first `w`-bit representation of an integer `x`,
+    /// `||` is bit array concatenation,
+    /// `scalar_bin` is all `bin(scalar[i])` concatenated, then extended at the back with 0s if not long enough.
+    ///
+    /// NOTE: in some groups, this function is much faster and cheaper than
+    /// calling `element_scalar_mul` and adding up the results using `scalar_add`.
+    public fun group_multi_scalar_mul<G>(elements: &vector<Element<G>>, scalars: &vector<u8>, scalar_size_in_bits: u64): Element<G> {
+        let element_handles = handles_from_elements(elements);
+        Element<G> {
+            handle: group_multi_scalar_mul_internal<G>(element_handles, scalars, scalar_size_in_bits)
+        }
+    }
+
+    /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` where `P[]` are `n` elements of group `G`
+    /// and `k[]` are `n` elements of the scalarfield `S` of group `G`.
+    public fun group_multi_scalar_mul_typed<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
+        let element_handles = handles_from_elements(elements);
+        let scalar_handles = handles_from_elements(scalars);
+        Element<G> {
+            handle: group_multi_scalar_mul_typed_internal<G>(element_handles, scalar_handles)
+        }
+    }
+
+    fun handles_from_elements<S>(elements: &vector<Element<S>>): vector<u64> {
+        let num_elements = std::vector::length(elements);
+        let element_handles = std::vector::empty();
+        let i = 0;
+        while (i < num_elements) {
+            std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
+            i = i + 1;
+        };
+        element_handles
+    }
+
     /// Compute `-P` for an element `P` of a group `G`.
     public fun group_neg<G>(element_p: &Element<G>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -424,11 +467,20 @@ module aptos_std::algebra {
     }
 
     /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
-    public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
+    public fun group_scalar_mul_typed<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         abort_unless_type_pair_enabled_for_group_scalar_mul<G,S>();
         Element<G> {
-            handle: group_scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
+            handle: group_scalar_mul_typed_internal<G, S>(element_p.handle, scalar_k.handle)
+        }
+    }
+
+    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
+    public fun group_scalar_mul<G>(element_p: &Element<G>, scalar_encoded: &vector<u8>): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_enabled_for_basic_operation<G>();
+        Element<G> {
+            handle: group_scalar_mul_internal<G>(element_p.handle, scalar_encoded)
         }
     }
 
@@ -498,6 +550,15 @@ module aptos_std::algebra {
         }
     }
 
+    /// Hash some bytes into structure `Struc` using suite `Suite`.
+    public fun hash_to<Struc, Suite>(bytes: &vector<u8>): Element<Struc> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_structure_hashsuite_pair_enabled_for_hash<Struc, Suite>();
+        Element {
+            handle: hash_to_internal<Struc, Suite>(bytes)
+        }
+    }
+
     #[test_only]
     /// Generate a random element of an algebraic structure `S`.
     public fun insecure_random_element<S>(): Element<S> {
@@ -532,10 +593,14 @@ module aptos_std::algebra {
     native fun group_generator_internal<G>(): u64;
     native fun group_identity_internal<G>(): u64;
     native fun group_is_identity_internal<G>(handle: u64): bool;
+    native fun group_multi_scalar_mul_internal<G>(element_handles: vector<u64>, scalars_encoded: &vector<u8>, scalar_size_in_bits: u64): u64;
+    native fun group_multi_scalar_mul_typed_internal<G>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun group_neg_internal<G>(handle: u64): u64;
     native fun group_order_internal<G>(): vector<u8>;
-    native fun group_scalar_mul_internal<G, S>(scalar_handle: u64, element_handle: u64): u64;
+    native fun group_scalar_mul_typed_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
+    native fun group_scalar_mul_internal<G>(element_handle: u64, scalar_encoded: &vector<u8>): u64;
     native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun hash_to_internal<S,C>(bytes: &vector<u8>): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
     native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
@@ -545,6 +610,13 @@ module aptos_std::algebra {
     // Native functions end.
 
     // private functions begin.
+
+    fun abort_unless_structure_hashsuite_pair_enabled_for_hash<S, H>() {
+        let structure_type = type_of<S>();
+        let hashsuite_type = type_of<H>();
+        if (structure_type == type_of<BLS12_381_G1>() && hashsuite_type == type_of<HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>() && bls12_381_structures_enabled()) return;
+        abort(std::error::not_implemented(0))
+    }
 
     fun abort_unless_generic_algebraic_structures_basic_operations_enabled() {
         if (generic_algebraic_structures_basic_operations_enabled()) return;
@@ -803,14 +875,47 @@ module aptos_std::algebra {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let point_7g_calc = group_scalar_mul_typed(&generator, &scalar_7);
+        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
+        let point_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_7g_calc), 1);
         assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_7g_calc), 1);
 
+        // Multi-scalar multiplication.
+        let scalar_a = x"0003";
+        let scalar_b = x"0104";
+        let scalar_c = x"0205";
+        let point_p = insecure_random_element<BLS12_381_G1>();
+        let point_q = insecure_random_element<BLS12_381_G1>();
+        let point_r = insecure_random_element<BLS12_381_G1>();
+        let expected = group_identity<BLS12_381_G1>();
+        let expected = group_add(&expected, &group_scalar_mul(&point_p, &scalar_a));
+        let expected = group_add(&expected, &group_scalar_mul(&point_q, &scalar_b));
+        let expected = group_add(&expected, &group_scalar_mul(&point_r, &scalar_c));
+        let points = std::vector::empty();
+        std::vector::push_back(&mut points, point_p);
+        std::vector::push_back(&mut points, point_q);
+        std::vector::push_back(&mut points, point_r);
+        let scalars_encoded = std::vector::empty();
+        std::vector::append(&mut scalars_encoded, scalar_a);
+        std::vector::append(&mut scalars_encoded, scalar_b);
+        std::vector::append(&mut scalars_encoded, scalar_c);
+        let actual = group_multi_scalar_mul(&points, &scalars_encoded, 16);
+        assert!(eq(&expected, &actual), 1);
+        let scalars = std::vector::empty();
+        let scalar_a = from_u64<BLS12_381_Fr>(0x0300);
+        let scalar_b = from_u64<BLS12_381_Fr>(0x0401);
+        let scalar_c = from_u64<BLS12_381_Fr>(0x0502);
+        std::vector::push_back(&mut scalars, scalar_a);
+        std::vector::push_back(&mut scalars, scalar_b);
+        std::vector::push_back(&mut scalars, scalar_c);
+        let actual = group_multi_scalar_mul_typed(&points, &scalars);
+        assert!(eq(&expected, &actual), 1);
+
         // Doubling.
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_2g = group_scalar_mul_typed(&generator, &scalar_2);
         let point_double_g = group_double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
@@ -821,8 +926,8 @@ module aptos_std::algebra {
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let point_9g = group_scalar_mul(&generator, &scalar_9);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_9g = group_scalar_mul_typed(&generator, &scalar_9);
+        let point_2g = group_scalar_mul_typed(&generator, &scalar_2);
         let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
@@ -893,14 +998,47 @@ module aptos_std::algebra {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let point_7g_calc = group_scalar_mul_typed(&generator, &scalar_7);
+        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
+        let point_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_7g_calc), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_7g_calc), 1);
 
+        // Multi-scalar multiplication.
+        let scalar_a = x"0003";
+        let scalar_b = x"0104";
+        let scalar_c = x"0205";
+        let point_p = insecure_random_element<BLS12_381_G2>();
+        let point_q = insecure_random_element<BLS12_381_G2>();
+        let point_r = insecure_random_element<BLS12_381_G2>();
+        let expected = group_identity<BLS12_381_G2>();
+        let expected = group_add(&expected, &group_scalar_mul(&point_p, &scalar_a));
+        let expected = group_add(&expected, &group_scalar_mul(&point_q, &scalar_b));
+        let expected = group_add(&expected, &group_scalar_mul(&point_r, &scalar_c));
+        let points = std::vector::empty();
+        std::vector::push_back(&mut points, point_p);
+        std::vector::push_back(&mut points, point_q);
+        std::vector::push_back(&mut points, point_r);
+        let scalars_encoded = std::vector::empty();
+        std::vector::append(&mut scalars_encoded, scalar_a);
+        std::vector::append(&mut scalars_encoded, scalar_b);
+        std::vector::append(&mut scalars_encoded, scalar_c);
+        let actual = group_multi_scalar_mul(&points, &scalars_encoded, 16);
+        assert!(eq(&expected, &actual), 1);
+        let scalars = std::vector::empty();
+        let scalar_a = from_u64<BLS12_381_Fr>(0x0300);
+        let scalar_b = from_u64<BLS12_381_Fr>(0x0401);
+        let scalar_c = from_u64<BLS12_381_Fr>(0x0502);
+        std::vector::push_back(&mut scalars, scalar_a);
+        std::vector::push_back(&mut scalars, scalar_b);
+        std::vector::push_back(&mut scalars, scalar_c);
+        let actual = group_multi_scalar_mul_typed(&points, &scalars);
+        assert!(eq(&expected, &actual), 1);
+
         // Doubling.
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_2g = group_scalar_mul_typed(&generator, &scalar_2);
         let point_double_g = group_double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
@@ -911,8 +1049,8 @@ module aptos_std::algebra {
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let point_9g = group_scalar_mul(&generator, &scalar_9);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
+        let point_9g = group_scalar_mul_typed(&generator, &scalar_9);
+        let point_2g = group_scalar_mul_typed(&generator, &scalar_2);
         let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
@@ -959,7 +1097,9 @@ module aptos_std::algebra {
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let element_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let element_7g_calc = group_scalar_mul_typed(&generator, &scalar_7);
+        assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
+        let element_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
         assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize(bls12_381_gt_format(), &element_7g_calc), 1);
 
@@ -969,9 +1109,9 @@ module aptos_std::algebra {
 
         // Element addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
-        let element_9g = group_scalar_mul(&generator, &scalar_9);
+        let element_9g = group_scalar_mul_typed(&generator, &scalar_9);
         let scalar_2 = from_u64<BLS12_381_Fr>(2);
-        let element_2g = group_scalar_mul(&generator, &scalar_2);
+        let element_2g = group_scalar_mul_typed(&generator, &scalar_2);
         let element_2g_calc = group_add(&element_minus_7g_calc, &element_9g);
         assert!(eq(&element_2g, &element_2g_calc), 1);
 
@@ -992,8 +1132,8 @@ module aptos_std::algebra {
         let element_q = insecure_random_element<BLS12_381_G2>();
         let a = insecure_random_element<BLS12_381_Fr>();
         let b = insecure_random_element<BLS12_381_Fr>();
-        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul(&element_p, &a), &group_scalar_mul(&element_q, &b));
-        let gt_element_another = group_scalar_mul(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
+        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul_typed(&element_p, &a), &group_scalar_mul_typed(&element_q, &b));
+        let gt_element_another = group_scalar_mul_typed(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
         assert!(eq(&gt_element, &gt_element_another), 1);
     }
 

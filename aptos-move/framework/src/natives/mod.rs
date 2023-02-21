@@ -87,6 +87,7 @@ impl GasParameters {
                 ark_bls12_381_g1_proj_infinity: 0.into(),
                 ark_bls12_381_g1_proj_generator: 0.into(),
                 ark_bls12_381_g1_affine_scalar_mul_to_proj: 0.into(),
+                ark_bls12_381_g1_affine_msm_base: 0.into(),
                 ark_bls12_381_g1_affine_serialize_uncomp: 0.into(),
                 ark_bls12_381_g1_affine_deser_uncomp: 0.into(),
                 ark_bls12_381_g1_affine_serialize_comp: 0.into(),
@@ -104,6 +105,7 @@ impl GasParameters {
                 ark_bls12_381_g1_affine_to_prepared: 0.into(),
                 ark_bls12_381_g1_proj_to_prepared: 0.into(),
                 ark_bls12_381_g2_affine_infinity: 0.into(),
+                ark_bls12_381_g2_affine_msm_base: 0.into(),
                 ark_bls12_381_g2_affine_generator: 0.into(),
                 ark_bls12_381_g2_proj_infinity: 0.into(),
                 ark_bls12_381_g2_proj_generator: 0.into(),
@@ -151,6 +153,8 @@ impl GasParameters {
                 ark_bls12_381_pairing: 0.into(),
                 ark_bls12_381_g1_proj_is_zero: 0.into(),
                 ark_bls12_381_g2_proj_is_zero: 0.into(),
+                ark_bls12_381_g1_affine_msm_per_entry: 0.into(),
+                ark_bls12_381_g2_affine_msm_per_entry: 0.into()
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),

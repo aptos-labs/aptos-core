@@ -31,6 +31,8 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
     rc::Rc,
 };
+use std::cmp::{max, min};
+use itertools::Itertools;
 
 pub mod gas;
 
@@ -1146,6 +1148,157 @@ fn group_is_identity_internal(
     }
 }
 
+fn bytes_from_bits(bits: &[bool]) -> Vec<u8> {
+    let num_bits = bits.len();
+    let num_bytes_needed = (num_bits + 7) / 8;
+    let mut bytes = Vec::with_capacity(num_bytes_needed);
+    for i in 0..num_bytes_needed {
+        let mut cur_byte = 0;
+        for j in 0..min(8, num_bits-8*i) {
+            cur_byte += (bits[8*i+j] as u8) << j;
+        }
+        bytes.push(cur_byte);
+    }
+    bytes
+}
+
+#[test]
+fn test_bytes_from_bits() {
+    assert_eq!(vec![15, 7], bytes_from_bits(vec![true,true,true,true,false,false,false,false,true,true,true].as_slice()));
+}
+
+fn bits_from_bytes(bytes: &[u8], min_num_bits: usize) -> Vec<bool> {
+    let num_bytes = bytes.len();
+    let num_bits = max(8 * num_bytes, min_num_bits);
+    let mut bits = Vec::with_capacity(num_bits);
+    for i in 0..num_bytes {
+        for j in 0..8 {
+            let bit = (bytes[i] & (1 << j)) != 0;
+            bits.push(bit);
+        }
+    }
+    for _ in 0..(num_bits - num_bytes * 8) {
+        bits.push(false);
+    }
+    bits
+}
+
+#[test]
+fn test_bits_from_bytes() {
+    assert_eq!(vec![true,true,false,false,false,false,false,false], bits_from_bytes(vec![3].as_slice(), 7));
+    assert_eq!(vec![true,true,false,false,false,false,false,false,false], bits_from_bytes(vec![3].as_slice(), 9));
+}
+
+macro_rules! ark_multi_scalar_mul_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+            let scalar_size_in_bits = pop_arg!($args, u64) as usize;
+            let vector_ref = pop_arg!($args, VectorRef);
+            let bytes_ref = vector_ref.as_bytes_ref();
+            let scalar_bytes = bytes_ref.as_slice();
+            let element_handles = pop_arg!($args, Vec<u64>);
+            let num_elements = element_handles.len();
+            let num_scalar_bits_needed = scalar_size_in_bits * num_elements;
+            let bases = element_handles
+                .iter()
+                .map(|&handle|{
+                    let element_ptr = get_obj_pointer!($context, handle as usize);
+                    let element = element_ptr.downcast_ref::<$typ>().unwrap();
+                    element.into_affine()
+                })
+                .collect::<Vec<_>>();
+            let all_scalar_bits_concat: Vec<bool> = bits_from_bytes(scalar_bytes, num_scalar_bits_needed);
+            let scalars_bytes: Vec<Vec<u8>> = (0..num_elements).map(|i|bytes_from_bits(&all_scalar_bits_concat[scalar_size_in_bits*i..scalar_size_in_bits*(i+1)])).collect();
+            let scalars = scalars_bytes.iter().map(|scalar_bytes|ark_bls12_381::Fr::from_le_bytes_mod_order(scalar_bytes.as_slice())).collect_vec();
+            let big_integers: Vec<ark_ff::BigInteger256> = scalars.iter().map(|s|s.into_repr()).collect();
+            let new_element = ark_ec::msm::VariableBaseMSM::multi_scalar_mul(bases.as_slice(), big_integers.as_slice());
+            let new_handle = store_obj!($context, new_element);
+            Ok(NativeResult::ok($gas_params.group_multi_scalar_mul($structure, num_elements, scalar_size_in_bits), smallvec![Value::u64(new_handle as u64)] ))
+    }};
+}
+
+fn group_multi_scalar_mul_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12381G1) => ark_multi_scalar_mul_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G1,
+            ark_bls12_381::G1Projective
+        ),
+        Some(Structure::BLS12381G2) => ark_multi_scalar_mul_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G2,
+            ark_bls12_381::G2Projective
+        ),
+        Some(Structure::BLS12381Gt) => todo!(),
+        _ => unreachable!(),
+    }
+}
+
+macro_rules! ark_multi_scalar_mul_typed_internal {
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $element_typ:ty, $scalar_typ:ty) => {{
+            let scalar_handles = pop_arg!($args, Vec<u64>);
+            let element_handles = pop_arg!($args, Vec<u64>);
+            let num_elements = element_handles.len();
+            let bases = element_handles
+                .iter()
+                .map(|&handle|{
+                    let element_ptr = get_obj_pointer!($context, handle as usize);
+                    let element = element_ptr.downcast_ref::<$element_typ>().unwrap();
+                    element.into_affine()
+                })
+                .collect::<Vec<_>>();
+            let big_integers = scalar_handles
+                .iter()
+                .map(|&handle|{
+                    let scalar_ptr = get_obj_pointer!($context, handle as usize);
+                    let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
+                    scalar.into_repr()
+                })
+                .collect::<Vec<_>>();
+            let new_element = ark_ec::msm::VariableBaseMSM::multi_scalar_mul(bases.as_slice(), big_integers.as_slice());
+            let new_handle = store_obj!($context, new_element);
+            Ok(NativeResult::ok($gas_params.group_multi_scalar_mul_typed($structure, num_elements), smallvec![Value::u64(new_handle as u64)] ))
+    }};
+}
+
+fn group_multi_scalar_mul_typed_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12381G1) => ark_multi_scalar_mul_typed_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G1,
+            ark_bls12_381::G1Projective,
+            ark_bls12_381::Fr
+        ),
+        Some(Structure::BLS12381G2) => ark_multi_scalar_mul_typed_internal!(
+            gas_params,
+            context,
+            args,
+            Structure::BLS12381G2,
+            ark_bls12_381::G2Projective,
+            ark_bls12_381::Fr
+        ),
+        Some(Structure::BLS12381Gt) => todo!(),
+        _ => unreachable!(),
+    }
+}
+
 static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(|| {
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
     ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap()
@@ -1368,7 +1521,7 @@ fn group_sub_internal(
     }
 }
 
-macro_rules! ark_group_scalar_mul_internal {
+macro_rules! ark_group_scalar_mul_typed_internal {
     (
         $gas_params:expr,
         $context:expr,
@@ -1394,7 +1547,7 @@ macro_rules! ark_group_scalar_mul_internal {
     }};
 }
 
-fn group_scalar_mul_internal(
+fn group_scalar_mul_typed_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
@@ -1405,7 +1558,7 @@ fn group_scalar_mul_internal(
     let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (group_opt, scalar_field_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {
-            ark_group_scalar_mul_internal!(
+            ark_group_scalar_mul_typed_internal!(
                 gas_params,
                 context,
                 args,
@@ -1417,7 +1570,7 @@ fn group_scalar_mul_internal(
             )
         },
         (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
-            ark_group_scalar_mul_internal!(
+            ark_group_scalar_mul_typed_internal!(
                 gas_params,
                 context,
                 args,
@@ -1429,6 +1582,103 @@ fn group_scalar_mul_internal(
             )
         },
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
+            ark_group_scalar_mul_typed_internal!(
+                gas_params,
+                context,
+                args,
+                Structure::BLS12381Gt,
+                Structure::BLS12_381_Fr,
+                ark_bls12_381::Fq12,
+                ark_bls12_381::Fr,
+                pow
+            )
+        },
+        _ => unreachable!(),
+    }
+}
+
+fn vec_u64_from_u8s(bytes: &[u8]) -> Vec<u64> {
+    let num_u8 = bytes.len();
+    let num_u64 = (num_u8 + 7) / 8;
+    let mut ret = Vec::with_capacity(num_u64);
+    let mut building: u64 = 0;
+    let mut offset = 0;
+    for i in 0..num_u8 {
+        building += (bytes[i] as u64) << offset;
+        offset += 8;
+        if offset == 64 || i == num_u8-1 {
+            ret.push(building);
+            building = 0;
+            offset = 0;
+        }
+    }
+    ret
+}
+
+#[test]
+fn test_vec_u64_from_u8s() {
+    assert_eq!(vec![0x0706050403020100, 0x08], vec_u64_from_u8s(vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08].as_slice()));
+}
+
+macro_rules! ark_group_scalar_mul_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $args:ident,
+        $group_structure:expr,
+        $scalar_structure:expr,
+        $group_typ:ty,
+        $scalar_typ:ty,
+        $op:ident
+    ) => {{
+        let vector_ref = pop_arg!($args, VectorRef);
+        let bytes_ref = vector_ref.as_bytes_ref();
+        let bytes = bytes_ref.as_slice();
+        let element_handle = pop_arg!($args, u64) as usize;
+        let element_ptr = get_obj_pointer!($context, element_handle);
+        let element = element_ptr.downcast_ref::<$group_typ>().unwrap();
+        let new_element = element.$op(vec_u64_from_u8s(bytes));
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.group_scalar_mul($group_structure),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }};
+}
+
+fn group_scalar_mul_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    match structure_from_ty_arg!(context, &ty_args[0]) {
+        Some(Structure::BLS12381G1) => {
+            ark_group_scalar_mul_internal!(
+                gas_params,
+                context,
+                args,
+                Structure::BLS12381G1,
+                Structure::BLS12_381_Fr,
+                ark_bls12_381::G1Projective,
+                ark_bls12_381::Fr,
+                mul
+            )
+        },
+        Some(Structure::BLS12381G2) => {
+            ark_group_scalar_mul_internal!(
+                gas_params,
+                context,
+                args,
+                Structure::BLS12381G2,
+                Structure::BLS12_381_Fr,
+                ark_bls12_381::G2Projective,
+                ark_bls12_381::Fr,
+                mul
+            )
+        },
+        Some(Structure::BLS12381Gt) => {
             ark_group_scalar_mul_internal!(
                 gas_params,
                 context,
@@ -1723,12 +1973,24 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_is_identity_internal),
         ),
         (
+            "group_multi_scalar_mul_internal",
+            make_native_from_func(gas_params.clone(), group_multi_scalar_mul_internal),
+        ),
+        (
+            "group_multi_scalar_mul_typed_internal",
+            make_native_from_func(gas_params.clone(), group_multi_scalar_mul_typed_internal),
+        ),
+        (
             "group_neg_internal",
             make_native_from_func(gas_params.clone(), group_neg_internal),
         ),
         (
             "group_order_internal",
             make_native_from_func(gas_params.clone(), group_order_internal),
+        ),
+        (
+            "group_scalar_mul_typed_internal",
+            make_native_from_func(gas_params.clone(), group_scalar_mul_typed_internal),
         ),
         (
             "group_scalar_mul_internal",

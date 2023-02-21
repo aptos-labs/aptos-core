@@ -50,6 +50,8 @@ pub struct GasParameters {
     pub ark_bls12_381_g1_affine_generator: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_infinity: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_scalar_mul_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_msm_base: InternalGasPerArg,
+    pub ark_bls12_381_g1_affine_msm_per_entry: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_neg: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_serialize_comp: InternalGasPerArg,
     pub ark_bls12_381_g1_affine_serialize_uncomp: InternalGasPerArg,
@@ -72,8 +74,10 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_affine_eq: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_generator: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_msm_base: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_msm_per_entry: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_neg: InternalGasPerArg,
+    pub ark_bls12_381_g2_affine_scalar_mul_to_proj: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_serialize_comp: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_serialize_uncomp: InternalGasPerArg,
     pub ark_bls12_381_g2_affine_to_prepared: InternalGasPerArg,
@@ -277,6 +281,24 @@ impl GasParameters {
         }
     }
 
+    pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize, scalar_bit_len: usize) -> InternalGas {
+        match structure {
+            Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
+            Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
+            Structure::BLS12381Gt => pippenger_gas(self.ark_bls12_381_fq12_mul, self.ark_bls12_381_fq12_square, num_entries, scalar_bit_len, pippenger_window_size(structure, num_entries)),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn group_multi_scalar_mul_typed(&self, structure: Structure, num_entries: usize) -> InternalGas {
+        match structure {
+            Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
+            Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
+            Structure::BLS12381Gt => pippenger_gas(self.ark_bls12_381_fq12_mul, self.ark_bls12_381_fq12_square, num_entries, 255, pippenger_window_size(structure, num_entries)),
+            _ => unreachable!(),
+        }
+    }
+
     pub fn group_neg(&self, structure: Structure) -> InternalGas {
         match structure {
             Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_neg * NumArgs::one(),
@@ -337,4 +359,17 @@ impl GasParameters {
             _ => unreachable!(),
         }
     }
+}
+
+fn pippenger_window_size(structure: Structure, num_entries: usize) -> usize {
+    match structure {
+        Structure::BLS12381Gt => 8, //TODO: precompute and hardcode.
+        _ => unimplemented!()
+    }
+}
+
+fn pippenger_gas(addition_gas: InternalGasPerArg, doubling_gas: InternalGasPerArg, num_entries: usize, scalar_bit_length: usize, window_size_in_bits: usize) -> InternalGas {
+    let num_windows = (scalar_bit_length + window_size_in_bits - 1) / window_size_in_bits;
+    return addition_gas * NumArgs::from((num_windows * (num_entries + (1<<num_windows) + 1)) as u64) + doubling_gas * NumArgs::from(scalar_bit_length as u64);
+    // A\cdot w(n + 2^w + 1) + |s|D
 }

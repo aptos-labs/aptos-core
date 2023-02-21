@@ -64,6 +64,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Struct `BLS12_381_G2`](#0x1_algebra_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_algebra_BLS12_381_Gt)
 -  [Struct `BLS12_381_Fr`](#0x1_algebra_BLS12_381_Fr)
+-  [Struct `HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_`](#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_)
 -  [Struct `Element`](#0x1_algebra_Element)
 -  [Function `bls12_381_fq_format`](#0x1_algebra_bls12_381_fq_format)
 -  [Function `bls12_381_fq_bendian_format`](#0x1_algebra_bls12_381_fq_bendian_format)
@@ -99,7 +100,11 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_double`](#0x1_algebra_group_double)
 -  [Function `group_generator`](#0x1_algebra_group_generator)
 -  [Function `group_identity`](#0x1_algebra_group_identity)
+-  [Function `group_multi_scalar_mul`](#0x1_algebra_group_multi_scalar_mul)
+-  [Function `group_multi_scalar_mul_typed`](#0x1_algebra_group_multi_scalar_mul_typed)
+-  [Function `handles_from_elements`](#0x1_algebra_handles_from_elements)
 -  [Function `group_neg`](#0x1_algebra_group_neg)
+-  [Function `group_scalar_mul_typed`](#0x1_algebra_group_scalar_mul_typed)
 -  [Function `group_scalar_mul`](#0x1_algebra_group_scalar_mul)
 -  [Function `group_sub`](#0x1_algebra_group_sub)
 -  [Function `deserialize`](#0x1_algebra_deserialize)
@@ -108,6 +113,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_is_identity`](#0x1_algebra_group_is_identity)
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
+-  [Function `hash_to`](#0x1_algebra_hash_to)
 -  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
 -  [Function `downcast_internal`](#0x1_algebra_downcast_internal)
 -  [Function `eq_internal`](#0x1_algebra_eq_internal)
@@ -128,13 +134,18 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_generator_internal`](#0x1_algebra_group_generator_internal)
 -  [Function `group_identity_internal`](#0x1_algebra_group_identity_internal)
 -  [Function `group_is_identity_internal`](#0x1_algebra_group_is_identity_internal)
+-  [Function `group_multi_scalar_mul_internal`](#0x1_algebra_group_multi_scalar_mul_internal)
+-  [Function `group_multi_scalar_mul_typed_internal`](#0x1_algebra_group_multi_scalar_mul_typed_internal)
 -  [Function `group_neg_internal`](#0x1_algebra_group_neg_internal)
 -  [Function `group_order_internal`](#0x1_algebra_group_order_internal)
+-  [Function `group_scalar_mul_typed_internal`](#0x1_algebra_group_scalar_mul_typed_internal)
 -  [Function `group_scalar_mul_internal`](#0x1_algebra_group_scalar_mul_internal)
 -  [Function `group_sub_internal`](#0x1_algebra_group_sub_internal)
+-  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
 -  [Function `pairing_internal`](#0x1_algebra_pairing_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
 -  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
+-  [Function `abort_unless_structure_hashsuite_pair_enabled_for_hash`](#0x1_algebra_abort_unless_structure_hashsuite_pair_enabled_for_hash)
 -  [Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`](#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled)
 -  [Function `abort_unless_type_enabled_for_basic_operation`](#0x1_algebra_abort_unless_type_enabled_for_basic_operation)
 -  [Function `abort_unless_type_serialization_scheme_enabled`](#0x1_algebra_abort_unless_type_serialization_scheme_enabled)
@@ -441,6 +452,35 @@ for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_Fr">BLS12_381_Fr</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_"></a>
+
+## Struct `HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_`
+
+A ciphersuite for hashing bytes to a <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> element.
+Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_</a>
 </code></pre>
 
 
@@ -1458,6 +1498,104 @@ Get the identity of a group <code>G</code>.
 
 </details>
 
+<a name="0x1_algebra_group_multi_scalar_mul"></a>
+
+## Function `group_multi_scalar_mul`
+
+Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where <code>P[]</code> are <code>n</code> elements of group <code>G</code>,
+and <code>k[]</code> are <code>n</code> scalars represented by a byte array <code>scalars</code>.
+<code>k[]</code> will be parsed assuming <code>bin(k[0]) || ... || bin(k[n-1]) == scalar_bin[0..w*n]</code>, where
+<code>w</code> is the scalar bit length, specified by parameter <code>scalar_size_in_bits</code>,
+<code>bin(x)</code> is the least-significant-bit-first <code>w</code>-bit representation of an integer <code>x</code>,
+<code>||</code> is bit array concatenation,
+<code>scalar_bin</code> is all <code>bin(scalar[i])</code> concatenated, then extended at the back with 0s if not long enough.
+
+NOTE: in some groups, this function is much faster and cheaper than
+calling <code>element_scalar_mul</code> and adding up the results using <code>scalar_add</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+    <b>let</b> element_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(elements);
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles, scalars, scalar_size_in_bits)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_group_multi_scalar_mul_typed"></a>
+
+## Function `group_multi_scalar_mul_typed`
+
+Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where <code>P[]</code> are <code>n</code> elements of group <code>G</code>
+and <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed">group_multi_scalar_mul_typed</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed">group_multi_scalar_mul_typed</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+    <b>let</b> element_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(elements);
+    <b>let</b> scalar_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(scalars);
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles, scalar_handles)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_handles_from_elements"></a>
+
+## Function `handles_from_elements`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>let</b> num_elements = std::vector::length(elements);
+    <b>let</b> element_handles = std::vector::empty();
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_elements) {
+        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
+        i = i + 1;
+    };
+    element_handles
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_group_neg"></a>
 
 ## Function `group_neg`
@@ -1487,14 +1625,14 @@ Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
 
 </details>
 
-<a name="0x1_algebra_group_scalar_mul"></a>
+<a name="0x1_algebra_group_scalar_mul_typed"></a>
 
-## Function `group_scalar_mul`
+## Function `group_scalar_mul_typed`
 
 Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of group <code>G</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed">group_scalar_mul_typed</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -1503,11 +1641,40 @@ Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G<
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed">group_scalar_mul_typed</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_abort_unless_type_pair_enabled_for_group_scalar_mul">abort_unless_type_pair_enabled_for_group_scalar_mul</a>&lt;G,S&gt;();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
+        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_group_scalar_mul"></a>
+
+## Function `group_scalar_mul`
+
+Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of group <code>G</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_type_enabled_for_basic_operation">abort_unless_type_enabled_for_basic_operation</a>&lt;G&gt;();
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_p.handle, scalar_encoded)
     }
 }
 </code></pre>
@@ -1714,6 +1881,35 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
         some(<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle: new_handle })
     } <b>else</b> {
         none()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_hash_to"></a>
+
+## Function `hash_to`
+
+Hash some bytes into structure <code>Struc</code> using suite <code>Suite</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;Struc, Suite&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Struc&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;Struc, Suite&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Struc&gt; {
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_structure_hashsuite_pair_enabled_for_hash">abort_unless_structure_hashsuite_pair_enabled_for_hash</a>&lt;Struc, Suite&gt;();
+    <a href="algebra.md#0x1_algebra_Element">Element</a> {
+        handle: <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;Struc, Suite&gt;(bytes)
     }
 }
 </code></pre>
@@ -2162,6 +2358,50 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 </details>
 
+<a name="0x1_algebra_group_multi_scalar_mul_internal"></a>
+
+## Function `group_multi_scalar_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalars_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalars_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_group_multi_scalar_mul_typed_internal"></a>
+
+## Function `group_multi_scalar_mul_typed_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_group_neg_internal"></a>
 
 ## Function `group_neg_internal`
@@ -2206,13 +2446,13 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 </details>
 
-<a name="0x1_algebra_group_scalar_mul_internal"></a>
+<a name="0x1_algebra_group_scalar_mul_typed_internal"></a>
 
-## Function `group_scalar_mul_internal`
+## Function `group_scalar_mul_typed_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
 </code></pre>
 
 
@@ -2221,7 +2461,29 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(scalar_handle: u64, element_handle: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_group_scalar_mul_internal"></a>
+
+## Function `group_scalar_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_handle: u64, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_handle: u64, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -2244,6 +2506,28 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_sub_internal">group_sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_hash_to_internal"></a>
+
+## Function `hash_to_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, C&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S,C&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -2310,6 +2594,33 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_upcast_internal">upcast_internal</a>&lt;S,L&gt;(handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_abort_unless_structure_hashsuite_pair_enabled_for_hash"></a>
+
+## Function `abort_unless_structure_hashsuite_pair_enabled_for_hash`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_structure_hashsuite_pair_enabled_for_hash">abort_unless_structure_hashsuite_pair_enabled_for_hash</a>&lt;S, H&gt;()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_structure_hashsuite_pair_enabled_for_hash">abort_unless_structure_hashsuite_pair_enabled_for_hash</a>&lt;S, H&gt;() {
+    <b>let</b> structure_type = type_of&lt;S&gt;();
+    <b>let</b> hashsuite_type = type_of&lt;H&gt;();
+    <b>if</b> (structure_type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;() && hashsuite_type == type_of&lt;<a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_</a>&gt;() && bls12_381_structures_enabled()) <b>return</b>;
+    <b>abort</b>(std::error::not_implemented(0))
+}
 </code></pre>
 
 
