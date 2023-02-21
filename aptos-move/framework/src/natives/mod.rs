@@ -245,6 +245,7 @@ pub fn all_natives(
         "transaction_context",
         transaction_context::make_all(gas_params.transaction_context)
     );
+
     add_natives_from_module!("code", code::make_all(gas_params.code));
     add_natives_from_module!(
         "event",
