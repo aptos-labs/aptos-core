@@ -221,9 +221,12 @@ Rewards
 ## App and Move development
 
 ### How do you generate FT and NFT tokens without issuing modules using “token.move” with Aptos Framework?
-### How do you ensure data security and token control. What are the pros on the Aptos side of publishing a token without a module (smart contract) that it is designed differently from languages such as Solidity, Cairo, Sway?
 
 * You can call the entry functions of token.move (such as [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L338-L395](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move#L338-L395) ) directly via the fullnode API by signing+submitting a transaction using any of our supported SDKs (more to come) or via the `aptos cli`. This allows you to create tokens without writing any Move code.
+
+
+### How do you ensure data security and token control. What are the pros on the Aptos side of publishing a token without a module (smart contract) that it is designed differently from languages such as Solidity, Cairo, Sway?
+
 * There are several benefits to issuing tokens using `token.move` instead of redeploying your own contract code every time, for example:
     * Well understood+tested security: You know that if you interact with a 0x1 contract that you have certain guarantees, for example: there is no way to `cheat` and magically mint beyond the specified limits, etc. In general all our core modules (part of aptos framework) are rigorously tested.
     * Interoperability: All tokens created by token.move follow a certain standard and static type, expose certain common functions (such as to transfer a token) and common events, such as when a token is removed/deposited from a token store. This makes it easy for wallets+marketplace and other apps in the ecosystem to display rich information, allow transfers, listings and also to build additional use-cases/apps or even Move contracts on top of your token, which enhances the utility of your token.
@@ -258,7 +261,7 @@ Rewards
 
     ```
 
-* And use this struct in several other modules, incl. modules deployed in different accounts at a later point time.
+* And use this struct in several other modules, including modules deployed in different accounts at a later point time.
 
 ### Data is kept in resources (user accounts), not modules. What is the purpose (security, privacy, etc.) and motivation for this? Doesn't reading the source data bound to each module add extra work and bytecode overhead to the modules (contracts)?
 
@@ -278,7 +281,7 @@ Rewards
 * No, currently only APT can be used for gas. As you called out, the relationship to fiat makes this a very difficult problem to solve.
 * We are working however on allowing subsidies- i.e allowing a contract or account to pay for storage or gas fees for user transactions.
 
-### We know that with Token.move we can create many different (customized) on-chain NFT metadata. But plus, does token.move support dynamic metadata that we create on-chain? For example; such as combining and separating NFTs, which has two different metadata that are compatible with each other. Let us explain why this is important for us, on the EVM side, we have coded and developed an on-chain Merging / Separable structure in Solidity. A much improved solution of ERC1155, an architecture that can support “Item Crafting” feature in the games (you can think of it as a very simple game engine that can combine and separate different NFTs and works by default). Is this possible to do it on the Aptos side with maintaining our structure?
+### We know that with Token.move we can create many different (customized) on-chain NFT metadata. But plus, does token.move support dynamic metadata that we create on-chain? For example; such as combining and separating NFTs, which has two different metadata that are compatible with each other.
 
 * We support dynamic metadata on-chain. The creator can customize properties and mutate the property values based on user interaction. 
 * For combining NFTs, currently, you can write a function taking two NFTs and return a merged NFT in a resource account that can do this automatically. For separating NFT, you can have a function taking one NFT and returning multiple NFTs similarly.

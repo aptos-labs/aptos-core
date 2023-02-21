@@ -345,7 +345,7 @@ const config = {
               {
                 label: "Community Highlights",
                 type: "doc",
-                docId: "contribute/highlights",
+                docId: "contribute/community/index",
               },
               {
                 label: "Frequently Asked Questions",

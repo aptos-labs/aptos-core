@@ -1,6 +1,6 @@
 ---
 title: "Community Highlights"
-slug: "community-index"
+slug: "community-highlights"
 ---
 
 # Aptos Community Highlights
