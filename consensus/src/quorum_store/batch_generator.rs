@@ -110,8 +110,9 @@ impl BatchGenerator {
 
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
+        max_count: u64,
         end_batch_when_back_pressure: bool,
-    ) -> (Option<(ProofCompletedChannel, bool)>) {
+    ) -> Option<(ProofCompletedChannel, bool)> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
@@ -127,11 +128,7 @@ impl BatchGenerator {
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
-            .pull_internal(
-                self.mempool_txn_pull_max_count,
-                self.mempool_txn_pull_max_bytes,
-                exclude_txns,
-            )
+            .pull_internal(max_count, self.mempool_txn_pull_max_bytes, exclude_txns)
             .await
             .unwrap();
 
@@ -144,7 +141,10 @@ impl BatchGenerator {
         }
 
         for txn in pulled_txns {
-            if !self.batch_builder.append_transaction(&txn) {
+            if !self
+                .batch_builder
+                .append_transaction(&txn, max_count as usize)
+            {
                 end_batch = true;
                 break;
             }
@@ -264,6 +264,7 @@ impl BatchGenerator {
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
         let mut back_pressure_in_last_pull = false;
         let mut end_batch_in_last_pull = false;
+        let mut dynamic_max_pull_count = self.mempool_txn_pull_max_count;
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
@@ -275,20 +276,34 @@ impl BatchGenerator {
                 },
                 _ = interval.tick() => {
                     if self.qs_back_pressure {
+                        // multiplicative decrease, every second
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(1)),
+                            dynamic_max_pull_count = std::cmp::max(dynamic_max_pull_count / 2, 80);
+                            debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
+                        );
                         counters::QS_BACKPRESSURE.set(1);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
                         // quorum store needs to be back pressured
                         // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
                         if !back_pressure_in_last_pull && !end_batch_in_last_pull {
-                            if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(true).await {
+                            if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(dynamic_max_pull_count, true).await {
                                 proofs_in_progress.push(Box::pin(proof_rx));
                                 end_batch_in_last_pull = end_batch;
                             }
                         }
                         back_pressure_in_last_pull = true;
                     } else {
+                        // additive increase, every second
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(1)),
+                            dynamic_max_pull_count = std::cmp::min(dynamic_max_pull_count + 100, self.mempool_txn_pull_max_count);
+                            debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
+                        );
                         counters::QS_BACKPRESSURE.set(0);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
                         // no back pressure
-                        if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(false).await {
+                        if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(dynamic_max_pull_count, false).await {
                             proofs_in_progress.push(Box::pin(proof_rx));
                             end_batch_in_last_pull = end_batch;
                         }

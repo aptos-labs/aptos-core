@@ -166,21 +166,31 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy
     .unwrap()
     });
 
-// /// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
-// pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-//     register_histogram!(
-//         "quorum_store_num_batch_left_when_pull_for_block",
-//         "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
-//         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-//     )
-//     .unwrap()
-// });
+/// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
+pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_batch_left_when_pull_for_block",
+        "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
 
 /// Histogram for the number of local batches/PoS left when forming a block proposal.
 pub static NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_local_batch_left_when_pull_for_block",
         "Histogram for the number of locally created batches/PoS left when forming a block proposal.",
+        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of local batches/PoS left when forming a block proposal.
+pub static AGE_OF_OLDEST_LOCAL_PROOF: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_age_of_oldest_local_proof",
+        "placeholder",
         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
     .unwrap()
@@ -378,6 +388,14 @@ pub static QS_BACKPRESSURE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "quorum_store_backpressure",
         "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
+    )
+    .unwrap()
+});
+
+pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_backpressure_dynamic_max",
+        "What the dynamic max is set to"
     )
     .unwrap()
 });

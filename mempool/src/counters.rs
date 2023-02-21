@@ -102,6 +102,11 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
 
+const TRANSACTION_COUNT_BUCKETS: &[f64] = &[
+    2.5, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 100.0, 150.0, 200.0, 250.0,
+    300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0,
+];
+
 #[cfg(test)]
 mod test {
     use crate::counters::RANKING_SCORE_BUCKETS;
@@ -258,9 +263,10 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
-        &["type"]
+        &["type"],
+        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn mempool_service_transactions(label: &'static str, num: usize) {
