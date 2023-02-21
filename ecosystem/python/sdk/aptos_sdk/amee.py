@@ -517,7 +517,7 @@ def download_and_compile(proposal: Dict[str, Any]):
         # Get named address for build command.
         named_address = proposal["named_address"]
         command = (  # Get aptos CLI build command.
-            f"aptos move compile --save-metadata "
+            f"aptos move compile --save-metadata --included-artifacts none "
             f"--package-dir {manifest_path.parent} "
             f"--named-addresses {named_address}={multisig_address}"
         )
@@ -559,6 +559,9 @@ def get_publication_transaction(proposal: Dict[str, Any]) -> RawTransaction:
         modules_path = build_path / Path("bytecode_modules")
         # Get list of bytecode module paths.
         module_paths = [m for m in modules_path.iterdir() if m.is_file()]
+        module_paths.sort(
+            key=lambda path: proposal["module_sequence"].index(path.stem)
+        )  # Sort module paths according to proposal's module sequence.
         modules = []  # Initialize empty modules list.
         for module_path in module_paths:  # Loop over module paths:
             with open(module_path, "rb") as module:  # With module open:
@@ -1321,6 +1324,7 @@ def publish_propose(args):
             "commit": args.commit,
             "manifest_path": args.manifest,
             "named_address": args.named_address,
+            "module_sequence": args.module_sequence,
             "multisig": publisher_data,
             "sequence_number": sequence_number,
             "chain_id": RestClient(NETWORK_URLS[args.network]).chain_id,
@@ -1371,15 +1375,30 @@ parser_publish_propose.add_argument(
     help="Named address of publisher in Move.toml. For example 'protocol'.",
 )
 parser_publish_propose.add_argument(
-    "expiry",
-    help="Publication expiry, in ISO 8601 format. For example '2023-02-15'.",
-    type=datetime.fromisoformat,
+    "-m",
+    "--module-sequence",
+    type=str,
+    nargs="+",
+    help="""Sequence to publish modules in from bottom of dependency hierarchy
+        up. Modules that are used should be listed before any modules that use
+        them, and modules that declare friends should be declared before the
+        friends they declare. Module names should not include .move suffix.""",
+    required=True,
 )
 parser_publish_propose.add_argument(
-    "name",
+    "-e",
+    "--expiry",
+    help="Publication expiry, in ISO 8601 format. For example '2023-02-15'.",
+    type=datetime.fromisoformat,
+    required=True,
+)
+parser_publish_propose.add_argument(
+    "-d",
+    "--name",
     type=str,
     nargs="+",
     help="Description for proposal. For example 'Genesis' or 'Upgrade'.",
+    required=True,
 )
 parser_publish_propose.add_argument(
     "-o",
