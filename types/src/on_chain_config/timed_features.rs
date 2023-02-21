@@ -4,9 +4,12 @@
 use crate::chain_id::{ChainId, NamedChain};
 
 // A placeholder that can be used to represent activation times that have not been determined.
+#[allow(unused)]
 const NOT_YET_SPECIFIED: u64 = END_OF_TIME; /* Thursday, December 31, 2099 11:59:59 PM */
 
+#[allow(unused)]
 pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59:59 PM */
+
 #[derive(Debug, Clone, Copy)]
 pub enum TimedFeatureFlag {
     VerifierLimitBackEdges,
@@ -70,19 +73,19 @@ impl TimedFeatureFlag {
 
         match (self, chain_id) {
             (VerifierLimitBackEdges, TESTNET) => 1675792800000, /* Tuesday, February 7, 2023 10:00:00 AM GMT-08:00 */
-            (VerifierLimitBackEdges, MAINNET) => NOT_YET_SPECIFIED,
+            (VerifierLimitBackEdges, MAINNET) => 1677524400000,
 
-            (VerifierMetering, TESTNET) => NOT_YET_SPECIFIED,
-            (VerifierMetering, MAINNET) => NOT_YET_SPECIFIED,
+            (VerifierMetering, TESTNET) => 1677110400000, /* Wednesday, February 22, 2023 04:00:00 PM GMT-08:00 */
+            (VerifierMetering, MAINNET) => 1677524400000, /* Monday, February 27, 2023 11:00:00 AM GMT-08:00 */
 
-            (NativesAbortEarlyIfOutOfGas, TESTNET) => NOT_YET_SPECIFIED,
-            (NativesAbortEarlyIfOutOfGas, MAINNET) => NOT_YET_SPECIFIED,
+            (NativesAbortEarlyIfOutOfGas, TESTNET) => 1677110400000,
+            (NativesAbortEarlyIfOutOfGas, MAINNET) => 1677524400000,
 
-            (MultiEd25519NativePublicKeyValidateGasFix, TESTNET) => NOT_YET_SPECIFIED,
-            (MultiEd25519NativePublicKeyValidateGasFix, MAINNET) => NOT_YET_SPECIFIED,
+            (MultiEd25519NativePublicKeyValidateGasFix, TESTNET) => 1677110400000,
+            (MultiEd25519NativePublicKeyValidateGasFix, MAINNET) => 1677524400000,
 
-            (Ristretto255NativeFloatingPointFix, TESTNET) => NOT_YET_SPECIFIED,
-            (Ristretto255NativeFloatingPointFix, MAINNET) => NOT_YET_SPECIFIED,
+            (Ristretto255NativeFloatingPointFix, TESTNET) => 1677110400000,
+            (Ristretto255NativeFloatingPointFix, MAINNET) => 1677524400000,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
