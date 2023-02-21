@@ -416,7 +416,7 @@ const sidebars = {
       className: "sidebar-title",
     },
     "contribute/index",
-    "contribute/highlights",
+    "contribute/community/index",
     "contribute/faq",
   ],
 };
