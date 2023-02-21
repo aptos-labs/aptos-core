@@ -323,6 +323,8 @@ libssl
 lifecycle
 liveness
 localhost
+Localnet
+localnet
 loopwise
 macOS
 mainnet

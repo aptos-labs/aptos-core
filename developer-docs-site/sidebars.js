@@ -239,6 +239,7 @@ const sidebars = {
         "nodes/local-testnet/run-a-local-testnet",
         "nodes/local-testnet/using-cli-to-run-a-local-testnet",
         "guides/running-a-local-multi-node-network",
+        "nodes/local-testnet/localnet-indexer",
       ],
     },
     {
