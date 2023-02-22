@@ -5,9 +5,11 @@ use crate::{
     aptos_cli::validator::generate_blob, smoke_test_environment::SwarmBuilder,
     txn_emitter::generate_traffic,
 };
+use aptos::test::CliTestFramework;
 use aptos_consensus::QUORUM_STORE_DB_NAME;
 use aptos_forge::{NodeExt, Swarm, SwarmExt, TransactionType};
 use aptos_logger::info;
+use aptos_rest_client::Client;
 use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
     PeerId,
@@ -52,6 +54,44 @@ async fn generate_traffic_and_assert_committed(swarm: &mut dyn Swarm, nodes: &[P
     assert!(txn_stat.committed > 30);
 }
 
+async fn get_current_consensus_config(rest_client: &Client) -> OnChainConsensusConfig {
+    bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap()
+}
+
+async fn update_consensus_config(
+    cli: &CliTestFramework,
+    root_cli_index: usize,
+    new_consensus_config: OnChainConsensusConfig,
+) {
+    let update_consensus_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+    );
+    cli.run_script(root_cli_index, &update_consensus_config_script)
+        .await
+        .unwrap();
+}
+
 // TODO: remove when quorum store becomes the in-code default
 #[tokio::test]
 async fn test_onchain_config_quorum_store_enabled() {
@@ -77,45 +117,16 @@ async fn test_onchain_config_quorum_store_enabled() {
         swarm.root_key(),
         swarm.chain_info().root_account().address(),
     );
-
     let rest_client = swarm.validators().next().unwrap().rest_client();
-    let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
-        &rest_client
-            .get_account_resource_bcs::<Vec<u8>>(
-                CORE_CODE_ADDRESS,
-                "0x1::consensus_config::ConsensusConfig",
-            )
-            .await
-            .unwrap()
-            .into_inner(),
-    )
-    .unwrap();
 
+    let current_consensus_config = get_current_consensus_config(&rest_client).await;
     let inner = match current_consensus_config {
         OnChainConsensusConfig::V1(inner) => inner,
         OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
     };
-
     // Change to V2
     let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
-
-    let update_consensus_config_script = format!(
-        r#"
-    script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::consensus_config;
-        fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-            let config_bytes = {};
-            consensus_config::set(&framework_signer, config_bytes);
-        }}
-    }}
-    "#,
-        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
-    );
-    cli.run_script(root_cli_index, &update_consensus_config_script)
-        .await
-        .unwrap();
+    update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
 
     generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
 }
@@ -148,18 +159,7 @@ async fn test_onchain_config_quorum_store_disabled() {
     );
 
     let rest_client = swarm.validators().next().unwrap().rest_client();
-    let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
-        &rest_client
-            .get_account_resource_bcs::<Vec<u8>>(
-                CORE_CODE_ADDRESS,
-                "0x1::consensus_config::ConsensusConfig",
-            )
-            .await
-            .unwrap()
-            .into_inner(),
-    )
-    .unwrap();
-
+    let current_consensus_config = get_current_consensus_config(&rest_client).await;
     let inner = match current_consensus_config {
         OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
         OnChainConsensusConfig::V2(inner) => inner,
@@ -167,24 +167,7 @@ async fn test_onchain_config_quorum_store_disabled() {
 
     // Disaster rollback to V1
     let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 { ..inner });
-
-    let update_consensus_config_script = format!(
-        r#"
-    script {{
-        use aptos_framework::aptos_governance;
-        use aptos_framework::consensus_config;
-        fun main(core_resources: &signer) {{
-            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-            let config_bytes = {};
-            consensus_config::set(&framework_signer, config_bytes);
-        }}
-    }}
-    "#,
-        generate_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
-    );
-    cli.run_script(root_cli_index, &update_consensus_config_script)
-        .await
-        .unwrap();
+    update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
 
     generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
 }
