@@ -31,7 +31,7 @@ use aptos_testcases::{
     },
     three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSimulationTest},
     twin_validator_test::TwinValidatorTest,
-    two_traffics_test::TwoTrafficsTest,
+    two_traffics_test::{ThreeRegionSimulationTwoTrafficsTest, TwoTrafficsTest},
     validator_join_leave_test::ValidatorJoinLeaveTest,
     validator_reboot_stress_test::ValidatorRebootStressTest,
 };
@@ -466,6 +466,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "account_creation" | "nft_mint" | "publishing" | "module_loading"
         | "write_new_resource" => individual_workload_tests(test_name.into(), config),
         "graceful_overload" => graceful_overload(config),
+        "three_region_simulation_graceful_overload" => three_region_sim_graceful_overload(config),
         // not scheduled on continuous
         "load_vs_perf_benchmark" => load_vs_perf_benchmark(config),
         "workload_vs_perf_benchmark" => workload_vs_perf_benchmark(config),
@@ -799,6 +800,58 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             // don't regress, but something to investigate
             avg_tps: 3400,
             latency_thresholds: &[],
+        }])
+        // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 1000 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+        )
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(900)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(120)
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 5 GB of memory for 30% of the time.
+                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_latency_threshold(10.0, LatencyType::P50)
+                .add_latency_threshold(30.0, LatencyType::P90)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 30.0,
+                    max_round_gap: 10,
+                }),
+        )
+}
+
+fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        // if we have full nodes for subset of validators, TPS drops.
+        // Validators without VFN are proposing almost empty blocks,
+        // as no useful transaction reach their mempool.
+        // something to potentially improve upon.
+        // So having VFNs for all validators
+        .with_initial_fullnode_count(20)
+        .with_network_tests(vec![&ThreeRegionSimulationTwoTrafficsTest {
+            traffic_test: TwoTrafficsTest {
+                inner_tps: 15000,
+                inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+                inner_init_gas_price_multiplier: 20,
+                // Additionally - we are not really gracefully handling overlaods,
+                // setting limits based on current reality, to make sure they
+                // don't regress, but something to investigate
+                avg_tps: 3400,
+                latency_thresholds: &[],
+            },
+            three_region_simulation_test: ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            },
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
