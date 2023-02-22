@@ -140,7 +140,6 @@ impl BackupStorage for CommandAdapter {
         let child = self
             .cmd(&self.config.commands.list_metadata_files, vec![])
             .spawn()?;
-
         let mut buf = FileHandle::new();
         child
             .into_data_source()

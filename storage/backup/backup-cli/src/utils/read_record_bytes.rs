@@ -9,6 +9,8 @@ use bytes::{Bytes, BytesMut};
 use std::convert::TryInto;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
+const MAX_RETRIES: u32 = 3;
+
 #[async_trait]
 pub trait ReadRecordBytes {
     async fn read_full_buf_or_none(&mut self, buf: &mut BytesMut) -> Result<()>;
@@ -42,27 +44,33 @@ impl<R: AsyncRead + Send + Unpin> ReadRecordBytes for R {
     }
 
     async fn read_record_bytes(&mut self) -> Result<Option<Bytes>> {
-        // read record size
-        let mut size_buf = BytesMut::with_capacity(4);
-        self.read_full_buf_or_none(&mut size_buf).await?;
-        if size_buf.is_empty() {
-            return Ok(None);
-        }
+        for retry in 0..=MAX_RETRIES {
+            // read record size
+            let mut size_buf = BytesMut::with_capacity(4);
+            self.read_full_buf_or_none(&mut size_buf).await?;
+            if size_buf.is_empty() {
+                return Ok(None);
+            }
 
-        // empty record
-        let record_size = u32::from_be_bytes(size_buf.as_ref().try_into()?) as usize;
-        if record_size == 0 {
-            return Ok(Some(Bytes::new()));
-        }
+            // empty record
+            let record_size = u32::from_be_bytes(size_buf.as_ref().try_into()?) as usize;
+            if record_size == 0 {
+                return Ok(Some(Bytes::new()));
+            }
 
-        // read record
-        let mut record_buf = BytesMut::with_capacity(record_size);
-        self.read_full_buf_or_none(&mut record_buf).await?;
-        if record_buf.is_empty() {
-            bail!("Hit EOF when reading record.")
-        }
+            // read record
+            let mut record_buf = BytesMut::with_capacity(record_size);
+            self.read_full_buf_or_none(&mut record_buf).await?;
+            if record_buf.is_empty() {
+                if retry == MAX_RETRIES {
+                    bail!("Hit EOF when reading record.")
+                }
+                continue;
+            }
 
-        Ok(Some(record_buf.freeze()))
+            return Ok(Some(record_buf.freeze()))
+        }
+        bail!("Maximum retries tried for reading record");
     }
 }
 
