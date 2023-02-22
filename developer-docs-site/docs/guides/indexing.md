@@ -12,7 +12,7 @@ This page describes how to employ data from the Aptos Indexer in your apps. To i
 
 Typical applications built on the Aptos blockchain, on any blockchain for that matter, require the raw blockchain data to be shaped and stored in an application-specific manner. This is essential to supporting low-latency and rich experiences when consuming blockchain data in end-user apps from millions of users. The [Aptos Node API](https://aptos.dev/nodes/aptos-api-spec#/) provides a lower level, stable and generic API and is not designed to support data shaping or therefore such rich end-user experiences directly.
 
-The Aptos Indexer is a answer to this need, allowing the data shaping critical to real-time app use. See this high-level diagram for how Aptos indexing works:
+The Aptos Indexer is the answer to this need, allowing the data shaping critical to real-time app use. See this high-level diagram for how Aptos indexing works:
 
 <center>
 <ThemedImage
