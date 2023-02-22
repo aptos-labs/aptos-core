@@ -17,6 +17,7 @@ Standard math utilities missing in the Move Language.
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
+<b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
 
 
@@ -28,6 +29,7 @@ Standard math utilities missing in the Move Language.
 
 <a name="0x1_math_fixed_EOVERFLOW"></a>
 
+Abort code on overflow
 
 
 <pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>: u64 = 1;
@@ -39,6 +41,7 @@ Standard math utilities missing in the Move Language.
 
 ## Function `sqrt`
 
+Square root of fixed point number
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_sqrt">sqrt</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
@@ -52,13 +55,7 @@ Standard math utilities missing in the Move Language.
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_sqrt">sqrt</a>(x: FixedPoint32): FixedPoint32 {
     <b>let</b> y = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
-    <b>let</b> prev_res = 0;
-    <b>let</b> res = y / 2;
-    <b>while</b> (res != prev_res) {
-        prev_res = res;
-        res = (res + (y &lt;&lt; 32) / res) / 2;
-    };
-    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((res <b>as</b> u64))
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math128.md#0x1_math128_sqrt">math128::sqrt</a>(y &lt;&lt; 32) <b>as</b> u64))
 }
 </code></pre>
 
@@ -70,6 +67,7 @@ Standard math utilities missing in the Move Language.
 
 ## Function `exp`
 
+Exponent function with a precission of 6 digits.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
@@ -94,6 +92,7 @@ Standard math utilities missing in the Move Language.
 
 ## Function `pow`
 
+Integer power of a fixed point number
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow">pow</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, n: u64): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
@@ -118,6 +117,7 @@ Standard math utilities missing in the Move Language.
 
 ## Function `mul_div`
 
+Specialized function for x * y / z that omits intermediate shifting
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_mul_div">mul_div</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, y: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, z: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>

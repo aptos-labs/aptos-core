@@ -2,32 +2,28 @@
 module aptos_std::math_fixed {
     use std::fixed_point32;
     use std::fixed_point32::FixedPoint32;
+    use aptos_std::math128;
 
+    /// Abort code on overflow
     const EOVERFLOW: u64 = 1;
 
-    // Square root of fixed point number
+    /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {
         let y = (fixed_point32::get_raw_value(x) as u128);
-        let prev_res = 0;
-        let res = y / 2;
-        while (res != prev_res) {
-            prev_res = res;
-            res = (res + (y << 32) / res) / 2;
-        };
-        fixed_point32::create_from_raw_value((res as u64))
+        fixed_point32::create_from_raw_value((math128::sqrt(y << 32) as u64))
     }
 
-    // Exponent function with a precission of 6 digits.
+    /// Exponent function with a precission of 6 digits.
     public fun exp(x: FixedPoint32): FixedPoint32 {
         fixed_point32::create_from_raw_value((exp_raw((fixed_point32::get_raw_value(x) as u128)) as u64))
     }
 
-    // Integer power of a fixed point number
+    /// Integer power of a fixed point number
     public fun pow(x: FixedPoint32, n: u64): FixedPoint32 {
         fixed_point32::create_from_raw_value((pow_raw((fixed_point32::get_raw_value(x) as u128), (n as u128)) as u64))
     }
 
-    // Specialized function for x * y / z that omits intermediate shifting
+    /// Specialized function for x * y / z that omits intermediate shifting
     public fun mul_div(x: FixedPoint32, y: FixedPoint32, z: FixedPoint32): FixedPoint32 {
         let a = (fixed_point32::get_raw_value(x) as u128);
         let b = (fixed_point32::get_raw_value(y) as u128);
