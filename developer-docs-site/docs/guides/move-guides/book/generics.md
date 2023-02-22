@@ -1,3 +1,8 @@
+---
+title: "Aptos Move Generics"
+slug: "generics"
+---
+
 # Generics
 
 Generics can be used to define functions and structs over different input data types. This language feature is sometimes referred to as *parametric polymorphism*. In Move, we will often use the term generics interchangeably with type parameters and type arguments.
