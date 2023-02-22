@@ -42,6 +42,9 @@ pub struct ReleaseConfig {
     pub consensus_config: Option<OnChainConsensusConfig>,
     #[serde(default)]
     pub is_multi_step: bool,
+    /// Execute the framework releases after setting all other flags.
+    #[serde(default)]
+    pub framework_release_at_end: bool,
 }
 
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
@@ -80,13 +83,23 @@ impl ReleaseConfig {
         let mut result: Vec<(String, String)> = vec![];
         let mut release_generation_functions: Vec<
             &dyn Fn(&Self, &Option<Client>, &mut Vec<(String, String)>) -> Result<()>,
-        > = vec![
-            &Self::generate_framework_release,
-            &Self::generate_gas_schedule,
-            &Self::generate_version_file,
-            &Self::generate_feature_flag_file,
-            &Self::generate_consensus_file,
-        ];
+        > = if self.framework_release_at_end {
+            vec![
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+                &Self::generate_framework_release,
+            ]
+        } else {
+            vec![
+                &Self::generate_framework_release,
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+            ]
+        };
         let client = self
             .remote_endpoint
             .as_ref()
@@ -338,6 +351,7 @@ impl Default for ReleaseConfig {
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,
+            framework_release_at_end: false,
         }
     }
 }

@@ -161,6 +161,8 @@ impl NetworkConfig {
         script_path: &Path,
         is_multi_step: bool,
     ) -> Result<u64> {
+        println!("Creating proposal: {:?}", script_path);
+
         let address_string = format!("{}", self.validator_account);
         let privkey_string = hex::encode(self.validator_key.to_bytes());
 
@@ -214,6 +216,8 @@ impl NetworkConfig {
     }
 
     pub async fn vote_proposal(&self, proposal_id: u64) -> Result<()> {
+        println!("Voting proposal id {:?}", proposal_id);
+
         let address_string = format!("{}", self.validator_account);
         let privkey_string = hex::encode(self.validator_key.to_bytes());
         let proposal_id = format!("{}", proposal_id);
@@ -288,6 +292,11 @@ impl NetworkConfig {
     }
 
     pub async fn execute_proposal(&self, proposal_id: u64, script_path: &Path) -> Result<()> {
+        println!(
+            "Executing: {:?} at proposal id {:?}",
+            script_path, proposal_id
+        );
+
         let address_string = format!("{}", self.validator_account);
         let privkey_string = hex::encode(self.validator_key.to_bytes());
         let proposal_id = format!("{}", proposal_id);

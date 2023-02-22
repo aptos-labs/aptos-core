@@ -16,3 +16,4 @@ feature_flags:
     - resource_groups
   disabled: []
 is_multi_step: true
+framework_release_at_end: true
