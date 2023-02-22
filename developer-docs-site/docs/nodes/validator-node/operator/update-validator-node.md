@@ -44,7 +44,7 @@ After connecting your nodes to the Aptos network, [establish staking pool operat
 
 To replace the validator node:
 
-1. Update DNS to [swap the node network addresses on-chain](staking-pool-operations.md#3-update-validator-network-addresses-on-chain).
+1. Update DNS to [swap the node network addresses on-chain](./staking-pool-operations.md#3-update-validator-network-addresses-on-chain).
 1. Turn down the validator node and validator fullnode intended to replace the validator.
 1. Restart the former validator fullnode with the validator node configuration.
 1. Observe that before DNS changes take effect that only outbound connections will form.
