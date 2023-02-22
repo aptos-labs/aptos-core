@@ -140,7 +140,7 @@ Please remember, community managers will never message or DM you first, and they
 
 Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us!
 
-Just want to pitch in? Think about [contributing](contribute/index.md) a feature, document, or both.
+Just want to pitch in? Think about [contributing](./contribute/index.md) a feature, document, or both.
 
 ## Find the ecosystem
 
