@@ -16,7 +16,8 @@ Standard math utilities missing in the Move Language.
 -  [Function `assert_approx_the_same`](#0x1_math_fixed_assert_approx_the_same)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
 
@@ -33,6 +34,16 @@ Abort code on overflow
 
 
 <pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_math_fixed_LN2"></a>
+
+Natural log 2 in 32 bit fixed point
+
+
+<pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a>: u128 = 2977044472;
 </code></pre>
 
 
@@ -80,7 +91,8 @@ Exponent function with a precission of 6 digits.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x: FixedPoint32): FixedPoint32 {
-    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_exp_raw">exp_raw</a>((<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128)) <b>as</b> u64))
+    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_exp_raw">exp_raw</a>(raw_value) <b>as</b> u64))
 }
 </code></pre>
 
@@ -105,7 +117,8 @@ Integer power of a fixed point number
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow">pow</a>(x: FixedPoint32, n: u64): FixedPoint32 {
-    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>((<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128), (n <b>as</b> u128)) <b>as</b> u64))
+    <b>let</b> raw_value = (<a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x) <b>as</b> u128);
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>((<a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(raw_value, (n <b>as</b> u128)) <b>as</b> u64))
 }
 </code></pre>
 
@@ -158,11 +171,10 @@ Specialized function for x * y / z that omits intermediate shifting
 
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_exp_raw">exp_raw</a>(x: u128): u128 {
     // <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
-    <b>let</b> ln2 = 2977044472;  // ln(2) in fixed 32 representation
-    <b>let</b> shift_long = x / ln2;
-    <b>assert</b>!(shift_long &lt;= 31, <a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>);
+    <b>let</b> shift_long = x / <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a>;
+    <b>assert</b>!(shift_long &lt;= 31, std::error::invalid_state(<a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>));
     <b>let</b> shift = (shift_long <b>as</b> u8);
-    <b>let</b> remainder = x % ln2;
+    <b>let</b> remainder = x % <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a>;
     // At this point we want <b>to</b> calculate 2^(remainder / ln2) &lt;&lt; shift
     // ln2 = 595528 * 4999 which means
     <b>let</b> bigfactor = 595528;
@@ -220,6 +232,8 @@ Specialized function for x * y / z that omits intermediate shifting
 
 ## Function `assert_approx_the_same`
 
+For functions that approximate a value it's useful to test a value is close
+to the most correct value up to 10^5 digits of precision
 
 
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128)

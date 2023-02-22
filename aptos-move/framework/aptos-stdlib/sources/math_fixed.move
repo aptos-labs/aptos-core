@@ -7,6 +7,9 @@ module aptos_std::math_fixed {
     /// Abort code on overflow
     const EOVERFLOW: u64 = 1;
 
+    /// Natural log 2 in 32 bit fixed point
+    const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation
+
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {
         let y = (fixed_point32::get_raw_value(x) as u128);
@@ -15,12 +18,14 @@ module aptos_std::math_fixed {
 
     /// Exponent function with a precission of 6 digits.
     public fun exp(x: FixedPoint32): FixedPoint32 {
-        fixed_point32::create_from_raw_value((exp_raw((fixed_point32::get_raw_value(x) as u128)) as u64))
+        let raw_value = (fixed_point32::get_raw_value(x) as u128);
+        fixed_point32::create_from_raw_value((exp_raw(raw_value) as u64))
     }
 
     /// Integer power of a fixed point number
     public fun pow(x: FixedPoint32, n: u64): FixedPoint32 {
-        fixed_point32::create_from_raw_value((pow_raw((fixed_point32::get_raw_value(x) as u128), (n as u128)) as u64))
+        let raw_value = (fixed_point32::get_raw_value(x) as u128);
+        fixed_point32::create_from_raw_value((pow_raw(raw_value, (n as u128)) as u64))
     }
 
     /// Specialized function for x * y / z that omits intermediate shifting
@@ -31,13 +36,13 @@ module aptos_std::math_fixed {
         fixed_point32::create_from_raw_value (((a * b / c) as u64))
     }
 
+    // Calculate e^x where x and the result are fixed point numbers
     fun exp_raw(x: u128): u128 {
         // exp(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
-        let ln2 = 2977044472;  // ln(2) in fixed 32 representation
-        let shift_long = x / ln2;
-        assert!(shift_long <= 31, EOVERFLOW);
+        let shift_long = x / LN2;
+        assert!(shift_long <= 31, std::error::invalid_state(EOVERFLOW));
         let shift = (shift_long as u8);
-        let remainder = x % ln2;
+        let remainder = x % LN2;
         // At this point we want to calculate 2^(remainder / ln2) << shift
         // ln2 = 595528 * 4999 which means
         let bigfactor = 595528;
@@ -54,6 +59,7 @@ module aptos_std::math_fixed {
         (power << shift) + taylor1 + taylor2 / 2
     }
 
+    // Calculate x to the power of n, where x and the result are fixed point numbers.
     fun pow_raw(x: u128, n: u128): u128 {
         let res: u128 = 1 << 32;
         while (n != 0) {
@@ -68,7 +74,7 @@ module aptos_std::math_fixed {
 
     #[test]
     public entry fun test_sqrt() {
-        // We use the case of exp
+        // Sqrt is based on math128::sqrt and thus most of the testing is done there.
         let fixed_base = 1 << 32;
         let result = sqrt(fixed_point32::create_from_u64(1));
         assert!(fixed_point32::get_raw_value(result) == fixed_base, 0);
@@ -96,6 +102,8 @@ module aptos_std::math_fixed {
     }
 
     #[testonly]
+    /// For functions that approximate a value it's useful to test a value is close
+    /// to the most correct value up to 10^5 digits of precision
     fun assert_approx_the_same(x: u128, y: u128) {
         if (x < y) {
             let tmp = x;
