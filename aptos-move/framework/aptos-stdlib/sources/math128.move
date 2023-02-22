@@ -23,6 +23,11 @@ module aptos_std::math128 {
         }
     }
 
+    /// Returns a * b / c going through u128 to prevent intermediate overflow
+    public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
+        (((a as u256) * (b as u256) / (c as u256)) as u128)
+    }
+
     /// Return x clamped to the interval [lower, upper].
     public fun clamp(x: u128, lower: u128, upper: u128): u128 {
         min(upper, max(lower, x))
@@ -137,6 +142,12 @@ module aptos_std::math128 {
 
         let result = pow(10u128, 0u128);
         assert!(result == 1, 0);
+    }
+
+    #[test]
+    public entry fun test_mul_div() {
+        let tmp: u128 = 1<<127;
+        assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
     }
 
     #[test]

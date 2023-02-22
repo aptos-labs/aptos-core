@@ -146,6 +146,12 @@ module aptos_std::math64 {
     }
 
     #[test]
+    public entry fun test_mul_div() {
+        let tmp: u64 = 1<<63;
+        assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
+    }
+
+    #[test]
     public entry fun test_floor_lg2() {
         let idx: u8 = 0;
         while (idx < 64) {
