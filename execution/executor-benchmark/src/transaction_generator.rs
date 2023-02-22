@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_generator::{AccountCache, AccountGenerator},
-    benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
-};
+use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -88,7 +85,7 @@ pub struct TransactionGenerator {
 
     /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
     /// sure if execution is slow to consume the transactions, we do not run out of memory.
-    block_sender: Option<mpsc::SyncSender<Vec<BenchmarkTransaction>>>,
+    block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
 
     /// Transaction Factory
     transaction_factory: TransactionFactory,
@@ -141,7 +138,7 @@ impl TransactionGenerator {
     pub fn new_with_existing_db<P: AsRef<Path>>(
         db: DbReaderWriter,
         genesis_key: Ed25519PrivateKey,
-        block_sender: mpsc::SyncSender<Vec<BenchmarkTransaction>>,
+        block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
         version: Version,
     ) -> Self {
@@ -267,18 +264,9 @@ impl TransactionGenerator {
                                 seed_account_balance,
                             ),
                     );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
-                            self.root_account.address(),
-                            new_account.address(),
-                            seed_account_balance,
-                        )),
-                    )
+                    Transaction::UserTransaction(txn)
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
@@ -321,18 +309,9 @@ impl TransactionGenerator {
                                 init_account_balance,
                             ),
                     );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
-                            sender.address(),
-                            new_account.address(),
-                            init_account_balance,
-                        )),
-                    )
+                    Transaction::UserTransaction(txn)
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
@@ -356,18 +335,9 @@ impl TransactionGenerator {
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory.transfer(receiver, amount),
                     );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::TransferInfo(TransferInfo::new(
-                            sender.address(),
-                            receiver,
-                            amount,
-                        )),
-                    )
+                    Transaction::UserTransaction(txn)
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
 

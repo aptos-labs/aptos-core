@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
-    metrics::TIMER,
-};
+use crate::metrics::TIMER;
 use anyhow::Result;
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
@@ -178,7 +175,9 @@ impl FakeExecutor {
     }
 
     fn handle_transfer(
-        _transfer_info: &TransferInfo,
+        _sender: AccountAddress,
+        _receiver: AccountAddress,
+        _amount: u64,
         _state_view: &CachedStateView,
     ) -> Result<TransactionOutput> {
         // TODO(grao): Implement this function.
@@ -191,13 +190,12 @@ impl FakeExecutor {
     }
 
     fn handle_account_creation(
-        account_creation_info: &AccountCreationInfo,
+        sender_address: AccountAddress,
+        new_account_address: AccountAddress,
+        initial_balance: u64,
         state_view: &CachedStateView,
     ) -> Result<TransactionOutput> {
         let _timer = TIMER.with_label_values(&["account_creation"]).start_timer();
-        let sender_address = account_creation_info.sender;
-        let new_account_address = account_creation_info.new_account;
-
         let sender_account_key = Self::new_state_key_account(sender_address);
         let mut sender_account = {
             let _timer = TIMER
@@ -240,7 +238,7 @@ impl FakeExecutor {
         }
 
         // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
-        sender_coin_store.coin -= account_creation_info.initial_balance;
+        sender_coin_store.coin -= initial_balance;
 
         let gas = 1;
         sender_coin_store.coin -= gas;
@@ -253,7 +251,7 @@ impl FakeExecutor {
         };
 
         let new_coin_store = CoinStore {
-            coin: account_creation_info.initial_balance,
+            coin: initial_balance,
             ..Default::default()
         };
 
@@ -319,35 +317,48 @@ impl FakeExecutor {
     }
 }
 
-impl TransactionBlockExecutor<BenchmarkTransaction> for FakeExecutor {
+impl TransactionBlockExecutor<Transaction> for FakeExecutor {
     fn execute_transaction_block(
-        transactions: Vec<BenchmarkTransaction>,
+        transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
         let transaction_outputs = FAKE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()
-                .map(|txn| match &txn.extra_info {
-                    Some(extra_info) => match &extra_info {
-                        ExtraInfo::TransferInfo(transfer_info) => {
-                            Self::handle_transfer(transfer_info, &state_view)
+                .map(|txn| match &txn {
+                    Transaction::UserTransaction(user_txn) => match user_txn.payload() {
+                        aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
+                            match (
+                                *f.module().address(),
+                                f.module().name().as_str(),
+                                f.function().as_str(),
+                            ) {
+                                (AccountAddress::ONE, "coin", "transfer") => Self::handle_transfer(
+                                    user_txn.sender(),
+                                    bcs::from_bytes(&f.args()[0]).unwrap(),
+                                    bcs::from_bytes(&f.args()[1]).unwrap(),
+                                    &state_view,
+                                ),
+                                (AccountAddress::ONE, "aptos_account", "transfer") => {
+                                    Self::handle_account_creation(
+                                        user_txn.sender(),
+                                        bcs::from_bytes(&f.args()[0]).unwrap(),
+                                        bcs::from_bytes(&f.args()[1]).unwrap(),
+                                        &state_view,
+                                    )
+                                },
+                                _ => unimplemented!(),
+                            }
                         },
-                        ExtraInfo::AccountCreationInfo(account_creation_info) => {
-                            Self::handle_account_creation(account_creation_info, &state_view)
-                        },
-                    },
-                    None => match &txn.transaction {
-                        Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
                         _ => unimplemented!(),
                     },
+                    Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
+                    _ => unimplemented!(),
                 })
                 .collect::<Result<Vec<_>>>()
         })?;
         Ok(ChunkOutput {
-            transactions: transactions
-                .into_iter()
-                .map(|txn| txn.transaction)
-                .collect(),
+            transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })

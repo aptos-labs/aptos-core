@@ -135,11 +135,6 @@ impl TransactionExecutor for RestApiTransactionExecutor {
             .sequence_number())
     }
 
-    async fn execute_transactions(&self, txns: &[SignedTransaction]) -> Result<()> {
-        self.execute_transactions_with_counter(txns, &[AtomicUsize::new(0)])
-            .await
-    }
-
     async fn execute_transactions_with_counter(
         &self,
         txns: &[SignedTransaction],

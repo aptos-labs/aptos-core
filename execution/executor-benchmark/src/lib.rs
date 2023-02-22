@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
-pub mod benchmark_transaction;
 pub mod db_generator;
 pub mod fake_executor;
 mod metrics;
@@ -13,9 +12,8 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    benchmark_transaction::BenchmarkTransaction, pipeline::Pipeline,
-    transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
-    transaction_generator::TransactionGenerator,
+    pipeline::Pipeline, transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
@@ -23,14 +21,16 @@ use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
+use aptos_logger::info;
 use aptos_storage_interface::DbReaderWriter;
-use std::{fs, path::Path};
+use aptos_types::transaction::Transaction;
+use std::{fs, path::Path, time::Instant};
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
-) -> (DbReaderWriter, BlockExecutor<V, BenchmarkTransaction>)
+) -> (DbReaderWriter, BlockExecutor<V, Transaction>)
 where
-    V: TransactionBlockExecutor<BenchmarkTransaction>,
+    V: TransactionBlockExecutor<Transaction>,
 {
     let db = DbReaderWriter::new(
         AptosDB::open(
@@ -69,8 +69,9 @@ pub fn run_benchmark<V>(
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
     use_state_kv_db: bool,
+    split_stages: bool,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor<Transaction> + 'static,
 {
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
@@ -82,7 +83,7 @@ pub fn run_benchmark<V>(
     let (db, executor) = init_db_and_executor::<V>(&config);
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, split_stages);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -91,9 +92,20 @@ pub fn run_benchmark<V>(
         source_dir,
         version,
     );
+    let start_time = Instant::now();
+
     generator.run_transfer(block_size, num_transfer_blocks);
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!(
+        "Overall TPS: {} txn/s = {} txn / {}s",
+        delta_v as f32 / elapsed,
+        delta_v,
+        elapsed
+    );
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
@@ -110,7 +122,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor<Transaction> + 'static,
 {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
@@ -136,7 +148,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor<Transaction> + 'static,
 {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
@@ -146,7 +158,7 @@ fn add_accounts_impl<V>(
 
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version, false);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -155,6 +167,8 @@ fn add_accounts_impl<V>(
         &source_dir,
         version,
     );
+
+    let start_time = Instant::now();
 
     generator.run_mint(
         db.reader.clone(),
@@ -165,6 +179,15 @@ fn add_accounts_impl<V>(
     );
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!(
+        "Overall TPS: {} txn/s = {} txn / {}s",
+        delta_v as f32 / elapsed,
+        delta_v,
+        elapsed
+    );
 
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
@@ -194,34 +217,51 @@ fn add_accounts_impl<V>(
 
 #[cfg(test)]
 mod tests {
+    use crate::fake_executor::FakeExecutor;
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+    use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
+    use aptos_types::transaction::Transaction;
     use aptos_vm::AptosVM;
 
-    #[test]
-    fn test_benchmark() {
+    fn test_generic_benchmark<E>(verify_sequence_numbers: bool)
+    where
+        E: TransactionBlockExecutor<Transaction> + 'static,
+    {
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
 
-        crate::db_generator::run::<AptosVM>(
+        crate::db_generator::run::<E>(
             25, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
             5,           /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
-            true,
+            verify_sequence_numbers,
             false,
         );
 
-        super::run_benchmark::<AptosVM>(
+        super::run_benchmark::<E>(
             5, /* block_size */
             5, /* num_transfer_blocks */
             storage_dir.as_ref(),
             checkpoint_dir,
-            true,
+            verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
+            false,
         );
+    }
+
+    #[test]
+    fn test_benchmark() {
+        test_generic_benchmark::<AptosVM>(true);
+    }
+
+    #[test]
+    fn test_fake_benchmark() {
+        // correct execution not yet implemented, so cannot be checked for validity
+        test_generic_benchmark::<FakeExecutor>(false);
     }
 }

@@ -113,12 +113,14 @@ fn report_block(
 ) {
     let total_versions = (version - start_version) as f64;
     info!(
-        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",
+        "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
         version,
         Instant::now().duration_since(execution_start_time).as_millis(),
         execution_time.as_millis(),
         commit_time.as_millis(),
         block_size as f64 / (std::cmp::max(execution_time, commit_time)).as_secs_f64(),
+        block_size as f64 / execution_time.as_secs_f64(),
+        block_size as f64 / commit_time.as_secs_f64(),
         total_versions / global_start_time.elapsed().as_secs_f64(),
     );
     info!(
