@@ -1192,6 +1192,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-state-sync-driver",
  "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
  "async-trait",
  "chrono",
  "either",
@@ -2964,6 +2965,36 @@ dependencies = [
 
 [[package]]
 name = "aptos-transaction-emitter-lib"
+version = "0.0.0"
+dependencies = [
+ "again",
+ "anyhow",
+ "aptos",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-transaction-generator-lib",
+ "async-trait",
+ "clap 3.2.23",
+ "futures",
+ "itertools",
+ "move-binary-format",
+ "once_cell",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "reqwest",
+ "serde 1.0.149",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
  "again",

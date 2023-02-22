@@ -83,6 +83,7 @@ members = [
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
+    "crates/transaction-generator-lib",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
@@ -359,6 +360,7 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
     "async",
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
+aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }

@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    emitter::MAX_RETRIES,
-    transaction_generator::{TransactionExecutor, SEND_AMOUNT},
-    EmitJobRequest, EmitModeParams,
-};
+use crate::{emitter::MAX_RETRIES, EmitJobRequest, EmitModeParams};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
@@ -20,6 +16,7 @@ use aptos_sdk::{
         AccountKey, LocalAccount,
     },
 };
+use aptos_transaction_generator_lib::{TransactionExecutor, SEND_AMOUNT};
 use core::{
     cmp::min,
     result::Result::{Err, Ok},
