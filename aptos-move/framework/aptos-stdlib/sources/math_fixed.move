@@ -6,7 +6,7 @@ module aptos_std::math_fixed {
     use aptos_std::math64;
 
     /// Abort code on overflow
-    const EOVERFLOW: u64 = 1;
+    const EOVERFLOW_EXP: u64 = 1;
 
     /// Natural log 2 in 32 bit fixed point
     const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation
@@ -41,7 +41,7 @@ module aptos_std::math_fixed {
     fun exp_raw(x: u128): u128 {
         // exp(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
         let shift_long = x / LN2;
-        assert!(shift_long <= 31, std::error::invalid_state(EOVERFLOW));
+        assert!(shift_long <= 31, std::error::invalid_state(EOVERFLOW_EXP));
         let shift = (shift_long as u8);
         let remainder = x % LN2;
         // At this point we want to calculate 2^(remainder / ln2) << shift
@@ -52,7 +52,12 @@ module aptos_std::math_fixed {
         // 2^(remainder / ln2) = (2^(1/4999))^exponent * exp(x / 2^32)
         let roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
         // This has an error of 5000 / 4 10^9 roughly 6 digits of precission
+        std::debug::print(&exponent);
         let power = pow_raw(roottwo, exponent);
+        let eps_correction = 1241009291;
+        std::debug::print(&power);
+        power = power + ((power * eps_correction * exponent) >> 64);
+        std::debug::print(&power);
         // x is fixed point number smaller than 595528/2^32 < 0.00014 so we need only 2 tayler steps
         // to get the 6 digits of precission
         let taylor1 = (power * x) >> (32 - shift);
@@ -62,15 +67,16 @@ module aptos_std::math_fixed {
 
     // Calculate x to the power of n, where x and the result are fixed point numbers.
     fun pow_raw(x: u128, n: u128): u128 {
-        let res: u128 = 1 << 32;
+        let res: u256 = 1 << 64;
+        x = x << 32;
         while (n != 0) {
             if (n & 1 != 0) {
-                res = (res * x) >> 32;
+                res = (res * (x as u256)) >> 64;
             };
             n = n >> 1;
-            x = (x * x) >> 32;
+            x = ((((x as u256) * (x as u256)) >> 64) as u128);
         };
-        res
+        ((res >> 32) as u128)
     }
 
     #[test]
@@ -92,6 +98,8 @@ module aptos_std::math_fixed {
 
         let result = exp_raw(fixed_base);
         let e = 11674931554;  // e in 32 bit fixed point
+        std::debug::print(&result);
+        std::debug::print(&e);
         assert_approx_the_same(result, e);
     }
 

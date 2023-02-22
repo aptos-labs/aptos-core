@@ -16,7 +16,8 @@ Standard math utilities missing in the Move Language.
 -  [Function `assert_approx_the_same`](#0x1_math_fixed_assert_approx_the_same)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
@@ -28,12 +29,12 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
-<a name="0x1_math_fixed_EOVERFLOW"></a>
+<a name="0x1_math_fixed_EOVERFLOW_EXP"></a>
 
 Abort code on overflow
 
 
-<pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>: u64 = 1;
+<pre><code><b>const</b> <a href="math_fixed.md#0x1_math_fixed_EOVERFLOW_EXP">EOVERFLOW_EXP</a>: u64 = 1;
 </code></pre>
 
 
@@ -172,7 +173,7 @@ Specialized function for x * y / z that omits intermediate shifting
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_exp_raw">exp_raw</a>(x: u128): u128 {
     // <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
     <b>let</b> shift_long = x / <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a>;
-    <b>assert</b>!(shift_long &lt;= 31, std::error::invalid_state(<a href="math_fixed.md#0x1_math_fixed_EOVERFLOW">EOVERFLOW</a>));
+    <b>assert</b>!(shift_long &lt;= 31, std::error::invalid_state(<a href="math_fixed.md#0x1_math_fixed_EOVERFLOW_EXP">EOVERFLOW_EXP</a>));
     <b>let</b> shift = (shift_long <b>as</b> u8);
     <b>let</b> remainder = x % <a href="math_fixed.md#0x1_math_fixed_LN2">LN2</a>;
     // At this point we want <b>to</b> calculate 2^(remainder / ln2) &lt;&lt; shift
@@ -183,7 +184,12 @@ Specialized function for x * y / z that omits intermediate shifting
     // 2^(remainder / ln2) = (2^(1/4999))^exponent * <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x / 2^32)
     <b>let</b> roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
     // This <b>has</b> an <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> of 5000 / 4 10^9 roughly 6 digits of precission
+    std::debug::print(&exponent);
     <b>let</b> power = <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(roottwo, exponent);
+    <b>let</b> eps_correction = 1241009291;
+    std::debug::print(&power);
+    power = power + ((power * eps_correction * exponent) &gt;&gt; 64);
+    std::debug::print(&power);
     // x is fixed point number smaller than 595528/2^32 &lt; 0.00014 so we need only 2 tayler steps
     // <b>to</b> get the 6 digits of precission
     <b>let</b> taylor1 = (power * x) &gt;&gt; (32 - shift);
@@ -212,15 +218,16 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 <pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(x: u128, n: u128): u128 {
-    <b>let</b> res: u128 = 1 &lt;&lt; 32;
+    <b>let</b> res: u256 = 1 &lt;&lt; 64;
+    x = x &lt;&lt; 32;
     <b>while</b> (n != 0) {
         <b>if</b> (n & 1 != 0) {
-            res = (res * x) &gt;&gt; 32;
+            res = (res * (x <b>as</b> u256)) &gt;&gt; 64;
         };
         n = n &gt;&gt; 1;
-        x = (x * x) &gt;&gt; 32;
+        x = ((((x <b>as</b> u256) * (x <b>as</b> u256)) &gt;&gt; 64) <b>as</b> u128);
     };
-    res
+    ((res &gt;&gt; 32) <b>as</b> u128)
 }
 </code></pre>
 

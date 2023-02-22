@@ -2,7 +2,7 @@
 module aptos_std::math128 {
 
     /// Abort value when an invalid argument is provided.
-    const EINVALID_ARG: u64 = 1;
+    const EINVALID_ARG_FLOOR_LG2: u64 = 1;
 
     /// Return the largest of two numbers.
     public fun max(a: u128, b: u128): u128 {
@@ -53,7 +53,7 @@ module aptos_std::math128 {
     /// Returns floor(lg2(x))
     public fun floor_lg2(x: u128): u8 {
         let res = 0;
-        assert!(x != 0, EINVALID_ARG);
+        assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LG2));
         // Effectively the position of the most significant set bit
         if (x >= (1 << 64)) {
             x = x >> 64;
@@ -148,6 +148,10 @@ module aptos_std::math128 {
     public entry fun test_mul_div() {
         let tmp: u128 = 1<<127;
         assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
+
+        assert!(mul_div(tmp,5,5) == tmp, 0);
+        // Note that ordering other way is imprecise.
+        assert!((tmp / 5) * 5 != tmp, 0);
     }
 
     #[test]

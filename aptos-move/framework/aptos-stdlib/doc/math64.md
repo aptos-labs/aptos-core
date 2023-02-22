@@ -21,7 +21,8 @@ Standard math utilities missing in the Move Language.
     -  [Function `pow`](#@Specification_1_pow)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+</code></pre>
 
 
 
@@ -30,12 +31,12 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
-<a name="0x1_math64_EINVALID_ARG"></a>
+<a name="0x1_math64_EINVALID_ARG_FLOOR_LG2"></a>
 
 Abort value when an invalid argument is provided.
 
 
-<pre><code><b>const</b> <a href="math64.md#0x1_math64_EINVALID_ARG">EINVALID_ARG</a>: u64 = 1;
+<pre><code><b>const</b> <a href="math64.md#0x1_math64_EINVALID_ARG_FLOOR_LG2">EINVALID_ARG_FLOOR_LG2</a>: u64 = 1;
 </code></pre>
 
 
@@ -199,7 +200,7 @@ Returns floor(lg2(x))
 
 <pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_floor_lg2">floor_lg2</a>(x: u64): u8 {
     <b>let</b> res = 0;
-    <b>assert</b>!(x != 0, <a href="math64.md#0x1_math64_EINVALID_ARG">EINVALID_ARG</a>);
+    <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math64.md#0x1_math64_EINVALID_ARG_FLOOR_LG2">EINVALID_ARG_FLOOR_LG2</a>));
     // Effectively the position of the most significant set bit
     <b>if</b> (x &gt;= (1 &lt;&lt; 32)) {
         x = x &gt;&gt; 32;
