@@ -18,7 +18,7 @@ pub fn generate_gas_upgrade_proposal(
     emitln!(
         writer,
         "// source commit hash: {}\n",
-        git_version::git_version!()
+        aptos_build_info::get_git_hash()
     );
 
     emitln!(writer, "// Gas schedule upgrade proposal\n");

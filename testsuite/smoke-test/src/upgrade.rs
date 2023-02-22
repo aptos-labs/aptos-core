@@ -331,6 +331,7 @@ async fn test_release_validate_tool_multi_step() {
             .as_ref()
             .unwrap()
             .private_key(),
+        framework_git_rev: None,
     };
 
     aptos_release_builder::validate::validate_config(config, network_config)
