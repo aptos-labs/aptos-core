@@ -2,7 +2,7 @@
 # action. It invokes the action with all the neccessary configurations
 # required by the specific fullnode sync test instance.
 
-name: "Run Fullnode Sync"
+name: "*run Fullnode Sync reusable workflow"
 
 on:
   workflow_call:
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
-      - uses: ./.github/actions/fullnode-sync
+      - uses: aptos-labs/aptos-core/.github/actions/fullnode-sync@main
         with:
           TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
           BRANCH: ${{ inputs.BRANCH }}

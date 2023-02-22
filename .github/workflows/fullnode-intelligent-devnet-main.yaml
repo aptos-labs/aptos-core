@@ -28,7 +28,7 @@ jobs:
 
   fullnode-intelligent-devnet-main:
     needs: check-repo
-    uses: ./.github/workflows/run-fullnode-sync.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-fullnode-sync.yaml@main
     secrets: inherit
     with:
       TEST_NAME: fullnode-intelligent-devnet-main

@@ -27,7 +27,7 @@ jobs:
 
   fullnode-fast-testnet-main:
     needs: check-repo
-    uses: ./.github/workflows/run-fullnode-sync.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-fullnode-sync.yaml@main
     secrets: inherit
     with:
       TEST_NAME: fullnode-fast-testnet-main
