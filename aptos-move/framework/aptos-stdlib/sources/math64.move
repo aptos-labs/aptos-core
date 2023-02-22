@@ -23,6 +23,11 @@ module aptos_std::math64 {
         }
     }
 
+    /// Returns a * b / c going through u128 to prevent intermediate overflow
+    public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
+        (((a as u128) * (b as u128) / (c as u128)) as u64)
+    }
+
     /// Return x clamped to the interval [lower, upper].
     public fun clamp(x: u64, lower: u64, upper: u64): u64 {
         min(upper, max(lower, x))

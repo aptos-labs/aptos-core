@@ -3,6 +3,7 @@ module aptos_std::math_fixed {
     use std::fixed_point32;
     use std::fixed_point32::FixedPoint32;
     use aptos_std::math128;
+    use aptos_std::math64;
 
     /// Abort code on overflow
     const EOVERFLOW: u64 = 1;
@@ -30,10 +31,10 @@ module aptos_std::math_fixed {
 
     /// Specialized function for x * y / z that omits intermediate shifting
     public fun mul_div(x: FixedPoint32, y: FixedPoint32, z: FixedPoint32): FixedPoint32 {
-        let a = (fixed_point32::get_raw_value(x) as u128);
-        let b = (fixed_point32::get_raw_value(y) as u128);
-        let c = (fixed_point32::get_raw_value(z) as u128);
-        fixed_point32::create_from_raw_value (((a * b / c) as u64))
+        let a = fixed_point32::get_raw_value(x);
+        let b = fixed_point32::get_raw_value(y);
+        let c = fixed_point32::get_raw_value(z);
+        fixed_point32::create_from_raw_value (math64::mul_div(a, b, c))
     }
 
     // Calculate e^x where x and the result are fixed point numbers
