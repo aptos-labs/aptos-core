@@ -4,6 +4,8 @@ name: Continuous Forge Tests - Unstable
 permissions:
   issues: write
   pull-requests: write
+  contents: read
+  id-token: write
 
 on:
   # Allow triggering manually
