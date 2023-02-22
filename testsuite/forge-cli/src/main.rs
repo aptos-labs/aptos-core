@@ -16,6 +16,7 @@ use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     forge_setup_test::ForgeSetupTest,
+    framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
@@ -452,6 +453,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
         "compat" => compat(config),
+        "framework_upgrade" => upgrade(config),
         "config" => config.with_network_tests(vec![&ReconfigurationTest]),
         "network_partition" => network_partition(config),
         "three_region_simulation" => three_region_simulation(config),
@@ -1069,6 +1071,16 @@ fn compat(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
         .with_network_tests(vec![&SimpleValidatorUpgrade])
+        .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 30.into();
+        }))
+}
+
+fn upgrade(config: ForgeConfig) -> ForgeConfig {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_network_tests(vec![&FrameworkUpgrade])
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 30.into();
