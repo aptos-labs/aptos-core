@@ -10,9 +10,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This page describes how to employ data from the Aptos Indexer in your apps. To instead operate an indexer, follow [Run an Indexer](../nodes/indexer-fullnode.md).
 
-Typical applications built on the Aptos blockchain, on any blockchain for that matter, require the raw blockchain data to be shaped and stored in an application-specific manner in order to support low-latency and rich user experiences when consuming blockchain data in enduser apps by millions of users. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/) is not designed to support data shaping and provides a lower level, stable and generic API that is not designed to directly support such end-user experiences. 
+Typical applications built on the Aptos blockchain, on any blockchain for that matter, require the raw blockchain data to be shaped and stored in an application-specific manner. This is essential to supporting low-latency and rich experiences when consuming blockchain data in end-user apps from millions of users. The [Aptos Node API](https://aptos.dev/nodes/aptos-api-spec#/) provides a lower level, stable and generic API and is not designed to support data shaping or therefore such rich end-user experiences directly.
 
-Indexer is a solution to this problem. See below a high-level block diagram of how Aptos indexing works. 
+The Aptos Indexer is a answer to this need, allowing the data shaping critical to real-time app use. See this high-level diagram for how Aptos indexing works:
 
 <center>
 <ThemedImage
