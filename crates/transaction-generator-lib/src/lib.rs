@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![forbid(unsafe_code)]
+
 use anyhow::Result;
 use aptos_infallible::RwLock;
 use aptos_sdk::{
@@ -26,13 +28,71 @@ use self::{
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
-use crate::{
-    emitter::stats::DynamicStatsTracking,
-    transaction_generator::accounts_pool_wrapper::AccountsPoolWrapperCreator, TransactionType,
-};
+use crate::accounts_pool_wrapper::AccountsPoolWrapperCreator;
 pub use publishing::module_simple::EntryPoints;
 
 pub const SEND_AMOUNT: u64 = 1;
+
+#[derive(Debug, Copy, Clone)]
+pub enum TransactionType {
+    CoinTransfer {
+        invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
+    },
+    AccountGeneration {
+        add_created_accounts_to_pool: bool,
+        max_account_working_set: usize,
+        creation_balance: u64,
+    },
+    NftMintAndTransfer,
+    PublishPackage {
+        use_account_pool: bool,
+    },
+    CallCustomModules {
+        entry_point: EntryPoints,
+        num_modules: usize,
+        use_account_pool: bool,
+    },
+}
+
+impl TransactionType {
+    pub fn default_coin_transfer() -> Self {
+        Self::CoinTransfer {
+            invalid_transaction_ratio: 0,
+            sender_use_account_pool: false,
+        }
+    }
+
+    pub fn default_account_generation() -> Self {
+        Self::AccountGeneration {
+            add_created_accounts_to_pool: true,
+            max_account_working_set: 1_000_000,
+            creation_balance: 0,
+        }
+    }
+
+    pub fn default_call_custom_module() -> Self {
+        Self::CallCustomModules {
+            entry_point: EntryPoints::Nop,
+            num_modules: 1,
+            use_account_pool: false,
+        }
+    }
+
+    pub fn default_call_different_modules() -> Self {
+        Self::CallCustomModules {
+            entry_point: EntryPoints::Nop,
+            num_modules: 100,
+            use_account_pool: false,
+        }
+    }
+}
+
+impl Default for TransactionType {
+    fn default() -> Self {
+        Self::default_coin_transfer()
+    }
+}
 
 pub trait TransactionGenerator: Sync + Send {
     fn generate_transactions(
@@ -69,7 +129,7 @@ pub async fn create_txn_generator_creator(
     txn_executor: &dyn TransactionExecutor,
     txn_factory: &TransactionFactory,
     init_txn_factory: &TransactionFactory,
-    stats: Arc<DynamicStatsTracking>,
+    cur_phase: Arc<AtomicUsize>,
 ) -> Box<dyn TransactionGeneratorCreator> {
     let all_addresses = Arc::new(RwLock::new(
         all_accounts.iter().map(|d| d.address()).collect::<Vec<_>>(),
@@ -165,6 +225,6 @@ pub async fn create_txn_generator_creator(
 
     Box::new(PhasedTxnMixGeneratorCreator::new(
         txn_generator_creator_mix_per_phase,
-        stats,
+        cur_phase,
     ))
 }
