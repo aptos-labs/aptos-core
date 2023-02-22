@@ -12,7 +12,16 @@ on:
       - ".github/workflows/fullnode-fast-testnet-stable.yaml"
 
 jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+
   fullnode-fast-testnet-stable:
+    needs: check-repo
     uses: ./.github/workflows/run-fullnode-sync.yaml
     secrets: inherit
     with:

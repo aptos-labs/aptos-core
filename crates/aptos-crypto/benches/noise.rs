@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Don't forget to run this benchmark with AES-NI enable.

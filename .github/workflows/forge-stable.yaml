@@ -1,5 +1,4 @@
 # Continuously run stable forge tests against the latest main branch.
-# TODO: for workflows triggered by a cron, we should only run it on the base repo, not on forks
 name: Continuous Forge Tests - Stable
 
 permissions:
@@ -66,6 +65,10 @@ jobs:
         with:
           ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
           fetch-depth: 0
+
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
 
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
 
@@ -174,4 +177,18 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 7200
       FORGE_TEST_SUITE: land_blocking
       FORGE_ENABLE_PERFORMANCE: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-compat:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-compat
+      # Run for 5 minutes
+      FORGE_RUNNER_DURATION_SECS: 300
+      # This will upgrade from testnet branch to the latest main
+      FORGE_TEST_SUITE: compat
+      IMAGE_TAG: testnet
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch

@@ -557,7 +557,9 @@ Only called during genesis.
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() ==&gt;
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).proposer) == proposer_addr;
 </code></pre>
 
 
@@ -573,7 +575,10 @@ Only called during genesis.
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+<pre><code><b>let</b> amount_to_burn = (burn_percentage * <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>)) / 100;
+<b>aborts_if</b> burn_percentage &gt; 100;
+<b>aborts_if</b> (amount_to_burn &gt; 0) && !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+<b>include</b> (amount_to_burn &gt; 0) ==&gt; <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">coin::AbortsIfNotExistCoinInfo</a>&lt;AptosCoin&gt;;
 </code></pre>
 
 
@@ -623,7 +628,9 @@ Only called during genesis.
 
 
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
+<b>aborts_if</b> fee &gt; 0 && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> fee &gt; 0 && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>).<a href="coin.md#0x1_coin">coin</a>.value &lt; fee;
 </code></pre>
 
 
