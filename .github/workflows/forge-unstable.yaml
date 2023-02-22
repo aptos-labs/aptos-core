@@ -6,6 +6,7 @@ permissions:
   pull-requests: write
   contents: read
   id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
 
 on:
   # Allow triggering manually

@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation
+  actions: write #required for workflow cancellation via check-aptos-core
 
 jobs:
   check-repo:

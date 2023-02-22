@@ -12,6 +12,11 @@ on:
     paths:
       - ".github/workflows/fullnode-intelligent-devnet-main.yaml"
 
+permissions:
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
+
 jobs:
   check-repo:
     runs-on: ubuntu-latest
