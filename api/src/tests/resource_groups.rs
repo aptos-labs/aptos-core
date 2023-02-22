@@ -91,4 +91,3 @@ async fn test_gen_resource_group() {
     let response = context.gen_resource(&user.address(), &secondary).await;
     assert_eq!(response.unwrap()["data"]["value"], 55);
 }
-
