@@ -6,6 +6,7 @@ permissions:
   pull-requests: write
   contents: read
   id-token: write
+  actions: write
 
 on:
   # Allow triggering manually
@@ -68,7 +69,7 @@ jobs:
           ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
           fetch-depth: 0
 
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: ./.github/actions/check-aptos-core
         with:
           cancel-workflow: true
 
