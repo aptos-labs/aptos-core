@@ -101,6 +101,9 @@ struct Opt {
     #[structopt(long)]
     use_sharded_state_merkle_db: bool,
 
+    #[structopt(long)]
+    split_stages: bool,
+
     #[structopt(subcommand)]
     cmd: Command,
 
@@ -207,6 +210,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.use_state_kv_db,
                 opt.use_sharded_state_merkle_db,
+                opt.split_stages,
             );
         },
         Command::AddAccounts {
