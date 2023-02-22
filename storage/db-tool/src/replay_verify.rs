@@ -55,6 +55,8 @@ pub struct Opt {
         help = "Skip the execution for txns that are known to break compatibility."
     )]
     txns_to_skip: Vec<Version>,
+    #[clap(long, help = "Do not quit right away when a replay issue is detected.")]
+    lazy_quit: bool,
 }
 
 impl Opt {
@@ -81,7 +83,7 @@ impl Opt {
             self.start_version.unwrap_or(0),
             self.end_version.unwrap_or(Version::MAX),
             self.validate_modules,
-            VerifyExecutionMode::verify_except(self.txns_to_skip),
+            VerifyExecutionMode::verify_except(self.txns_to_skip).set_lazy_quit(self.lazy_quit),
         )?
         .run()
         .await

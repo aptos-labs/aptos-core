@@ -21,7 +21,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/replay-verify.yaml"
-      - "testsuite/replay-verify.py"
+      - "testsuite/replay_verify.py"
   schedule:
     - cron: "0 8,20 * * *"
 

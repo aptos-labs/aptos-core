@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -489,7 +490,7 @@ proptest! {
                 next_version,
             );
 
-            // Check db-restore calculates usage correctly as well.
+            // Check db restore calculates usage correctly as well.
             let tmp_dir = TempPath::new();
             let db2 = AptosDB::new_for_test(&tmp_dir);
             let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();

@@ -12,6 +12,14 @@ on:
       - ".github/workflows/fullnode-output-mainnet-main.yaml"
 
 jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+
   fullnode-output-mainnet-main:
     uses: ./.github/workflows/run-fullnode-sync.yaml
     secrets: inherit

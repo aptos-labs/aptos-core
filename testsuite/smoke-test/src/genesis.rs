@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -71,9 +72,7 @@ async fn test_genesis_transaction_flow() {
     let aptos_cli = workspace_builder::get_bin("aptos");
 
     // prebuild tools.
-    workspace_builder::get_bin("db-backup");
-    workspace_builder::get_bin("db-restore");
-    workspace_builder::get_bin("db-backup-verify");
+    workspace_builder::get_bin("aptos-db-tool");
 
     println!("0. pre-building finished.");
 
@@ -249,7 +248,7 @@ async fn test_genesis_transaction_flow() {
         4
     );
 
-    println!("10. nuke DB on node 3, and run db-restore, test if it rejoins the network okay.");
+    println!("10. nuke DB on node 3, and run db restore, test if it rejoins the network okay.");
     let node = env.validators_mut().nth(3).unwrap();
     node.stop();
     let mut node_config = node.config().clone();
