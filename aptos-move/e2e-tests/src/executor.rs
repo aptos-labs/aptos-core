@@ -517,6 +517,7 @@ impl FakeExecutor {
             0,
             0,
             proposer,
+            vec![],
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,

@@ -16,7 +16,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{Transaction, Version, OrderedSignedUserTransaction},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -100,6 +100,16 @@ impl Block {
 
     pub fn payload(&self) -> Option<&Payload> {
         self.block_data.payload()
+    }
+
+    pub fn batch_proposers(&self) -> Vec<Author> {
+        if let Some(payload) = self.payload() {
+            if let Payload::InQuorumStore(proof_with_data) = payload {
+                return proof_with_data.proofs.iter().map(|p| p.info().batch_author).collect();
+            }
+        }
+
+        Vec::new()
     }
 
     pub fn payload_size(&self) -> usize {
@@ -345,12 +355,19 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
-        txns: Vec<SignedTransaction>,
+        txns: Vec<OrderedSignedUserTransaction>,
+        ordered_wrap_enabled: bool,
     ) -> Vec<Transaction> {
         once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(txns.into_iter().map(Transaction::UserTransaction))
+        .chain(txns.into_iter().map(|t|
+            if ordered_wrap_enabled {
+                Transaction::OrderedUserTransaction(t)
+            } else {
+                Transaction::UserTransaction(t.transaction)
+            }
+        ))
         .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }
@@ -361,6 +378,7 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
+            self.batch_proposers(),
             // A bitvec of voters
             self.quorum_cert()
                 .ledger_info()

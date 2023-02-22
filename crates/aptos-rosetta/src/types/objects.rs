@@ -30,7 +30,7 @@ use aptos_types::{
     event::EventKey,
     stake_pool::{SetOperatorEvent, StakePool},
     state_store::state_key::{StateKey, StateKeyInner},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayload, OrderedSignedUserTransaction},
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
@@ -594,7 +594,7 @@ impl Transaction {
     ) -> ApiResult<Transaction> {
         use aptos_types::transaction::Transaction::*;
         let (txn_type, maybe_user_txn, txn_info, events) = match &txn.transaction {
-            UserTransaction(user_txn) => {
+            UserTransaction(user_txn)  | OrderedUserTransaction(OrderedSignedUserTransaction{transaction: user_txn, ..}) => {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
             },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),

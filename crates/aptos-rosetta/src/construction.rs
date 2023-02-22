@@ -218,7 +218,7 @@ async fn construction_hash(
         decode_bcs(&request.signed_transaction, "SignedTransaction")?;
 
     Ok(TransactionIdentifierResponse {
-        transaction_identifier: signed_transaction.committed_hash().into(),
+        transaction_identifier: signed_transaction.lookup_hash().into(),
     })
 }
 
@@ -391,7 +391,7 @@ async fn simulate_transaction(
         ))));
     }
 
-    if let Ok(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
+    if let Some(user_txn) = simulated_txn.transaction.as_signed_user_txn() {
         // This gas price came from the simulation (would be the one from the input if provided)
         let simulated_gas_unit_price = user_txn.gas_unit_price();
 
@@ -1081,7 +1081,7 @@ async fn construction_submit(
     let rest_client = server_context.rest_client()?;
 
     let txn: SignedTransaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
-    let hash = txn.clone().committed_hash();
+    let hash = txn.clone().lookup_hash();
     rest_client.submit_bcs(&txn).await?;
     Ok(ConstructionSubmitResponse {
         transaction_identifier: hash.into(),

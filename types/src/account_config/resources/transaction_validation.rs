@@ -22,7 +22,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         module_prologue_name: Identifier::new("module_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
-        user_epilogue_name: Identifier::new("epilogue").unwrap(),
+        user_epilogue_name: Identifier::new("epilogue_v2").unwrap(),
     });
 
 /// A Rust representation of chain-specific account information

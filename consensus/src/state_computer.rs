@@ -43,6 +43,7 @@ pub struct ExecutionProxy {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
     validators: Mutex<Vec<AccountAddress>>,
+    ordered_wrap_enabled: bool,
     write_mutex: AsyncMutex<()>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
 }
@@ -75,6 +76,7 @@ impl ExecutionProxy {
             state_sync_notifier,
             async_state_sync_notifier: tx,
             validators: Mutex::new(vec![]),
+            ordered_wrap_enabled: true, // TODO pass in onchain config
             write_mutex: AsyncMutex::new(()),
             payload_manager: Mutex::new(None),
         }
@@ -110,7 +112,7 @@ impl StateComputer for ExecutionProxy {
         let executor = self.executor.clone();
 
         let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), txns.clone());
+            block.transactions_to_execute(&self.validators.lock(), txns.clone(), self.ordered_wrap_enabled);
 
         let compute_result = monitor!(
             "execute_block",
@@ -163,7 +165,7 @@ impl StateComputer for ExecutionProxy {
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
+            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns, self.ordered_wrap_enabled));
             reconfig_events.extend(block.reconfig_event());
 
             latest_epoch = max(latest_epoch, block.epoch());

@@ -207,7 +207,7 @@ fn init_store(
     let txns = gens
         .into_iter()
         .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+            Transaction::OrderedUserTransaction(OrderedSignedUserTransaction { transaction: gen.materialize(*index, &mut universe).into_inner(), batch_index: 0})
         })
         .collect::<Vec<_>>();
 

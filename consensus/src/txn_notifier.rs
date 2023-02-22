@@ -6,7 +6,7 @@ use anyhow::{format_err, Result};
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::transaction::{SignedTransaction, TransactionStatus};
+use aptos_types::transaction::{TransactionStatus, OrderedSignedUserTransaction};
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
 use std::time::Duration;
@@ -19,7 +19,7 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<OrderedSignedUserTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError>;
 }
@@ -48,7 +48,7 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        txns: Vec<SignedTransaction>,
+        txns: Vec<OrderedSignedUserTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
@@ -72,9 +72,9 @@ impl TxnNotifier for MempoolNotifier {
         for (txn, status) in txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(_) = status {
                 rejected_txns.push(RejectedTransactionSummary {
-                    sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
-                    hash: txn.clone().committed_hash(),
+                    sender: txn.transaction.sender(),
+                    sequence_number: txn.transaction.sequence_number(),
+                    hash: txn.transaction.clone().lookup_hash(),
                 });
             }
         }

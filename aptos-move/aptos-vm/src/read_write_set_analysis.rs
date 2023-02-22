@@ -5,7 +5,7 @@
 use crate::{
     adapter_common::PreprocessedTransaction,
     move_vm_ext::MoveResolverExt,
-    system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
+    system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE_V2, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME, USER_EPILOGUE_NAME_V2},
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_types::{
@@ -43,7 +43,7 @@ const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
 pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     vec![
-        (BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
+        (BLOCK_MODULE.clone(), BLOCK_PROLOGUE_V2.to_owned()),
         (
             TRANSACTION_VALIDATION.clone(),
             SCRIPT_PROLOGUE_NAME.to_owned(),
@@ -169,18 +169,18 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         match tx {
-            PreprocessedTransaction::UserTransaction(tx) => {
-                self.get_keys_user_transaction_impl(tx, concretize)
+            PreprocessedTransaction::OrderedUserTransaction(tx) => {
+                self.get_keys_user_transaction_impl(&tx.checked_txn, concretize)
             },
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let args = serialize_values(
                     &block_metadata
                         .clone()
-                        .get_prologue_move_args(account_config::reserved_vm_address()),
+                        .get_prologue_v2_move_args(account_config::reserved_vm_address()),
                 );
                 let metadata_access = self.get_partially_concretized_summary(
                     &BLOCK_MODULE,
-                    BLOCK_PROLOGUE,
+                    BLOCK_PROLOGUE_V2,
                     &[],
                     &args,
                     &[],
@@ -225,13 +225,14 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
 
         let epilogue_accesses = self.get_partially_concretized_summary(
             &TRANSACTION_VALIDATION,
-            USER_EPILOGUE_NAME,
+            USER_EPILOGUE_NAME_V2,
             &signers,
             &serialize_values(&vec![
                 MoveValue::U64(tx.sequence_number()),
                 MoveValue::U64(tx.gas_unit_price()),
                 MoveValue::U64(tx.max_gas_amount()),
                 MoveValue::U64(0), // gas_units_remaining
+                MoveValue::U16(0), // batch_index
             ]),
             &[],
             &self.module_cache,

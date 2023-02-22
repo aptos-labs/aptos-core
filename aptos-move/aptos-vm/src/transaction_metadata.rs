@@ -24,10 +24,11 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub batch_index: u16,
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransaction, batch_index: u16) -> Self {
         Self {
             sender: txn.sender(),
             authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
@@ -53,6 +54,7 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
+            batch_index,
         }
     }
 
@@ -99,6 +101,10 @@ impl TransactionMetadata {
     pub fn is_multi_agent(&self) -> bool {
         !self.secondary_signers.is_empty()
     }
+
+    pub fn batch_index(&self) -> u16 {
+        self.batch_index
+    }
 }
 
 impl Default for TransactionMetadata {
@@ -119,6 +125,7 @@ impl Default for TransactionMetadata {
             chain_id: ChainId::test(),
             script_hash: vec![],
             script_size: NumBytes::zero(),
+            batch_index: 0,
         }
     }
 }

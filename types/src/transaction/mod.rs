@@ -15,7 +15,7 @@ use crate::{
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
-use anyhow::{ensure, format_err, Error, Result};
+use anyhow::{ensure, format_err, Error, Result, Context};
 use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
@@ -608,7 +608,7 @@ impl SignedTransaction {
     }
 
     /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
+    pub fn lookup_hash(self) -> HashValue {
         Transaction::UserTransaction(self).hash()
     }
 }
@@ -653,7 +653,7 @@ impl TransactionWithProof {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = self.transaction.as_signed_user_txn()?;
+        let signed_transaction = self.transaction.as_signed_user_txn().context("not user transaction")?;
 
         ensure!(
             self.version == version,
@@ -1524,6 +1524,15 @@ impl AccountTransactionsWithProof {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct OrderedSignedUserTransaction {
+    /// TODO: We need to rename SignedTransaction to SignedUserTransaction, as well as all the other
+    ///       transaction types we had in our codebase.
+    pub transaction: SignedTransaction,
+    pub batch_index: u16,
+}
+
 /// `Transaction` will be the transaction type used internally in the aptos node to represent the
 /// transaction to be processed and persisted.
 ///
@@ -1549,13 +1558,34 @@ pub enum Transaction {
     /// in the TransactionInfo
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
+
+    /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
+    /// transaction, etc, after it has been ordered by consensus, and additional metadata provided.
+    OrderedUserTransaction(OrderedSignedUserTransaction),
 }
 
 impl Transaction {
-    pub fn as_signed_user_txn(&self) -> Result<&SignedTransaction> {
+    // Deterministic hash, users can lookup their transaction by.
+    pub fn lookup_hash(&self) -> aptos_crypto::hash::HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        let mut state = TransactionHasher::default();
+        // Transactions are indexed by hash in the db, we need to make sure
+        // hash is knowable beforehand (used in SignedTransaction.commit_hash())
+        // Maybe we should do something cleaner (and a breaking change) at some point here
+        if let Transaction::OrderedUserTransaction(OrderedSignedUserTransaction{transaction: txn, ..}) = &self {
+            bcs::serialize_into(&mut state, &Transaction::UserTransaction(txn.clone())).expect("serialization error");
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("serialization error");
+        }
+        state.finish()
+    }
+
+    pub fn as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
-            Transaction::UserTransaction(txn) => Ok(txn),
-            _ => Err(format_err!("Not a user transaction.")),
+            Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::OrderedUserTransaction(OrderedSignedUserTransaction{transaction: txn, ..}) => Some(txn),
+            _ => None,
         }
     }
 
@@ -1570,6 +1600,9 @@ impl Transaction {
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
+            Transaction::OrderedUserTransaction(ordered_txn) => {
+                ordered_txn.transaction.format_for_client(get_transaction_name)
+            },
         }
     }
 }

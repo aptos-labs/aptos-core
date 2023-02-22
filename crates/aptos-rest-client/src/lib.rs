@@ -542,7 +542,7 @@ impl Client {
     ) -> AptosResult<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
-            transaction.clone().committed_hash(),
+            transaction.clone().lookup_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
@@ -556,7 +556,7 @@ impl Client {
     ) -> AptosResult<Response<TransactionOnChainData>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash_bcs(
-            transaction.clone().committed_hash(),
+            transaction.clone().lookup_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,

@@ -42,7 +42,7 @@ pub trait VMAdapter {
         &self,
         session: &mut SessionExt<SS>,
         storage: &S,
-        transaction: &SignatureCheckedTransaction,
+        transaction: &OrderedSignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
 
@@ -61,11 +61,11 @@ pub trait VMAdapter {
         &self,
         session: &mut SessionExt<SS>,
         storage: &S,
-        transaction: &SignatureCheckedTransaction,
+        transaction: &OrderedSignatureCheckedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        self.check_transaction_format(transaction)?;
+        self.check_transaction_format(&transaction.checked_txn)?;
 
         let prologue_status = self.run_prologue(session, storage, transaction, log_context);
         match prologue_status {
@@ -79,12 +79,18 @@ pub trait VMAdapter {
     }
 }
 
+#[derive(Debug)]
+pub struct OrderedSignatureCheckedTransaction {
+    pub checked_txn: SignatureCheckedTransaction,
+    pub batch_index: u16,
+}
+
 /// Transactions after signature checking:
 /// Waypoints and BlockPrologues are not signed and are unaffected by signature checking,
 /// but a user transaction or writeset transaction is transformed to a SignatureCheckedTransaction.
 #[derive(Debug)]
 pub enum PreprocessedTransaction {
-    UserTransaction(Box<SignatureCheckedTransaction>),
+    OrderedUserTransaction(Box<OrderedSignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),
     BlockMetadata(BlockMetadata),
     InvalidSignature,
@@ -106,7 +112,16 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                     return PreprocessedTransaction::InvalidSignature;
                 },
             };
-            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
+            PreprocessedTransaction::OrderedUserTransaction(Box::new(OrderedSignatureCheckedTransaction{checked_txn, batch_index: 0}))
+        },
+        Transaction::OrderedUserTransaction(txn) => {
+            let checked_txn = match A::check_signature(txn.transaction) {
+                Ok(checked_txn) => checked_txn,
+                _ => {
+                    return PreprocessedTransaction::InvalidSignature;
+                },
+            };
+            PreprocessedTransaction::OrderedUserTransaction(Box::new(OrderedSignatureCheckedTransaction{checked_txn, batch_index: txn.batch_index}))
         },
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }

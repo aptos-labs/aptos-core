@@ -13,6 +13,7 @@
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
 -  [Function `epilogue`](#0x1_transaction_validation_epilogue)
+-  [Function `epilogue_v2`](#0x1_transaction_validation_epilogue_v2)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
@@ -455,6 +456,46 @@ Called by the Adapter
     txn_max_gas_units: u64,
     gas_units_remaining: u64
 ) {
+    <a href="transaction_validation.md#0x1_transaction_validation_epilogue_v2">epilogue_v2</a>(
+        <a href="account.md#0x1_account">account</a>,
+        _txn_sequence_number,
+        txn_gas_price,
+        txn_max_gas_units,
+        gas_units_remaining,
+        0, // batch_index
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_validation_epilogue_v2"></a>
+
+## Function `epilogue_v2`
+
+Epilogue function is run after a transaction is successfully executed.
+Called by the Adapter
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_v2">epilogue_v2</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _txn_sequence_number: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, batch_index: u16)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_v2">epilogue_v2</a>(
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _txn_sequence_number: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    gas_units_remaining: u64,
+    batch_index: u16,
+) {
     <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
     <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
 
@@ -474,7 +515,7 @@ Called by the Adapter
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         // If transaction fees are redistributed <b>to</b> validators, collect them here for
         // later redistribution.
-        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(addr, transaction_fee_amount);
+        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee_for_batch">transaction_fee::collect_fee_for_batch</a>(addr, transaction_fee_amount, batch_index); // batch_index
     } <b>else</b> {
         // Otherwise, just burn the fee.
         // TODO: this branch should be removed completely when transaction fee collection

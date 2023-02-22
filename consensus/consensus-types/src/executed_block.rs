@@ -14,7 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, Transaction, TransactionStatus},
+    transaction::{Transaction, TransactionStatus, OrderedSignedUserTransaction},
 };
 use std::fmt::{Debug, Display, Formatter};
 
@@ -107,7 +107,8 @@ impl ExecutedBlock {
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
-        txns: Vec<SignedTransaction>,
+        txns: Vec<OrderedSignedUserTransaction>,
+        ordered_wrap_enabled: bool,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 
@@ -115,7 +116,7 @@ impl ExecutedBlock {
             return vec![];
         }
         itertools::zip_eq(
-            self.block.transactions_to_execute(validators, txns),
+            self.block.transactions_to_execute(validators, txns, ordered_wrap_enabled),
             self.state_compute_result.compute_status(),
         )
         .filter_map(|(txn, status)| match status {

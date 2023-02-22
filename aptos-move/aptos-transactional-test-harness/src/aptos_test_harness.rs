@@ -877,6 +877,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     proposer,
                     vec![],
                     vec![],
+                    vec![],
                     block_cmd.time,
                 );
 

@@ -27,7 +27,7 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
+        EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction, OrderedSignedUserTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -112,7 +112,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
-            UserTransaction(txn) => {
+            UserTransaction(txn) | OrderedUserTransaction(OrderedSignedUserTransaction{transaction: txn, batch_index: _}) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
             },

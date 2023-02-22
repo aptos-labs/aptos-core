@@ -6,6 +6,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
+    use std::vector;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -26,45 +27,50 @@ module aptos_framework::transaction_fee {
 
     /// Stores information about the block proposer and the amount of fees
     /// collected when executing the block.
-    struct CollectedFeesPerBlock has key {
-        amount: AggregatableCoin<AptosCoin>,
-        proposer: Option<address>,
-        burn_percentage: u8,
+    struct CollectedFeesPerBlockAndBatches has key {
+        amount: vector<AggregatableCoin<AptosCoin>>,
+        block_proposer: Option<address>,
+        batch_proposers: vector<address>,
+        block_distribution_percentage: u8,
+        batch_distribution_percentage: u8,
     }
 
     /// Initializes the resource storing information about gas fees collection and
     /// distribution. Should be called by on-chain governance.
-    public fun initialize_fee_collection_and_distribution(aptos_framework: &signer, burn_percentage: u8) {
+    public fun initialize_fee_collection_and_distributions(aptos_framework: &signer, block_distribution_percentage: u8, batch_distribution_percentage: u8) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
-            !exists<CollectedFeesPerBlock>(@aptos_framework),
+            !exists<CollectedFeesPerBlockAndBatches>(@aptos_framework),
             error::already_exists(EALREADY_COLLECTING_FEES)
         );
-        assert!(burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
+        assert!(block_distribution_percentage + batch_distribution_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
 
         // Make sure stakng module is aware of transaction fees collection.
         stake::initialize_validator_fees(aptos_framework);
 
         // Initially, no fees are collected and the block proposer is not set.
-        let collected_fees = CollectedFeesPerBlock {
-            amount: coin::initialize_aggregatable_coin(aptos_framework),
-            proposer: option::none(),
-            burn_percentage,
+        let collected_fees = CollectedFeesPerBlockAndBatches {
+            amount: vector::empty(),
+            block_proposer: option::none(),
+            batch_proposers: vector::empty(),
+            block_distribution_percentage,
+            batch_distribution_percentage,
         };
         move_to(aptos_framework, collected_fees);
     }
 
     fun is_fees_collection_enabled(): bool {
-        exists<CollectedFeesPerBlock>(@aptos_framework)
+        exists<CollectedFeesPerBlockAndBatches>(@aptos_framework)
     }
 
     /// Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
-    public fun upgrade_burn_percentage(
+    public fun upgrade_distribution_percentages(
         aptos_framework: &signer,
-        new_burn_percentage: u8
-    ) acquires AptosCoinCapabilities, CollectedFeesPerBlock {
+        new_block_distribution_percentage: u8,
+        new_batch_distribution_percentage: u8
+    ) acquires CollectedFeesPerBlockAndBatches { // AptosCoinCapabilities
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(new_burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
+        assert!(new_block_distribution_percentage + new_batch_distribution_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
 
         // Prior to upgrading the burn percentage, make sure to process collected
         // fees. Otherwise we would use the new (incorrect) burn_percentage when
@@ -73,17 +79,20 @@ module aptos_framework::transaction_fee {
 
         if (is_fees_collection_enabled()) {
             // Upgrade has no effect unless fees are being collected.
-            let burn_percentage = &mut borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework).burn_percentage;
-            *burn_percentage = new_burn_percentage
+            let config = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
+            config.block_distribution_percentage = new_block_distribution_percentage;
+            config.batch_distribution_percentage = new_batch_distribution_percentage;
         }
     }
 
     /// Registers the proposer of the block for gas fees collection. This function
     /// can only be called at the beginning of the block.
-    public(friend) fun register_proposer_for_fee_collection(proposer_addr: address) acquires CollectedFeesPerBlock {
+    public(friend) fun register_proposers_for_fee_collection(block_proposer_addr: address, batch_proposers_addr: vector<address>) acquires CollectedFeesPerBlockAndBatches {
         if (is_fees_collection_enabled()) {
-            let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
-            let _ = option::swap_or_fill(&mut collected_fees.proposer, proposer_addr);
+            let collected_fees = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
+            // TODO implement
+            //  coin::initialize_aggregatable_coin(aptos_framework)
+            // let _ = option::swap_or_fill(&mut collected_fees.proposer, proposer_addr);
         }
     }
 
@@ -109,49 +118,49 @@ module aptos_framework::transaction_fee {
     /// Calculates the fee which should be distributed to the block proposer at the
     /// end of an epoch, and records it in the system. This function can only be called
     /// at the beginning of the block or during reconfiguration.
-    public(friend) fun process_collected_fees() acquires AptosCoinCapabilities, CollectedFeesPerBlock {
+    public(friend) fun process_collected_fees() acquires CollectedFeesPerBlockAndBatches { // AptosCoinCapabilities
         if (!is_fees_collection_enabled()) {
             return
         };
-        let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
 
-        // If there are no collected fees, only unset the proposer. See the rationale for
-        // setting proposer to option::none() below.
-        if (coin::is_aggregatable_coin_zero(&collected_fees.amount)) {
-            if (option::is_some(&collected_fees.proposer)) {
-                let _ = option::extract(&mut collected_fees.proposer);
-            };
-            return
-        };
+        // // If there are no collected fees, only unset the proposer. See the rationale for
+        // // setting proposer to option::none() below.
+        // if (coin::is_aggregatable_coin_zero(&collected_fees.amount)) {
+        //     if (option::is_some(&collected_fees.proposer)) {
+        //         let _ = option::extract(&mut collected_fees.proposer);
+        //     };
+        //     return
+        // };
 
-        // Otherwise get the collected fee, and check if it can distributed later.
-        let coin = coin::drain_aggregatable_coin(&mut collected_fees.amount);
-        if (option::is_some(&collected_fees.proposer)) {
-            // Extract the address of proposer here and reset it to option::none(). This
-            // is particularly useful to avoid any undesired side-effects where coins are
-            // collected but never distributed or distributed to the wrong account.
-            // With this design, processing collected fees enforces that all fees will be burnt
-            // unless the proposer is specified in the block prologue. When we have a governance
-            // proposal that triggers reconfiguration, we distribute pending fees and burn the
-            // fee for the proposal. Otherwise, that fee would be leaked to the next block.
-            let proposer = option::extract(&mut collected_fees.proposer);
+        // // Otherwise get the collected fee, and check if it can distributed later.
+        // let coin = coin::drain_aggregatable_coin(&mut collected_fees.amount);
+        // if (option::is_some(&collected_fees.proposer)) {
+        //     // Extract the address of proposer here and reset it to option::none(). This
+        //     // is particularly useful to avoid any undesired side-effects where coins are
+        //     // collected but never distributed or distributed to the wrong account.
+        //     // With this design, processing collected fees enforces that all fees will be burnt
+        //     // unless the proposer is specified in the block prologue. When we have a governance
+        //     // proposal that triggers reconfiguration, we distribute pending fees and burn the
+        //     // fee for the proposal. Otherwise, that fee would be leaked to the next block.
+        //     let proposer = option::extract(&mut collected_fees.proposer);
 
-            // Since the block can be produced by the VM itself, we have to make sure we catch
-            // this case.
-            if (proposer == @vm_reserved) {
-                burn_coin_fraction(&mut coin, 100);
-                coin::destroy_zero(coin);
-                return
-            };
+        //     // Since the block can be produced by the VM itself, we have to make sure we catch
+        //     // this case.
+        //     if (proposer == @vm_reserved) {
+        //         burn_coin_fraction(&mut coin, 100);
+        //         coin::destroy_zero(coin);
+        //         return
+        //     };
 
-            burn_coin_fraction(&mut coin, collected_fees.burn_percentage);
-            stake::add_transaction_fee(proposer, coin);
-            return
-        };
+        //     burn_coin_fraction(&mut coin, collected_fees.burn_percentage);
+        //     stake::add_transaction_fee(proposer, coin);
+        //     return
+        // };
 
-        // If checks did not pass, simply burn all collected coins and return none.
-        burn_coin_fraction(&mut coin, 100);
-        coin::destroy_zero(coin)
+        // // If checks did not pass, simply burn all collected coins and return none.
+        // burn_coin_fraction(&mut coin, 100);
+        // coin::destroy_zero(coin)
     }
 
     /// Burn transaction fees in epilogue.
@@ -164,14 +173,14 @@ module aptos_framework::transaction_fee {
     }
 
     /// Collect transaction fees in epilogue.
-    public(friend) fun collect_fee(account: address, fee: u64) acquires CollectedFeesPerBlock {
-        let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
+    public(friend) fun collect_fee_for_batch(account: address, fee: u64, batch_index: u16) acquires CollectedFeesPerBlockAndBatches {
+        let collected_fees = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
 
         // Here, we are always optimistic and always collect fees. If the proposer is not set,
         // or we cannot redistribute fees later for some reason (e.g. account cannot receive AptoCoin)
         // we burn them all at once. This way we avoid having a check for every transaction epilogue.
         let collected_amount = &mut collected_fees.amount;
-        coin::collect_into_aggregatable_coin<AptosCoin>(account, fee, collected_amount);
+        // coin::collect_into_aggregatable_coin<AptosCoin>(account, fee, collected_amount);
     }
 
     /// Only called during genesis.
@@ -184,15 +193,15 @@ module aptos_framework::transaction_fee {
     use aptos_framework::aggregator_factory;
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_initialize_fee_collection_and_distribution(aptos_framework: signer) acquires CollectedFeesPerBlock {
+    fun test_initialize_fee_collection_and_distribution(aptos_framework: signer) acquires CollectedFeesPerBlockAndBatches {
         aggregator_factory::initialize_aggregator_factory_for_test(&aptos_framework);
-        initialize_fee_collection_and_distribution(&aptos_framework, 25);
+        initialize_fee_collection_and_distributions(&aptos_framework, 10, 65);
 
         // Check struct has been published.
-        assert!(exists<CollectedFeesPerBlock>(@aptos_framework), 0);
+        assert!(exists<CollectedFeesPerBlockAndBatches>(@aptos_framework), 0);
 
         // Check that initial balance is 0 and there is no proposer set.
-        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
         assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(option::is_none(&collected_fees.proposer), 0);
         assert!(collected_fees.burn_percentage == 25, 0);
@@ -242,7 +251,7 @@ module aptos_framework::transaction_fee {
         alice: signer,
         bob: signer,
         carol: signer,
-    ) acquires AptosCoinCapabilities, CollectedFeesPerBlock {
+    ) acquires AptosCoinCapabilities, CollectedFeesPerBlockAndBatches {
         use std::signer;
         use aptos_framework::aptos_account;
         use aptos_framework::aptos_coin;
@@ -250,7 +259,7 @@ module aptos_framework::transaction_fee {
         // Initialization.
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         store_aptos_coin_burn_cap(&aptos_framework, burn_cap);
-        initialize_fee_collection_and_distribution(&aptos_framework, 10);
+        initialize_fee_collection_and_distributions(&aptos_framework, 10, 80);
 
         // Create dummy accounts.
         let alice_addr = signer::address_of(&alice);
@@ -269,7 +278,7 @@ module aptos_framework::transaction_fee {
         register_proposer_for_fee_collection(alice_addr);
 
         // Check that there was no fees distribution in the first block.
-        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
         assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 30000, 0);
@@ -295,7 +304,7 @@ module aptos_framework::transaction_fee {
         assert!(coin::balance<AptosCoin>(carol_addr) == 10000, 0);
 
         // Also, aggregator coin is drained and total supply is slightly changed (10% of 1000 is burnt).
-        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
         assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == bob_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 29900, 0);
@@ -320,7 +329,7 @@ module aptos_framework::transaction_fee {
         assert!(coin::balance<AptosCoin>(carol_addr) == 10000, 0);
 
         // Again, aggregator coin is drained and total supply is changed by 10% of 9000.
-        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
         assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == carol_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 29000, 0);
@@ -338,7 +347,7 @@ module aptos_framework::transaction_fee {
         assert!(coin::balance<AptosCoin>(bob_addr) == 0, 0);
 
         // Carol must have some fees assigned now.
-        let collected_fees = borrow_global<CollectedFeesPerBlock>(@aptos_framework);
+        let collected_fees = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
         assert!(stake::get_validator_fee(carol_addr) == 1800, 0);
         assert!(coin::is_aggregatable_coin_zero(&collected_fees.amount), 0);
         assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
@@ -346,5 +355,31 @@ module aptos_framework::transaction_fee {
 
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
+    }
+
+
+    // OLD: keeping for backward compatibility.
+
+    /// Stores information about the block proposer and the amount of fees
+    /// collected when executing the block.
+    struct CollectedFeesPerBlock has key {
+        amount: AggregatableCoin<AptosCoin>,
+        proposer: Option<address>,
+        burn_percentage: u8,
+    }
+
+    public fun initialize_fee_collection_and_distribution(aptos_framework: &signer, burn_percentage: u8) {
+    }
+
+    public fun upgrade_burn_percentage(
+        aptos_framework: &signer,
+        new_burn_percentage: u8
+    ) {
+    }
+
+    public(friend) fun register_proposer_for_fee_collection(proposer_addr: address) {
+    }
+
+    public(friend) fun collect_fee(account: address, fee: u64) {
     }
 }

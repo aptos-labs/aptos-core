@@ -97,12 +97,13 @@ module aptos_framework::block {
 
     /// Set the metadata for the current block.
     /// The runtime always runs this before executing the transactions in a block.
-    fun block_prologue(
+    fun block_prologue_v2(
         vm: signer,
         hash: address,
         epoch: u64,
         round: u64,
-        proposer: address,
+        block_proposer: address,
+        batch_proposers: vector<address>,
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
@@ -112,13 +113,13 @@ module aptos_framework::block {
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
-            proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
+            block_proposer == @vm_reserved || stake::is_current_epoch_validator(block_proposer),
             error::permission_denied(EINVALID_PROPOSER),
         );
 
         let proposer_index = option::none();
-        if (proposer != @vm_reserved) {
-            proposer_index = option::some(stake::get_validator_index(proposer));
+        if (block_proposer != @vm_reserved) {
+            proposer_index = option::some(stake::get_validator_index(block_proposer));
         };
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
@@ -130,7 +131,7 @@ module aptos_framework::block {
             round,
             height: block_metadata_ref.height,
             previous_block_votes_bitvec,
-            proposer,
+            proposer: block_proposer,
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
@@ -142,7 +143,7 @@ module aptos_framework::block {
             transaction_fee::process_collected_fees();
             // Set the proposer of this block as the receiver of the fees, so that the fees for this
             // block are assigned to the right account.
-            transaction_fee::register_proposer_for_fee_collection(proposer);
+            transaction_fee::register_proposers_for_fee_collection(block_proposer, batch_proposers);
         };
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
@@ -153,6 +154,31 @@ module aptos_framework::block {
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
         };
+    }
+
+    /// Set the metadata for the current block.
+    /// The runtime always runs this before executing the transactions in a block.
+    fun block_prologue(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64
+    ) acquires BlockResource {
+        block_prologue_v2(
+            vm,
+            hash,
+            epoch,
+            round,
+            proposer,
+            vector::empty(),
+            failed_proposer_indices,
+            previous_block_votes_bitvec,
+            timestamp,
+        );
     }
 
     /// Get the current block height
