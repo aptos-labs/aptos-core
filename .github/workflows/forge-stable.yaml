@@ -69,7 +69,7 @@ jobs:
           ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
           fetch-depth: 0
 
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@${{ github.base_ref }}
         with:
           cancel-workflow: true
 

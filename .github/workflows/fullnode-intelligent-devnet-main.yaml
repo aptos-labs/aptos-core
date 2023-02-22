@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@${{ github.base_ref }}
         with:
           cancel-workflow: true
 
