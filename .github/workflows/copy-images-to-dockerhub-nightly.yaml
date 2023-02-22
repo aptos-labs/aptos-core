@@ -9,7 +9,16 @@ permissions:
   id-token: write #required for GCP Workload Identity federation
 
 jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: true
+
   copy-images-to-dockerhub:
+    needs: check-repo
     if: github.repository == 'aptos-labs/aptos-core'
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:

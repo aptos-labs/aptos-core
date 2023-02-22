@@ -13,7 +13,7 @@ use aptos_backup_cli::{
         verify::VerifyCoordinator,
     },
     metadata::{cache, cache::MetadataCacheOpt},
-    storage::{DBToolStorageOpt, StorageOpt},
+    storage::DBToolStorageOpt,
     utils::{
         backup_service_client::{BackupServiceClient, BackupServiceClientOpt},
         ConcurrentDownloadsOpt, GlobalBackupOpt, TrustedWaypointOpt,
@@ -68,8 +68,8 @@ pub struct OneShotQueryBackupStorageStateOpt {
     metadata_cache: MetadataCacheOpt,
     #[clap(flatten)]
     concurrent_downloads: ConcurrentDownloadsOpt,
-    #[clap(subcommand)]
-    storage: StorageOpt,
+    #[clap(flatten)]
+    storage: DBToolStorageOpt,
 }
 
 #[derive(Parser)]

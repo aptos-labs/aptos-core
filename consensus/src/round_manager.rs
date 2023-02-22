@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -690,7 +691,18 @@ impl RoundManager {
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
-            // same proposal to self after some time.
+            // same proposal to self after some time. Even if processing proposal is delayed, we add
+            // the block to the block store so that we don't need to fetch it from remote once we
+            // are out of the backpressure. Please note that delayed processing of proposal is not
+            // guaranteed to add the block to the block store if we don't get out of the backpressure
+            // before the timeout, so this is needed to ensure that the proposed block is added to
+            // the block store irrespective. Also, it is possible that delayed processing of proposal
+            // tries to add the same block again, which is okay as `execute_and_insert_block` call
+            // is idempotent.
+            self.block_store
+                .execute_and_insert_block(proposal.clone())
+                .await
+                .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
                 proposal,
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
