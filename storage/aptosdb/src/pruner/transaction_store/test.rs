@@ -11,7 +11,9 @@ use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     proof::position::Position,
-    transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
+    transaction::{
+        OrderedSignedUserTransaction, SignedTransaction, Transaction, TransactionInfo, Version,
+    },
     write_set::WriteSet,
 };
 use proptest::{collection::vec, prelude::*, proptest};
@@ -25,6 +27,7 @@ proptest! {
         prop_oneof![
             any::<BlockMetadata>().prop_map(Transaction::BlockMetadata),
             any::<SignedTransaction>().prop_map(Transaction::UserTransaction),
+            any::<SignedTransaction>().prop_map(|t| Transaction::OrderedUserTransaction(OrderedSignedUserTransaction{transaction: t, batch_index: 0})),
         ], 1..100,),
         txn_infos in vec(any::<TransactionInfo>(),100,),
         step_size in 1usize..20,
@@ -35,9 +38,9 @@ proptest! {
      #[test]
     fn test_write_set_pruner(
         write_set in vec(any::<WriteSet>(), 100),
-        ) {
-            verify_write_set_pruner(write_set);
-        }
+    ) {
+        verify_write_set_pruner(write_set);
+    }
 }
 
 fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {

@@ -15,7 +15,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
@@ -870,17 +870,18 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         match input.command {
             AptosSubCommand::BlockCommand(block_cmd) => {
                 let proposer = self.compiled_state().resolve_address(&block_cmd.proposer);
-                let metadata = BlockMetadata::new(
+                let metadata = BlockMetadataV2::new(
                     HashValue::zero(),
                     0,
                     block_cmd.time,
                     proposer,
                     vec![],
                     vec![],
+                    vec![],
                     block_cmd.time,
                 );
 
-                let output = self.run_transaction(Transaction::BlockMetadata(metadata))?;
+                let output = self.run_transaction(Transaction::BlockMetadataV2(metadata))?;
 
                 Ok(render_events(output.events()))
             },

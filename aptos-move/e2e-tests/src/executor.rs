@@ -27,7 +27,7 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     chain_id::ChainId,
     on_chain_config::{
         Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
@@ -512,16 +512,17 @@ impl FakeExecutor {
             txns.into_iter().map(Transaction::UserTransaction).collect();
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
-        let new_block_metadata = BlockMetadata::new(
+        let new_block_metadata = BlockMetadataV2::new(
             HashValue::zero(),
             0,
             0,
             proposer,
+            vec![],
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
         );
-        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
+        txn_block.insert(0, Transaction::BlockMetadataV2(new_block_metadata));
 
         let outputs = self
             .execute_transaction_block(txn_block)

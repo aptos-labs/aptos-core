@@ -101,4 +101,84 @@ impl BlockMetadata {
     pub fn round(&self) -> u64 {
         self.round
     }
+
+    pub fn into_v2(self) -> BlockMetadataV2 {
+        BlockMetadataV2 {
+            inner: self,
+            batch_proposers: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockMetadataV2 {
+    inner: BlockMetadata,
+    batch_proposers: Vec<AccountAddress>,
+}
+
+impl BlockMetadataV2 {
+    pub fn new(
+        id: HashValue,
+        epoch: u64,
+        round: u64,
+        proposer: AccountAddress,
+        batch_proposers: Vec<AccountAddress>,
+        previous_block_votes_bitvec: Vec<u8>,
+        failed_proposer_indices: Vec<u32>,
+        timestamp_usecs: u64,
+    ) -> Self {
+        Self {
+            inner: BlockMetadata::new(
+                id,
+                epoch,
+                round,
+                proposer,
+                previous_block_votes_bitvec,
+                failed_proposer_indices,
+                timestamp_usecs,
+            ),
+            batch_proposers,
+        }
+    }
+
+    pub fn get_inner(&self) -> &BlockMetadata {
+        &self.inner
+    }
+
+    pub fn into_inner(self) -> BlockMetadata {
+        self.inner
+    }
+
+    pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+        vec![
+            MoveValue::Signer(signer),
+            MoveValue::Address(AccountAddress::from_bytes(self.inner.id.to_vec()).unwrap()),
+            MoveValue::U64(self.inner.epoch),
+            MoveValue::U64(self.inner.round),
+            MoveValue::Address(self.inner.proposer),
+            MoveValue::Vector(
+                self.batch_proposers
+                    .into_iter()
+                    .map(|a| AccountAddress::from_bytes(a.to_vec()).unwrap())
+                    .map(MoveValue::Address)
+                    .collect(),
+            ),
+            MoveValue::Vector(
+                self.inner
+                    .failed_proposer_indices
+                    .into_iter()
+                    .map(u64::from)
+                    .map(MoveValue::U64)
+                    .collect(),
+            ),
+            MoveValue::Vector(
+                self.inner
+                    .previous_block_votes_bitvec
+                    .into_iter()
+                    .map(MoveValue::U8)
+                    .collect(),
+            ),
+            MoveValue::U64(self.inner.timestamp_usecs),
+        ]
+    }
 }

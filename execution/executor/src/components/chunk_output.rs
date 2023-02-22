@@ -204,8 +204,10 @@ pub fn update_counters_for_processed_chunk(
 
         let kind = match txn {
             Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::OrderedUserTransaction(_) => "ordered_user_transaction",
             Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
+            Transaction::BlockMetadata(_) => "block_metadata_v1",
+            Transaction::BlockMetadataV2(_) => "block_metadata_v2",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
         };
 

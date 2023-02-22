@@ -18,7 +18,7 @@ use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, 
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     chain_id::ChainId,
     event::EventKey,
     test_helpers::transaction_test_helpers::block,
@@ -71,11 +71,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let txn_factory = TransactionFactory::new(ChainId::test());
 
     let block1_id = gen_block_id(1);
-    let block1_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block1_meta = Transaction::BlockMetadataV2(BlockMetadataV2::new(
         block1_id,
         1,
         0,
         signer.author(),
+        vec![],
         vec![0],
         vec![],
         1,
@@ -130,11 +131,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     ];
 
     let block2_id = gen_block_id(2);
-    let block2_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block2_meta = Transaction::BlockMetadataV2(BlockMetadataV2::new(
         block2_id,
         2,
         0,
         signer.author(),
+        vec![],
         vec![0],
         vec![],
         2,
@@ -144,11 +146,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
     let block3_id = gen_block_id(3);
-    let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block3_meta = Transaction::BlockMetadataV2(BlockMetadataV2::new(
         block3_id,
         2,
         1,
         signer.author(),
+        vec![],
         vec![0],
         vec![],
         3,

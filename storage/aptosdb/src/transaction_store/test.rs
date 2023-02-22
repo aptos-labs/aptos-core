@@ -8,7 +8,7 @@ use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proptest_types::{AccountInfoUniverse, SignatureCheckedTransactionGen},
-    transaction::Transaction,
+    transaction::{OrderedSignedUserTransaction, Transaction},
 };
 use proptest::{collection::vec, prelude::*};
 use std::collections::BTreeMap;
@@ -207,7 +207,10 @@ fn init_store(
     let txns = gens
         .into_iter()
         .map(|(index, gen)| {
-            Transaction::UserTransaction(gen.materialize(*index, &mut universe).into_inner())
+            Transaction::OrderedUserTransaction(OrderedSignedUserTransaction {
+                transaction: gen.materialize(*index, &mut universe).into_inner(),
+                batch_index: 0,
+            })
         })
         .collect::<Vec<_>>();
 

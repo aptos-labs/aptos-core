@@ -16,14 +16,15 @@ use aptos_executor_types::{Error, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainConsensusConfig, transaction::OrderedSignedUserTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStateComputer {
-    state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
+    state_sync_client: mpsc::UnboundedSender<Vec<OrderedSignedUserTransaction>>,
     executor_channel: UnboundedSender<OrderedBlocks>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
@@ -32,7 +33,7 @@ pub struct MockStateComputer {
 
 impl MockStateComputer {
     pub fn new(
-        state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
+        state_sync_client: mpsc::UnboundedSender<Vec<OrderedSignedUserTransaction>>,
         executor_channel: UnboundedSender<OrderedBlocks>,
         consensus_db: Arc<MockStorage>,
     ) -> Self {
@@ -132,7 +133,7 @@ impl StateComputer for MockStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
+    fn new_epoch(&self, _: &EpochState, _: &OnChainConsensusConfig, _: Arc<PayloadManager>) {}
 }
 
 pub struct EmptyStateComputer;
@@ -160,7 +161,7 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
+    fn new_epoch(&self, _: &EpochState, _: &OnChainConsensusConfig, _: Arc<PayloadManager>) {}
 }
 
 /// Random Compute Result State Computer
@@ -212,5 +213,5 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
+    fn new_epoch(&self, _: &EpochState, _: &OnChainConsensusConfig, _: Arc<PayloadManager>) {}
 }

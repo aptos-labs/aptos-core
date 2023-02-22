@@ -13,7 +13,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{OrderedSignedUserTransaction, SignedTransaction};
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -120,14 +120,24 @@ impl PayloadManager {
 
     /// Extract transaction from a given block
     /// Assumes it is never called for the same block concurrently. Otherwise status can be None.
-    pub async fn get_transactions(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
+    pub async fn get_transactions(
+        &self,
+        block: &Block,
+    ) -> Result<Vec<OrderedSignedUserTransaction>, Error> {
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok(Vec::new()),
         };
 
         match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns
+                .clone()
+                .into_iter()
+                .map(|t| OrderedSignedUserTransaction {
+                    transaction: t,
+                    batch_index: 0,
+                })
+                .collect()),
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
                 Payload::InQuorumStore(proof_with_data),
@@ -181,7 +191,18 @@ impl PayloadManager {
                                 },
                             }
                         }
-                        let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+                        let ret: Vec<OrderedSignedUserTransaction> = vec_ret
+                            .into_iter()
+                            .enumerate()
+                            .flat_map(|(batch_index, txns)| {
+                                txns.into_iter()
+                                    .map(|t| OrderedSignedUserTransaction {
+                                        transaction: t,
+                                        batch_index: u16::try_from(batch_index).unwrap(),
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .collect();
                         // execution asks for the data twice, so data is cached here for the second time.
                         proof_with_data
                             .status

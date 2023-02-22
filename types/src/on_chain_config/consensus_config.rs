@@ -74,6 +74,10 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V2(_config) => true,
         }
     }
+
+    pub fn ordered_wrap_enabled(&self) -> bool {
+        true
+    }
 }
 
 /// This is used when on-chain config is not initialized.

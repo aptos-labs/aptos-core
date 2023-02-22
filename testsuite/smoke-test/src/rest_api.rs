@@ -7,6 +7,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_forge::Swarm;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_logger::info;
 use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
@@ -476,4 +477,85 @@ async fn test_bcs() {
         json_events.first().unwrap().version.0,
         bcs_events.first().unwrap().transaction_version
     );
+}
+
+#[tokio::test]
+async fn test_get_user_transactions() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
+
+    let account1 = info.random_account();
+    let factory = info
+        .transaction_factory()
+        .with_transaction_expiration_time(10);
+    let create_account_txn = info
+        .root_account()
+        .sign_with_transaction_builder(factory.payload(
+            aptos_stdlib::aptos_account_create_account(account1.address()),
+        ));
+    let txn_submit_result = info.client().submit_and_wait(&create_account_txn).await;
+
+    let root_address = info.root_account().address();
+    let root_transactions = info
+        .client()
+        .get_account_transactions(root_address, Some(0), Some(10))
+        .await
+        .unwrap()
+        .into_inner();
+    let root_transactions_bcs = info
+        .client()
+        .get_account_transactions(root_address, Some(0), Some(10))
+        .await
+        .unwrap()
+        .into_inner();
+    let transactions = info
+        .client()
+        .get_transactions(Some(0), Some(1000))
+        .await
+        .unwrap()
+        .into_inner();
+    let user_transactions = transactions
+        .into_iter()
+        .filter(|t| matches!(t, aptos_rest_client::Transaction::UserTransaction(_)))
+        .collect::<Vec<_>>();
+    let transactions_bcs = info
+        .client()
+        .get_transactions(Some(0), Some(1000))
+        .await
+        .unwrap()
+        .into_inner();
+    let user_transactions_bcs = transactions_bcs
+        .into_iter()
+        .filter(|t| matches!(t, aptos_rest_client::Transaction::UserTransaction(_)))
+        .collect::<Vec<_>>();
+
+    let txn_by_hash = info
+        .client()
+        .get_transaction_by_hash(create_account_txn.clone().lookup_hash())
+        .await;
+
+    info!("created_txn: {:?}", create_account_txn);
+    info!("txn result: {:?}", txn_submit_result);
+    info!("txn_by_hash: {:?}", txn_by_hash);
+    info!(
+        "root_transactions [{}]: {:?}",
+        root_transactions.len(),
+        root_transactions
+    );
+    info!(
+        "root_transactions_bcs [{}]: {:?}",
+        root_transactions_bcs.len(),
+        root_transactions_bcs
+    );
+    info!(
+        "user_transactions [{}]: {:?}",
+        user_transactions.len(),
+        user_transactions
+    );
+    assert!(txn_submit_result.is_ok());
+    assert!(txn_by_hash.is_ok());
+    assert_eq!(1, root_transactions.len());
+    assert_eq!(root_transactions, root_transactions_bcs);
+    assert_eq!(root_transactions, user_transactions);
+    assert_eq!(root_transactions, user_transactions_bcs);
 }

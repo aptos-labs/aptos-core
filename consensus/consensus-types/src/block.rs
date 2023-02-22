@@ -13,10 +13,10 @@ use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    block_metadata::BlockMetadata,
+    block_metadata::{BlockMetadata, BlockMetadataV2},
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{OrderedSignedUserTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -100,6 +100,18 @@ impl Block {
 
     pub fn payload(&self) -> Option<&Payload> {
         self.block_data.payload()
+    }
+
+    pub fn batch_proposers(&self) -> Vec<Author> {
+        if let Some(Payload::InQuorumStore(proof_with_data)) = self.payload() {
+            return proof_with_data
+                .proofs
+                .iter()
+                .map(|p| p.info().batch_author)
+                .collect();
+        }
+
+        Vec::new()
     }
 
     pub fn payload_size(&self) -> usize {
@@ -345,14 +357,24 @@ impl Block {
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
-        txns: Vec<SignedTransaction>,
+        txns: Vec<OrderedSignedUserTransaction>,
+        ordered_wrap_enabled: bool,
     ) -> Vec<Transaction> {
-        once(Transaction::BlockMetadata(
-            self.new_block_metadata(validators),
-        ))
-        .chain(txns.into_iter().map(Transaction::UserTransaction))
-        .chain(once(Transaction::StateCheckpoint(self.id)))
-        .collect()
+        let block_metadata_transaciton = if ordered_wrap_enabled {
+            Transaction::BlockMetadataV2(self.new_block_metadata_v2(validators))
+        } else {
+            Transaction::BlockMetadata(self.new_block_metadata(validators))
+        };
+        once(block_metadata_transaciton)
+            .chain(txns.into_iter().map(|t| {
+                if ordered_wrap_enabled {
+                    Transaction::OrderedUserTransaction(t)
+                } else {
+                    Transaction::UserTransaction(t.transaction)
+                }
+            }))
+            .chain(once(Transaction::StateCheckpoint(self.id)))
+            .collect()
     }
 
     fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
@@ -361,6 +383,29 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
+            // A bitvec of voters
+            self.quorum_cert()
+                .ledger_info()
+                .get_voters_bitvec()
+                .clone()
+                .into(),
+            // For nil block, we use 0x0 which is convention for nil address in move.
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+        )
+    }
+
+    fn new_block_metadata_v2(&self, validators: &[AccountAddress]) -> BlockMetadataV2 {
+        BlockMetadataV2::new(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.batch_proposers(),
             // A bitvec of voters
             self.quorum_cert()
                 .ledger_info()

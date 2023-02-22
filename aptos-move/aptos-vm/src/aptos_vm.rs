@@ -4,7 +4,8 @@
 
 use crate::{
     adapter_common::{
-        discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
+        discard_error_output, discard_error_vm_status, OrderedSignatureCheckedTransaction,
+        PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::BlockAptosVM,
@@ -31,7 +32,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
         ChangeSet, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -966,7 +967,7 @@ impl AptosVM {
     pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
         &self,
         storage: &S,
-        txn: &SignatureCheckedTransaction,
+        txn: &OrderedSignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, TransactionOutputExt) {
         macro_rules! unwrap_or_discard {
@@ -980,7 +981,9 @@ impl AptosVM {
 
         // Revalidate the transaction.
         let resolver = self.0.new_move_resolver(storage);
-        let mut session = self.0.new_session(&resolver, SessionId::txn(txn));
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::txn(&txn.checked_txn));
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             storage,
@@ -997,12 +1000,14 @@ impl AptosVM {
             // have been previously cached in the prologue.
             //
             // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
-            session = self.0.new_session(&resolver, SessionId::txn(txn));
+            session = self
+                .0
+                .new_session(&resolver, SessionId::txn(&txn.checked_txn));
         }
 
         let gas_params = unwrap_or_discard!(self.0.get_gas_parameters(log_context));
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
-        let txn_data = TransactionMetadata::new(txn);
+        let txn_data = TransactionMetadata::new(&txn.checked_txn, txn.batch_index);
         let mut gas_meter = AptosGasMeter::new(
             self.0.get_gas_feature_version(),
             gas_params.clone(),
@@ -1014,7 +1019,7 @@ impl AptosVM {
         // cache as part of executing transactions. This would allow us to decide whether the cache
         // should be flushed later.
         let mut new_published_modules_loaded = false;
-        let result = match txn.payload() {
+        let result = match txn.checked_txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::EntryFunction(_) => self
                 .execute_script_or_entry_function(
@@ -1204,7 +1209,8 @@ impl AptosVM {
     pub(crate) fn process_block_prologue<S: MoveResolverExt>(
         &self,
         storage: &S,
-        block_metadata: BlockMetadata,
+        block_metadata: BlockMetadataV2,
+        use_v2: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
@@ -1222,20 +1228,41 @@ impl AptosVM {
         let resolver = self.0.new_move_resolver(storage);
         let mut session = self
             .0
-            .new_session(&resolver, SessionId::block_meta(&block_metadata));
+            .new_session(&resolver, SessionId::block_meta(block_metadata.get_inner()));
 
-        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
+        let args = if use_v2 {
+            serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender))
+        } else {
+            serialize_values(
+                &block_metadata
+                    .into_inner()
+                    .get_prologue_move_args(txn_data.sender),
+            )
+        };
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
-                BLOCK_PROLOGUE,
+                if use_v2 {
+                    BLOCK_PROLOGUE_V2
+                } else {
+                    BLOCK_PROLOGUE
+                },
                 vec![],
                 args,
                 &mut gas_meter,
             )
             .map(|_return_vals| ())
             .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+                expect_only_successful_execution(
+                    e,
+                    if use_v2 {
+                        BLOCK_PROLOGUE_V2
+                    } else {
+                        BLOCK_PROLOGUE
+                    }
+                    .as_str(),
+                    log_context,
+                )
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -1413,7 +1440,10 @@ impl VMValidator for AptosVM {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = match Self::check_signature(transaction) {
-            Ok(t) => t,
+            Ok(t) => OrderedSignatureCheckedTransaction {
+                checked_txn: t,
+                batch_index: 0,
+            },
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
@@ -1421,7 +1451,7 @@ impl VMValidator for AptosVM {
 
         let inner_resolver = &state_view.as_move_resolver();
         let resolver = self.0.new_move_resolver(inner_resolver);
-        let mut session = self.new_session(&resolver, SessionId::txn(&txn));
+        let mut session = self.new_session(&resolver, SessionId::txn(&txn.checked_txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,
@@ -1434,7 +1464,7 @@ impl VMValidator for AptosVM {
         let (counter_label, result) = match validation_result {
             Ok(_) => (
                 "success",
-                VMValidatorResult::new(None, txn.gas_unit_price()),
+                VMValidatorResult::new(None, txn.checked_txn.gas_unit_price()),
             ),
             Err(err) => (
                 "failure",
@@ -1475,14 +1505,14 @@ impl VMAdapter for AptosVM {
         &self,
         session: &mut SessionExt<SS>,
         storage: &S,
-        transaction: &SignatureCheckedTransaction,
+        transaction: &OrderedSignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let txn_data = TransactionMetadata::new(transaction);
+        let txn_data = TransactionMetadata::new(&transaction.checked_txn, transaction.batch_index);
         self.run_prologue_with_payload(
             session,
             storage,
-            transaction.payload(),
+            transaction.checked_txn.payload(),
             &txn_data,
             log_context,
             false,
@@ -1504,10 +1534,14 @@ impl VMAdapter for AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
-            PreprocessedTransaction::BlockMetadata(block_metadata) => {
+            PreprocessedTransaction::BlockMetadata(block_metadata, use_v2) => {
                 fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
+                let (vm_status, output) = self.process_block_prologue(
+                    data_cache,
+                    block_metadata.clone(),
+                    *use_v2,
+                    log_context,
+                )?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
@@ -1518,9 +1552,9 @@ impl VMAdapter for AptosVM {
                 )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             },
-            PreprocessedTransaction::UserTransaction(txn) => {
+            PreprocessedTransaction::OrderedUserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_string();
+                let sender = txn.checked_txn.sender().to_string();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) =
                     self.execute_user_transaction(data_cache, txn, log_context);
@@ -1531,7 +1565,7 @@ impl VMAdapter for AptosVM {
                     error!(
                         *log_context,
                         "[aptos_vm] Transaction breaking invariant violation. txn: {:?}",
-                        bcs::to_bytes::<SignedTransaction>(&**txn),
+                        bcs::to_bytes::<SignedTransaction>(&txn.checked_txn),
                     );
                     TRANSACTIONS_INVARIANT_VIOLATION.inc();
                 }
@@ -1617,7 +1651,7 @@ impl AptosSimulationVM {
         }
 
         // Revalidate the transaction.
-        let txn_data = TransactionMetadata::new(txn);
+        let txn_data = TransactionMetadata::new(txn, 0); // simulation doesn't need batch_index
         let resolver = self.0 .0.new_move_resolver(storage);
         let mut session = self
             .0

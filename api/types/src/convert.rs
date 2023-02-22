@@ -28,8 +28,8 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, OrderedSignedUserTransaction,
+        RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -114,7 +114,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
-            UserTransaction(txn) => {
+            UserTransaction(txn)
+            | OrderedUserTransaction(OrderedSignedUserTransaction {
+                transaction: txn,
+                batch_index: _,
+            }) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
             },
@@ -123,6 +127,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
+            BlockMetadataV2(txn) => (txn.get_inner(), info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,

@@ -17,7 +17,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     state_store::state_key::StateKey,
     transaction::{Transaction, WriteSetPayload},
     trusted_state::TrustedState,
@@ -117,11 +117,12 @@ fn test_reconfiguration() {
         Some(aptos_stdlib::aptos_coin_mint(validator_account, 1_000_000)),
     );
     // txn2 = a dummy block prologue to bump the timer.
-    let txn2 = Transaction::BlockMetadata(BlockMetadata::new(
+    let txn2 = Transaction::BlockMetadataV2(BlockMetadataV2::new(
         gen_block_id(1),
         0,
         1,
         validator_account,
+        vec![],
         vec![0],
         vec![],
         300000001,

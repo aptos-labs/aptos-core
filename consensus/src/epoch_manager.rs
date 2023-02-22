@@ -659,8 +659,11 @@ impl EpochManager {
             self.config.quorum_store_pull_timeout_ms,
         );
 
-        self.commit_state_computer
-            .new_epoch(&epoch_state, payload_manager.clone());
+        self.commit_state_computer.new_epoch(
+            &epoch_state,
+            &onchain_config,
+            payload_manager.clone(),
+        );
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),

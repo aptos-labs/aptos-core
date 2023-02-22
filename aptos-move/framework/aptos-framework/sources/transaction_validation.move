@@ -180,6 +180,27 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
+        epilogue_v2(
+            account,
+            _txn_sequence_number,
+            txn_gas_price,
+            txn_max_gas_units,
+            gas_units_remaining,
+            0, // batch_index
+        );
+    }
+
+
+    /// Epilogue function is run after a transaction is successfully executed.
+    /// Called by the Adapter
+    fun epilogue_v2(
+        account: signer,
+        _txn_sequence_number: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        batch_index: u16,
+    ) {
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
@@ -199,7 +220,7 @@ module aptos_framework::transaction_validation {
         if (features::collect_and_distribute_gas_fees()) {
             // If transaction fees are redistributed to validators, collect them here for
             // later redistribution.
-            transaction_fee::collect_fee(addr, transaction_fee_amount);
+            transaction_fee::collect_fee_for_batch(addr, transaction_fee_amount, batch_index); // batch_index
         } else {
             // Otherwise, just burn the fee.
             // TODO: this branch should be removed completely when transaction fee collection
@@ -210,4 +231,5 @@ module aptos_framework::transaction_validation {
         // Increment sequence number
         account::increment_sequence_number(addr);
     }
+
 }

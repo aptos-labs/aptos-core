@@ -138,7 +138,7 @@ impl TransactionStore {
                 &version,
             )?;
         }
-        batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
+        batch.put::<TransactionByHashSchema>(&transaction.lookup_hash(), &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())

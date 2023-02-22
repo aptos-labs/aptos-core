@@ -15,7 +15,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    block_metadata::BlockMetadata,
+    block_metadata::BlockMetadataV2,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{Transaction, TransactionStatus},
@@ -179,7 +179,7 @@ impl TestContext {
     pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
-        let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
+        let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadataV2(metadata.clone()))
             .chain(
                 signed_txns
                     .iter()
@@ -224,12 +224,12 @@ impl TestContext {
             .unwrap();
     }
 
-    fn new_block_metadata(&mut self) -> BlockMetadata {
+    fn new_block_metadata(&mut self) -> BlockMetadataV2 {
         let round = 1;
         let id = HashValue::random_with_rng(&mut self.rng);
         // incrementing half a second every time
         self.fake_time_usecs += (Duration::from_secs(1).as_micros() / 2) as u64;
-        BlockMetadata::new(
+        BlockMetadataV2::new(
             id,
             0,
             round,
@@ -243,7 +243,7 @@ impl TestContext {
 
     fn new_ledger_info(
         &self,
-        metadata: &BlockMetadata,
+        metadata: &BlockMetadataV2,
         root_hash: HashValue,
         block_size: usize,
     ) -> LedgerInfoWithSignatures {

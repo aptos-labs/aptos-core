@@ -14,7 +14,10 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::OnChainConsensusConfig,
+};
 use futures::future::BoxFuture;
 use std::sync::Arc;
 
@@ -67,5 +70,10 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>);
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        onchain_config: &OnChainConsensusConfig,
+        payload_manager: Arc<PayloadManager>,
+    );
 }

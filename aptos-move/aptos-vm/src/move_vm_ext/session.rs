@@ -63,7 +63,11 @@ pub enum SessionId {
 
 impl SessionId {
     pub fn txn(txn: &SignatureCheckedTransaction) -> Self {
-        Self::txn_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+        Self::Txn {
+            sender: txn.sender(),
+            sequence_number: txn.sequence_number(),
+            script_hash: txn.script_hash(),
+        }
     }
 
     pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {

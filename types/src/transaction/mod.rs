@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    block_metadata::BlockMetadata,
+    block_metadata::{BlockMetadata, BlockMetadataV2},
     chain_id::ChainId,
     contract_event::ContractEvent,
     ledger_info::LedgerInfo,
@@ -602,6 +602,17 @@ impl SignedTransaction {
         })
     }
 
+    pub fn script_hash(&self) -> Vec<u8> {
+        match self.payload() {
+            TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
+            TransactionPayload::EntryFunction(_) => vec![],
+            TransactionPayload::Multisig(_) => vec![],
+
+            // Deprecated. Will be removed in the future.
+            TransactionPayload::ModuleBundle(_) => vec![],
+        }
+    }
+
     /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
     /// the signature is valid.
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
@@ -642,7 +653,7 @@ impl SignedTransaction {
 
     /// Returns the hash when the transaction is commited onchain.
     pub fn lookup_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
+        Transaction::UserTransaction(self).lookup_hash()
     }
 }
 
@@ -1560,6 +1571,15 @@ impl AccountTransactionsWithProof {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct OrderedSignedUserTransaction {
+    /// TODO: We need to rename SignedTransaction to SignedUserTransaction, as well as all the other
+    ///       transaction types we had in our codebase.
+    pub transaction: SignedTransaction,
+    pub batch_index: u16,
+}
+
 /// `Transaction` will be the transaction type used internally in the aptos node to represent the
 /// transaction to be processed and persisted.
 ///
@@ -1585,12 +1605,45 @@ pub enum Transaction {
     /// in the TransactionInfo
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
+
+    /// Transaction to update the block metadata resource at the beginning of a block.
+    BlockMetadataV2(BlockMetadataV2),
+
+    /// Transaction submitted by the user. e.g: P2P payment transaction, publishing module
+    /// transaction, etc, after it has been ordered by consensus, and additional metadata provided.
+    OrderedUserTransaction(OrderedSignedUserTransaction),
 }
 
 impl Transaction {
+    // Deterministic hash, users can lookup their transaction by.
+    // needs to match SignedTransaction.lookup_hash
+    pub fn lookup_hash(&self) -> aptos_crypto::hash::HashValue {
+        use aptos_crypto::hash::CryptoHasher;
+
+        let mut state = TransactionHasher::default();
+        // Transactions are indexed by hash in the db, we need to make sure
+        // hash is knowable beforehand (used in SignedTransaction.commit_hash())
+        // Maybe we should do something cleaner (and a breaking change) at some point here
+        if let Transaction::OrderedUserTransaction(OrderedSignedUserTransaction {
+            transaction: txn,
+            ..
+        }) = &self
+        {
+            bcs::serialize_into(&mut state, &Transaction::UserTransaction(txn.clone()))
+                .expect("serialization error");
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("serialization error");
+        }
+        state.finish()
+    }
+
     pub fn as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
+            Transaction::OrderedUserTransaction(OrderedSignedUserTransaction {
+                transaction: txn,
+                ..
+            }) => Some(txn),
             _ => None,
         }
     }
@@ -1598,6 +1651,7 @@ impl Transaction {
     pub fn as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
             Transaction::BlockMetadata(v1) => Some(v1),
+            Transaction::BlockMetadataV2(v2) => Some(v2.get_inner()),
             _ => None,
         }
     }
@@ -1610,9 +1664,14 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
-            Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataV2(_) => {
+                String::from("block_metadata")
+            },
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
+            Transaction::OrderedUserTransaction(ordered_txn) => ordered_txn
+                .transaction
+                .format_for_client(get_transaction_name),
         }
     }
 }

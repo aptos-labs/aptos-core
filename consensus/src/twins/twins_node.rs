@@ -40,7 +40,7 @@ use aptos_types::{
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
-    transaction::SignedTransaction,
+    transaction::OrderedSignedUserTransaction,
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
@@ -56,7 +56,7 @@ pub struct SMRNode {
     pub commit_cb_receiver: mpsc::UnboundedReceiver<LedgerInfoWithSignatures>,
     _runtime: Runtime,
     _shared_mempool: MockSharedMempool,
-    _state_sync: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
+    _state_sync: mpsc::UnboundedReceiver<Vec<OrderedSignedUserTransaction>>,
 }
 
 fn author_from_config(config: &NodeConfig) -> Author {

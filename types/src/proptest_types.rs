@@ -9,7 +9,7 @@ use crate::{
     account_state::AccountState,
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
-    block_metadata::BlockMetadata,
+    block_metadata::{BlockMetadata, BlockMetadataV2},
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -949,6 +949,48 @@ impl Arbitrary for BlockMetadata {
                         epoch,
                         round,
                         proposer,
+                        previous_block_votes,
+                        failed_proposer_indices,
+                        timestamp,
+                    )
+                },
+            )
+            .boxed()
+    }
+}
+
+impl Arbitrary for BlockMetadataV2 {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
+        (
+            any::<HashValue>(),
+            any::<u64>(),
+            any::<u64>(),
+            any::<AccountAddress>(),
+            prop::collection::vec(any::<AccountAddress>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u32>(), num_validators_range),
+            any::<u64>(),
+        )
+            .prop_map(
+                |(
+                    id,
+                    epoch,
+                    round,
+                    proposer,
+                    batch_proposers,
+                    previous_block_votes,
+                    failed_proposer_indices,
+                    timestamp,
+                )| {
+                    BlockMetadataV2::new(
+                        id,
+                        epoch,
+                        round,
+                        proposer,
+                        batch_proposers,
                         previous_block_votes,
                         failed_proposer_indices,
                         timestamp,

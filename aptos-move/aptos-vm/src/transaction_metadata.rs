@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_gas::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
@@ -24,10 +24,11 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub batch_index: u16,
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransaction, batch_index: u16) -> Self {
         Self {
             sender: txn.sender(),
             authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
@@ -44,18 +45,12 @@ impl TransactionMetadata {
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
-            script_hash: match txn.payload() {
-                TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
-                TransactionPayload::EntryFunction(_) => vec![],
-                TransactionPayload::Multisig(_) => vec![],
-
-                // Deprecated. Will be removed in the future.
-                TransactionPayload::ModuleBundle(_) => vec![],
-            },
+            script_hash: txn.script_hash(),
             script_size: match txn.payload() {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
+            batch_index,
         }
     }
 
@@ -102,6 +97,10 @@ impl TransactionMetadata {
     pub fn is_multi_agent(&self) -> bool {
         !self.secondary_signers.is_empty()
     }
+
+    pub fn batch_index(&self) -> u16 {
+        self.batch_index
+    }
 }
 
 impl Default for TransactionMetadata {
@@ -122,6 +121,7 @@ impl Default for TransactionMetadata {
             chain_id: ChainId::test(),
             script_hash: vec![],
             script_size: NumBytes::zero(),
+            batch_index: 0,
         }
     }
 }

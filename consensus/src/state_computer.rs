@@ -22,7 +22,8 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
+    transaction::Transaction,
 };
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
@@ -35,6 +36,11 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
+struct EpochValues {
+    validators: Vec<AccountAddress>,
+    ordered_wrap_enabled: bool,
+}
+
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
@@ -42,7 +48,7 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
-    validators: Mutex<Vec<AccountAddress>>,
+    epoch_values: Mutex<EpochValues>,
     write_mutex: AsyncMutex<()>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
 }
@@ -74,7 +80,10 @@ impl ExecutionProxy {
             txn_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
-            validators: Mutex::new(vec![]),
+            epoch_values: Mutex::new(EpochValues {
+                validators: vec![],
+                ordered_wrap_enabled: false,
+            }),
             write_mutex: AsyncMutex::new(()),
             payload_manager: Mutex::new(None),
         }
@@ -109,8 +118,14 @@ impl StateComputer for ExecutionProxy {
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
 
-        let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), txns.clone());
+        let transactions_to_execute = {
+            let epoch_values = self.epoch_values.lock();
+            block.transactions_to_execute(
+                &epoch_values.validators,
+                txns.clone(),
+                epoch_values.ordered_wrap_enabled,
+            )
+        };
 
         let compute_result = monitor!(
             "execute_block",
@@ -163,7 +178,14 @@ impl StateComputer for ExecutionProxy {
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
+            {
+                let epoch_values = self.epoch_values.lock();
+                txns.extend(block.transactions_to_commit(
+                    &epoch_values.validators,
+                    signed_txns,
+                    epoch_values.ordered_wrap_enabled,
+                ));
+            }
             reconfig_events.extend(block.reconfig_event());
 
             latest_epoch = max(latest_epoch, block.epoch());
@@ -248,11 +270,20 @@ impl StateComputer for ExecutionProxy {
         })
     }
 
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>) {
-        *self.validators.lock() = epoch_state
-            .verifier
-            .get_ordered_account_addresses_iter()
-            .collect();
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        onchain_config: &OnChainConsensusConfig,
+        payload_manager: Arc<PayloadManager>,
+    ) {
+        *self.epoch_values.lock() = EpochValues {
+            validators: epoch_state
+                .verifier
+                .get_ordered_account_addresses_iter()
+                .collect(),
+            ordered_wrap_enabled: onchain_config.ordered_wrap_enabled(),
+        };
+
         self.payload_manager.lock().replace(payload_manager);
     }
 }
