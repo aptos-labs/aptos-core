@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/check-aptos-core
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
           cancel-workflow: true
 
