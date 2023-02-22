@@ -18,11 +18,12 @@ CREATE INDEX dsa_pa_da_index ON delegated_staking_activities (
   event_index asc
 );
 CREATE INDEX dsa_insat_index ON delegated_staking_activities (inserted_at);
--- estimates how much principal was staked by a delegator at a given time
+-- estimates how much delegator has staked in a pool (currently supports active only)
 CREATE TABLE current_delegator_balances (
   delegator_address VARCHAR(66) NOT NULL,
   pool_address VARCHAR(66) NOT NULL,
   pool_type VARCHAR(100) NOT NULL,
+  table_handle VARCHAR(66) NOT NULL,
   amount NUMERIC NOT NULL,
   last_transaction_version BIGINT NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),

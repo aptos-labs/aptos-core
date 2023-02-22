@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::models::move_resources::MoveResource;
+use crate::models::{move_resources::MoveResource, token_models::token_utils::Table};
 use anyhow::{Context, Result};
 use aptos_api_types::{deserialize_from_string, WriteResource};
 use bigdecimal::BigDecimal;
@@ -10,6 +10,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
     pub delegated_voter: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DelegationPoolResource {
+    pub active_shares: SharesResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SharesResource {
+    pub shares: SharesInnerResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SharesInnerResource {
+    pub inner: Table,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -58,17 +73,26 @@ pub struct ReactivateStakeEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StakeResource {
     StakePool(StakePoolResource),
+    DelegationPool(DelegationPoolResource),
 }
 
 impl StakeResource {
     fn is_resource_supported(data_type: &str) -> bool {
-        matches!(data_type, "0x1::stake::StakePool")
+        matches!(
+            data_type,
+            "0x1::stake::StakePool"
+                | "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+        ::delegation_pool::DelegationPool"
+        )
     }
 
     fn from_resource(data_type: &str, data: &serde_json::Value, txn_version: i64) -> Result<Self> {
         match data_type {
             "0x1::stake::StakePool" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeResource::StakePool(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::DelegationPool" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeResource::DelegationPool(inner))),
             _ => Ok(None),
         }
         .context(format!(
