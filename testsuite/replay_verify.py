@@ -52,7 +52,8 @@ def replay_verify_partition(
     # run and print output
     process = subprocess.Popen(
         [
-            "target/release/replay-verify",
+            "target/release/aptos-db-tool",
+            "replay-verify",
             *txns_to_skip_args,
             "--concurrent-downloads",
             "2",
