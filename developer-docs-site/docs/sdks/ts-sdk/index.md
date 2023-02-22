@@ -10,8 +10,7 @@ Aptos provides a fully supported TypeScript SDK with the source code in the [Apt
 
 ## Installing the Typescript SDK
 
-1. Make sure you [downloaded the latest precompiled binary for the Aptos CLI](/cli-tools/aptos-cli-tool/install-aptos-cli/#download-precompiled-binary).
-2. On a terminal run the below command to install the Typescript SDK from [npmjs](https://www.npmjs.com/package/aptos):
+1. Make sure you [downloaded the latest precompiled binary for the Aptos CLI](../../cli-tools/aptos-cli-tool/install-aptos-cli.md#download-precompiled-binary). On a terminal run the below command to install the Typescript SDK from [npmjs](https://www.npmjs.com/package/aptos):
    ```bash
    npm i aptos
    ```
@@ -34,7 +33,7 @@ Aptos provides a fully supported TypeScript SDK with the source code in the [Apt
 
 ## Using the Typescript SDK
 
-See the [Developer Tutorials](/tutorials/index.md) for code examples showing how to use the Typescript SDK.
+See the [Developer Tutorials](../../tutorials/index.md) for code examples showing how to use the Typescript SDK.
 
 ## Typescript SDK Architecture
 

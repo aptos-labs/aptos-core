@@ -105,7 +105,7 @@ With your development environment ready, now you can start to setup your validat
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-9. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page: 
+9. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page: 
    - `validator.yaml`
    - `fullnode.yaml`
    - `genesis.blob`

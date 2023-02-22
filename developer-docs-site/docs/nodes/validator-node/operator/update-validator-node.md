@@ -19,8 +19,8 @@ To failover from an outdated or erroneous validator node to an updated and relia
 
 1. Ensure your machine meets the [validator hardware requirements](node-requirements.md#hardware-requirements).
 1. Update your validator fullnode with the latest version of the:
-   * [required packages Aptos depends upon](../../../guides/getting-started#prepare-development-environment)
-   * [Aptos CLI](../../../cli-tools/aptos-cli-tool/install-aptos-cli.md)
+   * [required packages Aptos depends upon](../../../guides/getting-started.md#prepare-development-environment)
+   * [Aptos CLI](../../../cli-tools/aptos-cli-tool/index.md)
 1. Copy the configuration files between the two nodes. See the files in the [validator setup](running-validator-node/index.md) documentation you used for the full list.
 1. Synchonize data on the validator fullnode:
    * For mainnet, use [state synchronization](../../../guides/state-sync.md).
