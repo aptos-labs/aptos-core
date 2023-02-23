@@ -52,6 +52,8 @@ A `public` function can be called by *any* function defined in *any* module or s
 - functions defined in another module, or
 - the function defined in a script.
 
+There are also no restrictions for what the argument types a public function can take and its return type.
+
 ```move=
 address 0x42 {
 module m {
@@ -178,6 +180,9 @@ script {
     }
 }
 ```
+
+Entry functions can take primitive types, String, and vector arguments but cannot take Structs (e.g. Option). They also
+must not have any return values.
 
 ### Name
 
@@ -509,3 +514,47 @@ Using `return` without an argument is shorthand for `return ()`. That is, the fo
 fun foo() { return }
 fun foo() { return () }
 ```
+
+## Inline Functions
+
+Inline functions are functions which are expanded at caller side instead
+of compiled into Move bytecode. This allows to safe gas and may lead
+to faster execution. For example, one can define an inline function
+
+```move=
+inline fun percent(x: u64, y: u64):u64 { x * 100 / y }
+```
+
+Now, when call `percent(2, 200)` the compiler will inline the function
+definition as if the user has written `2 * 100 / 200`.
+
+### Function Parameters
+
+Inline functions support _function parameters_. This allows
+to define higher-order functions in Move which can comprehend common
+programming patterns. As inline functions are expanded at compilation time,
+this feature of function parameters can be supported without direct
+support for it in Move bytecode.
+
+Consider the following function (from the `vector` module):
+
+```move=
+/// Fold the function over the elements. For example, `fold(vector[1,2,3], 0, f)` will execute
+/// `f(f(f(0, 1), 2), 3)`
+public inline fun fold<Accumulator, Element>(
+    v: vector<Element>,
+    init: Accumulator,
+    f: |Accumulator,Element|Accumulator
+): Accumulator {
+  let accu = init;
+  foreach(v, |elem| accu = g(accu, elem));
+  accu
+}
+```
+
+Here, `foreach` is itself an inline function.
+
+In general, only lambda expressions can be passed to function parameters.
+Similar as the inline function itself, those lambdas are expanded at caller
+side. Notice that a lambda can access variables in the context, as in the
+example the variable `accu`.
