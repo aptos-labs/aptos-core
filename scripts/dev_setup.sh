@@ -16,6 +16,8 @@
 # fast fail.
 set -eo pipefail
 
+set -x
+
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
 KUBECTL_VERSION=1.18.6

@@ -418,7 +418,6 @@ prometheus-parse = { git = "https://github.com/banool/prometheus-parse-rs", rev 
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"
-prost-types = "0.10.1"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
