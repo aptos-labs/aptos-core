@@ -2,7 +2,7 @@
 module aptos_std::math64 {
 
     /// Abort value when an invalid argument is provided.
-    const EINVALID_ARG_FLOOR_LG2: u64 = 1;
+    const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
 
     /// Return the largest of two numbers.
     public fun max(a: u64, b: u64): u64 {
@@ -51,32 +51,17 @@ module aptos_std::math64 {
     }
 
     /// Returns floor(lg2(x))
-    public fun floor_lg2(x: u64): u8 {
+    public fun floor_log2(x: u64): u8 {
         let res = 0;
-        assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LG2));
+        assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2));
         // Effectively the position of the most significant set bit
-        if (x >= (1 << 32)) {
-            x = x >> 32;
-            res = res + 32;
-        };
-        if (x >= (1 << 16)) {
-            x = x >> 16;
-            res = res + 16;
-        };
-        if (x >= (1 << 8)) {
-            x = x >> 8;
-            res = res + 8;
-        };
-        if (x >= (1 << 4)) {
-            x = x >> 4;
-            res = res + 4;
-        };
-        if (x >= (1 << 2)) {
-            x = x >> 2;
-            res = res + 2;
-        };
-        if (x >= (1 << 1)) {
-            res = res + 1;
+        let n = 32;
+        while (n > 0) {
+            if (x >= (1 << n)) {
+                x = x >> n;
+                res = res + n;
+            };
+            n = n >> 1;
         };
         res
     }
@@ -89,7 +74,7 @@ module aptos_std::math64 {
         // for odd n [2^((n+1)/2)/sqrt(2), 2^((n+1)/2>. For even n the left end point is integer for odd the right
         // end point is integer. If we choose as our first approximation the integer end point we have as maximum
         // relative error either (sqrt(2) - 1) or (1 - 1/sqrt(2)) both are smaller then 1/2.
-        let res = 1 << ((floor_lg2(x) + 1) >> 1);
+        let res = 1 << ((floor_log2(x) + 1) >> 1);
         // We use standard newton-rhapson iteration to improve the initial approximation.
         // The error term evolves as delta_i+1 = delta_i^2 / 2 (quadratic convergence).
         // It turns out that after 4 iterations the delta is smaller than 2^-32 and thus below the treshold.
@@ -159,12 +144,12 @@ module aptos_std::math64 {
     public entry fun test_floor_lg2() {
         let idx: u8 = 0;
         while (idx < 64) {
-            assert!(floor_lg2(1<<idx) == idx, 0);
+            assert!(floor_log2(1<<idx) == idx, 0);
             idx = idx + 1;
         };
         idx = 1;
         while (idx <= 64) {
-            assert!(floor_lg2((((1u128<<idx) - 1) as u64)) == idx - 1, 0);
+            assert!(floor_log2((((1u128<<idx) - 1) as u64)) == idx - 1, 0);
             idx = idx + 1;
         };
     }

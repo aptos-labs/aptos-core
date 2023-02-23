@@ -12,7 +12,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `average`](#0x1_math128_average)
 -  [Function `clamp`](#0x1_math128_clamp)
 -  [Function `pow`](#0x1_math128_pow)
--  [Function `floor_lg2`](#0x1_math128_floor_lg2)
+-  [Function `floor_log2`](#0x1_math128_floor_log2)
 -  [Function `sqrt`](#0x1_math128_sqrt)
 -  [Specification](#@Specification_1)
     -  [Function `max`](#@Specification_1_max)
@@ -31,12 +31,12 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
-<a name="0x1_math128_EINVALID_ARG_FLOOR_LG2"></a>
+<a name="0x1_math128_EINVALID_ARG_FLOOR_LOG2"></a>
 
 Abort value when an invalid argument is provided.
 
 
-<pre><code><b>const</b> <a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LG2">EINVALID_ARG_FLOOR_LG2</a>: u64 = 1;
+<pre><code><b>const</b> <a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>: u64 = 1;
 </code></pre>
 
 
@@ -182,14 +182,14 @@ Return the value of n raised to power e
 
 </details>
 
-<a name="0x1_math128_floor_lg2"></a>
+<a name="0x1_math128_floor_log2"></a>
 
-## Function `floor_lg2`
+## Function `floor_log2`
 
-Returns floor(lg2(x))
+Returns floor(log2(x))
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_lg2">floor_lg2</a>(x: u128): u8
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x: u128): u8
 </code></pre>
 
 
@@ -198,36 +198,17 @@ Returns floor(lg2(x))
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_lg2">floor_lg2</a>(x: u128): u8 {
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x: u128): u8 {
     <b>let</b> res = 0;
-    <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LG2">EINVALID_ARG_FLOOR_LG2</a>));
+    <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>));
     // Effectively the position of the most significant set bit
-    <b>if</b> (x &gt;= (1 &lt;&lt; 64)) {
-        x = x &gt;&gt; 64;
-        res = res + 64;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 32)) {
-        x = x &gt;&gt; 32;
-        res = res + 32;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 16)) {
-        x = x &gt;&gt; 16;
-        res = res + 16;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 8)) {
-        x = x &gt;&gt; 8;
-        res = res + 8;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 4)) {
-        x = x &gt;&gt; 4;
-        res = res + 4;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 2)) {
-        x = x &gt;&gt; 2;
-        res = res + 2;
-    };
-    <b>if</b> (x &gt;= (1 &lt;&lt; 1)) {
-        res = res + 1;
+    <b>let</b> n = 64;
+    <b>while</b> (n &gt; 0) {
+        <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
+            x = x &gt;&gt; n;
+            res = res + n;
+        };
+        n = n &gt;&gt; 1;
     };
     res
 }
@@ -255,12 +236,12 @@ Returns square root of x, precisely floor(sqrt(x))
 
 <pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_sqrt">sqrt</a>(x: u128): u128 {
     <b>if</b> (x == 0) <b>return</b> 0;
-    // Note the plus 1 in the expression. Let n = <a href="math128.md#0x1_math128_floor_lg2">floor_lg2</a>(x) we have x in [2^n, 2^(n+1)&gt; and thus the answer in
-    // the half-open interval [2^(n/2), 2^((n+1)/2)&gt;. For even n we can write this <b>as</b> [2^(n/2), <a href="math128.md#0x1_math128_sqrt">sqrt</a>(2) 2^(n/2)&gt;
-    // for odd n [2^((n+1)/2)/<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2), 2^((n+1)/2&gt;. For even n the left end point is integer for odd the right
+    // Note the plus 1 in the expression. Let n = floor_lg2(x) we have x in [2^n, 2^{n+1}) and thus the answer in
+    // the half-open interval [2^(n/2), 2^{(n+1)/2}). For even n we can write this <b>as</b> [2^(n/2), <a href="math128.md#0x1_math128_sqrt">sqrt</a>(2) 2^{n/2})
+    // for odd n [2^((n+1)/2)/<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2), 2^((n+1)/2). For even n the left end point is integer for odd the right
     // end point is integer. If we <b>choose</b> <b>as</b> our first approximation the integer end point we have <b>as</b> maximum
     // relative <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> either (<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2) - 1) or (1 - 1/<a href="math128.md#0x1_math128_sqrt">sqrt</a>(2)) both are smaller then 1/2.
-    <b>let</b> res = 1 &lt;&lt; ((<a href="math128.md#0x1_math128_floor_lg2">floor_lg2</a>(x) + 1) &gt;&gt; 1);
+    <b>let</b> res = 1 &lt;&lt; ((<a href="math128.md#0x1_math128_floor_log2">floor_log2</a>(x) + 1) &gt;&gt; 1);
     // We <b>use</b> standard newton-rhapson iteration <b>to</b> improve the initial approximation.
     // The <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> term evolves <b>as</b> delta_i+1 = delta_i^2 / 2 (quadratic convergence).
     // It turns out that after 5 iterations the delta is smaller than 2^-64 and thus below the treshold.
