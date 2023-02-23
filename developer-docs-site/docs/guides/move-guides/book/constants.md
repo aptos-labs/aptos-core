@@ -1,9 +1,3 @@
----
-title: "Aptos Move Constants"
-slug: "constants"
----
-
-
 # Constants
 
 Constants are a way of giving a name to shared, static values inside of a `module` or `script`.

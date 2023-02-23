@@ -1,8 +1,3 @@
----
-title: "Aptos Move Abilities"
-slug: "abilities"
----
-
 # Abilities
 
 Abilities are a typing feature in Move that control what actions are permissible for values of a given type. This system grants fine grained control over the "linear" typing behavior of values, as well as if and how values are used in global storage. This is implemented by gating access to certain bytecode instructions so that for a value to be used with the bytecode instruction, it must have the ability required (if one is required at all—not every instruction is gated by an ability).

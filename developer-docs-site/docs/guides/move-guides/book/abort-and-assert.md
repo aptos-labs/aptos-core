@@ -1,8 +1,3 @@
----
-title: "Aptos Move Abort and Assert"
-slug: "abort-and-assert"
----
-
 # Abort and Assert
 
 [`return`](./functions.md) and `abort` are two control flow constructs that end execution, one for

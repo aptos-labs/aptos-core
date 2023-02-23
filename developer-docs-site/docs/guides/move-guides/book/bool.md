@@ -1,8 +1,3 @@
----
-title: "Aptos Move Bool"
-slug: "bool"
----
-
 # Bool
 
 `bool` is Move's primitive type for boolean `true` and `false` values.
