@@ -55,10 +55,20 @@ Use the [Aptos Simulation API](../../concepts/gas-txn-fee.md#estimating-the-gas-
 
 Install the [Move Prover](../../cli-tools/install-move-prover.md) dependencies after installing the Aptos CLI If you want to use the Move Prover to validate your Move code.
 
+### Move Debugger
+
+To run the Move Debugger, issue: `MOVE_VM_STEP=1 aptos move test`
+
+Generate the Move Virtual Machine execution trace with: `MOVE_VM_TRACE=1`
+
 
 ### IDEs for Move
 
-Install the [IDE plugins for the Move language](../../guides/getting-started.md#ide-plugins-for-move-language) for even more handy features.
+Install these IDE plugins for the Move language to gain some handy features:
+
+- [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
+- [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
+- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
 
 ## Supporting Move resources
 
