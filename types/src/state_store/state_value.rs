@@ -9,15 +9,24 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, CryptoHasher, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, CryptoHasher)]
 pub struct StateValue {
     inner: StateValueInner,
-    hash: HashValue,
+    hash: OnceCell<HashValue>,
 }
+
+impl PartialEq for StateValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl Eq for StateValue {}
 
 #[derive(
     BCSCryptoHash,
@@ -53,7 +62,7 @@ impl<'de> Deserialize<'de> for StateValue {
         D: Deserializer<'de>,
     {
         let inner = StateValueInner::deserialize(deserializer)?;
-        let hash = CryptoHash::hash(&inner);
+        let hash = OnceCell::new();
         Ok(Self { inner, hash })
     }
 }
@@ -70,7 +79,7 @@ impl Serialize for StateValue {
 impl StateValue {
     pub fn new(bytes: Vec<u8>) -> Self {
         let inner = StateValueInner::V0(bytes);
-        let hash = CryptoHash::hash(&inner);
+        let hash = OnceCell::new();
         Self { inner, hash }
     }
 
@@ -103,7 +112,7 @@ impl CryptoHash for StateValue {
     type Hasher = StateValueHasher;
 
     fn hash(&self) -> HashValue {
-        self.hash
+        *self.hash.get_or_init(|| CryptoHash::hash(&self.inner))
     }
 }
 
