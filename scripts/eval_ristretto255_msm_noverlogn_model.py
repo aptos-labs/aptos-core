@@ -1,13 +1,12 @@
 import argparse
+from math import ceil, log2
 import json
 import load_gas_datapoints
 import matplotlib.pyplot as plt
 
-def f(x):
-    if x<190:
-        return 115650*x+414250
-    else:
-        return 68203*x+18862000
+def f(n):
+    if n<=0: return 0
+    return 6000*n+9420000*ceil(n/log2(n))
 
 def percentile(values, k):
     values_sorted = sorted(values)
