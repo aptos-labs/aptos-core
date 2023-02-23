@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 //! Names of modules, functions, and types used by Aptos System.
 
 use aptos_types::account_config;

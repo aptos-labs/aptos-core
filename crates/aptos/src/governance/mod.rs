@@ -58,6 +58,7 @@ pub enum GovernanceTool {
     VerifyProposal(VerifyProposal),
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
+    ApproveExecutionHash(ApproveExecutionHash),
 }
 
 impl GovernanceTool {
@@ -71,6 +72,7 @@ impl GovernanceTool {
             ShowProposal(tool) => tool.execute_serialized().await,
             ListProposals(tool) => tool.execute_serialized().await,
             VerifyProposal(tool) => tool.execute_serialized().await,
+            ApproveExecutionHash(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -546,6 +548,35 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
     }
 }
 
+/// Submit a transaction to approve a proposal's script hash to bypass the transaction size limit.
+/// This is needed for upgrading large packages such as aptos-framework.
+#[derive(Parser)]
+pub struct ApproveExecutionHash {
+    /// Id of the proposal to vote on
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ApproveExecutionHash {
+    fn command_name(&self) -> &'static str {
+        "ApproveExecutionHash"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        Ok(self
+            .txn_options
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_add_approved_script_hash_script(self.proposal_id),
+            )
+            .await
+            .map(TransactionSummary::from)?)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VotingRecord {
     proposal_id: String,
@@ -840,14 +871,21 @@ impl GenerateExecutionHash {
             compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
-                framework_local_dir: Option::from(
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("..")
-                        .join("..")
-                        .join("aptos-move")
+                framework_local_dir: Option::from({
+                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    path.pop();
+                    path.pop();
+                    path.join("aptos-move")
                         .join("framework")
-                        .join("aptos-framework"),
-                ),
+                        .join("aptos-framework")
+                        .canonicalize()
+                        .map_err(|err| {
+                            CliError::IO(
+                                format!("Failed to canonicalize aptos framework path: {:?}", path),
+                                err,
+                            )
+                        })?
+                }),
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,

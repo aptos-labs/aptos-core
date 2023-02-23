@@ -21,6 +21,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-db-bootstrapper \
+    -p aptos-db-tool \
     -p aptos-transaction-emitter \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
@@ -50,10 +51,8 @@ BINS=(
     aptos-indexer-grpc-file-store
     aptos-indexer-grpc-data-service
     aptos-fn-check-client
-    db-backup
-    db-backup-verify
+    aptos-db-tool
     aptos-db-bootstrapper
-    db-restore
     forge
     aptos-transaction-emitter
 )

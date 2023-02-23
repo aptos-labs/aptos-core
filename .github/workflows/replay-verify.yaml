@@ -21,7 +21,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/replay-verify.yaml"
-      - "testsuite/replay-verify.py"
+      - "testsuite/replay_verify.py"
   schedule:
     - cron: "0 8,20 * * *"
 
@@ -67,6 +67,7 @@ jobs:
   test-replay:
     if: ${{ github.event_name == 'pull_request' }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
+    secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
       # replay-verify config

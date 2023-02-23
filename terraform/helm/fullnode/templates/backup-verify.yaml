@@ -27,15 +27,16 @@ spec:
             image: {{ .Values.backup.image.repo }}:{{ .Values.backup.image.tag | default .Values.imageTag }}
             imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
             command:
-            - /usr/local/bin/db-backup-verify
+            - /usr/local/bin/aptos-db-tool
+            - backup
+            - verify
             {{- range $.Values.restore.config.trusted_waypoints }}
             - --trust-waypoint
             - {{ . }}
             {{- end }}
             - --metadata-cache-dir
             - /tmp/aptos-backup-verify-metadata
-            - command-adapter
-            - --config
+            - --command-adapter-config
             # use the same config with the backup sts
             - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
             env:

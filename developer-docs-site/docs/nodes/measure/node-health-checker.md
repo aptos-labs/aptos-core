@@ -103,7 +103,7 @@ The NHC service can reasonably be run both as an external tool as well as a side
 
 In all the above cases, a baseline node is used to compare your node's health. For example, for a public fullnode connected to the Aptos devnet, the baseline node might be a node run by the Aptos team and this node demonstrates optimal performance and participation characteristics.
 
-You will download the baseline configuration YAML before running the NHC service for your node. The baseline node's configuration YAML describes where to find this baseline node (URL + port), what evaluators (e.g. metrics checks, TPS tests, API validations, etc.) the NHC service should run, what parameters the NHC should use for those evaluators, what name the configuration has, and so on. See some [example baseline configuration YAML files here](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/node-checker/configuration_examples).
+You will download the baseline configuration YAML before running the NHC service for your node. The baseline node's configuration YAML describes where to find this baseline node (URL + port), what evaluators (e.g. metrics checks, TPS tests, API validations, etc.) the NHC service should run, what parameters the NHC should use for those evaluators, what name the configuration has, and so on. See these [example baseline configuration YAML files](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/node-checker/configuration_examples).
 
 When you send requests to the NHC service, you must include a baseline configuration. For example, a request to NHC to use `devnet_fullnode` as the baseline configuration will look like this:
 
@@ -117,7 +117,7 @@ In order to run the NHC service, you must have a baseline configuration that the
 
 #### Configure a pre-existing YAML
 
-You can find a few [example baseline configuration YAML files here](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/node-checker/configuration_examples) that work for each of the above use cases and more.
+You can find a few [example baseline configuration YAML files](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/node-checker/configuration_examples) that work for each of the above use cases and more.
 
 Next, download these configuration YAML files into the `/etc/nhc` folder in your host system. For example:
 

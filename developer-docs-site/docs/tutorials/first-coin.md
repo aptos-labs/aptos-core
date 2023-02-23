@@ -65,7 +65,7 @@ Navigate to the Python SDK directory:
 cd ~/aptos-core/ecosystem/python/sdk
 ```
 
-Install the necessary dependencies. Also see [Aptos Developer Resources](/aptos-developer-resources):
+Install the necessary dependencies:
 
 ```bash
 curl -sSL https://install.python-poetry.org | python3
@@ -305,4 +305,4 @@ Aptos does not emit transfer events; instead it leverages withdraw and deposit e
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

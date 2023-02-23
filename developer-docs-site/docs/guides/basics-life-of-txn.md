@@ -99,7 +99,7 @@ The raw transaction includes the following fields:
 | ------------------------------------------------------------ | ------------------------------------------------ |
 | 8. **Consensus → Execution**: As part of reaching agreement, the block of transactions (containing T<sub>5</sub>) is shared with the execution component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
 | 9. **Execution → Virtual Machine**: The execution component manages the execution of transactions in the VM. Note that this execution happens speculatively before the transactions in the block have been agreed upon. | [2. Execution](#2-execution--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
-| 10. **Consensus → Execution**: After executing the transactions in the block, the execution component appends the transactions in the block (including T<sub>5</sub>) to the [Merkle accumulator](/reference/glossary#merkle-accumulator) (of the ledger history). This is an in-memory/temporary version of the Merkle accumulator. The necessary part of the proposed/speculative result of executing these transactions is returned to the consensus component to agree on. The arrow from "consensus" to "execution" indicates that the request to execute transactions was made by the consensus component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
+| 10. **Consensus → Execution**: After executing the transactions in the block, the execution component appends the transactions in the block (including T<sub>5</sub>) to the [Merkle accumulator](../reference/glossary.md#merkle-accumulator) (of the ledger history). This is an in-memory/temporary version of the Merkle accumulator. The necessary part of the proposed/speculative result of executing these transactions is returned to the consensus component to agree on. The arrow from "consensus" to "execution" indicates that the request to execute transactions was made by the consensus component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
 | 11. **Consensus → Other Validators**: V<sub>1</sub> (the consensus leader) attempts to reach consensus on the proposed block's execution result with the other validator nodes participating in consensus. | [3. Consensus](#3-consensus--execution-consensus--other-validators)                             |
 
 ### Committing the block
@@ -118,8 +118,8 @@ In the [Life of a Transaction](#life-of-a-transaction) section, we described the
 * Are interested in eventually contributing to the Aptos blockchain.
 
 You can learn more about the different types of Aptos nodes here:
-* [Validator nodes](/concepts/validator-nodes)
-* [Fullnodes](/concepts/fullnodes)
+* [Validator nodes](../concepts/validator-nodes.md)
+* [Fullnodes](../concepts/fullnodes.md)
 
 For our narrative, we will assume that a client submits a transaction T<sub>N</sub> to a validator V<sub>X</sub>. For each validator component, we will describe each of its inter-component interactions in subsections under the respective component's section. Note that subsections describing the inter-component interactions are not listed strictly in the order in which they are performed. Most of the interactions are relevant to the processing of a transaction, and some are relevant to clients querying the blockchain (queries for existing information on the blockchain).
 
@@ -198,7 +198,7 @@ It is important to understand that executing a transaction is different from upd
 
 When mempool receives a transaction from other validators via shared mempool or from the REST service, mempool invokes `VM::ValidateTransaction()` on the VM to validate the transaction.
 
-For implementation details refer to the [Virtual Machine README](https://github.com/move-language/move/tree/main/language/move-vm).
+For implementation details refer to the [Move Virtual Machine README](https://github.com/move-language/move/tree/main/language/move-vm).
 
 ## Mempool
 
@@ -246,7 +246,7 @@ sources={{
 />
 </center>
 
-The consensus component is responsible for ordering blocks of transactions and agreeing on the results of execution by participating in the [consensus protocol](/reference/glossary/#consensus-protocol) with other validators in the network.
+The consensus component is responsible for ordering blocks of transactions and agreeing on the results of execution by participating in the [consensus protocol](../reference/glossary.md#consensus-protocol) with other validators in the network.
 
 
 ### 1. Consensus → Mempool
@@ -284,7 +284,7 @@ The execution component coordinates the execution of a block of transactions and
 ### 1. Consensus → Execution
 
 * Consensus requests execution to execute a block of transactions via: `Execution::ExecuteBlock()`.
-* Execution maintains a “scratchpad,” which holds in-memory copies of the relevant portions of the [Merkle accumulator](/reference/glossary#merkle-accumulator). This information is used to calculate the root hash of the current state of the Aptos blockchain.
+* Execution maintains a “scratchpad,” which holds in-memory copies of the relevant portions of the [Merkle accumulator](../reference/glossary.md#merkle-accumulator). This information is used to calculate the root hash of the current state of the Aptos blockchain.
 * The root hash of the current state is combined with the information about the transactions in the proposed block to determine the new root hash of the accumulator. This is done prior to persisting any data, and to ensure that no state or transaction is stored until agreement is reached by a quorum of validators.
 * Execution computes the speculative root hash and then the consensus component of V<sub>X</sub> signs this root hash and attempts to reach agreement on this root hash with other validators.
 
@@ -319,7 +319,7 @@ The storage component persists agreed upon blocks of transactions and their exec
 * The order of the transactions
 * The execution results of the transactions in the block
 
-Refer to [Merkle accumulator](/reference/glossary#merkle-accumulator) for information on how a transaction is appended to the data structure representing the Aptos blockchain.
+Refer to [Merkle accumulator](../reference/glossary.md#merkle-accumulator) for information on how a transaction is appended to the data structure representing the Aptos blockchain.
 
 ### 1. VM → Storage
 
