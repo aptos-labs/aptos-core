@@ -164,7 +164,7 @@ Can I run a node using PC with Win10 or macOS?
 Yes! 
 
 - For macOS or Linux: See the Aptos developer documents: [Running a local testnet](https://aptos.dev/tutorials/run-a-local-testnet) and [Run a FullNode](https://aptos.dev/tutorials/full-node/run-a-fullnode).
-- For Windows: See the guide created by Mahamadou Camara: [https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing](https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing)
+- For Windows: See the presentation: [Install Aptos locally on windows](https://docs.google.com/presentation/d/12Gvf8GyRA90Gd6melO9n0zKmtCFYLry6g0ajEglXhGA/edit?usp=sharing)
     - Here is the Chinese language version of the above document, courtesy of @aptos_cn: [https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows](https://wiki.aptos.movemove.org/jiao-cheng/yun-hang-quan-jie-dian-she-qu/windows)
 
 ### How do I run a full node?
