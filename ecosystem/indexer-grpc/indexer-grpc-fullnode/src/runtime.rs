@@ -203,4 +203,3 @@ impl IndexerStreamService {
         }
     }
 }
-
