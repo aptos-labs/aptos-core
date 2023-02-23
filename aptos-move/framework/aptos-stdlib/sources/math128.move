@@ -92,7 +92,7 @@ module aptos_std::math128 {
         // the half-open interval [2^(n/2), 2^((n+1)/2)>. For even n we can write this as [2^(n/2), sqrt(2) 2^(n/2)>
         // for odd n [2^((n+1)/2)/sqrt(2), 2^((n+1)/2>. For even n the left end point is integer for odd the right
         // end point is integer. If we choose as our first approximation the integer end point we have as maximum
-        // relative error either (sqrt(2) - 1) or (1 - 1/sqrt(2)) both are smaller then 1/2.
+        // relative error either (sqrt(2) - 1) or (1 - 1/sqrt(2)) both are smaller than 1/2.
         let res = 1 << ((floor_lg2(x) + 1) >> 1);
         // We use standard newton-rhapson iteration to improve the initial approximation.
         // The error term evolves as delta_i+1 = delta_i^2 / 2 (quadratic convergence).
