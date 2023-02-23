@@ -529,7 +529,7 @@ module aptos_framework::coin {
     /// Before:
     /// ```
     /// let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr).coin;
-    /// let value_now = coin::value_mut(&coin_mut);
+    /// let value_now = coin::value(&coin_mut);
     /// let new_coin = coin::extract(&mut coin_mut, value_now - 100000000);
     /// ```
     /// After:

@@ -49,6 +49,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `register`](#0x1_coin_register)
 -  [Function `transfer`](#0x1_coin_transfer)
 -  [Function `value`](#0x1_coin_value)
+-  [Function `value_mut`](#0x1_coin_value_mut)
 -  [Function `withdraw`](#0x1_coin_withdraw)
 -  [Function `zero`](#0x1_coin_zero)
 -  [Function `destroy_freeze_cap`](#0x1_coin_destroy_freeze_cap)
@@ -1600,6 +1601,46 @@ Returns the <code>value</code> passed in <code><a href="coin.md#0x1_coin">coin</
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_value">value</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): u64 {
+    <a href="coin.md#0x1_coin">coin</a>.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_value_mut"></a>
+
+## Function `value_mut`
+
+Suppose a situation: you borrowed a struct with mut,
+Now you couldn't use &mut Coin to get coin value,
+That if you dont want to reborrowing as immutable reference.
+This function to resolve your problem, and for the gas optimize.
+Before:
+```
+let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr).coin;
+let value_now = coin::value_mut(&coin_mut);
+let new_coin = coin::extract(&mut coin_mut, value_now - 100000000);
+```
+After:
+```
+let coin_mut = &mut borrow_global_mut<StructName<CoinType>>(my_addr).coin;
+let value_now = coin::value_mut(coin_mut);
+let new_coin = coin::extract(coin_mut, value_now - 100000000);
+```
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_value_mut">value_mut</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_value_mut">value_mut</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): u64 {
     <a href="coin.md#0x1_coin">coin</a>.value
 }
 </code></pre>
