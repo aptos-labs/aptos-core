@@ -170,7 +170,7 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "tutorials/first-move-module",
         "guides/move-guides/upgrading-move-code",
-        "guides/move-guides/book/index",
+        "guides/move-guides/book/SUMMARY",
       ],
     },
   ],
