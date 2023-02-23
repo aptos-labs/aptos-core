@@ -21,19 +21,17 @@ File store fetches data from cache and stores in Google Cloud Storage.
 * Example command to run:
 
 ```bash
-SERVICE_ACCOUNT=YOUR_JSON.json \
-REDIS_ADDRESS=127.0.0.1:6379 \
-CHAIN_ID=43 \
-FILE_STORE_BUCKET_NAME=indexer-grpc-file-store \
-CHAIN_NAME=devnet \
-FILE_STORE_BLOB_FOLDER_NAME=blobs cargo run --release
+fullnode_grpc_address: 127.0.0.1:50051
+redis_address: 127.0.0.1:6379
+file_store_bucket_name: indexer-grpc-file-store-testnet 
+health_check_port: 8083
 ```
 
 * Your bucket looks like:
 
 ```bash
-indexer-grpc-file-store/
-    blobs/
+indexer-grpc-file-store-testnet/
+    files/
         0.json
         1000.json
         ...

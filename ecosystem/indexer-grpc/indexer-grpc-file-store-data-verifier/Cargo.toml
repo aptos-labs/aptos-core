@@ -1,6 +1,6 @@
 [package]
-name = "aptos-indexer-grpc-file-store"
-description = "Indexer gRPC file store to save transactions to Google Cloud Storage."
+name = "aptos-indexer-grpc-file-store-data-verifier"
+description = "Indexer gRPC file store verifier to validate the data against the fullnode."
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -18,9 +18,11 @@ aptos-crash-handler = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
+futures  = { workspace = true }
 futures-util = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }

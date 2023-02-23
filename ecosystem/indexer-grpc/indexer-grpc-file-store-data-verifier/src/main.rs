@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_cache_worker::worker::Worker;
+use aptos_indexer_grpc_file_store_data_verifier::worker::Worker;
 use clap::Parser;
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread,
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
 use warp::Filter;
 
@@ -30,16 +27,14 @@ fn main() {
     .unwrap();
 
     let health_port = config.health_check_port;
-
     let runtime = aptos_runtimes::spawn_named_runtime("indexercache".to_string(), None);
-
-    // Start processing.
+    // Start serving.
     runtime.spawn(async move {
-        let mut worker = Worker::new(config).await;
+        let mut worker = Worker::new(config);
         worker.run().await;
     });
 
-    // Start liveness/readiness probe.
+    // Start liveness and readiness probes.
     runtime.spawn(async move {
         let readiness = warp::path("readiness")
             .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
@@ -47,8 +42,9 @@ fn main() {
             .run(([0, 0, 0, 0], health_port))
             .await;
     });
+
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
-        thread::park();
+        std::thread::park();
     }
 }
