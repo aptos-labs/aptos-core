@@ -147,7 +147,7 @@ function install_protoc {
   )
   rm -rf "$TMPFILE"
 
-  # TODO(larry): uncomment when unstream issue is resolved.
+  # TODO(larry): uncomment when upstream issue is resolved.
   # # Install the cargo plugins
   # if ! command -v protoc-gen-prost &> /dev/null; then
   #   cargo install protoc-gen-prost
