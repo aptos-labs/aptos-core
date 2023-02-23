@@ -6,7 +6,9 @@ hide_table_of_contents: true
 
 # Aptos Blockchain Deployments
 
-You can connect to the Aptos blockchain in a few ways. See the below table:
+You can connect to the Aptos blockchain by [choosing a network](../guides/system-integrators-guide.md#choose-a-network). See [Check out release branch](../guides/getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
+
+See the table below for details on each Aptos network:
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|

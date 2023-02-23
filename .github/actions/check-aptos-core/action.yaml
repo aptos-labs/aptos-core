@@ -5,6 +5,10 @@ inputs:
     description: "Cancel the workflow if the calling repository is not aptos-core"
     required: false
     default: false
+  token:
+    description: "The GitHub token to use"
+    required: false
+    default: ${{ github.token }}
 outputs:
   is-aptos-core:
     description: "Whether the calling repository is aptos-core"
@@ -28,3 +32,5 @@ runs:
       run: |
         echo "Canceling workflow because the calling repo is not aptos-core"
         gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ inputs.token }} # this is required for gh commands to work https://cli.github.com/manual/gh_help_environment
