@@ -166,7 +166,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+12. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 

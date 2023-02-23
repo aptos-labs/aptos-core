@@ -258,7 +258,7 @@ If you are running a backend (server-side) application and want to call the inde
 
 ## Run an indexer-enabled fullnode
 
-See [Indexer Fullnode](/nodes/indexer-fullnode).
+See [Indexer Fullnode](../nodes/indexer-fullnode.md).
 
 ## Define your own data model
 

@@ -26,13 +26,13 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 7. Restart the fullnode.
 
-8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-or-docker#verify-initial-synchronization) section for checking if the fullnode is syncing again.
+8. See the [Verify initial synchronization](./fullnode-source-code-or-docker.md#verify-initial-synchronization) section for checking if the fullnode is syncing again.
 
 ## If you run a fullnode via Docker
 
 1. Shutdown your fullnode
 2. Delete the entire directory which holds your fullnode config and data directory.
-3. Rerun the instructions on [Approach #2: Using Docker](fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
+3. Rerun the instructions on [Approach #2: Using Docker](./fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
 
 ## If you run a fullnode on GCP
 

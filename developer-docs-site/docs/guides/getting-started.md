@@ -26,8 +26,8 @@ See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for
 
 Aptos requires no specific hardware to develop on the blockchain. To run one of our nodes, see the hardware requirements for:
 
-* [Fullnodes](nodes/full-node/fullnode-source-code-or-docker.md#hardware-requirements)
-* [Validators](nodes/validator-node/operator/node-requirements.md#hardware-requirements)
+* [Fullnodes](../nodes/full-node/fullnode-source-code-or-docker.md#hardware-requirements)
+* [Validators](../nodes/validator-node/operator/node-requirements.md#hardware-requirements)
 
 ## Workflows
 
@@ -173,7 +173,7 @@ Optionally, check out a release branch to install an Aptos node. We suggest you 
 </TabItem>
 </Tabs>
 
-Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
+Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](../tutorials/index.md) to get started in Aptos.
 
 ## Create and fund test accounts
 
