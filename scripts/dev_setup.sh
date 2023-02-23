@@ -147,16 +147,17 @@ function install_protoc {
   )
   rm -rf "$TMPFILE"
 
-  # Install the cargo plugins
-  if ! command -v protoc-gen-prost &> /dev/null; then
-    cargo install protoc-gen-prost
-  fi
-  if ! command -v protoc-gen-prost-serde &> /dev/null; then
-    cargo install protoc-gen-prost-serde
-  fi
-  if ! command -v protoc-gen-prost-crate &> /dev/null; then
-    cargo install protoc-gen-prost-crate
-  fi
+  # TODO(larry): uncomment when upstream issue is resolved.
+  # # Install the cargo plugins
+  # if ! command -v protoc-gen-prost &> /dev/null; then
+  #   cargo install protoc-gen-prost
+  # fi
+  # if ! command -v protoc-gen-prost-serde &> /dev/null; then
+  #   cargo install protoc-gen-prost-serde
+  # fi
+  # if ! command -v protoc-gen-prost-crate &> /dev/null; then
+  #   cargo install protoc-gen-prost-crate
+  # fi
 }
 
 function install_rustup {
