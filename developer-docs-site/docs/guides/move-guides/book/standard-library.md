@@ -347,7 +347,7 @@ The system is in a state where the performed operation is not allowed.
 ```
 
 ---------------------------------------------------------------------------
-A specific account address was required to perform an operation, but a different address from what was expected was encounterd.
+A specific account address was required to perform an operation, but a different address from what was expected was encountered.
 
 ```move
     const REQUIRES_ADDRESS: u8 = 2;
