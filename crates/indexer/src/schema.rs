@@ -1,9 +1,5 @@
-<<<<<<< HEAD
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
-=======
->>>>>>> 4e6f1e1a40 (Delegator activities)
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -148,6 +144,7 @@ diesel::table! {
         delegator_address -> Varchar,
         pool_address -> Varchar,
         pool_type -> Varchar,
+        table_handle -> Varchar,
         amount -> Numeric,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
