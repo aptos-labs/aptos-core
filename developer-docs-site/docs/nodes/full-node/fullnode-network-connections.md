@@ -9,7 +9,7 @@ When running a fullnode on an Aptos network, you can configure your node's
 network connections for a few different purposes. For example, you can add
 a seed peer to your node's configuration YAML to connect your node to a
 specific peer of your choosing. Or you can create a static network identity
-for your node to allow other nodes to connect to you, as described in [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode).
+for your node to allow other nodes to connect to you, as described in [Network Identity For Fullnode](./network-identity-fullnode.md).
 
 This document describes how to configure the network of your fullnode for
 different deployments and requirements, including:
@@ -25,7 +25,7 @@ different deployments and requirements, including:
 :::tip Before you proceed
 
 Before allowing other fullnodes to connect to your fullnode,
-be sure to create a fullnode identity. See [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode).
+be sure to create a fullnode identity. See [Network Identity For Fullnode](./network-identity-fullnode.md).
 
 :::
 
@@ -34,7 +34,7 @@ Once you start your fullnode with a static identity you can allow others to conn
 :::tip
 
 In the below steps, the port numbers used are for illustration only. You can
-use your choice of port numbers. See [Ports and port settings](/nodes/validator-node/operator/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
+use your choice of port numbers. See [Ports and port settings](../validator-node/operator/node-requirements.md#networking-requirements) for an explanation of port settings and how they are used.
 
 :::
 
@@ -45,7 +45,7 @@ use your choice of port numbers. See [Ports and port settings](/nodes/validator-
 
 Share your fullnode static network identity in the following format in our Discord to advertise your node.
 Note, the Discord channel to share your identity may differ depending on the blockchain deployment you're running in.
-See [Aptos Blockchain Deployments](/nodes/aptos-deployments) for more information.
+See [Aptos Blockchain Deployments](../aptos-deployments.md) for more information.
 
   ```yaml
   <Peer_ID>:
@@ -86,7 +86,7 @@ able to discover other nodes in the network automatically, e.g., using the
 genesis blob or the network addresses of the validators and validator fullnodes
 registered on the blockchain. Be sure to download the correct genesis blob and
 waypoint for your fullnode to ensure your node connects to the correct Aptos
-blockchain deployment. See [Aptos Blockchain Deployments](/nodes/aptos-deployments)
+blockchain deployment. See [Aptos Blockchain Deployments](../aptos-deployments.md)
 for more information.
 
 ## Connecting your fullnode to seed peers

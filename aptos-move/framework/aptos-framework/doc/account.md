@@ -33,6 +33,8 @@
 -  [Function `revoke_rotation_capability`](#0x1_account_revoke_rotation_capability)
 -  [Function `revoke_any_rotation_capability`](#0x1_account_revoke_any_rotation_capability)
 -  [Function `offer_signer_capability`](#0x1_account_offer_signer_capability)
+-  [Function `is_signer_capability_offered`](#0x1_account_is_signer_capability_offered)
+-  [Function `get_signer_capability_offer_for`](#0x1_account_get_signer_capability_offer_for)
 -  [Function `revoke_signer_capability`](#0x1_account_revoke_signer_capability)
 -  [Function `revoke_any_signer_capability`](#0x1_account_revoke_any_signer_capability)
 -  [Function `create_authorized_signer`](#0x1_account_create_authorized_signer)
@@ -677,6 +679,15 @@ The caller does not have a digital-signature-based capability to call this funct
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_CAPABILITY">ENO_CAPABILITY</a>: u64 = 9;
+</code></pre>
+
+
+
+<a name="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
+
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>: u64 = 19;
 </code></pre>
 
 
@@ -1395,6 +1406,59 @@ to the account owner's signer capability).
 
     // Update the existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer or put in a new <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer for the recipient.
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> account_resource.signer_capability_offer.for, recipient_address);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_is_signer_capability_offered"></a>
+
+## Function `is_signer_capability_offered`
+
+Returns true if the account at <code>account_addr</code> has a signer capability offer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.signer_capability_offer.for)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_get_signer_capability_offer_for"></a>
+
+## Function `get_signer_capability_offer_for`
+
+Returns the address of the account that has a signer capability offer from the account at <code>account_addr</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.signer_capability_offer.for), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>));
+    *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&account_resource.signer_capability_offer.for)
 }
 </code></pre>
 

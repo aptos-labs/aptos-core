@@ -1,6 +1,8 @@
 #!/bin/bash
 # Copyright © Aptos Foundation
+# Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
+
 # This script sets up the environment for the build by installing necessary dependencies.
 #
 # Usage ./dev_setup.sh <options>
@@ -145,16 +147,17 @@ function install_protoc {
   )
   rm -rf "$TMPFILE"
 
-  # Install the cargo plugins
-  if ! command -v protoc-gen-prost &> /dev/null; then
-    cargo install protoc-gen-prost
-  fi
-  if ! command -v protoc-gen-prost-serde &> /dev/null; then
-    cargo install protoc-gen-prost-serde
-  fi
-  if ! command -v protoc-gen-prost-crate &> /dev/null; then
-    cargo install protoc-gen-prost-crate
-  fi
+  # TODO(larry): uncomment when upstream issue is resolved.
+  # # Install the cargo plugins
+  # if ! command -v protoc-gen-prost &> /dev/null; then
+  #   cargo install protoc-gen-prost
+  # fi
+  # if ! command -v protoc-gen-prost-serde &> /dev/null; then
+  #   cargo install protoc-gen-prost-serde
+  # fi
+  # if ! command -v protoc-gen-prost-crate &> /dev/null; then
+  #   cargo install protoc-gen-prost-crate
+  # fi
 }
 
 function install_rustup {

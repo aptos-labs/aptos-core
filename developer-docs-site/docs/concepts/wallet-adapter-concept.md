@@ -32,7 +32,7 @@ In addition, creating and implementing a wallet is also not an easy task,
 When we started building a wallet adapter, we wanted to provide an adapter that can be easy enough for wallets to integrate with and for dapps to use and implement.
 
 For that, we provide an [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter) monorepo for wallet and dapps creators to ease development and ensure a smooth process in building projects on the Aptos network.
-The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
+The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard.md). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
 
 ## Adapter structure
 
