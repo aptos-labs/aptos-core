@@ -7,7 +7,7 @@ id: "install-aptos-cli"
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using precompiled binaries that reduce variables in setting up your environment. Also see:
 
-* [Installing the Aptos CLI](./index.md) for an advanced alternative to using the precompiled binaries.
+* [Installing the Aptos CLI](./index.md) for an alternative to using the precompiled binaries.
 * [Installing the Move Prover](../install-move-prover.md) for an optional tool to validate your Move code.
 * [Using Aptos CLI](use-aptos-cli.md) for detailed instructions on employing the Aptos CLI.
 
