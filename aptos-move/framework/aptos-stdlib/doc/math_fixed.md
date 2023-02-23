@@ -16,8 +16,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `assert_approx_the_same`](#0x1_math_fixed_assert_approx_the_same)
 
 
-<pre><code><b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
@@ -184,17 +183,15 @@ Specialized function for x * y / z that omits intermediate shifting
     // 2^(remainder / ln2) = (2^(1/4999))^exponent * <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x / 2^32)
     <b>let</b> roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
     // This <b>has</b> an <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> of 5000 / 4 10^9 roughly 6 digits of precission
-    std::debug::print(&exponent);
     <b>let</b> power = <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(roottwo, exponent);
     <b>let</b> eps_correction = 1241009291;
-    std::debug::print(&power);
     power = power + ((power * eps_correction * exponent) &gt;&gt; 64);
-    std::debug::print(&power);
     // x is fixed point number smaller than 595528/2^32 &lt; 0.00014 so we need only 2 tayler steps
     // <b>to</b> get the 6 digits of precission
     <b>let</b> taylor1 = (power * x) &gt;&gt; (32 - shift);
     <b>let</b> taylor2 = (taylor1 * x) &gt;&gt; 32;
-    (power &lt;&lt; shift) + taylor1 + taylor2 / 2
+    <b>let</b> taylor3 = (taylor2 * x) &gt;&gt; 32;
+    (power &lt;&lt; shift) + taylor1 + taylor2 / 2 + taylor3 / 6
 }
 </code></pre>
 
@@ -240,10 +237,10 @@ Specialized function for x * y / z that omits intermediate shifting
 ## Function `assert_approx_the_same`
 
 For functions that approximate a value it's useful to test a value is close
-to the most correct value up to 10^5 digits of precision
+to the most correct value up to last digit
 
 
-<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128)
+<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128)
 </code></pre>
 
 
@@ -252,13 +249,14 @@ to the most correct value up to 10^5 digits of precision
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128) {
+<pre><code><b>fun</b> <a href="math_fixed.md#0x1_math_fixed_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u128) {
     <b>if</b> (x &lt; y) {
         <b>let</b> tmp = x;
         x = y;
         y = tmp;
     };
-    <b>assert</b>!((x - y) * 100000 / x == 0, 0);
+    <b>let</b> mult = <a href="math128.md#0x1_math128_pow">math128::pow</a>(10, precission);
+    <b>assert</b>!((x - y) * mult &lt; x, 0);
 }
 </code></pre>
 

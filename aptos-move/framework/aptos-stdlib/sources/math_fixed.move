@@ -52,17 +52,15 @@ module aptos_std::math_fixed {
         // 2^(remainder / ln2) = (2^(1/4999))^exponent * exp(x / 2^32)
         let roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
         // This has an error of 5000 / 4 10^9 roughly 6 digits of precission
-        std::debug::print(&exponent);
         let power = pow_raw(roottwo, exponent);
         let eps_correction = 1241009291;
-        std::debug::print(&power);
         power = power + ((power * eps_correction * exponent) >> 64);
-        std::debug::print(&power);
         // x is fixed point number smaller than 595528/2^32 < 0.00014 so we need only 2 tayler steps
         // to get the 6 digits of precission
         let taylor1 = (power * x) >> (32 - shift);
         let taylor2 = (taylor1 * x) >> 32;
-        (power << shift) + taylor1 + taylor2 / 2
+        let taylor3 = (taylor2 * x) >> 32;
+        (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6
     }
 
     // Calculate x to the power of n, where x and the result are fixed point numbers.
@@ -87,7 +85,7 @@ module aptos_std::math_fixed {
         assert!(fixed_point32::get_raw_value(result) == fixed_base, 0);
 
         let result = sqrt(fixed_point32::create_from_u64(2));
-        assert_approx_the_same((fixed_point32::get_raw_value(result) as u128), 6074001000);
+        assert_approx_the_same((fixed_point32::get_raw_value(result) as u128), 6074001000, 9);
     }
 
     #[test]
@@ -98,27 +96,30 @@ module aptos_std::math_fixed {
 
         let result = exp_raw(fixed_base);
         let e = 11674931554;  // e in 32 bit fixed point
-        std::debug::print(&result);
-        std::debug::print(&e);
-        assert_approx_the_same(result, e);
+        assert_approx_the_same(result, e, 9);
+
+        let result = exp_raw(10 * fixed_base);
+        let exp10 = 94602950235157;  // e^10 in 32 bit fixed point
+        assert_approx_the_same(result, exp10, 9);
     }
 
     #[test]
     public entry fun test_pow() {
         // We use the case of exp
         let result = pow_raw(4295562865, 4999);
-        assert_approx_the_same(result,  1 << 33);
+        assert_approx_the_same(result,  1 << 33, 6);
     }
 
     #[testonly]
     /// For functions that approximate a value it's useful to test a value is close
-    /// to the most correct value up to 10^5 digits of precision
-    fun assert_approx_the_same(x: u128, y: u128) {
+    /// to the most correct value up to last digit
+    fun assert_approx_the_same(x: u128, y: u128, precission: u128) {
         if (x < y) {
             let tmp = x;
             x = y;
             y = tmp;
         };
-        assert!((x - y) * 100000 / x == 0, 0);
+        let mult = math128::pow(10, precission);
+        assert!((x - y) * mult < x, 0);
     }
 }
