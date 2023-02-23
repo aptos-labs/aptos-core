@@ -348,6 +348,11 @@ const config = {
                 docId: "contribute/community/index",
               },
               {
+                label: "External Resources",
+                type: "doc",
+                docId: "contribute/external-resources",
+              },
+              {
                 label: "Frequently Asked Questions",
                 type: "doc",
                 docId: "contribute/faq",
