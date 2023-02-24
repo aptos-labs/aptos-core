@@ -26,13 +26,13 @@ pub struct QuorumStoreConfig {
     pub batch_expiry_grace_rounds: Round,
     pub memory_quota: usize,
     pub db_quota: usize,
-    pub mempool_txn_pull_max_count: u64,
     pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure_total_txn_num: u64,
     pub back_pressure_decrease_duration_ms: u64,
     pub back_pressure_increase_duration_ms: u64,
     pub back_pressure_decrease_fraction: f64,
     pub back_pressure_dynamic_min_batch_count: u64,
+    pub back_pressure_dynamic_max_batch_count: u64,
     pub num_workers_for_remote_fragments: usize,
 }
 
@@ -53,7 +53,6 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 100000000,
             db_quota: 10000000000,
-            mempool_txn_pull_max_count: 1000, // Some "reasonable" max
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             // QS will be backpressured if the remaining total txns is more than this number
             back_pressure_total_txn_num: 4000 * 4,
@@ -61,6 +60,7 @@ impl Default for QuorumStoreConfig {
             back_pressure_increase_duration_ms: 1000,
             back_pressure_decrease_fraction: 0.5,
             back_pressure_dynamic_min_batch_count: 80,
+            back_pressure_dynamic_max_batch_count: 1000,
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
             num_workers_for_remote_fragments: 10,
         }

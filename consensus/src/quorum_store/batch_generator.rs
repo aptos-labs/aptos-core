@@ -252,7 +252,7 @@ impl BatchGenerator {
         // this is the flag that records whether there is backpressure during last txn pulling from the mempool
         let mut back_pressure_in_last_pull = false;
         let mut end_batch_in_last_pull = false;
-        let mut dynamic_max_pull_count = self.config.mempool_txn_pull_max_count;
+        let mut dynamic_max_pull_count = self.config.back_pressure_dynamic_max_batch_count;
 
         let back_pressure_decrease_duration =
             Duration::from_millis(self.config.back_pressure_decrease_duration_ms);
@@ -297,7 +297,7 @@ impl BatchGenerator {
                             back_pressure_increase_latest = Instant::now();
                             dynamic_max_pull_count = std::cmp::min(
                                 dynamic_max_pull_count + self.config.back_pressure_dynamic_min_batch_count,
-                                self.config.back_pressure_dynamic_min_batch_count,
+                                self.config.back_pressure_dynamic_max_batch_count,
                             );
                             debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }
