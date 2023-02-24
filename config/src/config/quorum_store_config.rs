@@ -12,7 +12,6 @@ pub struct QuorumStoreConfig {
     pub batch_request_num_peers: usize,
     pub mempool_pulling_interval: usize,
     pub end_batch_ms: u64,
-    pub max_batch_counts: usize,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
     /// Used when setting up the expiration time for the batch initation.
@@ -30,6 +29,10 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_count: u64,
     pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure_total_txn_num: u64,
+    pub back_pressure_decrease_duration_ms: u64,
+    pub back_pressure_increase_duration_ms: u64,
+    pub back_pressure_decrease_fraction: f64,
+    pub back_pressure_dynamic_min_batch_count: u64,
     pub num_workers_for_remote_fragments: usize,
 }
 
@@ -40,9 +43,10 @@ impl Default for QuorumStoreConfig {
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
             mempool_pulling_interval: 200,
+            // TODO: This essentially turns fragments off, because there was performance degradation. Needs more investigation.
             end_batch_ms: 10,
-            max_batch_counts: 1000,
-            max_batch_bytes: 4 * 1024 * 1024,
+            // Should be increased if consensus block size is increased, e.g., to 4 MB
+            max_batch_bytes: 3 * 1024 * 1024,
             batch_request_timeout_ms: 10000,
             batch_expiry_round_gap_when_init: 100,
             batch_expiry_round_gap_behind_latest_certified: 500,
@@ -50,10 +54,17 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 100000000,
             db_quota: 10000000000,
-            mempool_txn_pull_max_count: 1000, // Some "reasonable" max
-            mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
+            // Should be increased if consensus block size is increased, e.g., to 1000
+            mempool_txn_pull_max_count: 625, // Some "reasonable" max
+            // Should be increased if consensus block size is increased, e.g., to 4 MB
+            mempool_txn_pull_max_bytes: 3 * 1024 * 1024,
             // QS will be backpressured if the remaining total txns is more than this number
-            back_pressure_total_txn_num: 4000 * 4,
+            // Should be increased if consensus block size is increased, e.g., to 4000 * 4
+            back_pressure_total_txn_num: 2500 * 4,
+            back_pressure_decrease_duration_ms: 1000,
+            back_pressure_increase_duration_ms: 1000,
+            back_pressure_decrease_fraction: 0.5,
+            back_pressure_dynamic_min_batch_count: 80,
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
             num_workers_for_remote_fragments: 10,
         }

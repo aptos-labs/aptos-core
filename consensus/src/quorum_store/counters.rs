@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_gauge, Histogram, HistogramVec, IntCounter, IntGauge,
+    exponential_buckets, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_gauge, Histogram, HistogramVec,
+    IntCounter, IntGauge,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -16,6 +17,13 @@ pub const REQUEST_SUCCESS_LABEL: &str = "success";
 
 pub const CALLBACK_FAIL_LABEL: &str = "callback_fail";
 pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
+
+static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 /// Counter for tracking latency of quorum store processing requests from consensus
 /// A 'fail' result means the quorum store's callback response to consensus failed.
@@ -166,32 +174,22 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy
     .unwrap()
     });
 
-/// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
+/// Histogram for the number of total txns left after cleaning up commit notifications.
 pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_num_batch_left_when_pull_for_block",
-        "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+        "quorum_store_num_total_txns_left_on_commit",
+        "Histogram for the number of total txns left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
 
-/// Histogram for the number of local batches/PoS left when forming a block proposal.
-pub static NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+/// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
+pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_local_batch_left_when_pull_for_block",
         "Histogram for the number of locally created batches/PoS left when forming a block proposal.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-/// Histogram for the number of local batches/PoS left when forming a block proposal.
-pub static AGE_OF_OLDEST_LOCAL_PROOF: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_age_of_oldest_local_proof",
-        "placeholder",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });

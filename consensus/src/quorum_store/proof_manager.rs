@@ -29,17 +29,15 @@ pub struct ProofManager {
     latest_logical_time: LogicalTime,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
-    expiry_gap: u64,
 }
 
 impl ProofManager {
-    pub fn new(epoch: u64, back_pressure_total_txn_limit: u64, expiry_gap: u64) -> Self {
+    pub fn new(epoch: u64, back_pressure_total_txn_limit: u64) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
-            expiry_gap,
         }
     }
 
@@ -168,15 +166,7 @@ impl ProofManager {
                             // update the backpressure upon new commit round
                             self.remaining_total_txn_num = self.proofs_for_consensus.num_total_txns(logical_time);
                             // TODO: keeping here for metrics, might be part of the backpressure in the future?
-                            if let Some(expiration_of_oldest) = self.proofs_for_consensus.clean_local_proofs(logical_time) {
-                                if expiration_of_oldest <= logical_time.round() + self.expiry_gap {
-                                    counters::AGE_OF_OLDEST_LOCAL_PROOF.observe((logical_time.round() + self.expiry_gap - expiration_of_oldest) as f64);
-                                } else {
-                                    debug!("expiration {} > round {} + expiry {}", expiration_of_oldest, logical_time.round(), self.expiry_gap);
-                                }
-                            } else {
-                                counters::AGE_OF_OLDEST_LOCAL_PROOF.observe(0 as f64);
-                            }
+                            self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;

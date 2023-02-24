@@ -4,9 +4,9 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
-    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
+    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -102,10 +102,12 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
 
-const TRANSACTION_COUNT_BUCKETS: &[f64] = &[
-    2.5, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 100.0, 150.0, 200.0, 250.0,
-    300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0,
-];
+static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 #[cfg(test)]
 mod test {
@@ -264,7 +266,7 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.to_vec()
+        TRANSACTION_COUNT_BUCKETS.clone()
     )
     .unwrap()
 });

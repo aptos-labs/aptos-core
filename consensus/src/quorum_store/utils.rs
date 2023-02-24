@@ -35,19 +35,18 @@ pub(crate) struct BatchBuilder {
     summaries: Vec<TransactionSummary>,
     data: Vec<SerializedTransaction>,
     num_txns: usize,
-    max_txns: usize,
     num_bytes: usize,
+    // TODO: remove
     max_bytes: usize,
 }
 
 impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_txns: usize, max_bytes: usize) -> Self {
+    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
         Self {
             id: batch_id,
             summaries: Vec::new(),
             data: Vec::new(),
             num_txns: 0,
-            max_txns,
             num_bytes: 0,
             max_bytes,
         }
@@ -332,14 +331,11 @@ impl ProofQueue {
     pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
         let mut remaining_txns = 0;
         for (digest, expiration) in self.digest_queue.iter() {
-            // Not expired. It is possible that the proof entry in digest_proof was already removed
-            // when draining the digest_queue but local_digest_queue is not drained yet.
+            // Not expired
             if *expiration >= current_time {
-                if let Some(entry) = self.digest_proof.get(digest) {
-                    // Not committed
-                    if let Some(proof) = entry {
-                        remaining_txns += proof.info().num_txns;
-                    }
+                // Not committed
+                if let Some(Some(proof)) = self.digest_proof.get(digest) {
+                    remaining_txns += proof.info().num_txns;
                 }
             }
         }
@@ -370,9 +366,7 @@ impl ProofQueue {
                 }
             }
         }
-        // TODO: rename to NUM_LOCAL_PROOFS_LEFT_ON_COMMIT if not removed completely
-        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
-            .observe(remaining_local_proof_size as f64);
+        counters::NUM_LOCAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_local_proof_size as f64);
 
         if let Some(&(_, time)) = self.local_digest_queue.iter().next() {
             Some(time.round())
