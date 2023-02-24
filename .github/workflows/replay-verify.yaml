@@ -27,6 +27,7 @@ on:
   push:
     branches:
       - aptos-release-v* # the aptos release branches
+      - aptos-node-v*
 
 # cancel redundant builds
 concurrency:

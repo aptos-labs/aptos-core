@@ -29,6 +29,7 @@ on:
   push:
     branches:
       - aptos-release-v* # the aptos release branches
+      - aptos-node-v*
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
