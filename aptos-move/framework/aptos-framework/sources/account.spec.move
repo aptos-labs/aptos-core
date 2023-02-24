@@ -254,6 +254,16 @@ spec aptos_framework::account {
         modifies global<Account>(source_address);
     }
 
+    spec is_signer_capability_offered(account_addr: address): bool {
+        aborts_if !exists<Account>(account_addr);
+    }
+
+    spec get_signer_capability_offer_for(account_addr: address): address {
+        aborts_if !exists<Account>(account_addr);
+        let account_resource = global<Account>(account_addr);
+        aborts_if len(account_resource.signer_capability_offer.for.vec) == 0;
+    }
+
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
