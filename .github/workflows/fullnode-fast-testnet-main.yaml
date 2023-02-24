@@ -7,9 +7,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
-  pull_request:
-    paths:
-      - ".github/workflows/fullnode-fast-testnet-main.yaml"
 
 permissions:
   contents: read
