@@ -48,7 +48,6 @@ Aptos Foundation considers the following levels of severity:
 **************** Critical — Up to $1,000,000 USD in APT tokens (locked for 12 months) ****************
 
 - Direct loss of funds to users or protocols with minimal preconditions, such as, Move type confusion.
-- Execute arbitrary system commands (RCE) on validator nodes.
 - Vulnerabilities in the Proof of Stake system which directly compromise consensus.
 - Unintended permanent chain split requiring hard fork (network partition requiring hardfork).
 - Permanent freezing, burning, or modification of funds (fix requires hardfork).
