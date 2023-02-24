@@ -23,8 +23,9 @@ use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
+use aptos_logger::info;
 use aptos_storage_interface::DbReaderWriter;
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Instant};
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
@@ -91,9 +92,20 @@ pub fn run_benchmark<V>(
         source_dir,
         version,
     );
+
+    let start_time = Instant::now();
     generator.run_transfer(block_size, num_transfer_blocks);
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!(
+        "Overall TPS: transfer: {} txn/s = {} txn / {}s",
+        delta_v as f32 / elapsed,
+        delta_v,
+        elapsed
+    );
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
@@ -156,6 +168,7 @@ fn add_accounts_impl<V>(
         version,
     );
 
+    let start_time = Instant::now();
     generator.run_mint(
         db.reader.clone(),
         generator.num_existing_accounts(),
@@ -165,6 +178,15 @@ fn add_accounts_impl<V>(
     );
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!(
+        "Overall TPS: account creation: {} txn/s = {} txn / {}s",
+        delta_v as f32 / elapsed,
+        delta_v,
+        elapsed
+    );
 
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
