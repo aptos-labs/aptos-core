@@ -47,6 +47,10 @@ impl ChangeSetExt {
         }
     }
 
+    pub fn change_set(&self) -> &ChangeSet {
+        &self.change_set
+    }
+
     pub fn delta_change_set(&self) -> &DeltaChangeSet {
         &self.delta_change_set
     }
