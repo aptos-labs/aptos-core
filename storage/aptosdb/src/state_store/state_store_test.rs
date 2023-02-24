@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -32,16 +33,22 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
-    let batch = SchemaBatch::new();
+    let ledger_batch = SchemaBatch::new();
+    let state_kv_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &batch,
+            &ledger_batch,
+            &state_kv_batch,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(batch).unwrap();
+    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .state_kv_db
+        .write_schemas(state_kv_batch)
+        .unwrap();
     root
 }
 
@@ -483,7 +490,7 @@ proptest! {
                 next_version,
             );
 
-            // Check db-restore calculates usage correctly as well.
+            // Check db restore calculates usage correctly as well.
             let tmp_dir = TempPath::new();
             let db2 = AptosDB::new_for_test(&tmp_dir);
             let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod rest_interface;
@@ -173,20 +174,21 @@ impl DebuggerStateView {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<StateValue>> {
         let (tx, rx) = std::sync::mpsc::channel();
         let query_handler_locked = self.query_sender.lock().unwrap();
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        Ok(rx.recv()?)
+        let bytes_opt = rx.recv()?;
+        Ok(bytes_opt.map(StateValue::new))
     }
 }
 
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)
     }
 

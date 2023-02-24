@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{
@@ -80,6 +81,9 @@ struct Opt {
 
     #[structopt(flatten)]
     pruner_opt: PrunerOpt,
+
+    #[structopt(long)]
+    use_state_kv_db: bool,
 
     #[structopt(subcommand)]
     cmd: Command,
@@ -168,6 +172,7 @@ where
                 data_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
+                opt.use_state_kv_db,
             );
         },
         Command::RunExecutor {
@@ -182,6 +187,7 @@ where
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
+                opt.use_state_kv_db,
             );
         },
         Command::AddAccounts {
@@ -198,6 +204,7 @@ where
                 checkpoint_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
+                opt.use_state_kv_db,
             );
         },
     }

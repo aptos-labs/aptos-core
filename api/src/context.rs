@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -238,7 +239,7 @@ impl Context {
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
         self.db
             .state_view_at_version(Some(version))?
-            .get_state_value(state_key)
+            .get_state_value_bytes(state_key)
     }
 
     pub fn get_state_value_poem<E: InternalError>(

@@ -26,7 +26,6 @@ use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
 fn put_value_set(
-    db: &DB,
     state_store: &StateStore,
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
@@ -46,16 +45,22 @@ fn put_value_set(
         )
         .unwrap();
 
-    let batch = SchemaBatch::new();
+    let ledger_batch = SchemaBatch::new();
+    let state_kv_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &batch,
+            &ledger_batch,
+            &state_kv_batch,
         )
         .unwrap();
-    db.write_schemas(batch).unwrap();
+    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .state_kv_db
+        .write_schemas(state_kv_batch)
+        .unwrap();
 
     root
 }
@@ -99,7 +104,6 @@ fn test_state_store_pruner() {
     for i in 0..num_versions {
         let value = StateValue::from(vec![i as u8]);
         root_hashes.push(put_value_set(
-            &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
             i, /* version */
@@ -178,13 +182,11 @@ fn test_state_store_pruner_partial_version() {
     let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
-        &aptos_db.ledger_db,
         state_store,
         vec![(key1.clone(), value1.clone()), (key2.clone(), value2)],
         0, /* version */
     );
     let _root1 = put_value_set(
-        &aptos_db.ledger_db,
         state_store,
         vec![
             (key2.clone(), value2_update.clone()),
@@ -193,7 +195,6 @@ fn test_state_store_pruner_partial_version() {
         1, /* version */
     );
     let _root2 = put_value_set(
-        &aptos_db.ledger_db,
         state_store,
         vec![(key3.clone(), value3_update.clone())],
         2, /* version */
@@ -269,7 +270,6 @@ fn test_state_store_pruner_disabled() {
     for i in 0..num_versions {
         let value = StateValue::from(vec![i as u8]);
         root_hashes.push(put_value_set(
-            &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
             i, /* version */
@@ -317,23 +317,19 @@ fn test_worker_quit_eagerly() {
 
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let db = Arc::clone(&aptos_db.ledger_db);
     let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
-        &db,
         state_store,
         vec![(key.clone(), value0.clone())],
         0, /* version */
     );
     let _root1 = put_value_set(
-        &db,
         state_store,
         vec![(key.clone(), value1.clone())],
         1, /* version */
     );
     let _root2 = put_value_set(
-        &db,
         state_store,
         vec![(key.clone(), value2.clone())],
         2, /* version */

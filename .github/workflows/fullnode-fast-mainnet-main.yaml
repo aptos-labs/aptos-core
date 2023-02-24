@@ -11,8 +11,22 @@ on:
     paths:
       - ".github/workflows/fullnode-fast-mainnet-main.yaml"
 
+permissions:
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
+
 jobs:
+  check-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+        with:
+          cancel-workflow: true
+
   fullnode-fast-mainnet-main:
+    needs: check-repo
     uses: ./.github/workflows/run-fullnode-sync.yaml
     secrets: inherit
     with:

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils;
@@ -53,8 +54,9 @@ impl Default for RocksdbConfig {
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
-    pub use_kv_db: bool,
-    pub kv_db_config: RocksdbConfig,
+    // Note: Not ready for production use yet.
+    pub use_state_kv_db: bool,
+    pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
 
@@ -63,8 +65,8 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            use_kv_db: false,
-            kv_db_config: RocksdbConfig::default(),
+            use_state_kv_db: false,
+            state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
@@ -16,7 +17,7 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, PrunerConfig, RocksdbConfigs};
+use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
@@ -36,7 +37,7 @@ where
             &config.storage.dir(),
             false, /* readonly */
             config.storage.storage_pruner_config,
-            RocksdbConfigs::default(),
+            config.storage.rocksdb_configs,
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
@@ -67,6 +68,7 @@ pub fn run_benchmark<V>(
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -75,6 +77,7 @@ pub fn run_benchmark<V>(
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
+    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let version = db.reader.get_latest_version().unwrap();
@@ -105,6 +108,7 @@ pub fn add_accounts<V>(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -118,6 +122,7 @@ pub fn add_accounts<V>(
         checkpoint_dir,
         pruner_config,
         verify_sequence_numbers,
+        use_state_kv_db,
     );
 }
 
@@ -129,12 +134,14 @@ fn add_accounts_impl<V>(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
+    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -204,6 +211,7 @@ mod tests {
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             true,
+            false,
         );
 
         super::run_benchmark::<AptosVM>(
@@ -213,6 +221,7 @@ mod tests {
             checkpoint_dir,
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            false,
         );
     }
 }

@@ -129,7 +129,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
     let owner = &mut ctx.gen_account();
-    let txn1 = ctx.mint_user_account(creator);
+    let txn1 = ctx.mint_user_account(creator).await;
     let txn2 = ctx.account_transfer(creator, owner, 100_000);
 
     let collection_name = "collection name".to_owned().into_bytes();
@@ -222,14 +222,14 @@ async fn test_get_table_item() {
     let ctx = &mut context;
     let mut account = ctx.gen_account();
     let acc = &mut account;
-    let txn = ctx.create_user_account(acc);
+    let txn = ctx.create_user_account(acc).await;
     ctx.commit_block(&vec![txn.clone()]).await;
     make_test_tables(ctx, acc).await;
 
     // get the TestTables instance
     let tt = ctx
         .api_get_account_resource(
-            acc,
+            acc.address(),
             &acc.address().to_hex_literal(),
             "TableTestData",
             "TestTables",
@@ -322,14 +322,8 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
 
     ctx.api_publish_module(account, module.try_into().unwrap())
         .await;
-    ctx.api_execute_entry_function(
-        account,
-        "TableTestData",
-        "make_test_tables",
-        json!([]),
-        json!([]),
-    )
-    .await
+    ctx.api_execute_entry_function(account, "make_test_tables", json!([]), json!([]))
+        .await
 }
 
 async fn build_test_module(account: AccountAddress) -> Vec<u8> {

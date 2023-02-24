@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
@@ -6,7 +7,9 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
@@ -21,7 +24,7 @@ struct MockStateView;
 impl TStateView for MockStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<StateValue>> {
         Ok(None)
     }
 

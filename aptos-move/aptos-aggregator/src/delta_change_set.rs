@@ -170,7 +170,7 @@ impl DeltaOp {
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         state_view
-            .get_state_value(state_key)
+            .get_state_value_bytes(state_key)
             .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))
             .and_then(|maybe_bytes| {
                 match maybe_bytes {
@@ -352,7 +352,9 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 mod tests {
     use super::*;
     use aptos_state_view::TStateView;
-    use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+    use aptos_types::state_store::{
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
+    };
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
@@ -540,8 +542,8 @@ mod tests {
     impl TStateView for FakeView {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-            Ok(self.data.get(state_key).cloned())
+        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<StateValue>> {
+            Ok(self.data.get(state_key).cloned().map(StateValue::new))
         }
 
         fn is_genesis(&self) -> bool {

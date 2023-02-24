@@ -7,8 +7,8 @@ slug: "node-files-testnet"
 
 When you are deploying an Aptos node in the **testnet**, you will need to download the files listed on this page. 
 
-- **Mainnet:** If you are deploying in the mainnet, download the files from the [Node Files For Mainnet](node-files) page.
-- **Devnet:** If you are deploying in the testnet, download the files from the [Node Files For Devnet](node-files-devnet) page.
+- **Mainnet:** If you are deploying in the mainnet, download the files from the [Node Files For Mainnet](./node-files.md) page.
+- **Devnet:** If you are deploying in the testnet, download the files from the [Node Files For Devnet](./node-files-devnet.md) page.
 
 ---
 

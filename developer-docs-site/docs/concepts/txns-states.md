@@ -47,15 +47,15 @@ See [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md) for a comprehe
 A [signed transaction](../guides/sign-a-transaction.md) on the blockchain contains the following information:
 
 - **Signature**: The sender uses a digital signature to verify that they signed the transaction (i.e., authentication).
-- **Sender address**: The sender's [account address](./accounts#account-address).
+- **Sender address**: The sender's [account address](./accounts.md#account-address).
 - **Sender public key**: The public authentication key that corresponds to the private authentication key used to sign the transaction.
 - **Program**: The program comprises:
   - A Move module and function name or a move bytecode transaction script.
   - An optional list of inputs to the script. For a peer-to-peer transaction, these inputs contain the recipient's information and the amount transferred to them.
   - An optional list of Move bytecode modules to publish.
 - **Gas price** (in specified gas units): This is the amount the sender is willing to pay per unit of [gas](./gas-txn-fee.md) to execute the transaction. [Gas](./gas-txn-fee.md) is a way to pay for computation and storage. A gas unit is an abstract measurement of computation with no inherent real-world value.
-- **Maximum gas amount**: The [maximum gas amount](./gas-txn-fee#gas-and-transaction-fee-on-the-aptos-blockchain) is the maximum gas units the transaction is allowed to consume.
-- **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](./accounts#account-sequence-number) at the time of execution.
+- **Maximum gas amount**: The [maximum gas amount](./gas-txn-fee.md#gas-and-transaction-fee-on-the-aptos-blockchain) is the maximum gas units the transaction is allowed to consume.
+- **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](./accounts.md#account-sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
 
 ### Types of transactions
@@ -92,7 +92,7 @@ The Aptos blockchain uses proof to verify the authenticity and correctness of th
 
 Data within the Aptos blockchain is replicated across the network. Each validator and fullnode's [storage](./validator-nodes#storage) is responsible for persisting the agreed upon blocks of transactions and their execution results to the database. 
 
-The blockchain is represented as an ever-growing [Merkle tree](../reference/glossary#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
+The blockchain is represented as an ever-growing [Merkle tree](../reference/glossary.md#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
 
 All operations executed by the blockchain and all account states can be verified cryptographically. These cryptographic proofs ensure that:
 - The validator nodes agree on the state. 

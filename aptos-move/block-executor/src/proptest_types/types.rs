@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -17,7 +18,7 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    state_store::state_storage_usage::StateStorageUsage,
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
 use claims::assert_none;
@@ -51,9 +52,9 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
         // When aggregator value has to be resolved from storage, pretend it is 100.
-        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE)))
+        Ok(Some(StateValue::new(serialize(&STORAGE_AGGREGATOR_VALUE))))
     }
 
     fn id(&self) -> StateViewId {
@@ -81,7 +82,7 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
 
@@ -441,7 +442,7 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    reads_result.push(view.get_state_value(k).unwrap());
+                    reads_result.push(view.get_state_value_bytes(k).unwrap());
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),

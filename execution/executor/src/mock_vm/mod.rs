@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
@@ -233,7 +234,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_state_value(&StateKey::access_path(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -243,7 +244,7 @@ fn read_state_value_from_storage(
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view
-        .get_state_value(&StateKey::access_path(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 
