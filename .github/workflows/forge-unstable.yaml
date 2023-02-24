@@ -67,7 +67,7 @@ jobs:
 
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
-          cancel-workflow: true
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
 
