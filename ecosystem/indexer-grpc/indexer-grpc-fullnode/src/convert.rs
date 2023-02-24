@@ -469,9 +469,15 @@ pub fn convert_multisig_payload(
         .as_ref()
         .map(|p| match p {
             MultisigTransactionPayload::EntryFunctionPayload(entry_function_payload) => {
-                transaction::multisig_payload::MultisigTransactionPayload::EntryFunctionPayload(
-                    convert_entry_function_payload(entry_function_payload),
-                )
+                transaction::MultisigTransactionPayload {
+                    r#type: transaction::multisig_transaction_payload::Type::EntryFunctionPayload
+                        as i32,
+                    payload: Some(
+                        transaction::multisig_transaction_payload::Payload::EntryFunctionPayload(
+                            convert_entry_function_payload(entry_function_payload),
+                        ),
+                    ),
+                }
             },
         });
     transaction::MultisigPayload {
