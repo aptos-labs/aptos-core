@@ -65,6 +65,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
 pub fn run_benchmark<V>(
     block_size: usize,
     num_transfer_blocks: usize,
+    transactions_per_sender: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
@@ -94,18 +95,13 @@ pub fn run_benchmark<V>(
     );
 
     let start_time = Instant::now();
-    generator.run_transfer(block_size, num_transfer_blocks);
+    generator.run_transfer(block_size, num_transfer_blocks, transactions_per_sender);
     generator.drop_sender();
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f32();
     let delta_v = db.reader.get_latest_version().unwrap() - version;
-    info!(
-        "Overall TPS: transfer: {} txn/s = {} txn / {}s",
-        delta_v as f32 / elapsed,
-        delta_v,
-        elapsed
-    );
+    info!("Overall TPS: transfer: {} txn/s", delta_v as f32 / elapsed,);
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
@@ -182,10 +178,8 @@ fn add_accounts_impl<V>(
     let elapsed = start_time.elapsed().as_secs_f32();
     let delta_v = db.reader.get_latest_version().unwrap() - version;
     info!(
-        "Overall TPS: account creation: {} txn/s = {} txn / {}s",
+        "Overall TPS: account creation: {} txn/s",
         delta_v as f32 / elapsed,
-        delta_v,
-        elapsed
     );
 
     if verify_sequence_numbers {
@@ -237,8 +231,9 @@ mod tests {
         );
 
         super::run_benchmark::<AptosVM>(
-            5, /* block_size */
+            6, /* block_size */
             5, /* num_transfer_blocks */
+            2, /* transactions per sender */
             storage_dir.as_ref(),
             checkpoint_dir,
             true,
