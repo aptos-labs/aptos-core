@@ -777,7 +777,7 @@ impl CompileScriptFunction {
             script_path,
             &self.framework_package_args,
             prompt_options,
-            self.bytecode_version.unwrap_or(5),
+            self.bytecode_version.unwrap_or(6),
         )
     }
 }
