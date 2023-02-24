@@ -95,8 +95,7 @@ impl BatchGenerator {
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
         max_count: u64,
-        end_batch_when_back_pressure: bool,
-    ) -> Option<(ProofCompletedChannel, bool)> {
+    ) -> Option<ProofCompletedChannel> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
@@ -141,10 +140,6 @@ impl BatchGenerator {
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
         if self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128 {
-            end_batch = true;
-        }
-
-        if end_batch_when_back_pressure {
             end_batch = true;
         }
 
@@ -209,7 +204,7 @@ impl BatchGenerator {
 
             self.last_end_batch_time = Instant::now();
 
-            Some((proof_rx, end_batch))
+            Some(proof_rx)
         }
     }
 
@@ -249,17 +244,13 @@ impl BatchGenerator {
     ) {
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
-        // this is the flag that records whether there is backpressure during last txn pulling from the mempool
-        let mut back_pressure_in_last_pull = false;
-        let mut end_batch_in_last_pull = false;
-        let mut dynamic_max_pull_count = self.config.back_pressure_dynamic_max_batch_count;
-
         let back_pressure_decrease_duration =
             Duration::from_millis(self.config.back_pressure_decrease_duration_ms);
         let back_pressure_increase_duration =
             Duration::from_millis(self.config.back_pressure_increase_duration_ms);
         let mut back_pressure_decrease_latest = Instant::now();
         let mut back_pressure_increase_latest = Instant::now();
+        let mut dynamic_max_pull_count = self.config.back_pressure_dynamic_max_batch_count;
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
@@ -282,15 +273,6 @@ impl BatchGenerator {
                         }
                         counters::QS_BACKPRESSURE.set(1);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
-                        // quorum store needs to be back pressured
-                        // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
-                        if !back_pressure_in_last_pull && !end_batch_in_last_pull {
-                            if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(dynamic_max_pull_count, true).await {
-                                proofs_in_progress.push(Box::pin(proof_rx));
-                                end_batch_in_last_pull = end_batch;
-                            }
-                        }
-                        back_pressure_in_last_pull = true;
                     } else {
                         // additive increase, every second
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
@@ -303,12 +285,9 @@ impl BatchGenerator {
                         }
                         counters::QS_BACKPRESSURE.set(0);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
-                        // no back pressure
-                        if let Some((proof_rx, end_batch)) = self.handle_scheduled_pull(dynamic_max_pull_count, false).await {
-                            proofs_in_progress.push(Box::pin(proof_rx));
-                            end_batch_in_last_pull = end_batch;
-                        }
-                        back_pressure_in_last_pull = false;
+                    }
+                    if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_max_pull_count).await {
+                        proofs_in_progress.push(Box::pin(proof_rx));
                     }
                 },
                 Some(next_proof) = proofs_in_progress.next() => {

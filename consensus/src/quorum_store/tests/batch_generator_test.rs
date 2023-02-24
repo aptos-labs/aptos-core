@@ -153,11 +153,11 @@ async fn test_batch_creation() {
         }
     });
 
-    let result = batch_generator.handle_scheduled_pull(300, false).await;
+    let result = batch_generator.handle_scheduled_pull(300).await;
     assert!(result.is_none());
-    let result = batch_generator.handle_scheduled_pull(300, false).await;
+    let result = batch_generator.handle_scheduled_pull(300).await;
     assert!(result.is_some());
-    let result = batch_generator.handle_scheduled_pull(300, false).await;
+    let result = batch_generator.handle_scheduled_pull(300).await;
     assert!(result.is_none());
 
     timeout(Duration::from_millis(10_000), join_handle)
