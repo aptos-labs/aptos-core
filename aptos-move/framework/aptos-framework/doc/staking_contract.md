@@ -84,6 +84,7 @@ pool.
     -  [Function `add_stake`](#@Specification_1_add_stake)
     -  [Function `update_voter`](#@Specification_1_update_voter)
     -  [Function `reset_lockup`](#@Specification_1_reset_lockup)
+    -  [Function `update_commision`](#@Specification_1_update_commision)
     -  [Function `request_commission`](#@Specification_1_request_commission)
     -  [Function `request_commission_internal`](#@Specification_1_request_commission_internal)
     -  [Function `unlock_stake`](#@Specification_1_unlock_stake)
@@ -2151,6 +2152,22 @@ Only active validator can update locked_until_secs.
 <pre><code><b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>{staker: staker_address};
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_IncreaseLockupWithCapAbortsIf">IncreaseLockupWithCapAbortsIf</a>{staker: staker_address};
+</code></pre>
+
+
+
+<a name="@Specification_1_update_commision"></a>
+
+### Function `update_commision`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

@@ -93,6 +93,10 @@ impl ContractEventV0 {
     pub fn type_tag(&self) -> &TypeTag {
         &self.type_tag
     }
+
+    pub fn size(&self) -> usize {
+        self.key.size() + 8 /* u64 */ + bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
+    }
 }
 
 impl TryFrom<&ContractEvent> for NewBlockEvent {

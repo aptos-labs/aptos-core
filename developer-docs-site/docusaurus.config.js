@@ -204,6 +204,11 @@ const config = {
                 type: "doc",
                 docId: "guides/move-guides/upgrading-move-code",
               },
+              {
+                label: "Aptos Move Book",
+                type: "doc",
+                docId: "guides/move-guides/book/SUMMARY",
+              },
             ],
           },
           {

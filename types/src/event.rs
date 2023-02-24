@@ -46,6 +46,11 @@ impl EventKey {
         let salt = rng.next_u64();
         EventKey::new(salt, AccountAddress::random())
     }
+
+    pub fn size(&self) -> usize {
+        8 /* u64 */ + 32 /* address */
+    }
+
     /*
     pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, EventKeyParseError> {
         <[u8; Self::LENGTH]>::from_hex(hex)
