@@ -23,14 +23,11 @@ use aptos_jellyfish_merkle::metrics::{
 };
 use aptos_logger::info;
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::transaction::Transaction;
 use std::{fs, path::Path, time::Instant};
 
-pub fn init_db_and_executor<V>(
-    config: &NodeConfig,
-) -> (DbReaderWriter, BlockExecutor<V, Transaction>)
+pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
-    V: TransactionBlockExecutor<Transaction>,
+    V: TransactionBlockExecutor,
 {
     let db = DbReaderWriter::new(
         AptosDB::open(
@@ -71,7 +68,7 @@ pub fn run_benchmark<V>(
     use_state_kv_db: bool,
     split_stages: bool,
 ) where
-    V: TransactionBlockExecutor<Transaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
@@ -122,7 +119,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
 ) where
-    V: TransactionBlockExecutor<Transaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
@@ -148,7 +145,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
 ) where
-    V: TransactionBlockExecutor<Transaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
@@ -221,12 +218,11 @@ mod tests {
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
-    use aptos_types::transaction::Transaction;
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(verify_sequence_numbers: bool)
     where
-        E: TransactionBlockExecutor<Transaction> + 'static,
+        E: TransactionBlockExecutor + 'static,
     {
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();

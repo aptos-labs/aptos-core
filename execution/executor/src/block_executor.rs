@@ -31,14 +31,14 @@ use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
-pub trait TransactionBlockExecutor<T>: Send + Sync {
+pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
-        transactions: Vec<T>,
+        transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput>;
 }
 
-impl TransactionBlockExecutor<Transaction> for AptosVM {
+impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
@@ -47,15 +47,14 @@ impl TransactionBlockExecutor<Transaction> for AptosVM {
     }
 }
 
-pub struct BlockExecutor<V, T> {
+pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
-    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+    inner: RwLock<Option<BlockExecutorInner<V>>>,
 }
 
-impl<V, T> BlockExecutor<V, T>
+impl<V> BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -80,10 +79,9 @@ where
     }
 }
 
-impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
+impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
@@ -101,7 +99,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
@@ -130,16 +128,15 @@ where
     }
 }
 
-struct BlockExecutorInner<V, T> {
+struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<(V, T)>,
+    phantom: PhantomData<(V, Transaction)>,
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
@@ -161,10 +158,9 @@ where
     }
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
@@ -172,7 +168,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
         let (block_id, transactions) = block;

@@ -16,7 +16,6 @@ use aptos_executor::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::transaction::Transaction;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
 
@@ -29,7 +28,7 @@ pub fn run<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
 ) where
-    V: TransactionBlockExecutor<Transaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     println!("Initializing...");
 

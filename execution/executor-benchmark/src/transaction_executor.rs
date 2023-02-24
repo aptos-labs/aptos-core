@@ -12,7 +12,7 @@ use std::{
 };
 
 pub struct TransactionExecutor<V> {
-    executor: Arc<BlockExecutor<V, Transaction>>,
+    executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
     start_time: Option<Instant>,
     version: Version,
@@ -23,10 +23,10 @@ pub struct TransactionExecutor<V> {
 
 impl<V> TransactionExecutor<V>
 where
-    V: TransactionBlockExecutor<Transaction>,
+    V: TransactionBlockExecutor,
 {
     pub fn new(
-        executor: Arc<BlockExecutor<V, Transaction>>,
+        executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         version: Version,
         commit_sender: Option<

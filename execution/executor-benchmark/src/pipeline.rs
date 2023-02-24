@@ -24,10 +24,10 @@ pub struct Pipeline<V> {
 
 impl<V> Pipeline<V>
 where
-    V: TransactionBlockExecutor<Transaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     pub fn new(
-        executor: BlockExecutor<V, Transaction>,
+        executor: BlockExecutor<V>,
         version: Version,
         split_stages: bool,
     ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {

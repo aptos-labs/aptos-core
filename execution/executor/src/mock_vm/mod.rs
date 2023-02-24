@@ -57,7 +57,7 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
 
 pub struct MockVM;
 
-impl TransactionBlockExecutor<Transaction> for MockVM {
+impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,

@@ -8,7 +8,6 @@ use aptos_config::config::{
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::fake_executor::FakeExecutor;
 use aptos_push_metrics::MetricsPusher;
-use aptos_types::transaction::Transaction;
 use aptos_vm::AptosVM;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -176,7 +175,7 @@ enum Command {
 
 fn run<E>(opt: Opt)
 where
-    E: TransactionBlockExecutor<Transaction> + 'static,
+    E: TransactionBlockExecutor + 'static,
 {
     match opt.cmd {
         Command::CreateDb {

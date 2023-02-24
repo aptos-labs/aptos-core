@@ -20,11 +20,11 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 
-fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
+fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
-    BlockExecutor::<FakeVM, Transaction>::new(db_reader_writer)
+    BlockExecutor::<FakeVM>::new(db_reader_writer)
 }
 
 pub fn fuzz_execute_and_commit_blocks(
@@ -47,7 +47,7 @@ pub fn fuzz_execute_and_commit_blocks(
 /// A fake VM implementing VMExecutor
 pub struct FakeVM;
 
-impl TransactionBlockExecutor<Transaction> for FakeVM {
+impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,

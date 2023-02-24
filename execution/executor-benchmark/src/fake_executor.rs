@@ -317,7 +317,7 @@ impl FakeExecutor {
     }
 }
 
-impl TransactionBlockExecutor<Transaction> for FakeExecutor {
+impl TransactionBlockExecutor for FakeExecutor {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
