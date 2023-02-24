@@ -889,7 +889,9 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 }
 
-/// Downloads a package and verifies that the bytecode matches a local compilation of the Move code
+/// Downloads a package and verifies the bytecode
+///
+/// Downloads the package from onchain and verifies the bytecode matches a local compilation of the Move code
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
