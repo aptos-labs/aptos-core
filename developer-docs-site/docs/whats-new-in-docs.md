@@ -7,6 +7,12 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 23 February 2023
+
+- [Resurrected](https://github.com/aptos-labs/aptos-core/pull/6675) the [Move Debugger](guides/move-guides/index.md#move-debugger) feature the Move Virtual Machine once included.
+
+- [Made all links in Aptos.dev](https://github.com/aptos-labs/aptos-core/pull/6718) also work in the [site source code](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/docs) by replacing absolute links with relative and adding the Markdown file extension.
+
 ## 17 February 2023
 
 - Recommended specific paths for starting up an Aptos node via [state synchronization](guides/state-sync.md) depending upon node type and network.

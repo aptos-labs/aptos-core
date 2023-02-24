@@ -229,6 +229,5 @@ This section contains links to frequently referred Aptos developer resources.
 
 ### IDE plugins for Move language
 
-- [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
-- [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
-- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
+Install the [IDE plugins for the Move language](../guides/move-guides/index.md#ides-for-move) for even more handy features.
+
