@@ -8,9 +8,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
-  pull_request:
-    paths:
-      - ".github/workflows/fullnode-intelligent-devnet-main.yaml"
 
 permissions:
   contents: read
@@ -24,7 +21,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
-          cancel-workflow: true
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
   fullnode-intelligent-devnet-main:
     needs: check-repo
