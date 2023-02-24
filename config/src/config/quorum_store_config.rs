@@ -45,8 +45,7 @@ impl Default for QuorumStoreConfig {
             mempool_pulling_interval: 200,
             // TODO: This essentially turns fragments off, because there was performance degradation. Needs more investigation.
             end_batch_ms: 10,
-            // Should be increased if consensus block size is increased, e.g., to 4 MB
-            max_batch_bytes: 3 * 1024 * 1024,
+            max_batch_bytes: 4 * 1024 * 1024,
             batch_request_timeout_ms: 10000,
             batch_expiry_round_gap_when_init: 100,
             batch_expiry_round_gap_behind_latest_certified: 500,
@@ -54,13 +53,10 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 100000000,
             db_quota: 10000000000,
-            // Should be increased if consensus block size is increased, e.g., to 1000
-            mempool_txn_pull_max_count: 625, // Some "reasonable" max
-            // Should be increased if consensus block size is increased, e.g., to 4 MB
-            mempool_txn_pull_max_bytes: 3 * 1024 * 1024,
+            mempool_txn_pull_max_count: 1000, // Some "reasonable" max
+            mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             // QS will be backpressured if the remaining total txns is more than this number
-            // Should be increased if consensus block size is increased, e.g., to 4000 * 4
-            back_pressure_total_txn_num: 2500 * 4,
+            back_pressure_total_txn_num: 4000 * 4,
             back_pressure_decrease_duration_ms: 1000,
             back_pressure_increase_duration_ms: 1000,
             back_pressure_decrease_fraction: 0.5,
