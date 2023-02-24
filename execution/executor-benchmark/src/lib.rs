@@ -65,6 +65,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
 pub fn run_benchmark<V>(
     block_size: usize,
     num_transfer_blocks: usize,
+    transactions_per_sender: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
@@ -94,7 +95,7 @@ pub fn run_benchmark<V>(
     );
 
     let start_time = Instant::now();
-    generator.run_transfer(block_size, num_transfer_blocks);
+    generator.run_transfer(block_size, num_transfer_blocks, transactions_per_sender);
     generator.drop_sender();
     pipeline.join();
 
