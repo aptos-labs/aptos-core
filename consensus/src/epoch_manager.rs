@@ -766,7 +766,7 @@ impl EpochManager {
                 let onchain_config = onchain_config.unwrap_or_default();
                 self.quorum_store_enabled = onchain_config.quorum_store_enabled();
                 if self.quorum_store_enabled {
-                    self.config.use_quorum_store_overrides();
+                    self.config.apply_quorum_store_overrides();
                 }
                 self.start_round_manager(initial_data, epoch_state, onchain_config)
                     .await

@@ -80,7 +80,7 @@ async fn test_batch_creation() {
         .for_each(|txn| assert_eq!(txn_size, txn.len()));
 
     let config = QuorumStoreConfig {
-        max_batch_bytes: 9 * txn_size,
+        max_batch_bytes: 9 * txn_size + 1,
         ..Default::default()
     };
 
@@ -153,11 +153,11 @@ async fn test_batch_creation() {
         }
     });
 
-    let result = batch_generator.handle_scheduled_pull(100, false).await;
+    let result = batch_generator.handle_scheduled_pull(300, false).await;
     assert!(result.is_none());
-    let result = batch_generator.handle_scheduled_pull(100, false).await;
+    let result = batch_generator.handle_scheduled_pull(300, false).await;
     assert!(result.is_some());
-    let result = batch_generator.handle_scheduled_pull(100, false).await;
+    let result = batch_generator.handle_scheduled_pull(300, false).await;
     assert!(result.is_none());
 
     timeout(Duration::from_millis(10_000), join_handle)

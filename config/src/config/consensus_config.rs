@@ -120,7 +120,7 @@ impl ConsensusConfig {
     }
 
     // TODO: This is ugly. Remove this and configs when quorum store is always the default.
-    pub fn use_quorum_store_overrides(&mut self) {
+    pub fn apply_quorum_store_overrides(&mut self) {
         self.max_sending_block_txns = self.max_sending_block_txns_quorum_store_override;
         self.max_sending_block_bytes = self.max_sending_block_bytes_quorum_store_override;
         self.max_receiving_block_txns = self.max_receiving_block_txns_quorum_store_override;
