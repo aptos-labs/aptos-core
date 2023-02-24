@@ -10,6 +10,7 @@ module aptos_std::math_fixed {
 
     /// Natural log 2 in 32 bit fixed point
     const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation
+    const LN2_X_32: u64 = 32 * 2977044472;  // ln(2) in fixed 32 representation
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {
@@ -17,10 +18,23 @@ module aptos_std::math_fixed {
         fixed_point32::create_from_raw_value((math128::sqrt(y << 32) as u64))
     }
 
-    /// Exponent function with a precission of 6 digits.
+    /// Exponent function with a precission of 9 digits.
     public fun exp(x: FixedPoint32): FixedPoint32 {
         let raw_value = (fixed_point32::get_raw_value(x) as u128);
         fixed_point32::create_from_raw_value((exp_raw(raw_value) as u64))
+    }
+
+    /// Because log2 is negative for values < 1 we instead return log2(x) + 32 which
+    /// is positive for all values of x.
+    public fun log2_plus_32(x: FixedPoint32): FixedPoint32 {
+        let raw_value = (fixed_point32::get_raw_value(x) as u128);
+        math128::log2(raw_value)
+    }
+
+    public fun ln_plus_32ln2(x: FixedPoint32): FixedPoint32 {
+        let raw_value = (fixed_point32::get_raw_value(x) as u128);
+        let x = (fixed_point32::get_raw_value(math128::log2(raw_value)) as u128);
+        fixed_point32::create_from_raw_value((x * LN2 >> 32 as u64))
     }
 
     /// Integer power of a fixed point number

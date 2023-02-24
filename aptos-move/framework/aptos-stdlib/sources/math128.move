@@ -1,6 +1,9 @@
 /// Standard math utilities missing in the Move Language.
 module aptos_std::math128 {
 
+    use std::fixed_point32::FixedPoint32;
+    use std::fixed_point32;
+
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
 
@@ -65,6 +68,30 @@ module aptos_std::math128 {
         };
         res
     }
+
+    // Returns log2(x)
+    public fun log2(x: u128): FixedPoint32 {
+        let integer_part = floor_log2(x);
+        // Normalize x to [1, 2) in fixed point 32.
+        if (x >= 1 << 32) {
+            x = x >> (integer_part - 32);
+        } else {
+            x = x << (32 - integer_part);
+        };
+        let frac = 0;
+        let delta = 1 << 31;
+        while (delta != 0) {
+            // log x = 1/2 log x^2
+            // x in [1, 2)
+            x = (x * x) >> 32;
+            // x is now in [1, 4)
+            // if x in [2, 4) then log x = 1 + log (x / 2)
+            if (x >= (2 << 32)) { frac = frac + delta; x = x >> 1; };
+            delta = delta >> 1;
+        };
+        fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
+    }
+
 
     /// Returns square root of x, precisely floor(sqrt(x))
     public fun sqrt(x: u128): u128 {
@@ -136,7 +163,7 @@ module aptos_std::math128 {
     }
 
     #[test]
-    public entry fun test_floor_lg2() {
+    public entry fun test_floor_log2() {
         let idx: u8 = 0;
         while (idx < 128) {
             assert!(floor_log2(1<<idx) == idx, 0);
@@ -145,6 +172,30 @@ module aptos_std::math128 {
         idx = 1;
         while (idx <= 128) {
             assert!(floor_log2((((1u256<<idx) - 1) as u128)) == idx - 1, 0);
+            idx = idx + 1;
+        };
+    }
+
+    #[test]
+    public entry fun test_log2() {
+        let idx: u8 = 0;
+        while (idx < 128) {
+            let res = log2(1<<idx);
+            assert!(fixed_point32::get_raw_value(res) == (idx as u64) << 32, 0);
+            idx = idx + 1;
+        };
+        idx = 10;
+        while (idx <= 128) {
+            let res = log2((((1u256<<idx) - 1) as u128));
+            // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
+            // Use 3rd order taylor to approximate expected result
+            let expected = (idx as u128) << 32;
+            let taylor1 = ((1 << 32) / ((1u256<<idx)) as u128);
+            let taylor2 = (taylor1 * taylor1) >> 32;
+            let taylor3 = (taylor2 * taylor1) >> 32;
+            let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
+            // verify it matches to 8 significant digits
+            assert_approx_the_same((fixed_point32::get_raw_value(res) as u128), expected, 8);
             idx = idx + 1;
         };
     }
@@ -171,5 +222,18 @@ module aptos_std::math128 {
 
         let result = sqrt((1u128 << 127) - 1);
         assert!(result == 13043817825332782212, 0);
+    }
+
+    #[testonly]
+    /// For functions that approximate a value it's useful to test a value is close
+    /// to the most correct value up to last digit
+    fun assert_approx_the_same(x: u128, y: u128, precission: u128) {
+        if (x < y) {
+            let tmp = x;
+            x = y;
+            y = tmp;
+        };
+        let mult = pow(10, precission);
+        assert!((x - y) * mult < x, 0);
     }
 }

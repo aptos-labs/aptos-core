@@ -1,6 +1,9 @@
 /// Standard math utilities missing in the Move Language.
 module aptos_std::math64 {
 
+    use std::fixed_point32::FixedPoint32;
+    use std::fixed_point32;
+
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
 
@@ -64,6 +67,29 @@ module aptos_std::math64 {
             n = n >> 1;
         };
         res
+    }
+
+    // Returns log2(x)
+    public fun log2(x: u64): FixedPoint32 {
+        let integer_part = floor_log2(x);
+        // Normalize x to [1, 2) in fixed point 32.
+        let y = (if (x >= 1 << 32) {
+            x >> (integer_part - 32)
+        } else {
+            x << (32 - integer_part)
+        } as u128);
+        let frac = 0;
+        let delta = 1 << 31;
+        while (delta != 0) {
+            // log x = 1/2 log x^2
+            // x in [1, 2)
+            y = (y * y) >> 32;
+            // x is now in [1, 4)
+            // if x in [2, 4) then log x = 1 + log (x / 2)
+            if (y >= (2 << 32)) { frac = frac + delta; y = y >> 1; };
+            delta = delta >> 1;
+        };
+        fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
     }
 
     /// Returns square root of x, precisely floor(sqrt(x))
@@ -155,6 +181,30 @@ module aptos_std::math64 {
     }
 
     #[test]
+    public entry fun test_log2() {
+        let idx: u8 = 0;
+        while (idx < 64) {
+            let res = log2(1<<idx);
+            assert!(fixed_point32::get_raw_value(res) == (idx as u64) << 32, 0);
+            idx = idx + 1;
+        };
+        idx = 10;
+        while (idx <= 64) {
+            let res = log2((((1u128<<idx) - 1) as u64));
+            // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
+            // Use 3rd order taylor to approximate expected result
+            let expected = (idx as u128) << 32;
+            let taylor1 = ((1 << 32) / ((1u256<<idx)) as u128);
+            let taylor2 = (taylor1 * taylor1) >> 32;
+            let taylor3 = (taylor2 * taylor1) >> 32;
+            let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
+            // verify it matches to 8 significant digits
+            assert_approx_the_same((fixed_point32::get_raw_value(res) as u128), expected, 8);
+            idx = idx + 1;
+        };
+    }
+
+    #[test]
     public entry fun test_sqrt() {
         let result = sqrt(0);
         assert!(result == 0, 0);
@@ -176,5 +226,18 @@ module aptos_std::math64 {
 
         let result = sqrt((1u64 << 63) - 1);
         assert!(result == 3037000499, 0);
+    }
+
+    #[testonly]
+    /// For functions that approximate a value it's useful to test a value is close
+    /// to the most correct value up to last digit
+    fun assert_approx_the_same(x: u128, y: u128, precission: u64) {
+        if (x < y) {
+            let tmp = x;
+            x = y;
+            y = tmp;
+        };
+        let mult = (pow(10, precission) as u128);
+        assert!((x - y) * mult < x, 0);
     }
 }

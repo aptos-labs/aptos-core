@@ -13,7 +13,9 @@ Standard math utilities missing in the Move Language.
 -  [Function `clamp`](#0x1_math64_clamp)
 -  [Function `pow`](#0x1_math64_pow)
 -  [Function `floor_log2`](#0x1_math64_floor_log2)
+-  [Function `log2`](#0x1_math64_log2)
 -  [Function `sqrt`](#0x1_math64_sqrt)
+-  [Function `assert_approx_the_same`](#0x1_math64_assert_approx_the_same)
 -  [Specification](#@Specification_1)
     -  [Function `max`](#@Specification_1_max)
     -  [Function `min`](#@Specification_1_min)
@@ -22,6 +24,7 @@ Standard math utilities missing in the Move Language.
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 </code></pre>
 
 
@@ -218,6 +221,48 @@ Returns floor(lg2(x))
 
 </details>
 
+<a name="0x1_math64_log2"></a>
+
+## Function `log2`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_log2">log2</a>(x: u64): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_log2">log2</a>(x: u64): FixedPoint32 {
+    <b>let</b> integer_part = <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x);
+    // Normalize x <b>to</b> [1, 2) in fixed point 32.
+    <b>let</b> y = (<b>if</b> (x &gt;= 1 &lt;&lt; 32) {
+        x &gt;&gt; (integer_part - 32)
+    } <b>else</b> {
+        x &lt;&lt; (32 - integer_part)
+    } <b>as</b> u128);
+    <b>let</b> frac = 0;
+    <b>let</b> delta = 1 &lt;&lt; 31;
+    <b>while</b> (delta != 0) {
+        // log x = 1/2 log x^2
+        // x in [1, 2)
+        y = (y * y) &gt;&gt; 32;
+        // x is now in [1, 4)
+        // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
+        <b>if</b> (y &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; y = y &gt;&gt; 1; };
+        delta = delta &gt;&gt; 1;
+    };
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_math64_sqrt"></a>
 
 ## Function `sqrt`
@@ -250,6 +295,38 @@ Returns square root of x, precisely floor(sqrt(x))
     res = (res + x / res) &gt;&gt; 1;
     res = (res + x / res) &gt;&gt; 1;
     <b>min</b>(res, x / res)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_math64_assert_approx_the_same"></a>
+
+## Function `assert_approx_the_same`
+
+For functions that approximate a value it's useful to test a value is close
+to the most correct value up to last digit
+
+
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64) {
+    <b>if</b> (x &lt; y) {
+        <b>let</b> tmp = x;
+        x = y;
+        y = tmp;
+    };
+    <b>let</b> mult = (<a href="math64.md#0x1_math64_pow">pow</a>(10, precission) <b>as</b> u128);
+    <b>assert</b>!((x - y) * mult &lt; x, 0);
 }
 </code></pre>
 
