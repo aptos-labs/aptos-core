@@ -16,7 +16,7 @@ The below installation steps are verified only on macOS with Apple silicon. They
 To run an indexer fullnode, these are the steps in summary:
 
 1. Make sure that you have all the required tools and packages described below in this document.
-1. Follow the instructions to [set up a public fullnode](full-node/fullnode-source-code-or-docker/) but do not start the fullnode yet. 
+1. Follow the instructions to [set up a public fullnode](./full-node/fullnode-source-code-or-docker.md) but do not start the fullnode yet. 
 1. Edit the `fullnode.yaml` as described below in this document.
 1. Run the indexer fullnode per the instructions below.
 
@@ -58,7 +58,7 @@ For an Aptos indexer fullnode, install these packages:
 
 ## Start the fullnode indexer
 
-1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
+1. Follow the instructions to set up a [public fullnode](./full-node/fullnode-source-code-or-docker.md) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
 1. Pull the latest indexer Docker image with:
     ```bash
     docker pull aptoslabs/validator:nightly_indexer

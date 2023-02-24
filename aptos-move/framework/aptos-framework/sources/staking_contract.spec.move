@@ -108,6 +108,11 @@ spec aptos_framework::staking_contract {
         include IncreaseLockupWithCapAbortsIf{staker: staker_address};
     }
 
+    spec update_commision (staker: &signer, operator: address, new_commission_percentage: u64) {
+        // TODO: Call `distribute_internal`
+        pragma verify = false;
+    }
+
     /// Only staker or operator can call this.
     spec request_commission(account: &signer, staker: address, operator: address) {
         // TODO: Call `update_distribution_pool`

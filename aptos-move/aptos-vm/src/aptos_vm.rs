@@ -266,7 +266,13 @@ impl AptosVM {
             .finish(&mut (), gas_meter.change_set_configs())
             .map_err(|e| e.into_vm_status())?;
         // Charge gas for write set
-        gas_meter.charge_write_set_gas(user_txn_change_set_ext.write_set().iter())?;
+        gas_meter.charge_write_set_gas_for_io(user_txn_change_set_ext.write_set().iter())?;
+        gas_meter.charge_storage_fee(
+            user_txn_change_set_ext.write_set().iter(),
+            user_txn_change_set_ext.change_set().events(),
+            txn_data.transaction_size,
+            txn_data.gas_unit_price,
+        )?;
         // TODO(Gas): Charge for aggregator writes
 
         let storage_with_changes =

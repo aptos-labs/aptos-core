@@ -25,7 +25,9 @@ async fn test_mint_transfer() {
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
     //            testsuite/forge/src/interface/aptos.rs?
-    info.mint(account1.address(), 100_000_000).await.unwrap();
+    info.mint(account1.address(), 100_000_000_000)
+        .await
+        .unwrap();
 
     let transfer_txn = account1.sign_with_transaction_builder(
         info.transaction_factory()

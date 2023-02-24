@@ -466,8 +466,8 @@ module aptos_framework::coin {
         spec {
             assume dst_coin.value + source_coin.value <= MAX_U64;
         };
-        dst_coin.value = dst_coin.value + source_coin.value;
-        let Coin { value: _ } = source_coin;
+        let Coin { value } = source_coin;
+        dst_coin.value = dst_coin.value + value;
     }
 
     /// Mint new `Coin` with capability.

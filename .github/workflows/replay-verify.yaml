@@ -24,6 +24,10 @@ on:
       - "testsuite/replay_verify.py"
   schedule:
     - cron: "0 8,20 * * *"
+  push:
+    branches:
+      - aptos-release-v* # the aptos release branches
+      - aptos-node-v*
 
 # cancel redundant builds
 concurrency:
