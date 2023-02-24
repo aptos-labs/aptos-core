@@ -67,6 +67,14 @@ impl DelegatedStakingActivity {
                             event_type: event_type.clone(),
                             amount: u64_to_bigdecimal(inner.amount_reactivated),
                         },
+                        StakeEvent::DistributeRewardsEvent(inner) => DelegatedStakingActivity {
+                            transaction_version: txn_version,
+                            event_index,
+                            delegator_address: "".to_string(),
+                            pool_address: inner.pool_address,
+                            event_type: event_type.clone(),
+                            amount: u64_to_bigdecimal(inner.rewards_amount),
+                        },
                         _ => continue,
                     };
                     delegator_activities.push(activity);

@@ -39,6 +39,13 @@ pub struct GovernanceVoteEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DistributeRewardsEvent {
+    pub pool_address: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub rewards_amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AddStakeEvent {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount_added: u64,
@@ -135,6 +142,7 @@ impl StakeResource {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StakeEvent {
     GovernanceVoteEvent(GovernanceVoteEvent),
+    DistributeRewardsEvent(DistributeRewardsEvent),
     AddStakeEvent(AddStakeEvent),
     UnlockStakeEvent(UnlockStakeEvent),
     WithdrawStakeEvent(WithdrawStakeEvent),
@@ -150,6 +158,8 @@ impl StakeEvent {
         match data_type {
             "0x1::aptos_governance::VoteEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner))),
+            "0x1::stake::DistributeRewardsEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
             "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
             ::delegation_pool::AddStakeEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::AddStakeEvent(inner))),
