@@ -1,29 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    new_test_context,
-    resource_groups::{build_package, publish_package},
-};
-use aptos_api_test_context::current_function_name;
+use super::new_test_context;
+use aptos_api_test_context::{current_function_name, TestContext};
 use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_abi() {
     let mut context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account();
+    let mut root_account = context.root_account().await;
     let mut account = context.gen_account();
     let txn = context.create_user_account_by(&mut root_account, &account);
     context.commit_block(&vec![txn]).await;
 
     // Publish packages
     let named_addresses = vec![("abi".to_string(), account.address())];
-    // TODO: Switch to build_package and publish_package in test_context once they're moved there.
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_abi");
-        build_package(path, named_addresses)
+        TestContext::build_package(path, named_addresses)
     });
-    publish_package(&mut context, &mut account, txn).await;
+    context.publish_package(&mut account, txn).await;
 
     // Get abi.
     let modules = context

@@ -12,13 +12,13 @@ Several new features are up for testing by the AIT-3 participants. See below:
 
 ### Petra (Aptos Wallet)
 
-- Petra, the new Aptos Wallet, is now available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3.  See [installation instructions for Petra here](/guides/install-petra-wallet-extension).
+- Petra, the new Aptos Wallet, is now available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3.  See [installation instructions for Petra here](../guides/install-petra-wallet.md).
 
 ### Owner, operator and voter personas
 
 Participation in staking and governance is now enabled with three personas: an owner, an operator and a voter.  
 
-- **Owner**: The owner is the owner of the funds. For example, the owner Bob can assign his operator address to the account of Alice, a trusted validator operator. See also [How a custodian can stake on Aptos](/concepts/staking#how-a-custodian-can-stake-on-aptos). The owner account contains the validator settings and the coins. The coins are airdropped into the owner account.
+- **Owner**: The owner is the owner of the funds. For example, the owner Bob can assign his operator address to the account of Alice, a trusted validator operator. See also [How a custodian can stake on Aptos](../concepts/staking.md#how-a-custodian-can-stake-on-aptos). The owner account contains the validator settings and the coins. The coins are airdropped into the owner account.
 - **Operator**: If you are the owner, then, using your owner key, you will select the specific operator and you will:
   - Manage the settings for the specific validator, and
   - Delegate the stake pool to the validator.

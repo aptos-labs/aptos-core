@@ -4,6 +4,9 @@ name: Continuous Forge Tests - Stable
 permissions:
   issues: write
   pull-requests: write
+  contents: read
+  id-token: write
+  actions: write #required for workflow cancellation via check-aptos-core
 
 on:
   # Allow triggering manually
@@ -66,7 +69,7 @@ jobs:
           ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
           fetch-depth: 0
 
-      - uses: ./.github/actions/check-aptos-core
+      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
           cancel-workflow: true
 

@@ -524,4 +524,4 @@ Coming soon.
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

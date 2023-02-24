@@ -153,6 +153,8 @@ module aptos_framework::account {
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
     /// The specified rotation capablity offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
+    // The signer capability is not offered to any address
+    const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
@@ -483,6 +485,21 @@ module aptos_framework::account {
 
         // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
         option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+    }
+
+    #[view]
+    /// Returns true if the account at `account_addr` has a signer capability offer.
+    public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
+        let account_resource = borrow_global<Account>(account_addr);
+        option::is_some(&account_resource.signer_capability_offer.for)
+    }
+
+    #[view]
+    /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
+    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account {
+        let account_resource = borrow_global<Account>(account_addr);
+        assert!(option::is_some(&account_resource.signer_capability_offer.for), error::not_found(ENO_SIGNER_CAPABILITY_OFFERED));
+        *option::borrow(&account_resource.signer_capability_offer.for)
     }
 
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
@@ -908,6 +925,31 @@ module aptos_framework::account {
         let signer = create_authorized_signer(&bob, alice_addr);
         assert!(signer::address_of(&signer) == signer::address_of(&alice), 0);
     }
+
+    #[test(bob = @0x345)]
+    public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) acquires Account {
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+
+        let bob_addr = signer::address_of(&bob);
+        create_account(bob_addr);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(&alice, ed25519::signature_to_bytes(&alice_signer_capability_offer_sig), 0, alice_pk_bytes, bob_addr);
+
+        assert!(is_signer_capability_offered(alice_addr), 0);
+        assert!(get_signer_capability_offer_for(alice_addr) == bob_addr, 0);
+    }
+
 
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230, location = Self)]

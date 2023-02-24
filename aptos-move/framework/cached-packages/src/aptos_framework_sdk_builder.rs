@@ -445,6 +445,12 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Convenience function to allow a staker to update the commision percentage paid to the operator.
+    StakingContractUpdateCommision {
+        operator: AccountAddress,
+        new_commission_percentage: u64,
+    },
+
     /// Convenient function to allow the staker to update the voter address in a staking contract they made.
     StakingContractUpdateVoter {
         operator: AccountAddress,
@@ -824,6 +830,10 @@ impl EntryFunctionCall {
             StakingContractUnlockStake { operator, amount } => {
                 staking_contract_unlock_stake(operator, amount)
             },
+            StakingContractUpdateCommision {
+                operator,
+                new_commission_percentage,
+            } => staking_contract_update_commision(operator, new_commission_percentage),
             StakingContractUpdateVoter {
                 operator,
                 new_voter,
@@ -2094,6 +2104,28 @@ pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> T
     ))
 }
 
+/// Convenience function to allow a staker to update the commision percentage paid to the operator.
+pub fn staking_contract_update_commision(
+    operator: AccountAddress,
+    new_commission_percentage: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("update_commision").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&new_commission_percentage).unwrap(),
+        ],
+    ))
+}
+
 /// Convenient function to allow the staker to update the voter address in a staking contract they made.
 pub fn staking_contract_update_voter(
     operator: AccountAddress,
@@ -3249,6 +3281,19 @@ mod decoder {
         }
     }
 
+    pub fn staking_contract_update_commision(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakingContractUpdateCommision {
+                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_commission_percentage: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn staking_contract_update_voter(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -3771,6 +3816,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_contract_unlock_stake".to_string(),
             Box::new(decoder::staking_contract_unlock_stake),
+        );
+        map.insert(
+            "staking_contract_update_commision".to_string(),
+            Box::new(decoder::staking_contract_update_commision),
         );
         map.insert(
             "staking_contract_update_voter".to_string(),
