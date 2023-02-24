@@ -1424,6 +1424,7 @@ fn large_db_test(
 fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     forge_config
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
         .with_network_tests(vec![&QuorumStoreOnChainEnableTest {}])
         .with_success_criteria(
             SuccessCriteria::new(5000)
