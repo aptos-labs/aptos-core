@@ -79,6 +79,15 @@ jobs:
         # forge relies on the default and failpoints variants
         run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
 
+      - name: Write summary
+        run: |
+          IMAGE_TAG=${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+          BRANCH=${{ steps.determine-test-branch.outputs.BRANCH }}
+          if [ -n "${BRANCH}" ]; then
+            echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
+
   forge-continuous:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
