@@ -92,8 +92,8 @@ spec aptos_framework::staking_proxy {
         include SetStakePoolVoterAbortsIf;
     }
 
-    spec schema SetStakePoolVoterAbortsIf { 
-        owner: &signer; 
+    spec schema SetStakePoolVoterAbortsIf {
+        owner: &signer;
         new_voter: address;
 
         let owner_address = signer::address_of(owner);

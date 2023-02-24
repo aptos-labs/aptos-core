@@ -48,7 +48,7 @@ spec aptos_framework::resource_account {
         origin: signer;
         resource_addr: address;
         optional_auth_key: vector<u8>;
-        
+
         let origin_addr = signer::address_of(origin);
         let container = global<Container>(origin_addr);
         let get = len(optional_auth_key) == 0;
