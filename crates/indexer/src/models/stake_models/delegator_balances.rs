@@ -47,6 +47,7 @@ impl CurrentDelegatorBalance {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
         if let Some(pool_address) = active_share_mapping.get(&table_handle) {
+            let pool_address = standardize_address(pool_address);
             let delegator_address = standardize_address(&write_table_item.key.to_string());
             let data = write_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
@@ -69,7 +70,7 @@ impl CurrentDelegatorBalance {
 
             return Ok(Some(Self {
                 delegator_address,
-                pool_address: pool_address.clone(),
+                pool_address,
                 pool_type: "active_shares".to_string(),
                 table_handle,
                 amount,

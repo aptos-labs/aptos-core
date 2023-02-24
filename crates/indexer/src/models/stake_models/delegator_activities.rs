@@ -4,7 +4,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::stake_utils::StakeEvent;
-use crate::{schema::delegated_staking_activities, util::u64_to_bigdecimal};
+use crate::{
+    schema::delegated_staking_activities,
+    util::{standardize_address, u64_to_bigdecimal},
+};
 use aptos_api_types::Transaction as APITransaction;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -43,32 +46,32 @@ impl DelegatedStakingActivity {
                     StakeEvent::AddStakeEvent(inner) => DelegatedStakingActivity {
                         transaction_version: txn_version,
                         event_index,
-                        delegator_address: inner.delegator_address,
-                        pool_address: inner.pool_address,
+                        delegator_address: standardize_address(&inner.delegator_address),
+                        pool_address: standardize_address(&inner.pool_address),
                         event_type: event_type.clone(),
                         amount: u64_to_bigdecimal(inner.amount_added),
                     },
                     StakeEvent::UnlockStakeEvent(inner) => DelegatedStakingActivity {
                         transaction_version: txn_version,
                         event_index,
-                        delegator_address: inner.delegator_address,
-                        pool_address: inner.pool_address,
+                        delegator_address: standardize_address(&inner.delegator_address),
+                        pool_address: standardize_address(&inner.pool_address),
                         event_type: event_type.clone(),
                         amount: u64_to_bigdecimal(inner.amount_unlocked),
                     },
                     StakeEvent::WithdrawStakeEvent(inner) => DelegatedStakingActivity {
                         transaction_version: txn_version,
                         event_index,
-                        delegator_address: inner.delegator_address,
-                        pool_address: inner.pool_address,
+                        delegator_address: standardize_address(&inner.delegator_address),
+                        pool_address: standardize_address(&inner.pool_address),
                         event_type: event_type.clone(),
                         amount: u64_to_bigdecimal(inner.amount_withdrawn),
                     },
                     StakeEvent::ReactivateStakeEvent(inner) => DelegatedStakingActivity {
                         transaction_version: txn_version,
                         event_index,
-                        delegator_address: inner.delegator_address,
-                        pool_address: inner.pool_address,
+                        delegator_address: standardize_address(&inner.delegator_address),
+                        pool_address: standardize_address(&inner.pool_address),
                         event_type: event_type.clone(),
                         amount: u64_to_bigdecimal(inner.amount_reactivated),
                     },
@@ -76,7 +79,7 @@ impl DelegatedStakingActivity {
                         transaction_version: txn_version,
                         event_index,
                         delegator_address: "".to_string(),
-                        pool_address: inner.pool_address,
+                        pool_address: standardize_address(&inner.pool_address),
                         event_type: event_type.clone(),
                         amount: u64_to_bigdecimal(inner.rewards_amount),
                     },
