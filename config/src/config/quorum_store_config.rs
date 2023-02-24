@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE;
 use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +56,7 @@ impl Default for QuorumStoreConfig {
             db_quota: 10000000000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             // QS will be backpressured if the remaining total txns is more than this number
-            back_pressure_total_txn_num: 4000 * 4,
+            back_pressure_total_txn_num: MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE * 4,
             back_pressure_decrease_duration_ms: 1000,
             back_pressure_increase_duration_ms: 1000,
             back_pressure_decrease_fraction: 0.5,
