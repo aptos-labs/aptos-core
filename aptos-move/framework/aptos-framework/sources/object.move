@@ -323,6 +323,8 @@ module aptos_framework::object {
         transfer_raw(owner, object, to)
     }
 
+    /// Transfers ownership of the object (and all associated resources) at the specified address
+    /// for Object<T> to the "to" address.
     public fun transfer<T: key>(
         owner: &signer,
         object: Object<T>,

@@ -1175,6 +1175,8 @@ Entry function that can be used to transfer, if allow_ungated_transfer is set tr
 
 ## Function `transfer`
 
+Transfers ownership of the object (and all associated resources) at the specified address
+for Object<T> to the "to" address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer">transfer</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, <b>to</b>: <b>address</b>)
