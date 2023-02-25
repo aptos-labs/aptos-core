@@ -420,6 +420,35 @@ module aptos_framework::object {
         owner(object) == owner
     }
 
+    /// Return true if the provided address has indirect or direct ownership of the provided object.
+    public fun owns<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
+        let current_address = object_address(&object);
+        if (current_address == owner) {
+            return true
+        };
+
+        assert!(
+            exists<ObjectCore>(current_address),
+            error::not_found(EOBJECT_DOES_NOT_EXIST),
+        );
+
+        let object = borrow_global<ObjectCore>(current_address);
+        let current_address = object.owner;
+
+        let count = 0;
+        while (owner != current_address) {
+            let count = count + 1;
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
+            if (!exists<ObjectCore>(current_address)) {
+                return false
+            };
+
+            let object = borrow_global<ObjectCore>(current_address);
+            current_address = object.owner;
+        };
+        true
+    }
+
     #[test_only]
     use std::option::{Self, Option};
 
@@ -505,7 +534,9 @@ module aptos_framework::object {
         let (_, hero) = create_hero(creator);
         let (_, weapon) = create_weapon(creator);
 
+        assert!(owns(weapon, @0x123), 0);
         hero_equip(creator, hero, weapon);
+        assert!(owns(weapon, @0x123), 1);
         hero_unequip(creator, hero, weapon);
     }
 
@@ -516,6 +547,7 @@ module aptos_framework::object {
         let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
         transfer_with_ref(linear_transfer_ref, @0x456);
         assert!(owner(hero) == @0x456, 0);
+        assert!(owns(hero, @0x456), 1);
     }
 
     #[test(creator = @0x123)]
