@@ -6,6 +6,7 @@ module aptos_std::math128 {
 
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
+    const EDIVISION_BY_ZERO: u64 = 2;
 
     /// Return the largest of two numbers.
     public fun max(a: u128, b: u128): u128 {
@@ -113,6 +114,27 @@ module aptos_std::math128 {
         min(res, x / res)
     }
 
+    public inline fun ceil_div(x: u128, y: u128): u128 {
+        // ceil_div(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
+        // (x + y - 1) could spuriously overflow. so we use the later version
+        if (x == 0) {
+            assert!(y != 0, EDIVISION_BY_ZERO);
+            0
+        }
+        else (x - 1) / y + 1
+    }
+
+    #[test]
+    public entry fun test_ceil_div() {
+        assert!(ceil_div(9, 3) == 3, 0);
+        assert!(ceil_div(10, 3) == 4, 0);
+        assert!(ceil_div(11, 3) == 4, 0);
+        assert!(ceil_div(12, 3) == 4, 0);
+        assert!(ceil_div(13, 3) == 5, 0);
+
+        // No overflow
+        assert!(ceil_div((((1u256<<128) - 9) as u128), 11) == 30934760629176223951215873402888019223, 0);
+    }
     #[test]
     public entry fun test_max() {
         let result = max(3u128, 6u128);

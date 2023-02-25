@@ -34,6 +34,15 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
+<a name="0x1_math64_EDIVISION_BY_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="math64.md#0x1_math64_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="0x1_math64_EINVALID_ARG_FLOOR_LOG2"></a>
 
 Abort value when an invalid argument is provided.

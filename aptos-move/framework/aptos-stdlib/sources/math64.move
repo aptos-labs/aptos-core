@@ -6,6 +6,7 @@ module aptos_std::math64 {
 
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
+    const EDIVISION_BY_ZERO: u64 = 1;
 
     /// Return the largest of two numbers.
     public fun max(a: u64, b: u64): u64 {
@@ -109,6 +110,28 @@ module aptos_std::math64 {
         res = (res + x / res) >> 1;
         res = (res + x / res) >> 1;
         min(res, x / res)
+    }
+
+    public inline fun ceil_div(x: u64, y: u64): u64 {
+        // ceil_div(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
+        // (x + y - 1) could spuriously overflow. so we use the later version
+        if (x == 0) {
+            assert!(y != 0, EDIVISION_BY_ZERO);
+            0
+        }
+        else (x - 1) / y + 1
+    }
+
+    #[test]
+    public entry fun test_ceil_div() {
+        assert!(ceil_div(9, 3) == 3, 0);
+        assert!(ceil_div(10, 3) == 4, 0);
+        assert!(ceil_div(11, 3) == 4, 0);
+        assert!(ceil_div(12, 3) == 4, 0);
+        assert!(ceil_div(13, 3) == 5, 0);
+
+        // No overflow
+        assert!(ceil_div((((1u128<<64) - 9) as u64), 11) == 1676976733973595601, 0);
     }
 
     #[test]
