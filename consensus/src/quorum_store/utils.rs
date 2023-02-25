@@ -313,7 +313,7 @@ impl ProofQueue {
                             break;
                         }
                         ret.push(proof.clone());
-                        if let Some(insertion_time) = self.digest_insertion_time.get(&digest) {
+                        if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
                             counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
                         }
                     },
