@@ -85,6 +85,12 @@ impl<'t> AccountMinter<'t> {
             .unwrap()
             .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
             .unwrap();
+        println!("{:?}", req);
+        println!(">>> coins_per_seed_account {}", coins_per_seed_account);
+        println!(
+            ">>> expected_num_seed_accounts {}",
+            expected_num_seed_accounts
+        );
         let coins_for_source = coins_per_seed_account
             .checked_mul(expected_num_seed_accounts as u64)
             .unwrap()
