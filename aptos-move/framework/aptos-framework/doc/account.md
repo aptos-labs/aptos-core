@@ -625,6 +625,15 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 
 
+<a name="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
+
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM">EEXCEEDED_MAX_GUID_CREATION_NUM</a>: u64 = 20;
+</code></pre>
+
+
+
 <a name="0x1_account_EINVALID_ACCEPT_ROTATION_CAPABILITY"></a>
 
 The caller does not have a valid rotation capability offer from the other account
@@ -770,6 +779,16 @@ Specified current public key is not correct
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="0x1_account_MAX_GUID_CREATION_NUM"></a>
+
+Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">MAX_GUID_CREATION_NUM</a>: u64 = 1125899906842624;
 </code></pre>
 
 
@@ -1802,7 +1821,12 @@ GUID management methods.
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_guid">create_guid</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-    <a href="guid.md#0x1_guid_create">guid::create</a>(addr, &<b>mut</b> <a href="account.md#0x1_account">account</a>.guid_creation_num)
+    <b>let</b> <a href="guid.md#0x1_guid">guid</a> = <a href="guid.md#0x1_guid_create">guid::create</a>(addr, &<b>mut</b> <a href="account.md#0x1_account">account</a>.guid_creation_num);
+    <b>assert</b>!(
+        <a href="account.md#0x1_account">account</a>.guid_creation_num &lt; <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">MAX_GUID_CREATION_NUM</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="account.md#0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM">EEXCEEDED_MAX_GUID_CREATION_NUM</a>),
+    );
+    <a href="guid.md#0x1_guid">guid</a>
 }
 </code></pre>
 

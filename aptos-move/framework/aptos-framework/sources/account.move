@@ -155,7 +155,11 @@ module aptos_framework::account {
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
     // The signer capability is not offered to any address
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
+    // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
+    const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
 
+    /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
+    const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
     public fun create_signer_for_test(addr: address): signer { create_signer(addr) }
@@ -669,7 +673,12 @@ module aptos_framework::account {
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
         let account = borrow_global_mut<Account>(addr);
-        guid::create(addr, &mut account.guid_creation_num)
+        let guid = guid::create(addr, &mut account.guid_creation_num);
+        assert!(
+            account.guid_creation_num < MAX_GUID_CREATION_NUM,
+            error::out_of_range(EEXCEEDED_MAX_GUID_CREATION_NUM),
+        );
+        guid
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1213,5 +1222,15 @@ module aptos_framework::account {
         let expected_originating_address = table::borrow(address_map, new_addr);
         assert!(*expected_originating_address == alice_addr, 0);
         assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x20014, location = Self)]
+    public entry fun test_max_guid(account: &signer) acquires Account {
+        let addr = signer::address_of(account);
+        create_account_unchecked(addr);
+        let account_state = borrow_global_mut<Account>(addr);
+        account_state.guid_creation_num = MAX_GUID_CREATION_NUM - 1;
+        create_guid(account);
     }
 }
