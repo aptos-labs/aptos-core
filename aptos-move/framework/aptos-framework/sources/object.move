@@ -42,6 +42,9 @@ module aptos_framework::object {
     /// The resource is not stored at the specified address.
     const ERESOURCE_DOES_NOT_EXIST: u64 = 7;
 
+    /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
+    const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
+
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
@@ -184,7 +187,7 @@ module aptos_framework::object {
         assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
 
         let object_signer = create_signer(object);
-        let guid_creation_num = 0;
+        let guid_creation_num = INIT_GUID_CREATION_NUM;
         let transfer_events_guid = guid::create(object, &mut guid_creation_num);
 
         move_to(
