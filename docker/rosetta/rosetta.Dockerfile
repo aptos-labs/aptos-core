@@ -13,8 +13,7 @@ ARG GIT_REPO=https://github.com/aptos-labs/aptos-core.git
 ARG GIT_REF
 
 RUN git clone $GIT_REPO ./ && git reset $GIT_REF --hard
-RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry \
-  cargo build --release \
+RUN cargo build --release \
   -p aptos-rosetta \
   && mkdir dist \
   && cp target/release/aptos-rosetta dist/aptos-rosetta
