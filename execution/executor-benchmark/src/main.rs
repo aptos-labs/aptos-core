@@ -76,6 +76,9 @@ struct Opt {
     #[structopt(long, default_value = "10000")]
     block_size: usize,
 
+    #[structopt(long, default_value = "5")]
+    transactions_per_sender: usize,
+
     #[structopt(long)]
     concurrency_level: Option<usize>,
 
@@ -183,6 +186,7 @@ where
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
+                opt.transactions_per_sender,
                 data_dir,
                 checkpoint_dir,
                 opt.verify_sequence_numbers,

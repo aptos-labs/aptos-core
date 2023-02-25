@@ -26,6 +26,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
+  push:
+    branches:
+      - aptos-release-v* # the aptos release branches
+      - aptos-node-v*
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -57,6 +61,9 @@ jobs:
               echo "Unknown schedule: ${{ github.event.schedule }}"
               exit 1
             fi
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+              echo "Branch: ${{ github.ref_name }}"
+              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "Using GIT_SHA"
             # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
@@ -71,7 +78,7 @@ jobs:
 
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
-          cancel-workflow: true
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
 
@@ -82,6 +89,15 @@ jobs:
         id: determine-test-image-tag
         # forge relies on the default and failpoints variants
         run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
+
+      - name: Write summary
+        run: |
+          IMAGE_TAG=${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+          BRANCH=${{ steps.determine-test-branch.outputs.BRANCH }}
+          if [ -n "${BRANCH}" ]; then
+            echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
 
   run-forge-three-region:
     if: ${{ github.event_name != 'pull_request' }}
