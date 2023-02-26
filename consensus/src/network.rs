@@ -70,7 +70,7 @@ pub struct NetworkReceivers {
 }
 
 #[async_trait::async_trait]
-pub(crate) trait QuorumStoreSender {
+pub trait QuorumStoreSender {
     async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);

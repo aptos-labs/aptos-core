@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand, batch_reader::BatchReaderCommand, counters,
+        batch_coordinator::BatchCoordinatorCommand, batch_reader::BatchReader, counters,
         proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
+        types::Batch,
     },
     round_manager::VerifiedEvent,
 };
@@ -12,30 +14,40 @@ use aptos_channels::aptos_channel;
 use aptos_logger::debug;
 use aptos_types::PeerId;
 use futures::StreamExt;
+use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
+    epoch: u64,
+    my_peer_id: PeerId,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-    batch_reader_tx: Sender<BatchReaderCommand>,
+    batch_reader: Arc<BatchReader<NetworkSender>>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
+    network_sender: NetworkSender,
 }
 
 impl NetworkListener {
     pub(crate) fn new(
+        epoch: u64,
+        my_peer_id: PeerId,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-        batch_reader_tx: Sender<BatchReaderCommand>,
+        batch_reader: Arc<BatchReader<NetworkSender>>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
         remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
         proof_manager_tx: Sender<ProofManagerCommand>,
+        network_sender: NetworkSender,
     ) -> Self {
         Self {
+            epoch,
+            my_peer_id,
             network_msg_rx,
-            batch_reader_tx,
+            batch_reader,
             proof_coordinator_tx,
             remote_batch_coordinator_tx,
             proof_manager_tx,
+            network_sender,
         }
     }
 
@@ -85,12 +97,13 @@ impl NetworkListener {
                         request.source(),
                         request.digest()
                     );
-                    let cmd =
-                        BatchReaderCommand::GetBatchForPeer(request.digest(), request.source());
-                    self.batch_reader_tx
-                        .send(cmd)
-                        .await
-                        .expect("could not push Batch batch_reader");
+                    if let Ok(value) = self.batch_reader.get_batch_from_local(&request.digest()) {
+                        let batch =
+                            Batch::new(self.my_peer_id, self.epoch, request.digest(), value);
+                        self.network_sender
+                            .send_batch(batch, vec![request.source()])
+                            .await;
+                    }
                 },
                 VerifiedEvent::UnverifiedBatchMsg(batch) => {
                     counters::RECEIVED_BATCH_COUNT.inc();
@@ -99,12 +112,9 @@ impl NetworkListener {
                         batch.source(),
                         batch.digest()
                     );
-                    let cmd =
-                        BatchReaderCommand::BatchResponse(batch.digest(), batch.into_payload());
-                    self.batch_reader_tx
-                        .send(cmd)
-                        .await
-                        .expect("could not push Batch batch_reader");
+                    self.batch_reader
+                        .receive_batch(batch.digest(), batch.into_payload())
+                        .await;
                 },
                 VerifiedEvent::ProofOfStoreMsg(proof) => {
                     counters::REMOTE_POS_COUNT.inc();

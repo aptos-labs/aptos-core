@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand,
+use crate::{
+    network::NetworkSender,
+    quorum_store::{batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
     block::Block,
@@ -22,14 +23,17 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<BatchReader>, Mutex<Sender<CoordinatorCommand>>),
+    InQuorumStore(
+        Arc<BatchReader<NetworkSender>>,
+        Mutex<Sender<CoordinatorCommand>>,
+    ),
 }
 
 impl PayloadManager {
     async fn request_transactions(
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
-        batch_reader: &BatchReader,
+        batch_reader: &BatchReader<NetworkSender>,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,

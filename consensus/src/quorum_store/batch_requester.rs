@@ -79,7 +79,7 @@ impl BatchRequesterState {
     }
 }
 
-pub(crate) struct BatchRequester<T: QuorumStoreSender> {
+pub(crate) struct BatchRequester<T> {
     epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,

@@ -93,11 +93,11 @@ impl SerializedTransaction {
 }
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
-pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
-    pub(crate) expiration: LogicalTime,
-    pub(crate) author: PeerId,
-    pub(crate) num_bytes: usize,
+pub struct PersistedValue {
+    pub maybe_payload: Option<Vec<SignedTransaction>>,
+    pub expiration: LogicalTime,
+    pub author: PeerId,
+    pub num_bytes: usize,
 }
 
 impl PersistedValue {
