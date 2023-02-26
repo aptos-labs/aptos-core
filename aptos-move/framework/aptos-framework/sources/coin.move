@@ -528,9 +528,9 @@ module aptos_framework::coin {
     /// This function to resolve your problem, and for the gas optimize.
     /// Before:
     /// ```
-    /// let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr).coin;
-    /// let value_now = coin::value(&coin_mut);
-    /// let new_coin = coin::extract(&mut coin_mut, value_now - 100000000);
+    /// let coin_mut = borrow_global_mut<StructName<CoinType>>(my_addr);
+    /// let value_now = coin::value(&coin_mut.coin);
+    /// let new_coin = coin::extract(&mut coin_mut.coin, value_now - 100000000);
     /// ```
     /// After:
     /// ```
