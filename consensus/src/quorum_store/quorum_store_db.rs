@@ -21,7 +21,7 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
 
     fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError>;
 
-    fn get_batch(&self, digest: HashValue) -> Result<Option<PersistedValue>, DbError>;
+    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError>;
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
 
@@ -84,8 +84,8 @@ impl QuorumStoreStorage for QuorumStoreDB {
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }
 
-    fn get_batch(&self, digest: HashValue) -> Result<Option<PersistedValue>, DbError> {
-        Ok(self.db.get::<BatchSchema>(&digest)?)
+    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError> {
+        Ok(self.db.get::<BatchSchema>(digest)?)
     }
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
@@ -139,7 +139,7 @@ impl QuorumStoreStorage for MockQuorumStoreDB {
         Ok(())
     }
 
-    fn get_batch(&self, _: HashValue) -> Result<Option<PersistedValue>, DbError> {
+    fn get_batch(&self, _: &HashValue) -> Result<Option<PersistedValue>, DbError> {
         Ok(None)
     }
 

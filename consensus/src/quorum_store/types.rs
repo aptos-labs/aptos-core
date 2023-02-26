@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::proof_of_store::LogicalTime;
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
@@ -93,11 +93,11 @@ impl SerializedTransaction {
 }
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
-pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
-    pub(crate) expiration: LogicalTime,
-    pub(crate) author: PeerId,
-    pub(crate) num_bytes: usize,
+pub struct PersistedValue {
+    pub maybe_payload: Option<Vec<SignedTransaction>>,
+    pub expiration: LogicalTime,
+    pub author: PeerId,
+    pub num_bytes: usize,
 }
 
 impl PersistedValue {
@@ -310,16 +310,18 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    // Check the source == the sender. To protect from DDoS we check is Payload matches digest later.
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if self.source == peer_id {
+    pub fn verify(&self) -> anyhow::Result<()> {
+        let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
+        let serialized_payload: Vec<u8> = self
+            .payload
+            .iter()
+            .flat_map(|txn| to_bytes(txn).unwrap())
+            .collect();
+        hasher.update(&serialized_payload);
+        if hasher.finish() == self.digest() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!(
-                "Sender mismatch: peer_id: {}, source: {}",
-                self.source,
-                peer_id
-            ))
+            Err(anyhow::anyhow!("Digest doesn't match"))
         }
     }
 
