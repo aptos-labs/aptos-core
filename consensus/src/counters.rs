@@ -634,17 +634,17 @@ pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to block retrieval channel
-pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counters(queued,dequeued,dropped) related to rpc request channel
+pub static RPC_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_consensus_block_retrieval_channel_msgs_count",
-        "Counters(queued,dequeued,dropped) related to block retrieval channel",
+        "aptos_consensus_rpc_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to rpc request channel",
         &["state"]
     )
     .unwrap()
 });
 
-/// Counters(queued,dequeued,dropped) related to block retrieval task
+/// Counters(queued,dequeued,dropped) related to block retrieval per epoch task
 pub static BLOCK_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_block_retrieval_task_msgs_count",

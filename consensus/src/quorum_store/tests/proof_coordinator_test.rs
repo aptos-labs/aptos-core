@@ -9,18 +9,13 @@ use crate::quorum_store::{
     types::BatchId,
 };
 use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigest, SignedDigestInfo};
-use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
-};
+use aptos_types::validator_verifier::random_validator_verifier;
 use futures::channel::oneshot;
-use std::sync::Arc;
 use tokio::sync::mpsc::{channel, error::TryRecvError};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_proof_coordinator_basic() {
     let (signers, verifier) = random_validator_verifier(4, None, true);
-    let arc_signers: Vec<Arc<ValidatorSigner>> =
-        signers.clone().into_iter().map(Arc::new).collect();
     let proof_coordinator = ProofCoordinator::new(100, signers[0].author());
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (proof_manager_tx, mut proof_manager_rx) = channel(100);
@@ -40,7 +35,7 @@ async fn test_proof_coordinator_basic() {
         ))
         .await
         .is_ok());
-    for arc_signer in &arc_signers {
+    for signer in &signers {
         let signed_digest = SignedDigest::new(
             batch_author,
             1,
@@ -48,7 +43,7 @@ async fn test_proof_coordinator_basic() {
             LogicalTime::new(1, 20),
             1,
             1,
-            arc_signer.clone(),
+            signer,
         )
         .unwrap();
         assert!(proof_coordinator_tx
@@ -96,7 +91,7 @@ async fn test_proof_coordinator_basic() {
         ))
         .await
         .is_ok());
-    for arc_signer in &arc_signers {
+    for signer in &signers {
         let signed_digest = SignedDigest::new(
             batch_author,
             1,
@@ -104,7 +99,7 @@ async fn test_proof_coordinator_basic() {
             LogicalTime::new(1, 20),
             1,
             1,
-            arc_signer.clone(),
+            signer,
         )
         .unwrap();
         assert!(proof_coordinator_tx
@@ -131,7 +126,7 @@ async fn test_proof_coordinator_basic() {
         ))
         .await
         .is_ok());
-    for _ in 0..arc_signers.len() {
+    for _ in 0..signers.len() {
         let signed_digest = SignedDigest::new(
             batch_author,
             1,
@@ -139,7 +134,7 @@ async fn test_proof_coordinator_basic() {
             LogicalTime::new(1, 20),
             1,
             1,
-            arc_signers[1].clone(),
+            &signers[1],
         )
         .unwrap();
         assert!(proof_coordinator_tx
