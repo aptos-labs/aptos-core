@@ -12,7 +12,7 @@ The `aptos` tool is a command line interface (CLI) for developing on the Aptos b
 Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options. See below the usage output from `aptos --help`:
 
 ```bash
-USAGE
+USAGE:
     aptos <SUBCOMMAND>
 
 OPTIONS:
