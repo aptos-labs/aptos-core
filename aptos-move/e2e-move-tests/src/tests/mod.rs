@@ -16,6 +16,7 @@ mod init_module;
 mod lazy_natives;
 mod max_loop_depth;
 mod memory_quota;
+mod metadata;
 mod mint_nft;
 mod new_integer_types;
 mod nft_dao;

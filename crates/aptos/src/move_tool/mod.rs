@@ -128,7 +128,7 @@ pub(crate) fn set_bytecode_version(version: Option<u32>) {
     if let Some(ver) = version {
         env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
     } else if env::var(VAR_BYTECODE_VERSION) == Err(env::VarError::NotPresent) {
-        env::set_var(VAR_BYTECODE_VERSION, "5");
+        env::set_var(VAR_BYTECODE_VERSION, "6");
     }
 }
 
