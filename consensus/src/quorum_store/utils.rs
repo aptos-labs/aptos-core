@@ -299,7 +299,7 @@ impl ProofQueue {
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
 
-        for (digest, expiration) in self.digest_queue.iter() {
+        for (i, (digest, expiration)) in self.digest_queue.iter().enumerate() {
             if *expiration >= current_time && !excluded_proofs.contains(digest) {
                 match self
                     .digest_proof
@@ -327,12 +327,15 @@ impl ProofQueue {
                     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
-                expired.push(digest);
+                expired.push(i);
             }
         }
-        for digest in expired {
-            claims::assert_some!(self.digest_proof.remove(digest));
-            self.digest_insertion_time.remove(digest);
+        // TODO: ok, so this has bad O.
+        for i in expired.iter().rev() {
+            if let Some((digest, _)) = self.digest_queue.remove(*i) {
+                claims::assert_some!(self.digest_proof.remove(&digest));
+                self.digest_insertion_time.remove(&digest);
+            }
         }
 
         counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
