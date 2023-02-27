@@ -55,7 +55,7 @@ impl Default for ExecutionConfigV1 {
     fn default() -> Self {
         Self {
             // TODO(change this to NoShuffling before landing)
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32, 128),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
         }
     }
 }
@@ -64,7 +64,7 @@ impl Default for ExecutionConfigV1 {
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
-    SenderAwareV1(u32, u32),
+    SenderAwareV1(u32),
 }
 
 #[cfg(test)]
@@ -92,21 +92,21 @@ mod test {
     #[test]
     fn test_config_serialization() {
         let config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32, 32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32, 32)
+            TransactionShufflerType::SenderAwareV1(32)
         ));
     }
 
     #[test]
     fn test_config_onchain_payload() {
         let execution_config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32, 32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
         });
 
         let mut configs = HashMap::new();
@@ -121,7 +121,7 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32, 32)
+            TransactionShufflerType::SenderAwareV1(32)
         ));
     }
 }

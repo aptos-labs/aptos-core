@@ -30,8 +30,8 @@ pub fn create_transaction_shuffler(
 ) -> Arc<dyn TransactionShuffler> {
     match shuffler_type {
         NoShuffling => Arc::new(NoOpShuffler {}),
-        SenderAwareV1(confict_window_size, look_ahead_window) => Arc::new(
-            SenderAwareShuffler::new(confict_window_size as usize, look_ahead_window as usize),
-        ),
+        SenderAwareV1(confict_window_size) => {
+            Arc::new(SenderAwareShuffler::new(confict_window_size as usize))
+        },
     }
 }

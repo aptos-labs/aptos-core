@@ -4,10 +4,7 @@ use crate::{
 };
 use aptos_types::transaction::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
-use std::{
-    cmp::min,
-    collections::{HashMap, VecDeque},
-};
+use std::collections::{HashMap, VecDeque};
 
 /// An implementation of transaction shuffler, which tries to spread transactions from same senders
 /// in a block in order to reduce conflict. On a high level, it works as follows - It defines a
@@ -28,11 +25,10 @@ use std::{
 ///
 /// Another optimization introduced is the `look_ahead_sender_window` - this limits the number of senders
 /// to check to find non-conflicting transactions before giving up. This is needed to ensure the shuffling
-/// is not O(n) even in the worst case.
+/// is not O(n*2) even in the worst case.
 
 pub struct SenderAwareShuffler {
     conflict_window_size: usize,
-    look_ahead_sender_window: usize,
 }
 
 impl TransactionShuffler for SenderAwareShuffler {
@@ -41,92 +37,101 @@ impl TransactionShuffler for SenderAwareShuffler {
 
         // maintains the intermediate state of the shuffled transactions
         let mut sliding_window = SlidingWindowState::new(self.conflict_window_size);
+        let mut pending_txns = PendingTransactions::new();
         let num_transactions = txns.len();
-        let mut candidate_txn_chunks = self.prepare_txn_chunk_by_senders(txns);
-        for _ in 0..num_transactions {
-            let max_lookup = min(self.look_ahead_sender_window, candidate_txn_chunks.len());
-            // These are the chunks, which are evaluated in each iteration. These needs to be pushed
-            // back to preserve the original order of the transactions after each iteration.
-            let mut to_be_pushed_back_chunks = VecDeque::new();
-            let mut candidate_found = false;
-            let mut current_sender_index = 0;
-            while current_sender_index < max_lookup {
-                let mut candidate_chunk = candidate_txn_chunks
-                    .pop_front()
-                    .expect("Expected transaction chunk in the candidate transaction chunk");
-                if !sliding_window.has_conflict_in_window(&candidate_chunk.sender()) {
-                    sliding_window.add_transaction(
-                        candidate_chunk
-                            .remove_transaction()
-                            .expect("Expected transaction in candidate chunk"),
-                    );
-                    candidate_found = true;
-                    if !candidate_chunk.is_empty() {
-                        // Non-empty chunk needs to be pushed back again.
-                        to_be_pushed_back_chunks.push_front(candidate_chunk)
-                    }
-                    break;
-                }
-                current_sender_index += 1;
-                to_be_pushed_back_chunks.push_front(candidate_chunk);
+        let mut orig_txns = VecDeque::from(txns);
+        'outer: loop {
+            if sliding_window.num_txns() == num_transactions {
+                break;
             }
-
-            if !candidate_found {
-                // We didn't find any non-conflicting txn in the look up window. In this case, just
-                // add the first candidate to the block. Which can be found by popping the back of the
-                // `to_be_pushed_back_chunks`
-                let mut chunk = to_be_pushed_back_chunks
-                    .pop_back()
-                    .expect("Expected non empty vector");
-                sliding_window.add_transaction(
-                    chunk
-                        .remove_transaction()
-                        .expect("Empty chunk not expected"),
-                );
-                if !chunk.is_empty() {
-                    to_be_pushed_back_chunks.push_back(chunk)
+            // First check if we have a sender dropped off of conflict window in previous step, if so,
+            // we try to find pending transaction from the corresponding sender and add it to the block.
+            if let Some(sender) = sliding_window.last_dropped_sender() {
+                if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
+                    sliding_window.add_transaction(txn);
+                    continue 'outer;
                 }
             }
 
-            // Add the remaining txns to the candidate txns list in the original order.
-            let mut chunk = to_be_pushed_back_chunks.pop_front();
-            while chunk.is_some() {
-                candidate_txn_chunks.push_front(chunk.unwrap());
-                chunk = to_be_pushed_back_chunks.pop_front();
+            // Iterate through the original transactions and try to find the next candidate
+            let mut txn_opt = orig_txns.pop_front();
+            while txn_opt.is_some() {
+                let txn = txn_opt.unwrap();
+                if !sliding_window.has_conflict(&txn.sender()) {
+                    sliding_window.add_transaction(txn);
+                    continue 'outer;
+                }
+                pending_txns.add_transaction(txn);
+                txn_opt = orig_txns.pop_front();
             }
+            // Add pending transactions in the order if we can't find any other candidate
+            sliding_window.add_transaction(pending_txns.remove_first_pending().unwrap())
         }
         sliding_window.finalize()
     }
 }
 
 impl SenderAwareShuffler {
-    pub fn new(conflict_window_size: usize, look_ahead_sender_window: usize) -> Self {
+    pub fn new(conflict_window_size: usize) -> Self {
         Self {
             conflict_window_size,
-            look_ahead_sender_window,
+        }
+    }
+}
+
+/// A structure to maintain a set of transactions that are pending to be added to the block indexed by
+/// the sender. For a particular sender, relative ordering of transactions are maintained,
+/// so that the final block preserves the ordering of transactions by sender. It also maintains a vector
+/// to preserve the original order of the transactions. This is needed in case we can't find
+/// any non-conflicting transactions and we need to add the first pending transaction to the block.
+struct PendingTransactions {
+    txns_by_senders: HashMap<AccountAddress, VecDeque<SignedTransaction>>,
+    // Transactions are kept in the original order. This is not kept in sync with pending transactions,
+    // so this can contain a bunch of transactions that are already added to the block.
+    ordered_txns: VecDeque<SignedTransaction>,
+}
+
+impl PendingTransactions {
+    pub fn new() -> Self {
+        Self {
+            txns_by_senders: HashMap::new(),
+            ordered_txns: VecDeque::new(),
         }
     }
 
-    // Prepares the index of transaction chunks by sender
-    fn prepare_txn_chunk_by_senders(
-        &self,
-        txns: Vec<SignedTransaction>,
-    ) -> VecDeque<TransactionsChunkBySender> {
-        let mut candidate_txn_chunks = VecDeque::new();
-        let mut prev_sender = None;
-        for txn in txns {
-            let current_sender = txn.sender();
-            if prev_sender != Some(current_sender) {
-                let txn_chunk = TransactionsChunkBySender::new(current_sender);
-                candidate_txn_chunks.push_back(txn_chunk);
+    pub fn add_transaction(&mut self, txn: SignedTransaction) {
+        self.ordered_txns.push_back(txn.clone());
+        self.txns_by_senders
+            .entry(txn.sender())
+            .or_insert_with(VecDeque::new)
+            .push_back(txn);
+    }
+
+    /// Removes the first pending transaction from the sender. Please note that the transaction is not
+    /// removed from the `ordered_txns`, so the `ordered_txns` will contain a set of transactions that
+    /// are removed from pending transactions already.
+    pub fn remove_pending_from_sender(
+        &mut self,
+        sender: AccountAddress,
+    ) -> Option<SignedTransaction> {
+        self.txns_by_senders
+            .get_mut(&sender)
+            .and_then(|txns| txns.pop_front())
+    }
+
+    pub fn remove_first_pending(&mut self) -> Option<SignedTransaction> {
+        let mut txn_opt = self.ordered_txns.pop_front();
+        while txn_opt.is_some() {
+            let sender = txn_opt.as_ref().unwrap().sender();
+            // We don't remove the txns from ordered_txns when remove_pending_from_sender is called.
+            // So it is possible that the ordered_txns has some transactions that are not pending
+            // anymore.
+            if txn_opt.as_ref() == self.txns_by_senders.get(&sender).unwrap().front() {
+                return self.remove_pending_from_sender(sender);
             }
-            candidate_txn_chunks
-                .back_mut()
-                .unwrap()
-                .add_transaction(txn);
-            prev_sender = Some(current_sender)
+            txn_opt = self.ordered_txns.pop_front();
         }
-        candidate_txn_chunks
+        None
     }
 }
 
@@ -177,46 +182,31 @@ impl SlidingWindowState {
         self.start_index += 1;
     }
 
-    pub fn has_conflict_in_window(&self, addr: &AccountAddress) -> bool {
+    pub fn has_conflict(&self, addr: &AccountAddress) -> bool {
         self.senders_in_window
             .get(addr)
             .map_or(false, |count| *count != 0)
     }
 
+    /// Returns the sender which was dropped off of the conflict window in previous iteration.
+    pub fn last_dropped_sender(&self) -> Option<AccountAddress> {
+        let prev_start_index = self.start_index - 1;
+        if prev_start_index >= 0 {
+            let last_sender = self.txns.get(prev_start_index as usize).unwrap().sender();
+            if *self.senders_in_window.get(&last_sender).unwrap() == 0 {
+                return Some(last_sender);
+            }
+        }
+        None
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.txns.len()
+    }
+
     pub fn finalize(self) -> Vec<SignedTransaction> {
         NUM_SENDERS_IN_BLOCK.set(self.senders_in_window.len() as f64);
         self.txns
-    }
-}
-
-/// This represents a contiguous chunk of transactions in a block grouped by the same sender.
-struct TransactionsChunkBySender {
-    sender: AccountAddress,
-    transactions: VecDeque<SignedTransaction>,
-}
-
-impl TransactionsChunkBySender {
-    pub fn new(sender: AccountAddress) -> Self {
-        Self {
-            sender,
-            transactions: VecDeque::new(),
-        }
-    }
-
-    pub fn add_transaction(&mut self, txn: SignedTransaction) {
-        self.transactions.push_back(txn);
-    }
-
-    pub fn remove_transaction(&mut self) -> Option<SignedTransaction> {
-        self.transactions.pop_front()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.transactions.is_empty()
-    }
-
-    pub fn sender(&self) -> AccountAddress {
-        self.sender
     }
 }
 
@@ -268,9 +258,9 @@ mod tests {
 
     #[test]
     fn test_single_user_txns() {
-        for i in [1, 5, 50, 500] {
-            let txns = create_signed_transaction(i);
-            let txn_shuffer = SenderAwareShuffler::new(10, 10);
+        for num_txns in [1, 5, 50, 500] {
+            let txns = create_signed_transaction(num_txns);
+            let txn_shuffer = SenderAwareShuffler::new(10);
             let optimized_txns = txn_shuffer.shuffle(txns.clone());
             assert_eq!(txns.len(), optimized_txns.len());
             // Assert that ordering is unchanged in case of single sender block
@@ -280,19 +270,20 @@ mod tests {
 
     #[test]
     fn test_unique_sender_txns() {
-        let num_senders = 500;
-        let mut txns = Vec::new();
-        let mut senders = Vec::new();
-        for _ in 0..num_senders {
-            let mut sender_txns = create_signed_transaction(1);
-            senders.push(sender_txns.get(0).unwrap().sender());
-            txns.append(&mut sender_txns);
+        for num_senders in [1, 5, 50, 500] {
+            let mut txns = Vec::new();
+            let mut senders = Vec::new();
+            for _ in 0..num_senders {
+                let mut sender_txns = create_signed_transaction(1);
+                senders.push(sender_txns.get(0).unwrap().sender());
+                txns.append(&mut sender_txns);
+            }
+            let txn_shuffer = SenderAwareShuffler::new(10);
+            let optimized_txns = txn_shuffer.shuffle(txns.clone());
+            assert_eq!(txns.len(), optimized_txns.len());
+            // Assert that the ordering is unchanged in case of unique senders txns.
+            assert_eq!(txns, optimized_txns)
         }
-        let txn_shuffer = SenderAwareShuffler::new(10, 10);
-        let optimized_txns = txn_shuffer.shuffle(txns.clone());
-        assert_eq!(txns.len(), optimized_txns.len());
-        // Assert that the ordering is unchanged in case of unique senders txns.
-        assert_eq!(txns, optimized_txns)
     }
 
     #[test]
@@ -306,7 +297,7 @@ mod tests {
             txns.append(&mut sender_txns);
         }
 
-        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1, 1000);
+        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1);
         let optimized_txns = txn_shuffler.shuffle(txns.clone());
         assert_eq!(txns.len(), optimized_txns.len());
         let mut sender_index = 0;
@@ -328,7 +319,7 @@ mod tests {
         }
 
         let now = Instant::now();
-        let txn_shuffler = SenderAwareShuffler::new(32, 256);
+        let txn_shuffler = SenderAwareShuffler::new(32);
         let optimized_txns = txn_shuffler.shuffle(txns.clone());
         println!("elapsed time is {}", now.elapsed().as_millis());
         assert_eq!(txns.len(), optimized_txns.len());
@@ -346,7 +337,7 @@ mod tests {
             orig_txns_by_sender.insert(sender_txns.get(0).unwrap().sender(), sender_txns.clone());
             orig_txns.append(&mut sender_txns);
         }
-        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1, 100);
+        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1);
         let optimized_txns = txn_shuffler.shuffle(orig_txns.clone());
         let mut optimized_txns_by_sender = HashMap::new();
         for txn in optimized_txns {
@@ -373,7 +364,7 @@ mod tests {
         orig_txns.extend(sender1_txns.clone());
         orig_txns.extend(sender2_txns.clone());
         orig_txns.extend(sender3_txns.clone());
-        let txn_shuffler = SenderAwareShuffler::new(3, 100);
+        let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
         assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
         assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
@@ -398,7 +389,7 @@ mod tests {
         orig_txns.extend(sender3_txns.clone());
         orig_txns.extend(sender4_txns.clone());
         orig_txns.extend(sender5_txns.clone());
-        let txn_shuffler = SenderAwareShuffler::new(3, 100);
+        let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
         assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
         assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
@@ -426,7 +417,7 @@ mod tests {
         orig_txns.extend(sender4_txns.clone());
         orig_txns.extend(sender5_txns.clone());
         orig_txns.extend(sender6_txns.clone());
-        let txn_shuffler = SenderAwareShuffler::new(3, 100);
+        let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
         assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
         assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
@@ -456,7 +447,7 @@ mod tests {
             orig_txn_set.insert(txn.into_raw_transaction());
         }
 
-        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1, 100);
+        let txn_shuffler = SenderAwareShuffler::new(num_senders - 1);
         let optimized_txns = txn_shuffler.shuffle(orig_txns.clone());
         let mut optimized_txn_set = HashSet::new();
         assert_eq!(orig_txns.len(), optimized_txns.len());
