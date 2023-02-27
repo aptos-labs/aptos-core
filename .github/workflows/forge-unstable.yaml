@@ -46,7 +46,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 9 * * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 15 * * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
@@ -98,42 +98,6 @@ jobs:
       # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
 
-  run-forge-changing-working-quorum-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-changing-working-quorum-test
-      FORGE_RUNNER_DURATION_SECS: 1200
-      FORGE_TEST_SUITE: changing_working_quorum_test
-      POST_TO_SLACK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
-  run-forge-changing-working-quorum-test-high-load:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: changing_working_quorum_test_high_load
-      POST_TO_SLACK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
-  run-forge-different-node-speed-and-reliability-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: different_node_speed_and_reliability_test
-      POST_TO_SLACK: true
-      FORGE_ENABLE_FAILPOINTS: true
-
   run-forge-graceful-overload-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
@@ -145,30 +109,6 @@ jobs:
       FORGE_TEST_SUITE: graceful_overload
       POST_TO_SLACK: true
 
-  run-forge-haproxy:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-haproxy
-      FORGE_RUNNER_DURATION_SECS: 600
-      FORGE_ENABLE_HAPROXY: true
-      FORGE_TEST_SUITE: land_blocking
-      POST_TO_SLACK: true
-
-  run-forge-network-partition-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-network-partition
-      # Run for 15 minutes
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: network_partition
-      POST_TO_SLACK: true
-
   run-forge-nft-mint-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
@@ -178,54 +118,6 @@ jobs:
       FORGE_NAMESPACE: forge-nft-mint-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: nft_mint
-      POST_TO_SLACK: true
-
-  run-forge-single-vfn-perf:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn
-      # Run for 8 minutes
-      FORGE_RUNNER_DURATION_SECS: 480
-      FORGE_TEST_SUITE: single_vfn_perf
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-perf-fullnode-execute-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-perf-fullnode-fast-sync-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-perf-validator-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-state-sync-perf-validator
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_validators
       POST_TO_SLACK: true
 
   run-forge-state-sync-slow-processing-catching-up-test:
@@ -250,6 +142,32 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: twin_validator_test
       POST_TO_SLACK: true
+
+  run-forge-three-region-different-node-speed:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-three-region-with-different-node-speed
+      FORGE_RUNNER_DURATION_SECS: 3600
+      FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
+      FORGE_ENABLE_FAILPOINTS: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-state-sync-failures-catching-up-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: state_sync_failures_catching_up
+      FORGE_ENABLE_FAILPOINTS: true
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-validator-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
