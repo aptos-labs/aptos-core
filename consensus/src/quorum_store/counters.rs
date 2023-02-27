@@ -174,6 +174,24 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy
     .unwrap()
     });
 
+pub static POS_TO_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pos_to_pull",
+        "Histogram for how long it took a PoS to go from inserted to pulled into a proposed block",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static POS_TO_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pos_to_commit",
+        "Histogram for how long it took a PoS to go from inserted to commit notified",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of total txns left after cleaning up commit notifications.
 pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
