@@ -295,6 +295,7 @@ impl ProofQueue {
         }
 
         let mut ret = Vec::new();
+        let mut expired = Vec::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
 
@@ -326,8 +327,14 @@ impl ProofQueue {
                     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
+                expired.push(digest);
             }
         }
+        for digest in expired {
+            claims::assert_some!(self.digest_proof.remove(digest));
+            self.digest_insertion_time.remove(digest);
+        }
+
         counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
         counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
         counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
