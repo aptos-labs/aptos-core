@@ -51,4 +51,4 @@ Learn how to [deploy and manage a coin](first-coin.md). The `coin` interface is 
 
 ### [Your First Multisig](first-multisig.md)
 
-Learn how to perform assorted operations using [K-of-N multisigner authentication](../concepts/accounts.md#multisigner-authentication).
+Learn how to perform assorted operations using [K-of-N multisigner authentication](../concepts/accounts.md#multi-signer-authentication).
