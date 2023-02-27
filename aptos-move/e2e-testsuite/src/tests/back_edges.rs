@@ -11,11 +11,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use move_binary_format::file_format::{empty_script, Bytecode};
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{ResourceKey, StructTag},
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
 
 fn offending_script() -> Vec<u8> {
     use Bytecode::*;
@@ -42,7 +38,7 @@ fn test_script(chain_id: ChainId, time: u64) {
     let mut executor = FakeExecutor::from_head_genesis();
 
     executor.write_state_value(
-        StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+        StateKey::access_path(AccessPath::resource_access_path(
             CORE_CODE_ADDRESS,
             StructTag {
                 address: CORE_CODE_ADDRESS,
@@ -50,7 +46,7 @@ fn test_script(chain_id: ChainId, time: u64) {
                 name: Identifier::new("ChainId").unwrap(),
                 type_params: vec![],
             },
-        ))),
+        )),
         bcs::to_bytes(&chain_id).unwrap(),
     );
 

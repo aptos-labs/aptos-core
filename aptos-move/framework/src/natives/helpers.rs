@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::VecDeque, sync::Arc};
-
 use aptos_types::{
     on_chain_config::{TimedFeatureFlag, TimedFeatures},
     vm_status::StatusCode,
@@ -14,6 +12,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use smallvec::SmallVec;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Used to pop a Vec<Vec<u8>> argument off the stack.
 #[macro_export]
@@ -74,13 +73,13 @@ where
 
 #[macro_export]
 macro_rules! pop_arg_safe {
-    ($args: ident, $t: ty) => {
+    ($args:ident, $t:ty) => {
         match $args.pop_back() {
             Some(val) => match val.value_as::<$t>() {
                 Ok(v) => v,
                 Err(_e) => {
                     return Err($crate::natives::helpers::SafeNativeError::InvariantViolation)
-                }
+                },
             },
             None => return Err($crate::natives::helpers::SafeNativeError::InvariantViolation),
         }

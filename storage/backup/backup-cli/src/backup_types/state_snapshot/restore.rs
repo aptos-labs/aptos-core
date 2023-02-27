@@ -26,10 +26,10 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::StateSnapshotReceiver;
-use aptos_types::on_chain_config::{TimedFeatureOverride, TimedFeatures};
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{TimedFeatureOverride, TimedFeatures},
     proof::TransactionInfoWithProof,
     state_store::{
         state_key::{StateKey, StateKeyInner},

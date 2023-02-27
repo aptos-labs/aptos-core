@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_native_from_func;
-use crate::natives::helpers::make_safe_native;
-use crate::natives::helpers::SafeNativeContext;
-use crate::natives::helpers::SafeNativeResult;
-use crate::pop_arg_safe;
-
+use crate::{
+    natives::helpers::{
+        make_native_from_func, make_safe_native, SafeNativeContext, SafeNativeResult,
+    },
+    pop_arg_safe,
+};
 use aptos_types::on_chain_config::TimedFeatures;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
@@ -16,8 +16,7 @@ use move_vm_types::{
 };
 use ripemd::Digest as RipemdDigest;
 use sha2::Digest;
-use smallvec::smallvec;
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, hash::Hasher};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 

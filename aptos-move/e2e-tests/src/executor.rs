@@ -21,7 +21,6 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -30,7 +29,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{Features, OnChainConfig, TimedFeatures, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -39,7 +38,6 @@ use aptos_types::{
     vm_status::VMStatus,
     write_set::WriteSet,
 };
-use aptos_types::{chain_id::ChainId, on_chain_config::TimedFeatures};
 use aptos_vm::{
     block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},

@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::ed25519::GasParameters;
-use crate::natives::helpers::make_native_from_func;
 #[cfg(feature = "testing")]
 use crate::natives::helpers::make_test_only_native_from_func;
+use crate::natives::{cryptography::ed25519::GasParameters, helpers::make_native_from_func};
 #[cfg(feature = "testing")]
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
@@ -140,10 +139,9 @@ fn native_signature_verify_strict(
         )) * num_sub_sigs;
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::bool(verify_result)],
-    ))
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(
+        verify_result
+    )]))
 }
 
 #[cfg(feature = "testing")]
@@ -167,13 +165,10 @@ fn native_generate_keys(
         .collect();
     let group_sk = multi_ed25519::MultiEd25519PrivateKey::new(private_keys, threshold).unwrap();
     let group_pk = multi_ed25519::MultiEd25519PublicKey::new(public_keys, threshold).unwrap();
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![
-            Value::vector_u8(group_sk.to_bytes()),
-            Value::vector_u8(group_pk.to_bytes()),
-        ],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(group_sk.to_bytes()),
+        Value::vector_u8(group_pk.to_bytes()),
+    ]))
 }
 
 #[cfg(feature = "testing")]
@@ -186,10 +181,9 @@ fn native_sign(
     let sk_bytes = pop_arg!(arguments, Vec<u8>);
     let group_sk = multi_ed25519::MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = group_sk.sign_arbitrary_message(message.as_slice());
-    Ok(NativeResult::ok(
-        InternalGas::zero(),
-        smallvec![Value::vector_u8(sig.to_bytes()),],
-    ))
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_u8(sig.to_bytes()),
+    ]))
 }
 /***************************************************************************************************
  * module
