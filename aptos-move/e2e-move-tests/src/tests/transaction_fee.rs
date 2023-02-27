@@ -19,7 +19,7 @@ use rand::{
 };
 use std::collections::BTreeMap;
 
-pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(|| build_scripts());
+pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 
 fn build_scripts() -> BTreeMap<String, Vec<u8>> {
     let mut scripts = BTreeMap::new();
@@ -127,7 +127,7 @@ impl TestUniverse {
         package_name: &str,
         args: Vec<TransactionArgument>,
     ) {
-        let script_code = &*PROPOSAL_SCRIPTS
+        let script_code = PROPOSAL_SCRIPTS
             .get(package_name)
             .expect("proposal script should be built");
         let sender = &self.core_resources;
