@@ -1477,28 +1477,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-file-store-data-verifier"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crash-handler",
- "aptos-indexer-grpc-utils",
- "aptos-logger",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "clap 3.2.23",
- "cloud-storage",
- "futures",
- "futures-util",
- "redis",
- "serde 1.0.149",
- "serde_json",
- "tokio",
- "warp",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-fullnode"
 version = "0.1.0"
 dependencies = [
