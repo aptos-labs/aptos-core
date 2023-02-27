@@ -1,9 +1,34 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE;
+use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
 use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct QuorumStoreBackPressureConfig {
+    pub backlog_txn_limit_count: u64,
+    pub decrease_duration_ms: u64,
+    pub increase_duration_ms: u64,
+    pub decrease_fraction: f64,
+    pub dynamic_min_batch_count: u64,
+    pub dynamic_max_batch_count: u64,
+}
+
+impl Default for QuorumStoreBackPressureConfig {
+    fn default() -> QuorumStoreBackPressureConfig {
+        QuorumStoreBackPressureConfig {
+            // QS will be backpressured if the remaining total txns is more than this number
+            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            decrease_duration_ms: 1000,
+            increase_duration_ms: 1000,
+            decrease_fraction: 0.5,
+            dynamic_min_batch_count: 40,
+            dynamic_max_batch_count: 500,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -28,12 +53,7 @@ pub struct QuorumStoreConfig {
     pub memory_quota: usize,
     pub db_quota: usize,
     pub mempool_txn_pull_max_bytes: u64,
-    pub back_pressure_total_txn_num: u64,
-    pub back_pressure_decrease_duration_ms: u64,
-    pub back_pressure_increase_duration_ms: u64,
-    pub back_pressure_decrease_fraction: f64,
-    pub back_pressure_dynamic_min_batch_count: u64,
-    pub back_pressure_dynamic_max_batch_count: u64,
+    pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_fragments: usize,
 }
 
@@ -55,13 +75,7 @@ impl Default for QuorumStoreConfig {
             memory_quota: 100000000,
             db_quota: 10000000000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
-            // QS will be backpressured if the remaining total txns is more than this number
-            back_pressure_total_txn_num: MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE * 4,
-            back_pressure_decrease_duration_ms: 1000,
-            back_pressure_increase_duration_ms: 1000,
-            back_pressure_decrease_fraction: 0.5,
-            back_pressure_dynamic_min_batch_count: 40,
-            back_pressure_dynamic_max_batch_count: 500,
+            back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
             num_workers_for_remote_fragments: 10,
         }

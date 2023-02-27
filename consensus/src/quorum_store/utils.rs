@@ -330,6 +330,7 @@ impl ProofQueue {
 
     pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
         let mut remaining_txns = 0;
+        // TODO: if the digest_queue is large, this may be too inefficient
         for (digest, expiration) in self.digest_queue.iter() {
             // Not expired
             if *expiration >= current_time {

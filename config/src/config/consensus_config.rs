@@ -6,7 +6,7 @@ use crate::config::{QuorumStoreConfig, SafetyRulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub(crate) const MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE: u64 = 4000;
+pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -58,14 +58,14 @@ impl Default for ConsensusConfig {
         ConsensusConfig {
             max_sending_block_txns: 2500,
             max_sending_block_txns_quorum_store_override:
-                MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE,
+                MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 600 * 1024, // 600 KB
             max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
             max_receiving_block_txns: 10000,
             max_receiving_block_txns_quorum_store_override: 2
-                * MAX_SENDING_BLOCK_BYTES_QUORUM_STORE_OVERRIDE,
+                * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,

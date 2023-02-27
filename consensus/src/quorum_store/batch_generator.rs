@@ -245,12 +245,14 @@ impl BatchGenerator {
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         let back_pressure_decrease_duration =
-            Duration::from_millis(self.config.back_pressure_decrease_duration_ms);
+            Duration::from_millis(self.config.back_pressure.decrease_duration_ms);
         let back_pressure_increase_duration =
-            Duration::from_millis(self.config.back_pressure_increase_duration_ms);
+            Duration::from_millis(self.config.back_pressure.increase_duration_ms);
         let mut back_pressure_decrease_latest = Instant::now();
         let mut back_pressure_increase_latest = Instant::now();
-        let mut dynamic_max_pull_count = self.config.back_pressure_dynamic_max_batch_count;
+        let mut dynamic_max_pull_count = (self.config.back_pressure.dynamic_min_batch_count
+            + self.config.back_pressure.dynamic_max_batch_count)
+            / 2;
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
@@ -266,8 +268,8 @@ impl BatchGenerator {
                         if back_pressure_decrease_latest.elapsed() >= back_pressure_decrease_duration {
                             back_pressure_decrease_latest = Instant::now();
                             dynamic_max_pull_count = std::cmp::max(
-                                (dynamic_max_pull_count as f64 * self.config.back_pressure_decrease_fraction) as u64,
-                                self.config.back_pressure_dynamic_min_batch_count,
+                                (dynamic_max_pull_count as f64 * self.config.back_pressure.decrease_fraction) as u64,
+                                self.config.back_pressure.dynamic_min_batch_count,
                             );
                             debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }
@@ -278,8 +280,8 @@ impl BatchGenerator {
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
                             back_pressure_increase_latest = Instant::now();
                             dynamic_max_pull_count = std::cmp::min(
-                                dynamic_max_pull_count + self.config.back_pressure_dynamic_min_batch_count,
-                                self.config.back_pressure_dynamic_max_batch_count,
+                                dynamic_max_pull_count + self.config.back_pressure.dynamic_min_batch_count,
+                                self.config.back_pressure.dynamic_max_batch_count,
                             );
                             debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }

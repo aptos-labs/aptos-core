@@ -356,7 +356,10 @@ impl InnerBuilder {
         );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager = ProofManager::new(self.epoch, self.config.back_pressure_total_txn_num);
+        let proof_manager = ProofManager::new(
+            self.epoch,
+            self.config.back_pressure.backlog_txn_limit_count,
+        );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
