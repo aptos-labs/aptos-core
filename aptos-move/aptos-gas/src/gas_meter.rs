@@ -11,6 +11,7 @@ use crate::{
     transaction::{ChangeSetConfigs, TransactionGasParameters},
     FeePerGasUnit, StorageGasParameters,
 };
+use aptos_logger::error;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOp,
@@ -862,6 +863,10 @@ impl AptosGasMeter {
         );
         let gas_consumed_internal = InternalGas::new(
             if gas_consumed_internal > u64::MAX as u128 {
+                error!(
+                    "Something's wrong in the gas schedule: gas_consumed_internal ({}) > u64::MAX",
+                    gas_consumed_internal
+                );
                 u64::MAX
             } else {
                 gas_consumed_internal as u64
