@@ -107,5 +107,5 @@ aptos-move/aptos-vm-profiling/**/*.txt
 
 # replay-verify and module-verify script outputs
 metadata-cache
-local
+/local/
 run_*
