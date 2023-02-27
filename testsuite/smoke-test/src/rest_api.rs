@@ -37,8 +37,14 @@ async fn test_basic_client() {
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
     //            testsuite/forge/src/interface/aptos.rs?
-    let mut account1 = info.create_and_fund_user_account(10_000_000).await.unwrap();
-    let account2 = info.create_and_fund_user_account(10_000_000).await.unwrap();
+    let mut account1 = info
+        .create_and_fund_user_account(10_000_000_000)
+        .await
+        .unwrap();
+    let account2 = info
+        .create_and_fund_user_account(10_000_000_000)
+        .await
+        .unwrap();
 
     let tx = account1.sign_with_transaction_builder(
         info.transaction_factory()
@@ -194,13 +200,13 @@ async fn test_bcs() {
 
     // Create accounts
     let mut local_account = info
-        .create_and_fund_user_account(100_000_000)
+        .create_and_fund_user_account(100_000_000_000)
         .await
         .unwrap();
     let account = local_account.address();
     let public_key = local_account.public_key();
     let other_local_account = info
-        .create_and_fund_user_account(100_000_000)
+        .create_and_fund_user_account(100_000_000_000)
         .await
         .unwrap();
 

@@ -146,8 +146,35 @@ pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeMod
     }
 }
 
+/// Check if the metadata has unknown key/data types
+pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
+    let mut exist = false;
+    for data in module.metadata.iter() {
+        if data.key == *APTOS_METADATA_KEY || data.key == *APTOS_METADATA_KEY_V1 {
+            if exist {
+                return Err(MalformedError::DuplicateKey);
+            }
+            exist = true;
+
+            if data.key == *APTOS_METADATA_KEY {
+                bcs::from_bytes::<RuntimeModuleMetadata>(&data.value)
+                    .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
+            } else if data.key == *APTOS_METADATA_KEY_V1 {
+                bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
+                    .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
+            }
+        } else {
+            return Err(MalformedError::UnknownKey(data.key.clone()));
+        }
+    }
+
+    Ok(())
+}
+
 /// Extract metadata from a compiled module, upgrading V0 to V1 representation as needed.
-pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_metadata_from_compiled_module(
+    module: &CompiledModule,
+) -> Option<RuntimeModuleMetadataV1> {
     if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY_V1) {
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
         // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
@@ -169,8 +196,38 @@ pub fn get_module_metadata(module: &CompiledModule) -> Option<RuntimeModuleMetad
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+pub enum MetaDataValidationError {
+    #[error(transparent)]
+    Malformed(MalformedError),
+    #[error(transparent)]
+    InvalidAttribute(AttributeValidationError),
+}
+
+impl From<MalformedError> for MetaDataValidationError {
+    fn from(value: MalformedError) -> Self {
+        MetaDataValidationError::Malformed(value)
+    }
+}
+
+impl From<AttributeValidationError> for MetaDataValidationError {
+    fn from(value: AttributeValidationError) -> Self {
+        MetaDataValidationError::InvalidAttribute(value)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+pub enum MalformedError {
+    #[error("Unknown key found: {0:?}")]
+    UnknownKey(Vec<u8>),
+    #[error("Unable to deserialize value for {0:?}: {1}")]
+    DeserializedError(Vec<u8>, bcs::Error),
+    #[error("Duplicate key for metadata")]
+    DuplicateKey,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[error("Unknown attribute ({}) for key: {}", self.attribute, self.key)]
-pub struct MetadataValidationError {
+pub struct AttributeValidationError {
     pub key: String,
     pub attribute: u8,
 }
@@ -178,7 +235,7 @@ pub struct MetadataValidationError {
 pub fn is_valid_view_function(
     functions: &BTreeMap<Identifier, Function>,
     fun: &str,
-) -> Result<(), MetadataValidationError> {
+) -> Result<(), AttributeValidationError> {
     if let Ok(ident_fun) = Identifier::new(fun) {
         if let Some(mod_fun) = functions.get(&ident_fun) {
             if !mod_fun.return_.is_empty() {
@@ -187,7 +244,7 @@ pub fn is_valid_view_function(
         }
     }
 
-    Err(MetadataValidationError {
+    Err(AttributeValidationError {
         key: fun.to_string(),
         attribute: KnownAttributeKind::ViewFunction as u8,
     })
@@ -196,7 +253,7 @@ pub fn is_valid_view_function(
 pub fn is_valid_resource_group(
     structs: &BTreeMap<Identifier, Struct>,
     struct_: &str,
-) -> Result<(), MetadataValidationError> {
+) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
         if let Some(mod_struct) = structs.get(&ident_struct) {
             if mod_struct.abilities == AbilitySet::EMPTY
@@ -208,7 +265,7 @@ pub fn is_valid_resource_group(
         }
     }
 
-    Err(MetadataValidationError {
+    Err(AttributeValidationError {
         key: struct_.to_string(),
         attribute: KnownAttributeKind::ViewFunction as u8,
     })
@@ -217,7 +274,7 @@ pub fn is_valid_resource_group(
 pub fn is_valid_resource_group_member(
     structs: &BTreeMap<Identifier, Struct>,
     struct_: &str,
-) -> Result<(), MetadataValidationError> {
+) -> Result<(), AttributeValidationError> {
     if let Ok(ident_struct) = Identifier::new(struct_) {
         if let Some(mod_struct) = structs.get(&ident_struct) {
             if mod_struct.abilities.has_ability(Ability::Key) {
@@ -226,7 +283,7 @@ pub fn is_valid_resource_group_member(
         }
     }
 
-    Err(MetadataValidationError {
+    Err(AttributeValidationError {
         key: struct_.to_string(),
         attribute: KnownAttributeKind::ViewFunction as u8,
     })
@@ -235,8 +292,11 @@ pub fn is_valid_resource_group_member(
 pub fn verify_module_metadata(
     module: &CompiledModule,
     features: &Features,
-) -> Result<(), MetadataValidationError> {
-    let metadata = if let Some(metadata) = get_module_metadata(module) {
+) -> Result<(), MetaDataValidationError> {
+    if features.are_resource_groups_enabled() {
+        check_metadata_format(module)?;
+    }
+    let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
         metadata
     } else {
         return Ok(());
@@ -253,10 +313,11 @@ pub fn verify_module_metadata(
             if attr.is_view_function() {
                 is_valid_view_function(&functions, fun)?
             } else {
-                return Err(MetadataValidationError {
+                return Err(AttributeValidationError {
                     key: fun.clone(),
                     attribute: attr.kind,
-                });
+                }
+                .into());
             }
         }
     }
@@ -280,10 +341,11 @@ pub fn verify_module_metadata(
                     continue;
                 }
             }
-            return Err(MetadataValidationError {
+            return Err(AttributeValidationError {
                 key: struct_.clone(),
                 attribute: attr.kind,
-            });
+            }
+            .into());
         }
     }
     Ok(())

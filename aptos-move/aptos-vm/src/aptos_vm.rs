@@ -403,8 +403,13 @@ impl AptosVM {
             let change_set_ext = session
                 .finish(&mut (), gas_meter.change_set_configs())
                 .map_err(|e| e.into_vm_status())?;
-            // Charge gas for write set
-            gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+            gas_meter.charge_write_set_gas_for_io(change_set_ext.write_set().iter())?;
+            gas_meter.charge_storage_fee(
+                change_set_ext.write_set().iter(),
+                change_set_ext.change_set().events(),
+                txn_data.transaction_size,
+                txn_data.gas_unit_price,
+            )?;
             // TODO(Gas): Charge for aggregator writes
 
             self.success_transaction_cleanup(
@@ -591,7 +596,13 @@ impl AptosVM {
         let inner_function_change_set_ext = session
             .finish(&mut (), gas_meter.change_set_configs())
             .map_err(|e| e.into_vm_status())?;
-        gas_meter.charge_write_set_gas(inner_function_change_set_ext.write_set().iter())?;
+        gas_meter.charge_write_set_gas_for_io(inner_function_change_set_ext.write_set().iter())?;
+        gas_meter.charge_storage_fee(
+            inner_function_change_set_ext.write_set().iter(),
+            inner_function_change_set_ext.change_set().events(),
+            txn_data.transaction_size,
+            txn_data.gas_unit_price,
+        )?;
 
         let storage_with_changes =
             DeltaStateView::new(storage, inner_function_change_set_ext.write_set());
@@ -807,8 +818,13 @@ impl AptosVM {
         let change_set_ext = session
             .finish(&mut (), gas_meter.change_set_configs())
             .map_err(|e| e.into_vm_status())?;
-        // Charge gas for write set
-        gas_meter.charge_write_set_gas(change_set_ext.write_set().iter())?;
+        gas_meter.charge_write_set_gas_for_io(change_set_ext.write_set().iter())?;
+        gas_meter.charge_storage_fee(
+            change_set_ext.write_set().iter(),
+            change_set_ext.change_set().events(),
+            txn_data.transaction_size,
+            txn_data.gas_unit_price,
+        )?;
         // TODO(Gas): Charge for aggregator writes
 
         self.success_transaction_cleanup(storage, change_set_ext, gas_meter, txn_data, log_context)
@@ -1644,8 +1660,15 @@ impl AptosSimulationVM {
                                     let change_set_ext = session
                                         .finish(&mut (), gas_meter.change_set_configs())
                                         .map_err(|e| e.into_vm_status())?;
-                                    gas_meter
-                                        .charge_write_set_gas(change_set_ext.write_set().iter())?;
+                                    gas_meter.charge_write_set_gas_for_io(
+                                        change_set_ext.write_set().iter(),
+                                    )?;
+                                    gas_meter.charge_storage_fee(
+                                        change_set_ext.write_set().iter(),
+                                        change_set_ext.change_set().events(),
+                                        txn_data.transaction_size,
+                                        txn_data.gas_unit_price,
+                                    )?;
                                     self.0.success_transaction_cleanup(
                                         storage,
                                         change_set_ext,

@@ -20,11 +20,10 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{PeerSet, RateLimitConfig, HANDSHAKE_VERSION},
+    config::{RateLimitConfig, HANDSHAKE_VERSION},
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
@@ -56,7 +55,7 @@ struct TransportContext {
     chain_id: ChainId,
     supported_protocols: ProtocolIdSet,
     authentication_mode: AuthenticationMode,
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     enable_proxy_protocol: bool,
 }
 
@@ -75,7 +74,6 @@ struct PeerManagerContext {
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
     peers_and_metadata: Arc<PeersAndMetadata>,
-    trusted_peers: Arc<RwLock<PeerSet>>,
     upstream_handlers:
         HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
@@ -99,7 +97,6 @@ impl PeerManagerContext {
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
         peers_and_metadata: Arc<PeersAndMetadata>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
         upstream_handlers: HashMap<
             ProtocolId,
             aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
@@ -122,7 +119,6 @@ impl PeerManagerContext {
             connection_reqs_rx,
 
             peers_and_metadata,
-            trusted_peers,
             upstream_handlers,
             connection_event_handlers,
 
@@ -184,7 +180,6 @@ impl PeerManagerBuilder {
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
         peers_and_metadata: Arc<PeersAndMetadata>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
         max_concurrent_network_reqs: usize,
@@ -213,7 +208,7 @@ impl PeerManagerBuilder {
                 chain_id,
                 supported_protocols: ProtocolIdSet::empty(),
                 authentication_mode,
-                trusted_peers: trusted_peers.clone(),
+                peers_and_metadata: peers_and_metadata.clone(),
                 enable_proxy_protocol,
             }),
             peer_manager_context: Some(PeerManagerContext::new(
@@ -222,7 +217,6 @@ impl PeerManagerBuilder {
                 connection_reqs_tx,
                 connection_reqs_rx,
                 peers_and_metadata,
-                trusted_peers,
                 HashMap::new(),
                 Vec::new(),
                 max_concurrent_network_reqs,
@@ -280,11 +274,11 @@ impl PeerManagerBuilder {
         let (key, auth_mode) = match transport_context.authentication_mode {
             AuthenticationMode::MaybeMutual(key) => (
                 key,
-                HandshakeAuthMode::maybe_mutual(transport_context.trusted_peers),
+                HandshakeAuthMode::maybe_mutual(transport_context.peers_and_metadata),
             ),
             AuthenticationMode::Mutual(key) => (
                 key,
-                HandshakeAuthMode::mutual(transport_context.trusted_peers),
+                HandshakeAuthMode::mutual(transport_context.peers_and_metadata),
             ),
         };
 
@@ -368,7 +362,6 @@ impl PeerManagerBuilder {
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
             pm_context.peers_and_metadata,
-            pm_context.trusted_peers,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,
             pm_context.upstream_handlers,

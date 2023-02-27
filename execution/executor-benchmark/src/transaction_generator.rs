@@ -226,9 +226,14 @@ impl TransactionGenerator {
         );
     }
 
-    pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
+    pub fn run_transfer(
+        &mut self,
+        block_size: usize,
+        num_transfer_blocks: usize,
+        transactions_per_sender: usize,
+    ) {
         assert!(self.block_sender.is_some());
-        self.gen_transfer_transactions(block_size, num_transfer_blocks);
+        self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
     }
 
     pub fn create_seed_accounts(
@@ -345,25 +350,39 @@ impl TransactionGenerator {
     }
 
     /// Generates transactions for random pairs of accounts.
-    pub fn gen_transfer_transactions(&mut self, block_size: usize, num_blocks: usize) {
+    pub fn gen_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        transactions_per_sender: usize,
+    ) {
         for _ in 0..num_blocks {
-            let transactions: Vec<_> = (0..block_size)
+            // TODO: handle when block_size isn't divisible by transactions_per_sender
+            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
                 .into_iter()
-                .map(|_| {
-                    let (sender, receiver) =
-                        self.accounts_cache.as_mut().unwrap().get_random_transfer();
-                    let amount = 1;
-                    let txn = sender.sign_with_transaction_builder(
-                        self.transaction_factory.transfer(receiver, amount),
-                    );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::TransferInfo(TransferInfo::new(
-                            sender.address(),
-                            receiver,
-                            amount,
-                        )),
-                    )
+                .flat_map(|_| {
+                    let (sender, receivers) = self
+                        .accounts_cache
+                        .as_mut()
+                        .unwrap()
+                        .get_random_transfer_batch(transactions_per_sender);
+                    receivers
+                        .into_iter()
+                        .map(|receiver| {
+                            let amount = 1;
+                            let txn = sender.sign_with_transaction_builder(
+                                self.transaction_factory.transfer(receiver, amount),
+                            );
+                            BenchmarkTransaction::new(
+                                Transaction::UserTransaction(txn),
+                                ExtraInfo::TransferInfo(TransferInfo::new(
+                                    sender.address(),
+                                    receiver,
+                                    amount,
+                                )),
+                            )
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .chain(once(
                     Transaction::StateCheckpoint(HashValue::random()).into(),

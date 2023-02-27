@@ -27,7 +27,6 @@ use aptos_config::{
     config::{PeerRole, MAX_INBOUND_CONNECTIONS},
     network_id::{NetworkContext, NetworkId},
 };
-use aptos_infallible::RwLock;
 use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::{
     boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
@@ -37,7 +36,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::error::Error;
 use tokio::runtime::Handle;
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
@@ -108,7 +107,6 @@ fn build_test_peer_manager(
         NetworkContext::mock_with_peer_id(peer_id),
         "/memory/0".parse().unwrap(),
         PeersAndMetadata::new(&[network_id]),
-        Arc::new(RwLock::new(HashMap::new())),
         peer_manager_request_rx,
         connection_reqs_rx,
         [(ProtocolId::mock(), hello_tx)].iter().cloned().collect(),
