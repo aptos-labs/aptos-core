@@ -5,7 +5,7 @@ title: Contributing to Aptos Core
 
 # Contributing
 
-Our goal is to make contributing to Aptos Core easy and transparent.
+Our goal is to make contributing to Aptos Core easy and transparent. See [Contribute to Aptos](./developer-docs-site/docs/contribute/index.md) for full details. This page described [our development process](#our-development-process).
 
 ## Aptos Core
 
@@ -24,13 +24,13 @@ cargo test
 
 ### Code Style, Hints, and Testing
 
-Refer to our [Coding Guidelines](https://github.com/aptos-labs/aptos-core/blob/main/documentation/coding_guidelines.md) for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/guides/move-guides/book/coding-conventions.md) and [Rust](./developer-docs-site/docs/contribute/rust-coding-guidelines.md) programming languages for detailed guidance about how to contribute to the project.
 
 ### Documentation
 
 Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
 
-If you know Markdown, you can already contribute! How to contribute can be found in the [website repo](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md).
+If you know Markdown, you can already contribute!
 
 ## Developer Workflow
 

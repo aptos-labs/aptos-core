@@ -418,6 +418,7 @@ const sidebars = {
     "contribute/index",
     "contribute/community/index",
     "contribute/external-resources",
+    "contribute/rust-coding-guidelines",
     "contribute/faq",
   ],
 };
