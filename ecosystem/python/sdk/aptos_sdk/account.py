@@ -9,6 +9,7 @@ import unittest
 
 from . import ed25519
 from .account_address import AccountAddress
+from .bcs import Serializer
 
 
 class Account:
@@ -77,6 +78,37 @@ class Account:
         """Returns the public key for the associated account"""
 
         return self.private_key.public_key()
+
+
+class RotationProofChallenge:
+    type_info_account_address: AccountAddress = AccountAddress.from_hex("0x1")
+    type_info_module_name: str = "account"
+    type_info_struct_name: str = "RotationProofChallenge"
+    sequence_number: int
+    originator: AccountAddress
+    current_auth_key: AccountAddress
+    new_public_key: bytes
+
+    def __init__(
+        self,
+        sequence_number: int,
+        originator: AccountAddress,
+        current_auth_key: AccountAddress,
+        new_public_key: bytes,
+    ):
+        self.sequence_number = sequence_number
+        self.originator = originator
+        self.current_auth_key = current_auth_key
+        self.new_public_key = new_public_key
+
+    def serialize(self, serializer: Serializer):
+        self.type_info_account_address.serialize(serializer)
+        serializer.str(self.type_info_module_name)
+        serializer.str(self.type_info_struct_name)
+        serializer.u64(self.sequence_number)
+        self.originator.serialize(serializer)
+        self.current_auth_key.serialize(serializer)
+        serializer.to_bytes(self.new_public_key)
 
 
 class Test(unittest.TestCase):

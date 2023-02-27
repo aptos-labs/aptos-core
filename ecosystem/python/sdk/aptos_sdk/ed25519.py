@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import unittest
+from typing import List, Tuple
 
 from nacl.signing import SigningKey, VerifyKey
 
@@ -92,6 +94,42 @@ class PublicKey:
         serializer.to_bytes(self.key.encode())
 
 
+class MultiEd25519PublicKey:
+    keys: List[PublicKey]
+    threshold: int
+
+    def __init__(self, keys: List[PublicKey], threshold: int):
+        self.keys = keys
+        self.threshold = threshold
+
+    def __str__(self) -> str:
+        return f"{self.threshold}-of-{len(self.keys)} Multi-Ed25519 public key"
+
+    def auth_key(self) -> bytes:
+        hasher = hashlib.sha3_256()
+        hasher.update(self.to_bytes() + b"\x01")
+        return hasher.digest()
+
+    def to_bytes(self) -> bytes:
+        concatenated_keys = bytes()
+        for key in self.keys:
+            concatenated_keys += key.key.encode()
+        return concatenated_keys + bytes([self.threshold])
+
+    @staticmethod
+    def from_bytes(key: bytes) -> MultiEd25519PublicKey:
+        n_signers = int(len(key) / PublicKey.LENGTH)
+        keys = []
+        for i in range(n_signers):
+            start_byte = i * PublicKey.LENGTH
+            end_byte = (i + 1) * PublicKey.LENGTH
+            keys.append(PublicKey(VerifyKey(key[start_byte:end_byte])))
+        return MultiEd25519PublicKey(keys, int(key[-1]))
+
+    def serialize(self, serializer: Serializer):
+        serializer.to_bytes(self.to_bytes())
+
+
 class Signature:
     LENGTH: int = 64
 
@@ -121,6 +159,35 @@ class Signature:
 
     def serialize(self, serializer: Serializer):
         serializer.to_bytes(self.signature)
+
+
+class MultiEd25519Signature:
+    signatures: List[Signature]
+    bitmap: bytes
+
+    def __init__(
+        self,
+        public_key: MultiEd25519PublicKey,
+        signatures_map: List[Tuple[PublicKey, Signature]],
+    ):
+        self.signatures = list()
+        bitmap = 0
+        for entry in signatures_map:
+            self.signatures.append(entry[1])
+            index = public_key.keys.index(entry[0])
+            shift = 31 - index  # 32 bit positions, left to right.
+            bitmap = bitmap | (1 << shift)
+        # 4-byte big endian bitmap.
+        self.bitmap = bitmap.to_bytes(4, "big")
+
+    def to_bytes(self) -> bytes:
+        concatenated_signatures = bytes()
+        for signature in self.signatures:
+            concatenated_signatures += signature.data()
+        return concatenated_signatures + self.bitmap
+
+    def serialize(self, serializer: Serializer):
+        serializer.to_bytes(self.to_bytes())
 
 
 class Test(unittest.TestCase):
