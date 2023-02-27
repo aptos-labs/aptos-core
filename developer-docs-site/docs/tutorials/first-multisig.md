@@ -5,7 +5,7 @@ slug: "your-first-multisig"
 
 # Your First Multisig
 
-This tutorial introduces assorted [K-of-N multi-signer authentication](../concepts/accounts.md#multisigner-authentication) operations, and supplements content from the following tutorials:
+This tutorial introduces assorted [K-of-N multi-signer authentication](../concepts/accounts.md#multi-signer-authentication) operations and supplements content from the following tutorials:
 
 * [Your First Transaction](./first-transaction.md)
 * [Your First Coin](./first-coin.md)
@@ -71,7 +71,7 @@ For each user, note the [account address](../concepts/accounts.md#account-addres
 
 ## Step 4: Generate a multisig account
 
-Next generate a [K-of-N multi-signer](../concepts/accounts.md#multisigner-authentication) public key and account address for a multisig account requiring two of the three signatures:
+Next generate a [K-of-N multi-signer](../concepts/accounts.md#multi-signer-authentication) public key and account address for a multisig account requiring two of the three signatures:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_2
@@ -104,7 +104,7 @@ Multisig balance: 40000000
 ## Step 6: Send coins from the multisig
 
 This transaction will send 100 octas from the multisig account to Chad's account.
-Since it is a two-of-three multisig account, signatures are required only from two individual signers.
+Since it is a two-of-three multisig account, signatures are required from only two individual signers.
 
 ### Step 6.1: Gather individual signatures
 
@@ -215,13 +215,13 @@ Then Deedee and the Alice/Bob/Chad group (under the authority of Bob and Chad) a
 
 ## Step 8: Perform Move package governance
 
-In this section the multisig vanity account will publish a simple package, upgrade it, then invoke a [Move governance](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) script.
+In this section, the multisig vanity account will publish a simple package, upgrade it, then invoke a [Move governance](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) script.
 
 Here, [semantic versioning](https://semver.org/) is used to distinguish between versions `v1.0.0` and `v1.1.0` of the `UpgradeAndGovern` example package from the `move-examples` folder.
 
 ### Step 8.1: Review v1.0.0
 
-Version 1.0.0 of the `UpgradeAndGovern` package contains a simple manifest and a single Move source file:
+Version 1.0.0 of the `UpgradeAndGovern` package contains a simple `.toml` manifest and a single Move source file:
 
 ```toml title="Move.toml"
 :!: static/move-examples/upgrade_and_govern/v1_0_0/Move.toml manifest
@@ -332,7 +332,7 @@ However, a non-script approach would require two transactions instead of just on
 in practical terms, Alice, Bob, and/or Chad would likely have to send single-signer transaction signatures around through off-chain communication channels, and a *scribe* for the group would then have to submit a multisig `Authenticator` (for *each* `public entry fun` call).
 Hence in a non-script approach, extra operational complexity can quickly introduce opportunities for consensus failure.
 
-A Move script, by contrast, collapses multiple governance function calls into a single transaction, and moreover, Move scripts can be published in a public forum like GitHub so that all signatories can review the actual function calls before they sign the script.
+A Move script, by contrast, collapses multiple governance function calls into a single transaction; and moreover, Move scripts can be published in a public forum like GitHub so that all signatories can review the actual function calls before they sign the script.
 
 ### Step 8.5: Execute the governance script
 
