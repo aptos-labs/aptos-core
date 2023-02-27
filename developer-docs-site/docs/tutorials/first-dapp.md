@@ -17,12 +17,12 @@ For a more comprehensive view of this process, see [Build an End-to-End Dapp on 
 We will use the:
 
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
-* [Petra Wallet](../guides/install-petra-wallet-extension)
+* [Petra Wallet](../guides/install-petra-wallet.md)
 * [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
 
 :::tip Full source code
 
-The full source code for this tutorial is being updated. Meanwhile, the older one is available [here](https://github.com/aptos-labs/aptos-core/tree/53e240003e95c9b865441ea792ab4e1e8134a267/developer-docs-site/static/examples/typescript/dapp-example).
+We recommend becoming familiar with the newer full source code documented in the [Build an End-to-End Dapp on Aptos](build-e2e-dapp/index.md) tutorial. The full source code for this tutorial is still available in the [`dapp-example`](https://github.com/aptos-labs/aptos-core/tree/53e240003e95c9b865441ea792ab4e1e8134a267/developer-docs-site/static/examples/typescript/dapp-example) directory.
 :::
 
 ## Prerequisites
@@ -30,7 +30,7 @@ The full source code for this tutorial is being updated. Meanwhile, the older on
 ### Aptos Wallet
 
 Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp. You can first install
-the [Petra wallet extension](../guides/install-petra-wallet-extension) for use in this tutorial.
+the [Petra wallet extension](../guides/install-petra-wallet.md) for use in this tutorial.
 
 If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.
@@ -52,7 +52,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 We will also be installing the Aptos CLI so that we can publish 
 
-1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
+1. Install the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md).
 
 2. Run `aptos init --profile my-first-nft`.
 
@@ -377,7 +377,7 @@ Make a note of `"name": "message"; we will use it in the next section.
 <summary>Publish the `hello_blockchain` module with the TS SDK</summary>
 We will use the Aptos CLI to compile the `hello_blockchain` module and use the [TypeScript SDK](../sdks/ts-sdk/index.md) to publish the module.
 
-1. Download [the `hello_blockchain` package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain).
+1. Download the [`hello_blockchain`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/hello_blockchain) package.
 
 2. Next, use the `aptos move compile --save-metadata` command (replacing `/path/to/hello_blockchain/` and `<address>`):
 

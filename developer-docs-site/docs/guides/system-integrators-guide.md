@@ -82,7 +82,7 @@ Either of these methods will expose a [REST API service](./aptos-apis.md) at `ht
 Aptos currently provides three SDKs:
 1. [Typescript](../sdks/ts-sdk/index.md)
 2. [Python](../sdks/python-sdk.md)
-3. [Rust](../sdks/rust-sSDKs and Toolsdk.md)
+3. [Rust](../sdks/rust-sdk.md)
 
 Almost all developers will benefit from exploring the CLI. [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
 
@@ -496,6 +496,6 @@ By monitoring the events, you will find all balance changes in the `0x1::coin::C
 
 :::
 
-To create some sample data to explore, conduct ["Your first transaction"](../tutorials/your-first-transaction).
+To create some sample data to explore, conduct ["Your first transaction"](../tutorials/first-transaction.md).
 
-To learn more about coin creation, make ["Your First Coin"](../tutorials/your-first-coin).
+To learn more about coin creation, make ["Your First Coin"](../tutorials/first-coin.md).

@@ -24,7 +24,7 @@ Once published, the definition of a struct in Move is immutable. Structs themsel
 
 In Move, each account may have only one resource of a given type. This is because an account in Move resembles a hashmap whereby there will be only one `Coin` type, for instance. The hashmap is a mapping of resource type or module name to resource value. This is why Aptos offers the holder patterns of `CoinStore` and `TokenStore`, to provide an abstraction for holding multiple coins and tokens. These holders will contain tables or use generics for storage.
 
-Aptos employs [Merkle trees](https://aptos.dev/reference/glossary/#merkle-trees) for efficient state synchronization and authenticated storage reads.
+Aptos employs [Merkle trees](../../reference/glossary.md#merkle-trees) for efficient state synchronization and authenticated storage reads.
 
 ## Signers
 

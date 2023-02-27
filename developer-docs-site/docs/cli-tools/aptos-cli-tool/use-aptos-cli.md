@@ -770,7 +770,7 @@ In this case, see [Install the dependencies of Move Prover](install-aptos-cli#st
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
-First, you need to include Move nursery in your Move [toml file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
+First, you need to include Move nursery in your Move [TOML file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
 
 Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
@@ -1141,12 +1141,12 @@ cargo run --package aptos -- \\
 
 ### Generating a genesis and waypoint
 
-`genesis.blob` and the waypoint can be generated after obtaining the `Layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
+`genesis.blob` and the waypoint can be generated after obtaining the `layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
 
 To generate the `genesis.blob` and waypoint:
-* Place the `Layout` file in a directory, e.g., `genesis`.
+* Place the `layout` file in a directory, e.g., `genesis`.
 * Place all the `ValidatorConfiguration` files into the `genesis` directory.
-* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `Layout` file.
+* Ensure that the `ValidatorConfiguration` files are listed under the set of `users` within the `layout` file.
 * Make a `framework` directory within the `genesiss` directory and place the framework release `.mv` files into the `framework` directory.
 * Use the `aptos` CLI to generate genesis and waypoint:
 

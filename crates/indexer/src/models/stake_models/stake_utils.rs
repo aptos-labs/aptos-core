@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::models::move_resources::MoveResource;
+use crate::models::{move_resources::MoveResource, token_models::token_utils::Table};
 use anyhow::{Context, Result};
 use aptos_api_types::{deserialize_from_string, WriteResource};
 use bigdecimal::BigDecimal;
@@ -10,6 +10,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
     pub delegated_voter: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DelegationPoolResource {
+    pub active_shares: SharesResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SharesResource {
+    pub shares: SharesInnerResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SharesInnerResource {
+    pub inner: Table,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,19 +39,67 @@ pub struct GovernanceVoteEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DistributeRewardsEvent {
+    pub pool_address: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub rewards_amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AddStakeEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount_added: u64,
+    pub delegator_address: String,
+    pub pool_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UnlockStakeEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount_unlocked: u64,
+    pub delegator_address: String,
+    pub pool_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawStakeEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount_withdrawn: u64,
+    pub delegator_address: String,
+    pub pool_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReactivateStakeEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount_reactivated: u64,
+    pub delegator_address: String,
+    pub pool_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StakeResource {
     StakePool(StakePoolResource),
+    DelegationPool(DelegationPoolResource),
 }
 
 impl StakeResource {
     fn is_resource_supported(data_type: &str) -> bool {
-        matches!(data_type, "0x1::stake::StakePool")
+        matches!(
+            data_type,
+            "0x1::stake::StakePool"
+                | "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+        ::delegation_pool::DelegationPool"
+        )
     }
 
     fn from_resource(data_type: &str, data: &serde_json::Value, txn_version: i64) -> Result<Self> {
         match data_type {
             "0x1::stake::StakePool" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeResource::StakePool(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::DelegationPool" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeResource::DelegationPool(inner))),
             _ => Ok(None),
         }
         .context(format!(
@@ -79,6 +142,11 @@ impl StakeResource {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StakeEvent {
     GovernanceVoteEvent(GovernanceVoteEvent),
+    DistributeRewardsEvent(DistributeRewardsEvent),
+    AddStakeEvent(AddStakeEvent),
+    UnlockStakeEvent(UnlockStakeEvent),
+    WithdrawStakeEvent(WithdrawStakeEvent),
+    ReactivateStakeEvent(ReactivateStakeEvent),
 }
 
 impl StakeEvent {
@@ -90,6 +158,20 @@ impl StakeEvent {
         match data_type {
             "0x1::aptos_governance::VoteEvent" => serde_json::from_value(data.clone())
                 .map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner))),
+            "0x1::stake::DistributeRewardsEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::AddStakeEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::AddStakeEvent(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::UnlockStakeEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::UnlockStakeEvent(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::WithdrawStakeEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::WithdrawStakeEvent(inner))),
+            "0x1310dc820487f24755e6e06747f6582118597a48868e2a98260fa8c3ee945cbd\
+            ::delegation_pool::ReactivateStakeEvent" => serde_json::from_value(data.clone())
+                .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
             _ => Ok(None),
         }
         .context(format!(

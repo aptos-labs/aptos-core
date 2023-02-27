@@ -935,7 +935,7 @@ impl RoundManager {
             self.round_state.record_vote(vote);
         }
         if let Err(e) = self.process_new_round_event(new_round_event).await {
-            error!(error = ?e, "[RoundManager] Error during start");
+            warn!(error = ?e, "[RoundManager] Error during start");
         }
     }
 

@@ -19,6 +19,7 @@ pull_request_rules:
               - check-success=rust-smoke-test
               - check-success=forge-e2e-test / forge
               - check-success=forge-compat-test / forge
+#              - check-success=forge-framework-upgrade-test / forge
               - check-success=sdk-release / test-sdk-confirm-client-generated-publish
               - check-success=rust-images / rust-all
           - and:

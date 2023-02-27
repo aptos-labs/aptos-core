@@ -1,3 +1,20 @@
+filesystem
+pseudocode
+sandboxed
+polymorphism
+instantiation
+struct's
+Subtyping
+subtyping
+subtype
+boolean
+copyable
+serializable
+lexically
+debuggability
+arity
+Destructuring
+dereference
 ABI
 ABIs
 ACK
@@ -27,6 +44,7 @@ BCS
 BFT
 BIP
 Bitwise
+bitwise
 BlockMetadata
 BlockMetadataTransaction
 BlockQuote
@@ -369,6 +387,7 @@ prover
 pvc
 quickstart
 quickstarts
+RBAC
 repo
 repos
 requiers
@@ -428,6 +447,7 @@ validatorSet
 validators
 verifications
 verifier
+visibilities
 vm
 walkthrough
 waypoint
