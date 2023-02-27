@@ -122,6 +122,7 @@ impl ProofCoordinator {
     }
 
     fn init_proof(&mut self, info: SignedDigestInfo, batch_id: BatchId, tx: ProofReturnChannel) {
+        debug!("BCHO: init {}", info.digest);
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
         self.digest_to_proof.insert(
             info.digest,

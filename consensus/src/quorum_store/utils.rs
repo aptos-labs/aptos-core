@@ -287,6 +287,12 @@ impl ProofQueue {
                         counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
                             .observe((current_time.round() - expiration_time.round()) as f64);
                     }
+                    debug!(
+                        "BCHO: expired 1: {}, expiration_round: {}, current_round: {}",
+                        digest,
+                        expiration_time.round(),
+                        current_time.round()
+                    );
                 },
                 None => {}, // Proof was already committed
             }
@@ -327,6 +333,12 @@ impl ProofQueue {
                     counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
                         .observe((current_time.round() - expiration.round()) as f64);
                 }
+                debug!(
+                    "BCHO: expired 2: {}, expiration_round: {}, current_round: {}",
+                    digest,
+                    expiration.round(),
+                    current_time.round()
+                );
                 expired.push(i);
             }
         }
