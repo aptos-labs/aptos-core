@@ -116,5 +116,14 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.aggregator.destroy.base, "aggregator.destroy.base", 500 * MUL],
     [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL],
 
-    [.object.exists_at.base_cost, { 7.. => "object.exists_at.base" }, 250 * MUL]
+    [.object.common.load_base, { 7 .. => "object.common.load.base"}, 8000],
+    [.object.common.load_per_byte, { 7 .. => "object.common.load.per_byte"}, 1000],
+    [.object.common.load_failure, { 7 .. => "object.common.load.failure"}, 0],
+    [.object.add.base, { 7 .. => "object.add.base"}, 1200 * MUL],
+    [.object.add.per_byte_serialized, { 7 .. => "object.add.per_byte_serialized"}, 10 * MUL],
+    [.object.borrow.base, { 7 .. => "object.borrow.base"}, 1200 * MUL],
+    [.object.borrow.per_byte_serialized, { 7 .. => "object.borrow.per_byte_serialized"}, 10 * MUL],
+    [.object.exists.base, { 7 .. => "object.exists.base"}, 1200 * MUL],
+    [.object.remove.base, { 7 .. => "object.remove.base"}, 1200 * MUL],
+    [.object.remove.per_byte_serialized, { 7 .. => "object.remove.per_byte_serialized"}, 10 * MUL],
 ]);

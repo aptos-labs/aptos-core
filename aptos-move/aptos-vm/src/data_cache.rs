@@ -22,6 +22,7 @@ use move_core_types::{
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
 use std::ops::{Deref, DerefMut};
+use aptos_framework::natives::object::ObjectResolver;
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -88,6 +89,16 @@ impl<'a, 'm, S: MoveResolverExt> TableResolver for MoveResolverWithVMMetadata<'a
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.move_resolver.resolve_table_entry(handle, key)
+    }
+}
+
+impl<'a, 'm, S: MoveResolverExt> ObjectResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
+    fn resolve_object_entry(
+        &self,
+        id: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.move_resolver.resolve_object_entry(id, struct_tag)
     }
 }
 
@@ -183,6 +194,16 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
+}
+
+impl<'a, S: StateView> ObjectResolver for StorageAdapter<'a, S> {
+    fn resolve_object_entry(
+        &self,
+        id: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.get_state_value_bytes(&StateKey::object_item(AccessPath::resource_access_path(*id, struct_tag.clone())))
     }
 }
 
@@ -288,6 +309,17 @@ impl<S: StateView> TableResolver for StorageAdapterOwned<S> {
         self.as_move_resolver().resolve_table_entry(handle, key)
     }
 }
+
+impl<S: StateView> ObjectResolver for StorageAdapterOwned<S> {
+    fn resolve_object_entry(
+        &self,
+        id: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.as_move_resolver().resolve_object_entry(id, struct_tag)
+    }
+}
+
 
 impl<S: StateView> ConfigStorage for StorageAdapterOwned<S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {

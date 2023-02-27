@@ -41,6 +41,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use aptos_framework::natives::object::{NativeObjectContext, ObjectChangeSet};
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -123,6 +124,11 @@ where
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
+        let object_context: NativeObjectContext = extensions.remove();
+        let object_change_set = object_context
+            .into_change_set()
+            .map_err(|e| e.finish(Location::Undefined))?;
+
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
 
@@ -131,6 +137,7 @@ where
             resource_group_change_set,
             events,
             table_change_set,
+            object_change_set,
             aggregator_change_set,
             ap_cache,
             configs,
@@ -258,6 +265,7 @@ where
         resource_group_change_set: MoveChangeSet,
         events: Vec<MoveEvent>,
         table_change_set: TableChangeSet,
+        object_change_set: ObjectChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
@@ -297,6 +305,14 @@ where
         for (handle, change) in table_change_set.changes {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
+                let op = Self::convert_write_op(value_op, false);
+                write_set_mut.insert((state_key, op))
+            }
+        }
+
+        for (id, change) in object_change_set.changes {
+            for (struct_tag, value_op) in change.entries {
+                let state_key = StateKey::object_item(ap_cache.get_resource_path(id, struct_tag));
                 let op = Self::convert_write_op(value_op, false);
                 write_set_mut.insert((state_key, op))
             }

@@ -241,6 +241,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             StateKeyInner::TableItem { handle, key } => {
                 self.try_table_item_into_write_set_change(hash, handle, key, op)
             },
+            StateKeyInner::ObjectItem(access_path) => {
+                self.try_access_path_into_write_set_change(hash, access_path, op)
+            },
             StateKeyInner::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key

@@ -13,9 +13,10 @@ use move_core_types::{
 };
 use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
+use aptos_framework::natives::object::ObjectResolver;
 
 pub trait MoveResolverExt:
-    MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveResolver<Err = VMError> + TableResolver + ObjectResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 

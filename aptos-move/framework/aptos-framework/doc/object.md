@@ -33,7 +33,11 @@ make it so that a reference to a global object can be returned from a function.
 -  [Constants](#@Constants_0)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
--  [Function `exists_at`](#0x1_object_exists_at)
+-  [Function `native_exists`](#0x1_object_native_exists)
+-  [Function `native_add`](#0x1_object_native_add)
+-  [Function `native_remove`](#0x1_object_native_remove)
+-  [Function `native_borrow`](#0x1_object_native_borrow)
+-  [Function `native_borrow_mut`](#0x1_object_native_borrow_mut)
 -  [Function `object_address`](#0x1_object_object_address)
 -  [Function `create_named_object`](#0x1_object_create_named_object)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
@@ -62,7 +66,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Specification](#@Specification_1)
-    -  [Function `exists_at`](#@Specification_1_exists_at)
+    -  [Function `native_exists`](#@Specification_1_native_exists)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -514,8 +518,8 @@ Produces an ObjectId from the given address. This is not verified.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>));
-    <b>assert</b>!(<a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="object.md#0x1_object_native_exists">native_exists</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="object.md#0x1_object_native_exists">native_exists</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
     <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;{ inner: <a href="object.md#0x1_object">object</a> }
 }
 </code></pre>
@@ -552,13 +556,13 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 </details>
 
-<a name="0x1_object_exists_at"></a>
+<a name="0x1_object_native_exists"></a>
 
-## Function `exists_at`
+## Function `native_exists`
 
 
 
-<pre><code><b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_exists">native_exists</a>&lt;T: key&gt;(a: <b>address</b>): bool
 </code></pre>
 
 
@@ -567,7 +571,95 @@ Derives an object address from source material: sha3_256([creator address | seed
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_exists">native_exists</a>&lt;T: key&gt;(a: <b>address</b>): bool;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_native_add"></a>
+
+## Function `native_add`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_add">native_add</a>&lt;T: key&gt;(a: <b>address</b>, data: T)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_add">native_add</a>&lt;T: key&gt;(a: <b>address</b>, data: T);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_native_remove"></a>
+
+## Function `native_remove`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_remove">native_remove</a>&lt;T: key&gt;(a: <b>address</b>): T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_remove">native_remove</a>&lt;T: key&gt;(a: <b>address</b>): T;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_native_borrow"></a>
+
+## Function `native_borrow`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_borrow">native_borrow</a>&lt;T: key&gt;(a: <b>address</b>): &T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_borrow">native_borrow</a>&lt;T: key&gt;(a: <b>address</b>): &T;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_native_borrow_mut"></a>
+
+## Function `native_borrow_mut`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_borrow_mut">native_borrow_mut</a>&lt;T: key&gt;(a: <b>address</b>): &<b>mut</b> T
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_native_borrow_mut">native_borrow_mut</a>&lt;T: key&gt;(a: <b>address</b>): &<b>mut</b> T;
 </code></pre>
 
 
@@ -1384,12 +1476,12 @@ Return true if the provided address is the current owner.
 ## Specification
 
 
-<a name="@Specification_1_exists_at"></a>
+<a name="@Specification_1_native_exists"></a>
 
-### Function `exists_at`
+### Function `native_exists`
 
 
-<pre><code><b>fun</b> <a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool
+<pre><code><b>fun</b> <a href="object.md#0x1_object_native_exists">native_exists</a>&lt;T: key&gt;(a: <b>address</b>): bool
 </code></pre>
 
 

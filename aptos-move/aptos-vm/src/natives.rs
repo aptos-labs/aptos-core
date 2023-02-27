@@ -17,6 +17,7 @@ use {
     move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
+use aptos_framework::natives::object::NativeObjectContext;
 
 #[cfg(feature = "testing")]
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);

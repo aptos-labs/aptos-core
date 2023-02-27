@@ -43,6 +43,7 @@ pub enum StateKeyInner {
         #[serde(with = "serde_bytes")]
         key: Vec<u8>,
     },
+    ObjectItem(AccessPath),
     // Only used for testing
     #[serde(with = "serde_bytes")]
     Raw(Vec<u8>),
@@ -53,6 +54,7 @@ pub enum StateKeyInner {
 pub enum StateKeyTag {
     AccessPath,
     TableItem,
+    ObjectItem,
     Raw = 255,
 }
 
@@ -92,6 +94,9 @@ impl StateKey {
                 let key = val[1 + HANDLE_SIZE..].to_vec();
                 Ok(StateKey::table_item(handle, key))
             },
+            StateKeyTag::ObjectItem => {
+                Ok(StateKeyInner::ObjectItem(bcs::from_bytes(&val[1..])?).into())
+            },
             StateKeyTag::Raw => Ok(StateKey::raw(val[1..].to_vec())),
         }
     }
@@ -100,6 +105,7 @@ impl StateKey {
         match &self.inner {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
             StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
+            StateKeyInner::ObjectItem(access_path) => access_path.size(),
             StateKeyInner::Raw(bytes) => bytes.len(),
         }
     }
@@ -110,6 +116,10 @@ impl StateKey {
 
     pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
         Self::new(StateKeyInner::TableItem { handle, key })
+    }
+
+    pub fn object_item(access_path: AccessPath) -> Self {
+        Self::new(StateKeyInner::AccessPath(access_path))
     }
 
     pub fn raw(raw_key: Vec<u8>) -> Self {
@@ -139,6 +149,9 @@ impl StateKeyInner {
                 bytes.extend(key);
                 (StateKeyTag::TableItem, bytes)
             },
+            StateKeyInner::ObjectItem(access_path) => {
+                (StateKeyTag::ObjectItem, bcs::to_bytes(access_path)?)
+            }
             StateKeyInner::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
         };
         out.push(prefix as u8);

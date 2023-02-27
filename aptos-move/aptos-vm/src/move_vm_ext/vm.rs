@@ -9,6 +9,7 @@ use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+    object::NativeObjectContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{FeatureFlag, Features};
@@ -75,6 +76,7 @@ impl MoveVmExt {
             .expect("HashValue should convert to [u8; 32]");
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
+        extensions.add(NativeObjectContext::new(remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 

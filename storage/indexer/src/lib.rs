@@ -170,6 +170,14 @@ impl<'a> TableInfoParser<'a> {
                     }
                 },
                 StateKeyInner::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
+                StateKeyInner::ObjectItem (access_path) => {
+                    let path: Path = (&access_path.path).try_into()?;
+                    match path {
+                        Path::Code(_) => (),
+                        Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,
+                        Path::ResourceGroup(_struct_tag) => (),
+                    }
+                },
                 StateKeyInner::Raw(_) => (),
             },
             WriteOp::Deletion => (),

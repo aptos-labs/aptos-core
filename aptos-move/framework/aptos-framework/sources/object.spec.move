@@ -1,5 +1,5 @@
 spec aptos_framework::object {
-    spec exists_at {
+    spec native_exists {
         pragma opaque;
         aborts_if false;
         // TODO: Disabled the following post-condition due to an issue with

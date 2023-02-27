@@ -183,11 +183,7 @@ impl GasParameters {
             aggregator_factory: aggregator_factory::GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
-            object: object::GasParameters {
-                exists_at: object::ExistsAtGasParameters {
-                    base_cost: 0.into(),
-                },
-            },
+            object: object::GasParameters::zeros(),
         }
     }
 }
