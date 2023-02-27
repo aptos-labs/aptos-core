@@ -8,6 +8,7 @@ on:
       - testnet
       - mainnet
       - aptos-node-v*
+      - aptos-release-v*
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
