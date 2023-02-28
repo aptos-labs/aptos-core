@@ -59,6 +59,14 @@ impl ProofManager {
         logical_time: LogicalTime,
         digests: Vec<HashValue>,
     ) {
+        debug!("BCHO: handle_commit_notification {}", logical_time.round());
+        for digest in digests.iter() {
+            debug!(
+                "BCHO: handle_commit_notification {}, digest: {}",
+                logical_time.round(),
+                digest
+            );
+        }
         debug!("QS: got clean request from execution");
         assert_eq!(
             self.latest_logical_time.epoch(),
