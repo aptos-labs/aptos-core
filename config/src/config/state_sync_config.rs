@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 4 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -123,7 +123,7 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 200,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
-            max_network_chunk_bytes: 20971520,
+            max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 5000,
