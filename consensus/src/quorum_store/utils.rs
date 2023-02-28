@@ -332,7 +332,7 @@ impl ProofQueue {
                     None => {}, // Proof was already committed, skip.
                 }
             } else {
-                if let Some(_) = self.digest_proof.get(digest) {
+                if let Some(Some(_)) = self.digest_proof.get(digest) {
                     num_expired_but_not_committed += 1;
                     if expiration.round() < current_time.round() {
                         counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
