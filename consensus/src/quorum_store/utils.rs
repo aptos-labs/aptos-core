@@ -297,11 +297,10 @@ impl ProofQueue {
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
 
-        for (i, (digest, expiration)) in self
+        for (digest, expiration) in self
             .digest_queue
             .iter()
             .filter(|(digest, _)| !excluded_proofs.contains(digest))
-            .enumerate()
         {
             if *expiration >= current_time {
                 match self
@@ -323,13 +322,11 @@ impl ProofQueue {
                     },
                     None => {}, // Proof was already committed, skip.
                 }
-            } else {
-                if let Some(Some(_)) = self.digest_proof.get(digest) {
-                    num_expired_but_not_committed += 1;
-                    if expiration.round() < current_time.round() {
-                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                            .observe((current_time.round() - expiration.round()) as f64);
-                    }
+            } else if let Some(Some(_)) = self.digest_proof.get(digest) {
+                num_expired_but_not_committed += 1;
+                if expiration.round() < current_time.round() {
+                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                        .observe((current_time.round() - expiration.round()) as f64);
                 }
             }
         }
