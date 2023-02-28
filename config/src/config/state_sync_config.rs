@@ -123,10 +123,10 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 200,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
-            max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_network_chunk_bytes: 20971520,
             max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
-            max_transaction_chunk_size: 2000,
+            max_transaction_chunk_size: 5000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
         }
@@ -166,7 +166,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 20,
             max_concurrent_state_requests: 6,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
