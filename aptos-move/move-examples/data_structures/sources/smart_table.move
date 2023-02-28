@@ -22,6 +22,8 @@ module aptos_std::smart_table {
     const EINVALID_LOAD_THRESHOLD_PERCENT: u64 = 5;
     /// Invalid target bucket size.
     const EINVALID_TARGET_BUCKET_SIZE: u64 = 6;
+    /// Invalid target bucket size.
+    const EEXCEED_MAX_BUCKET_SIZE: u64 = 7;
 
     /// SmartTable entry contains both the key and value.
     struct Entry<K, V> has copy, drop, store {
@@ -111,6 +113,8 @@ module aptos_std::smart_table {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(table.level, table.num_buckets, hash);
         let bucket = table_with_length::borrow_mut(&mut table.buckets, index);
+        // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
+        assert!(vector::length(bucket) <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
         assert!(vector::all(bucket, |entry| {
             let e: &Entry<K, V> = entry;
             &e.key != &key
