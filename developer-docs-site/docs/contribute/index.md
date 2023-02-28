@@ -1,6 +1,6 @@
 ---
 title: "Contribute to Aptos"
-slug: "contribute"
+slug: "contribute-index"
 ---
 
 # Contribute to Aptos
