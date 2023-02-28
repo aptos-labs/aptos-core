@@ -681,7 +681,7 @@ impl EpochManager {
             payload_manager.clone(),
         ));
 
-        self.quorum_store_coordinator_tx = quorum_store_builder.start(block_store.clone());
+        self.quorum_store_coordinator_tx = quorum_store_builder.start();
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
@@ -765,6 +765,9 @@ impl EpochManager {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let onchain_config = onchain_config.unwrap_or_default();
                 self.quorum_store_enabled = onchain_config.quorum_store_enabled();
+                if self.quorum_store_enabled {
+                    self.config.apply_quorum_store_overrides();
+                }
                 self.start_round_manager(initial_data, epoch_state, onchain_config)
                     .await
             },

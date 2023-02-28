@@ -26,7 +26,7 @@ use std::{
     },
     hash::Hash,
     mem,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::time::timeout;
 
@@ -35,28 +35,32 @@ pub(crate) struct BatchBuilder {
     summaries: Vec<TransactionSummary>,
     data: Vec<SerializedTransaction>,
     num_txns: usize,
-    max_txns: usize,
     num_bytes: usize,
+    // TODO: remove
     max_bytes: usize,
 }
 
 impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_txns: usize, max_bytes: usize) -> Self {
+    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
         Self {
             id: batch_id,
             summaries: Vec::new(),
             data: Vec::new(),
             num_txns: 0,
-            max_txns,
             num_bytes: 0,
             max_bytes,
         }
     }
 
-    pub(crate) fn append_transaction(&mut self, txn: &SignedTransaction) -> bool {
+    pub(crate) fn append_transaction(
+        &mut self,
+        txn: &SignedTransaction,
+        max_txns_override: usize,
+    ) -> bool {
         let serialized_txn = SerializedTransaction::from_signed_txn(txn);
 
-        if self.num_bytes + serialized_txn.len() <= self.max_bytes && self.num_txns < self.max_txns
+        if self.num_bytes + serialized_txn.len() <= self.max_bytes
+            && self.num_txns < max_txns_override
         {
             self.num_txns += 1;
             self.num_bytes += serialized_txn.len();
@@ -67,7 +71,7 @@ impl BatchBuilder {
             });
             self.data.push(serialized_txn);
 
-            true
+            self.num_txns < max_txns_override && self.num_bytes < self.max_bytes
         } else {
             false
         }
@@ -218,6 +222,7 @@ pub struct ProofQueue {
     digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of all proofs
     local_digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of local proofs, to make back pressure update more efficient
     digest_proof: HashMap<HashValue, Option<ProofOfStore>>, // None means committed
+    digest_insertion_time: HashMap<HashValue, Instant>,
 }
 
 impl ProofQueue {
@@ -226,6 +231,7 @@ impl ProofQueue {
             digest_queue: VecDeque::new(),
             local_digest_queue: VecDeque::new(),
             digest_proof: HashMap::new(),
+            digest_insertion_time: HashMap::new(),
         }
     }
 
@@ -235,6 +241,8 @@ impl ProofQueue {
                 self.digest_queue
                     .push_back((*proof.digest(), proof.expiration()));
                 entry.insert(Some(proof.clone()));
+                self.digest_insertion_time
+                    .insert(*proof.digest(), Instant::now());
             },
             Occupied(mut entry) => {
                 if entry.get().is_some()
@@ -282,6 +290,7 @@ impl ProofQueue {
                 None => {}, // Proof was already committed
             }
             claims::assert_some!(self.digest_proof.remove(&digest));
+            self.digest_insertion_time.remove(&digest);
         }
 
         let mut ret = Vec::new();
@@ -303,6 +312,9 @@ impl ProofQueue {
                             break;
                         }
                         ret.push(proof.clone());
+                        if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
+                            counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
+                        }
                     },
                     None => {}, // Proof was already committed, skip.
                 }
@@ -323,8 +335,24 @@ impl ProofQueue {
         ret
     }
 
+    pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
+        let mut remaining_txns = 0;
+        // TODO: if the digest_queue is large, this may be too inefficient
+        for (digest, expiration) in self.digest_queue.iter() {
+            // Not expired
+            if *expiration >= current_time {
+                // Not committed
+                if let Some(Some(proof)) = self.digest_proof.get(digest) {
+                    remaining_txns += proof.info().num_txns;
+                }
+            }
+        }
+        counters::NUM_TOTAL_TXNS_LEFT_ON_COMMIT.observe(remaining_txns as f64);
+        remaining_txns
+    }
+
     // returns the number of unexpired local proofs
-    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> usize {
+    pub(crate) fn clean_local_proofs(&mut self, current_time: LogicalTime) -> Option<Round> {
         let num_expired = self
             .local_digest_queue
             .iter()
@@ -346,16 +374,22 @@ impl ProofQueue {
                 }
             }
         }
-        counters::NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK
-            .observe(remaining_local_proof_size as f64);
+        counters::NUM_LOCAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_local_proof_size as f64);
 
-        remaining_local_proof_size
+        if let Some(&(_, time)) = self.local_digest_queue.iter().next() {
+            Some(time.round())
+        } else {
+            None
+        }
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire
     pub(crate) fn mark_committed(&mut self, digests: Vec<HashValue>) {
         for digest in digests {
             self.digest_proof.insert(digest, None);
+            if let Some(insertion_time) = self.digest_insertion_time.get(&digest) {
+                counters::POS_TO_COMMIT.observe(insertion_time.elapsed().as_secs_f64());
+            }
         }
     }
 }
