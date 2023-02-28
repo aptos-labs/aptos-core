@@ -554,7 +554,7 @@ impl MoveStorage for &dyn DbReader {
         let config_value_option = self.get_state_value_by_version(
             &StateKey::access_path(AccessPath::new(
                 CORE_CODE_ADDRESS,
-                access_path_for_config(config_id).path,
+                access_path_for_config(config_id)?.path,
             )),
             version,
         )?;

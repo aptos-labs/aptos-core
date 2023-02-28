@@ -222,7 +222,10 @@ fn test_new_genesis() {
         ChangeSet::new(
             WriteSetMut::new(vec![
                 (
-                    StateKey::access_path(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    StateKey::access_path(
+                        access_path_for_config(ValidatorSet::CONFIG_ID)
+                            .expect("access path in test"),
+                    ),
                     WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
                 (

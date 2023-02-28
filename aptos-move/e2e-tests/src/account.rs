@@ -120,6 +120,7 @@ impl Account {
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
         AccessPath::resource_access_path(self.addr, AccountResource::struct_tag())
+            .expect("access path in test")
     }
 
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
@@ -127,6 +128,7 @@ impl Account {
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
         AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
+            .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.

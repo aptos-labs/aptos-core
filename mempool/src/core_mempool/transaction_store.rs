@@ -374,6 +374,47 @@ impl TransactionStore {
         false
     }
 
+    fn log_ready_transaction(
+        ranking_score: u64,
+        bucket: &str,
+        time_delta: Duration,
+        broadcast_ready: bool,
+    ) {
+        if broadcast_ready {
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                E2E_LABEL,
+                bucket,
+                time_delta,
+            );
+            counters::core_mempool_txn_commit_latency(
+                BROADCAST_READY_LABEL,
+                E2E_LABEL,
+                bucket,
+                time_delta,
+            );
+            counters::core_mempool_txn_ranking_score(
+                BROADCAST_READY_LABEL,
+                BROADCAST_READY_LABEL,
+                bucket,
+                ranking_score,
+            );
+        } else {
+            counters::core_mempool_txn_commit_latency(
+                CONSENSUS_READY_LABEL,
+                LOCAL_LABEL,
+                bucket,
+                time_delta,
+            );
+        }
+        counters::core_mempool_txn_ranking_score(
+            CONSENSUS_READY_LABEL,
+            CONSENSUS_READY_LABEL,
+            bucket,
+            ranking_score,
+        );
+    }
+
     /// Maintains the following invariants:
     /// - All transactions of a given account that are sequential to the current sequence number
     ///   should be included in both the PriorityIndex (ordering for Consensus) and
@@ -390,49 +431,25 @@ impl TransactionStore {
             match sequence_info {
                 AccountSequenceInfo::Sequential(_) => {
                     while let Some(txn) = txns.get_mut(&min_seq) {
+                        let process_ready = !self.priority_index.contains(txn);
                         self.priority_index.insert(txn);
 
-                        let mut broadcast_ready = false;
-                        if txn.timeline_state == TimelineState::NotReady {
+                        let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
+                        if process_broadcast_ready {
                             self.timeline_index.insert(txn);
-                            broadcast_ready = true;
                         }
 
-                        if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
-                        {
-                            if broadcast_ready {
-                                counters::core_mempool_txn_commit_latency(
-                                    CONSENSUS_READY_LABEL,
-                                    E2E_LABEL,
-                                    self.timeline_index.get_bucket(txn.ranking_score),
-                                    time_delta,
-                                );
-                                counters::core_mempool_txn_commit_latency(
-                                    BROADCAST_READY_LABEL,
-                                    E2E_LABEL,
-                                    self.timeline_index.get_bucket(txn.ranking_score),
-                                    time_delta,
-                                );
-                                counters::core_mempool_txn_ranking_score(
-                                    BROADCAST_READY_LABEL,
-                                    BROADCAST_READY_LABEL,
-                                    self.timeline_index.get_bucket(txn.ranking_score),
+                        if process_ready {
+                            if let Ok(time_delta) =
+                                SystemTime::now().duration_since(txn.insertion_time)
+                            {
+                                Self::log_ready_transaction(
                                     txn.ranking_score,
-                                );
-                            } else {
-                                counters::core_mempool_txn_commit_latency(
-                                    CONSENSUS_READY_LABEL,
-                                    LOCAL_LABEL,
                                     self.timeline_index.get_bucket(txn.ranking_score),
                                     time_delta,
+                                    process_broadcast_ready,
                                 );
                             }
-                            counters::core_mempool_txn_ranking_score(
-                                CONSENSUS_READY_LABEL,
-                                CONSENSUS_READY_LABEL,
-                                self.timeline_index.get_bucket(txn.ranking_score),
-                                txn.ranking_score,
-                            );
                         }
 
                         // Remove txn from parking lot after it has been promoted to

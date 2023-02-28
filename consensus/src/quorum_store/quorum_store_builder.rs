@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
     network::NetworkSender,
     payload_manager::PayloadManager,
     quorum_store::{
@@ -53,13 +52,13 @@ impl QuorumStoreBuilder {
         }
     }
 
-    pub fn start(self, block_store: Arc<BlockStore>) -> Option<Sender<CoordinatorCommand>> {
+    pub fn start(self) -> Option<Sender<CoordinatorCommand>> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
                 None
             },
-            QuorumStoreBuilder::InQuorumStore(inner) => Some(inner.start(block_store)),
+            QuorumStoreBuilder::InQuorumStore(inner) => Some(inner.start()),
         }
     }
 }
@@ -277,10 +276,7 @@ impl InnerBuilder {
         batch_reader
     }
 
-    fn spawn_quorum_store_wrapper(
-        mut self,
-        block_store: Arc<dyn BlockReader + Send + Sync>,
-    ) -> Sender<CoordinatorCommand> {
+    fn spawn_quorum_store_wrapper(mut self) -> Sender<CoordinatorCommand> {
         let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
 
         // TODO: parameter? bring back back-off?
@@ -308,17 +304,11 @@ impl InnerBuilder {
         let back_pressure_rx = self.back_pressure_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
             self.epoch,
+            self.config.clone(),
             quorum_store_storage,
             self.quorum_store_to_mempool_sender,
             self.batch_coordinator_cmd_tx.clone(),
             self.mempool_txn_pull_timeout_ms,
-            self.config.mempool_txn_pull_max_count,
-            self.config.mempool_txn_pull_max_bytes,
-            self.config.max_batch_counts,
-            self.config.max_batch_bytes,
-            self.config.batch_expiry_round_gap_when_init,
-            self.config.end_batch_ms,
-            block_store,
         );
         spawn_named!(
             "batch_generator",
@@ -366,8 +356,10 @@ impl InnerBuilder {
         );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager =
-            ProofManager::new(self.epoch, self.config.back_pressure_local_batch_num);
+        let proof_manager = ProofManager::new(
+            self.epoch,
+            self.config.back_pressure.backlog_txn_limit_count,
+        );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
@@ -413,7 +405,7 @@ impl InnerBuilder {
         )
     }
 
-    fn start(self, block_store: Arc<BlockStore>) -> Sender<CoordinatorCommand> {
-        self.spawn_quorum_store_wrapper(block_store)
+    fn start(self) -> Sender<CoordinatorCommand> {
+        self.spawn_quorum_store_wrapper()
     }
 }
