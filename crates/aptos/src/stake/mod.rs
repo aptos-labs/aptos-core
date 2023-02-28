@@ -346,7 +346,7 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
 
 /// Delegate operator capability to another account
 ///
-/// This changes teh operator capability from it's current operator to a different operator.
+/// This changes teh operator capability from its current operator to a different operator.
 /// By default, the operator of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetOperator {
@@ -422,7 +422,7 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
 
 /// Delegate voting capability to another account
 ///
-/// Delegates voting capability from it's current voter to a different voter.
+/// Delegates voting capability from its current voter to a different voter.
 /// By default, the voter of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
