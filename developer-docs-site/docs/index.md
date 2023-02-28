@@ -124,23 +124,13 @@ Aptos offers the ability to run a local testnet, as well as provides a shared de
 The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos Discord](https://discord.gg/aptoslabs).
 :::info
 
-## Ask questions and offer answers
-
-Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
-
-For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location.
-
-:::caution Be safe with communications
-
-Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
-
 :::
 
 ## Join the team
 
 Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us!
 
-Just want to pitch in? Think about [contributing](./contribute/index.md) a feature, document, or both.
+Just want to pitch in? Think about [helping](./help/index.md) with a feature, document, or both.
 
 ## Find the ecosystem
 

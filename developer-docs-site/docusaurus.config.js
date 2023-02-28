@@ -334,43 +334,43 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Contribute",
+            label: "Help",
             position: "left",
             items: [
               {
-                label: "Contribute to Aptos",
+                label: "Help the Aptos Ecosystem",
                 type: "doc",
-                docId: "contribute/index",
+                docId: "help/index",
               },
               {
                 label: "Community Highlights",
                 type: "doc",
-                docId: "contribute/community/index",
+                docId: "help/community/index",
               },
               {
                 label: "External Resources",
                 type: "doc",
-                docId: "contribute/external-resources",
+                docId: "help/external-resources",
               },
               {
                 label: "Frequently Asked Questions",
                 type: "doc",
-                docId: "contribute/faq",
+                docId: "help/faq",
               },
               {
                 label: "Rust Coding Guidelines",
                 type: "doc",
-                docId: "contribute/rust-coding-guidelines",
+                docId: "help/rust-coding-guidelines",
               },
               {
                 label: "Update Aptos.dev",
                 type: "doc",
-                docId: "contribute/site-updates",
+                docId: "help/site-updates",
               },
               {
                 label: "Follow Aptos Style",
                 type: "doc",
-                docId: "contribute/aptos-style",
+                docId: "help/aptos-style",
               },
             ],
           },

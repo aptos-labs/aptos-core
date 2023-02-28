@@ -1,9 +1,9 @@
 ---
-title: "Contribute to Aptos"
-slug: "contribute-index"
+title: "Help the Aptos Ecosystem"
+slug: "help-index"
 ---
 
-# Contribute to Aptos
+# Help the Aptos Ecosystem
 
 We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! Aptos exists to foster an inclusive ecosystem. This page describes ways you can help, while the other pages in this section highlight our community's contributions.
 
