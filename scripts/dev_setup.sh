@@ -140,7 +140,7 @@ function install_protoc {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip"
+    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
     sudo chmod +x "/usr/local/bin/protoc"
