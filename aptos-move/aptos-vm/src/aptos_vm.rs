@@ -530,6 +530,14 @@ impl AptosVM {
             MoveValue::vector_u8(payload_bytes),
         ]);
         let final_change_set_ext = if let Err(execution_error) = execution_result {
+            // Invalidate the loader cache in case there was a new module loaded from a module
+            // publish request that failed.
+            // This is redundant with the logic in execute_user_transaction but unfortunately is
+            // necessary here as executing the underlying call can fail without this function
+            // returning an error to execute_user_transaction.
+            if *new_published_modules_loaded {
+                self.0.mark_loader_cache_as_invalid();
+            };
             self.failure_multisig_payload_cleanup(
                 storage,
                 gas_meter,
