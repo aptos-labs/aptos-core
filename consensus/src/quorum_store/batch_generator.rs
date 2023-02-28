@@ -1,18 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    block_storage::BlockReader,
-    quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand,
-        counters,
-        quorum_store_db::BatchIdDB,
-        types::BatchId,
-        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
-    },
+use crate::quorum_store::{
+    batch_coordinator::BatchCoordinatorCommand,
+    counters,
+    quorum_store_db::BatchIdDB,
+    types::BatchId,
+    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
+use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{Round, TransactionSummary},
+    common::TransactionSummary,
     proof_of_store::{LogicalTime, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -42,37 +40,26 @@ pub enum ProofError {
 
 pub struct BatchGenerator {
     db: Arc<dyn BatchIdDB>,
+    config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
-    mempool_txn_pull_max_count: u64,
-    mempool_txn_pull_max_bytes: u64,
-    batch_expiry_round_gap_when_init: Round,
-    end_batch_ms: u64,
     last_end_batch_time: Instant,
-    // for consensus back pressure
-    block_store: Arc<dyn BlockReader + Send + Sync>,
     // quorum store back pressure, get updated from proof manager
-    qs_back_pressure: bool,
+    back_pressure: bool,
 }
 
 impl BatchGenerator {
     pub fn new(
         epoch: u64,
+        config: QuorumStoreConfig,
         db: Arc<dyn BatchIdDB>,
         mempool_tx: Sender<QuorumStoreRequest>,
         batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
         mempool_txn_pull_timeout_ms: u64,
-        mempool_txn_pull_max_count: u64,
-        mempool_txn_pull_max_bytes: u64,
-        max_batch_counts: usize,
-        max_batch_bytes: usize,
-        batch_expiry_round_gap_when_init: Round,
-        end_batch_ms: u64,
-        block_store: Arc<dyn BlockReader + Send + Sync>,
     ) -> Self {
         let batch_id = if let Some(mut id) = db
             .clean_and_get_batch_id(epoch)
@@ -89,28 +76,25 @@ impl BatchGenerator {
         incremented_batch_id.increment();
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
+        let max_batch_bytes = config.max_batch_bytes;
 
         Self {
             db,
+            config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batch_coordinator_tx,
             batches_in_progress: HashMap::new(),
             batch_expirations: RoundExpirations::new(),
-            batch_builder: BatchBuilder::new(batch_id, max_batch_counts, max_batch_bytes),
+            batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
-            mempool_txn_pull_max_count,
-            mempool_txn_pull_max_bytes,
-            batch_expiry_round_gap_when_init,
-            end_batch_ms,
             last_end_batch_time: Instant::now(),
-            block_store,
-            qs_back_pressure: false,
+            back_pressure: false,
         }
     }
 
     pub(crate) async fn handle_scheduled_pull(
         &mut self,
-        end_batch_when_back_pressure: bool,
+        max_count: u64,
     ) -> Option<ProofCompletedChannel> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
@@ -128,8 +112,8 @@ impl BatchGenerator {
         let pulled_txns = self
             .mempool_proxy
             .pull_internal(
-                self.mempool_txn_pull_max_count,
-                self.mempool_txn_pull_max_bytes,
+                max_count,
+                self.config.mempool_txn_pull_max_bytes,
                 exclude_txns,
             )
             .await
@@ -144,7 +128,10 @@ impl BatchGenerator {
         }
 
         for txn in pulled_txns {
-            if !self.batch_builder.append_transaction(&txn) {
+            if !self
+                .batch_builder
+                .append_transaction(&txn, max_count as usize)
+            {
                 end_batch = true;
                 break;
             }
@@ -152,11 +139,7 @@ impl BatchGenerator {
 
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
-        if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms as u128 {
-            end_batch = true;
-        }
-
-        if end_batch_when_back_pressure {
+        if self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128 {
             end_batch = true;
         }
 
@@ -202,7 +185,7 @@ impl BatchGenerator {
 
             let (proof_tx, proof_rx) = oneshot::channel();
             let expiry_round =
-                self.latest_logical_time.round() + self.batch_expiry_round_gap_when_init;
+                self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
             self.batch_coordinator_tx
@@ -261,31 +244,52 @@ impl BatchGenerator {
     ) {
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
-        // this is the flag that records whether there is backpressure during last txn pulling from the mempool
-        let mut back_pressure_in_last_pull = false;
+        let back_pressure_decrease_duration =
+            Duration::from_millis(self.config.back_pressure.decrease_duration_ms);
+        let back_pressure_increase_duration =
+            Duration::from_millis(self.config.back_pressure.increase_duration_ms);
+        let mut back_pressure_decrease_latest = Instant::now();
+        let mut back_pressure_increase_latest = Instant::now();
+        let mut dynamic_max_pull_count = (self.config.back_pressure.dynamic_min_batch_count
+            + self.config.back_pressure.dynamic_max_batch_count)
+            / 2;
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
+                biased;
+                Some(updated_back_pressure) = back_pressure_rx.recv() => {
+                    self.back_pressure = updated_back_pressure;
+                },
                 _ = interval.tick() => {
-                    if self.qs_back_pressure || self.block_store.back_pressure() {
+                    if self.back_pressure {
+                        // multiplicative decrease, every second
+                        if back_pressure_decrease_latest.elapsed() >= back_pressure_decrease_duration {
+                            back_pressure_decrease_latest = Instant::now();
+                            dynamic_max_pull_count = std::cmp::max(
+                                (dynamic_max_pull_count as f64 * self.config.back_pressure.decrease_fraction) as u64,
+                                self.config.back_pressure.dynamic_min_batch_count,
+                            );
+                            debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
+                        }
                         counters::QS_BACKPRESSURE.set(1);
-                        // quorum store needs to be back pressured
-                        // if last txn pull is not back pressured, there may be unfinished batch so we need to end the batch
-                        if !back_pressure_in_last_pull {
-                            if let Some(proof_rx) = self.handle_scheduled_pull(true).await {
-                                proofs_in_progress.push(Box::pin(proof_rx));
-                            }
-                        }
-                        back_pressure_in_last_pull = true;
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
                     } else {
-                        counters::QS_BACKPRESSURE.set(0);
-                        // no back pressure
-                        if let Some(proof_rx) = self.handle_scheduled_pull(false).await {
-                            proofs_in_progress.push(Box::pin(proof_rx));
+                        // additive increase, every second
+                        if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
+                            back_pressure_increase_latest = Instant::now();
+                            dynamic_max_pull_count = std::cmp::min(
+                                dynamic_max_pull_count + self.config.back_pressure.dynamic_min_batch_count,
+                                self.config.back_pressure.dynamic_max_batch_count,
+                            );
+                            debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }
-                        back_pressure_in_last_pull = false;
+                        counters::QS_BACKPRESSURE.set(0);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
+                    }
+                    if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_max_pull_count).await {
+                        proofs_in_progress.push(Box::pin(proof_rx));
                     }
                 },
                 Some(next_proof) = proofs_in_progress.next() => {
@@ -329,10 +333,7 @@ impl BatchGenerator {
                             break;
                         },
                     }
-                },
-                Some(updated_back_pressure) = back_pressure_rx.recv() => {
-                    self.qs_back_pressure = updated_back_pressure;
-                },
+                }
             }
         }
     }

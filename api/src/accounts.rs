@@ -248,10 +248,16 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(AccessPath::resource_access_path(
-            self.address.into(),
-            AccountResource::struct_tag(),
-        ));
+        let state_key = StateKey::access_path(
+            AccessPath::resource_access_path(self.address.into(), AccountResource::struct_tag())
+                .map_err(|e| {
+                    BasicErrorWith404::internal_with_code(
+                        e,
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?,
+        );
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -475,10 +481,17 @@ impl Account {
         &self,
         struct_tag: &StructTag,
     ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(AccessPath::resource_access_path(
-            self.address.into(),
-            struct_tag.clone(),
-        ));
+        let state_key = StateKey::access_path(
+            AccessPath::resource_access_path(self.address.into(), struct_tag.clone()).map_err(
+                |e| {
+                    BasicErrorWith404::internal_with_code(
+                        e,
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                },
+            )?,
+        );
         let state_value_bytes = self
             .context
             .db

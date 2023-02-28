@@ -27,17 +27,17 @@ pub enum ProofManagerCommand {
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
     latest_logical_time: LogicalTime,
-    back_pressure_local_batch_limit: usize,
-    remaining_local_proof_num: usize,
+    back_pressure_total_txn_limit: u64,
+    remaining_total_txn_num: u64,
 }
 
 impl ProofManager {
-    pub fn new(epoch: u64, back_pressure_local_batch_limit: usize) -> Self {
+    pub fn new(epoch: u64, back_pressure_total_txn_limit: u64) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
-            back_pressure_local_batch_limit,
-            remaining_local_proof_num: 0,
+            back_pressure_total_txn_limit,
+            remaining_total_txn_num: 0,
         }
     }
 
@@ -92,6 +92,9 @@ impl ProofManager {
                     max_txns,
                     max_bytes,
                 );
+                self.remaining_total_txn_num = self
+                    .proofs_for_consensus
+                    .num_total_txns(LogicalTime::new(self.latest_logical_time.epoch(), round));
 
                 let res = ConsensusResponse::GetBlockResponse(
                     if proof_block.is_empty() {
@@ -115,7 +118,7 @@ impl ProofManager {
 
     /// return true when quorum store is back pressured
     pub(crate) fn qs_back_pressure(&self) -> bool {
-        self.remaining_local_proof_num > self.back_pressure_local_batch_limit
+        self.remaining_total_txn_num > self.back_pressure_total_txn_limit
     }
 
     pub async fn start(
@@ -134,6 +137,14 @@ impl ProofManager {
             tokio::select! {
                 Some(msg) = proposal_rx.next() => {
                     self.handle_proposal_request(msg);
+
+                    let updated_back_pressure = self.qs_back_pressure();
+                    if updated_back_pressure != back_pressure {
+                        back_pressure = updated_back_pressure;
+                        if back_pressure_tx.send(back_pressure).await.is_err() {
+                            debug!("Failed to send back_pressure for proposal");
+                        }
+                    }
                 },
                 Some(msg) = proof_rx.recv() => {
                     match msg {
@@ -153,7 +164,9 @@ impl ProofManager {
                             self.handle_commit_notification(logical_time, digests);
 
                             // update the backpressure upon new commit round
-                            self.remaining_local_proof_num = self.proofs_for_consensus.clean_local_proofs(logical_time);
+                            self.remaining_total_txn_num = self.proofs_for_consensus.num_total_txns(logical_time);
+                            // TODO: keeping here for metrics, might be part of the backpressure in the future?
+                            self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;

@@ -134,7 +134,8 @@ impl FakeExecutor {
                 module,
                 name,
                 type_params,
-            )),
+            ))
+            .expect("access path in test"),
         ))
     }
 

@@ -344,12 +344,14 @@ impl Context {
             .flatten()
             .collect();
 
-        let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
-            StateKey::access_path(AccessPath::new(
+        let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
+            Some(StateKey::access_path(AccessPath::new(
                 address,
-                AccessPath::resource_path_vec(struct_tag),
-            ))
-        });
+                AccessPath::resource_path_vec(struct_tag)?,
+            )))
+        } else {
+            None
+        };
         Ok((kvs, next_key))
     }
 

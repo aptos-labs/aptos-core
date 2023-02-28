@@ -215,7 +215,7 @@ impl BatchCoordinator {
                     break;
                 },
                 BatchCoordinatorCommand::AppendToBatch(fragment_payload, batch_id) => {
-                    debug!("QS: end batch cmd received, batch id {}", batch_id);
+                    debug!("QS: append to batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
@@ -239,7 +239,7 @@ impl BatchCoordinator {
                         .await
                         .expect("Failed to send to BatchStore");
 
-                    counters::NUM_FRAGMENT_PER_BATCH.observe(self.local_fragment_id as f64);
+                    counters::NUM_FRAGMENT_PER_BATCH.observe((self.local_fragment_id + 1) as f64);
 
                     self.local_fragment_id = 0;
                 },
