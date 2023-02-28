@@ -129,6 +129,7 @@ impl ReplayVerifyCoordinator {
         )?;
         let global_opt = GlobalRestoreOptions {
             target_version: self.end_version,
+            replay_start_version: None,
             trusted_waypoints: Arc::new(self.trusted_waypoints_opt.verify()?),
             run_mode,
             concurrent_downloads: self.concurrent_downloads,

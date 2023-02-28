@@ -1507,6 +1507,7 @@ impl CliCommand<()> for BootstrapDbFromBackup {
             dry_run: false,
             db_dir: Some(self.db_dir),
             target_version: None,
+            replay_start_version: None,
             trusted_waypoints: Default::default(),
             rocksdb_opt: RocksdbOpt::default(),
             concurrent_downloads: self.concurrent_downloads,

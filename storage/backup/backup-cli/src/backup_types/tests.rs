@@ -37,6 +37,7 @@ struct TestData {
     state_snapshot_epoch: Option<u64>,
     state_snapshot_ver: Option<u64>,
     target_ver: Version,
+    replay_delta: u64,
 }
 
 fn test_data_strategy() -> impl Strategy<Value = TestData> {
@@ -59,15 +60,23 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
                 prop_oneof![Just(Some(state_snapshot_epoch)), Just(None)],
                 Just(state_snapshot_ver),
                 state_snapshot_ver..=latest_ver,
+                0..=state_snapshot_ver,
             )
         })
         .prop_map(
-            move |(txn_start_ver, state_snapshot_epoch, state_snapshot_ver, target_ver)| TestData {
+            move |(
+                txn_start_ver,
+                state_snapshot_epoch,
+                state_snapshot_ver,
+                target_ver,
+                replay_delta,
+            )| TestData {
                 db: Arc::clone(&db),
                 txn_start_ver,
                 state_snapshot_epoch,
                 state_snapshot_ver: state_snapshot_epoch.map(|_| state_snapshot_ver),
                 target_ver,
+                replay_delta,
             },
         )
 }
@@ -121,6 +130,7 @@ fn test_end_to_end_impl(d: TestData) {
         dry_run: false,
         db_dir: Some(tgt_db_dir.path().to_path_buf()),
         target_version: Some(d.target_ver),
+        replay_start_version: Some(d.target_ver - d.replay_delta),
         trusted_waypoints: TrustedWaypointOpt::default(),
         rocksdb_opt: RocksdbOpt::default(),
         concurrent_downloads: ConcurrentDownloadsOpt::default(),

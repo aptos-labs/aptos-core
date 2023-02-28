@@ -83,6 +83,7 @@ fn end_to_end() {
                 dry_run: false,
                 db_dir: Some(tgt_db_dir.path().to_path_buf()),
                 target_version: Some(target_version),
+                replay_start_version: None,
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
                 concurrent_downloads: ConcurrentDownloadsOpt::default(),

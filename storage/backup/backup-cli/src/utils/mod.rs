@@ -133,9 +133,18 @@ pub struct GlobalRestoreOpt {
     #[clap(
         long,
         help = "Content newer than this version will not be recovered to DB, \
-        defaulting to the largest version possible, meaning recover everything in the backups."
+        defaulting to the largest version possible, meaning recover everything in the backups. \
+        If target_version is not a snapshot checkpoint, we will use the closest checkpoint version."
     )]
     pub target_version: Option<Version>,
+
+    #[clap(
+        long,
+        help = "the version that we replay the txn from when restoring DB to the target version \
+    If this version is set, we will try to restore snapshot from this version and replay \
+    all transactions afterwards. "
+    )]
+    pub replay_start_version: Option<Version>,
 
     #[clap(flatten)]
     pub trusted_waypoints: TrustedWaypointOpt,
@@ -252,6 +261,7 @@ impl RestoreRunMode {
 #[derive(Clone)]
 pub struct GlobalRestoreOptions {
     pub target_version: Version,
+    pub replay_start_version: Option<Version>,
     pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
     pub run_mode: Arc<RestoreRunMode>,
     pub concurrent_downloads: usize,
@@ -282,6 +292,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         };
         Ok(Self {
             target_version,
+            replay_start_version: opt.replay_start_version,
             trusted_waypoints: Arc::new(opt.trusted_waypoints.verify()?),
             run_mode: Arc::new(run_mode),
             concurrent_downloads,

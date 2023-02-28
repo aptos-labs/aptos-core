@@ -83,6 +83,7 @@ fn end_to_end() {
                 db_dir: Some(tgt_db_dir.path().to_path_buf()),
                 dry_run: false,
                 target_version: Some(target_version),
+                replay_start_version: None,
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
                 concurrent_downloads: ConcurrentDownloadsOpt::default(),
@@ -215,6 +216,7 @@ async fn test_trusted_waypoints_impl(
             db_dir: None,
             dry_run: true,
             target_version: None,
+            replay_start_version: None,
             trusted_waypoints: TrustedWaypointOpt::default(),
             rocksdb_opt: RocksdbOpt::default(),
             concurrent_downloads: ConcurrentDownloadsOpt::default(),
@@ -234,6 +236,7 @@ async fn test_trusted_waypoints_impl(
             db_dir: None,
             dry_run: true,
             target_version: None,
+            replay_start_version: None,
             trusted_waypoints: TrustedWaypointOpt {
                 trust_waypoint: trusted_waypoints,
             },

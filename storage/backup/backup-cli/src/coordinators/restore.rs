@@ -139,16 +139,19 @@ impl RestoreCoordinator {
                     .max_transaction_version()?
                     .ok_or_else(|| anyhow!("No transaction backup found."))?;
                 metadata_view
-                    .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
+                    .select_state_snapshot(std::cmp::min(self.replay_start_version(), max_txn_ver))?
                     .ok_or_else(|| anyhow!("No usable state snapshot."))?
             };
         let version = state_snapshot_backup.version;
-        self.global_opt.target_version = version;
+
+        // only need to update to a snapshot version if we don't want to replay
+        if self.global_opt.replay_start_version.is_none() {
+            self.global_opt.target_version = version;
+        }
+
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
-        let transaction_backup = metadata_view
-            .select_transaction_backups(version, version)?
-            .pop()
-            .unwrap();
+        let transaction_backups =
+            metadata_view.select_transaction_backups(version, self.target_version())?;
         COORDINATOR_TARGET_VERSION.set(version as i64);
         info!(version = version, "Restore target decided.");
 
@@ -182,12 +185,15 @@ impl RestoreCoordinator {
         .run()
         .await?;
 
-        let txn_manifests = vec![transaction_backup.manifest];
+        let txn_manifests = transaction_backups
+            .iter()
+            .map(|e| e.manifest.clone())
+            .collect();
         TransactionRestoreBatchController::new(
             self.global_opt,
             self.storage,
             txn_manifests,
-            None,
+            Some(version),
             epoch_history,
             VerifyExecutionMode::NoVerify,
         )
@@ -201,6 +207,12 @@ impl RestoreCoordinator {
 impl RestoreCoordinator {
     fn target_version(&self) -> Version {
         self.global_opt.target_version
+    }
+
+    fn replay_start_version(&self) -> Version {
+        self.global_opt
+            .replay_start_version
+            .unwrap_or(self.global_opt.target_version)
     }
 
     #[allow(dead_code)]
