@@ -59,7 +59,6 @@ impl BatchBuilder {
     ) -> bool {
         let serialized_txn = SerializedTransaction::from_signed_txn(txn);
 
-        // TODO: bytes, off-by-one?
         if self.num_bytes + serialized_txn.len() <= self.max_bytes
             && self.num_txns < max_txns_override
         {
