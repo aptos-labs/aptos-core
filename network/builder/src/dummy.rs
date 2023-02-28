@@ -11,7 +11,6 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
-use aptos_infallible::RwLock;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -27,10 +26,7 @@ use futures::{executor::block_on, StreamExt};
 use maplit::hashmap;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::HashSet;
 use tokio::runtime::Runtime;
 
 const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpcBcs;
@@ -96,7 +92,6 @@ pub fn setup_network() -> DummyNetwork {
         Peer::new(vec![], dialer_pubkeys, PeerRole::Validator),
     );
 
-    let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
     let authentication_mode = AuthenticationMode::Mutual(listener_identity_private_key);
     let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     // Set up the listener network
@@ -104,7 +99,6 @@ pub fn setup_network() -> DummyNetwork {
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,
         seeds.clone(),
-        trusted_peers,
         network_context,
         TimeService::real(),
         listener_addr,
@@ -135,12 +129,9 @@ pub fn setup_network() -> DummyNetwork {
     // Set up the dialer network
     let network_context = NetworkContext::new(role, network_id, dialer_peer.peer_id());
 
-    let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
-
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,
         seeds,
-        trusted_peers,
         network_context,
         TimeService::real(),
         dialer_addr,

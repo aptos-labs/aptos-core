@@ -5,12 +5,15 @@
 use crate::{
     application::{
         error::Error,
-        metadata::{ConnectionState, PeerMetadata},
+        metadata::{ConnectionState, PeerMetadata, PeerMonitoringMetadata},
     },
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_config::{
+    config::PeerSet,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_infallible::RwLock;
 use aptos_types::PeerId;
 use std::{
@@ -25,6 +28,7 @@ use std::{
 #[derive(Debug)]
 pub struct PeersAndMetadata {
     peers_and_metadata: HashMap<NetworkId, RwLock<HashMap<PeerId, PeerMetadata>>>,
+    trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
 }
 
 impl PeersAndMetadata {
@@ -32,19 +36,23 @@ impl PeersAndMetadata {
         // Create the container
         let mut peers_and_metadata = PeersAndMetadata {
             peers_and_metadata: HashMap::new(),
+            trusted_peers: HashMap::new(),
         };
 
-        // Initialize each network mapping
+        // Initialize each network mapping and trusted peer set
         network_ids.iter().for_each(|network_id| {
             peers_and_metadata
                 .peers_and_metadata
                 .insert(*network_id, RwLock::new(HashMap::new()));
+
+            peers_and_metadata
+                .trusted_peers
+                .insert(*network_id, Arc::new(RwLock::new(PeerSet::new())));
         });
 
         Arc::new(peers_and_metadata)
     }
 
-    // TODO: cache this for frequent uses
     /// Returns all connected peers that support at least one of
     /// the given protocols.
     pub fn get_connected_supported_peers(
@@ -53,8 +61,8 @@ impl PeersAndMetadata {
     ) -> Result<Vec<PeerNetworkId>, Error> {
         let mut connected_supported_peers = Vec::new();
         for network_id in self.get_registered_networks() {
-            let peer_metadata = self.get_peer_metadata_for_network(&network_id)?;
-            for (peer_id, peer_metadata) in peer_metadata.read().iter() {
+            let peer_metadata_for_network = self.get_peer_metadata_for_network(&network_id)?;
+            for (peer_id, peer_metadata) in peer_metadata_for_network.read().iter() {
                 if peer_metadata.is_connected() && peer_metadata.supports_any_protocol(protocol_ids)
                 {
                     let peer_network_id = PeerNetworkId::new(network_id, *peer_id);
@@ -72,8 +80,8 @@ impl PeersAndMetadata {
     ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, Error> {
         let mut connected_peers_and_metadata = HashMap::new();
         for network_id in self.get_registered_networks() {
-            let peer_metadata = self.get_peer_metadata_for_network(&network_id)?;
-            for (peer_id, peer_metadata) in peer_metadata.read().iter() {
+            let peer_metadata_for_network = self.get_peer_metadata_for_network(&network_id)?;
+            for (peer_id, peer_metadata) in peer_metadata_for_network.read().iter() {
                 if peer_metadata.is_connected() {
                     let peer_network_id = PeerNetworkId::new(network_id, *peer_id);
                     connected_peers_and_metadata.insert(peer_network_id, peer_metadata.clone());
@@ -94,17 +102,25 @@ impl PeersAndMetadata {
         &self,
         peer_network_id: PeerNetworkId,
     ) -> Result<PeerMetadata, Error> {
-        let peer_metadata = self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
-        peer_metadata
+        let peer_metadata_for_network =
+            self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
+
+        // Get the metadata for the peer or return a missing metadata error
+        peer_metadata_for_network
             .read()
             .get(&peer_network_id.peer_id())
             .cloned()
-            .ok_or_else(|| {
-                Error::UnexpectedError(format!(
-                    "No metadata was found for the given peer: {:?}",
-                    peer_network_id
-                ))
-            })
+            .ok_or_else(|| missing_metadata_error(&peer_network_id))
+    }
+
+    /// Returns the trusted peer set for the given network ID
+    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<Arc<RwLock<PeerSet>>, Error> {
+        self.trusted_peers.get(network_id).cloned().ok_or_else(|| {
+            Error::UnexpectedError(format!(
+                "No trusted peers were found for the given network id: {:?}",
+                network_id
+            ))
+        })
     }
 
     /// Updates the connection metadata associated with the given peer.
@@ -116,6 +132,8 @@ impl PeersAndMetadata {
     ) -> Result<(), Error> {
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
+
+        // Update the metadata for the peer or insert a new entry
         peer_metadata_for_network
             .write()
             .entry(peer_network_id.peer_id())
@@ -136,19 +154,39 @@ impl PeersAndMetadata {
     ) -> Result<(), Error> {
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
+
+        // Update the connection state for the peer or return a missing metadata error
         if let Some(peer_metadata) = peer_metadata_for_network
             .write()
             .get_mut(&peer_network_id.peer_id())
         {
             peer_metadata.connection_state = connection_state;
+            Ok(())
         } else {
-            return Err(Error::UnexpectedError(format!(
-                "No peer metadata was found for the given peer: {:?}",
-                peer_network_id
-            )));
+            Err(missing_metadata_error(&peer_network_id))
         }
+    }
 
-        Ok(())
+    /// Updates the peer monitoring state associated with the given peer.
+    /// If no peer metadata exists, an error is returned.
+    pub fn update_peer_monitoring_metadata(
+        &self,
+        peer_network_id: PeerNetworkId,
+        peer_monitoring_metadata: PeerMonitoringMetadata,
+    ) -> Result<(), Error> {
+        let peer_metadata_for_network =
+            self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
+
+        // Update the peer monitoring metadata for the peer or return a missing metadata error
+        if let Some(peer_metadata) = peer_metadata_for_network
+            .write()
+            .get_mut(&peer_network_id.peer_id())
+        {
+            peer_metadata.peer_monitoring_metadata = peer_monitoring_metadata;
+            Ok(())
+        } else {
+            Err(missing_metadata_error(&peer_network_id))
+        }
     }
 
     /// Removes the peer metadata from the container. If the peer
@@ -162,6 +200,7 @@ impl PeersAndMetadata {
         let peer_metadata_for_network =
             self.get_peer_metadata_for_network(&peer_network_id.network_id())?;
 
+        // Remove the peer metadata for the peer or return a missing metadata error
         if let Entry::Occupied(entry) = peer_metadata_for_network
             .write()
             .entry(peer_network_id.peer_id())
@@ -179,10 +218,7 @@ impl PeersAndMetadata {
                 )))
             }
         } else {
-            Err(Error::UnexpectedError(format!(
-                "No peer metadata was found for the given peer: {:?}",
-                peer_network_id
-            )))
+            Err(missing_metadata_error(&peer_network_id))
         }
     }
 
@@ -198,4 +234,13 @@ impl PeersAndMetadata {
             ))
         })
     }
+}
+
+/// A simple helper for returning a missing metadata error
+/// for the specified peer.
+fn missing_metadata_error(peer_network_id: &PeerNetworkId) -> Error {
+    Error::UnexpectedError(format!(
+        "No metadata was found for the given peer: {:?}",
+        peer_network_id
+    ))
 }

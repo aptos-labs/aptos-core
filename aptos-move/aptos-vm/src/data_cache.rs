@@ -133,7 +133,7 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
         let module_bytes = self.get_module(&module_id).ok()??;
         let module = CompiledModule::deserialize(&module_bytes).ok()?;
-        aptos_framework::get_module_metadata(&module)
+        aptos_framework::get_metadata_from_compiled_module(&module)
     }
 
     fn get_resource_group_data(
