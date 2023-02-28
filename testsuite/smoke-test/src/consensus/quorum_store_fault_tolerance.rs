@@ -19,7 +19,11 @@ use std::{fs, sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 60;
 
-async fn generate_traffic_and_assert_committed(swarm: &mut dyn Swarm, nodes: &[PeerId]) {
+async fn generate_traffic_and_assert_committed(
+    swarm: &mut dyn Swarm,
+    nodes: &[PeerId],
+    duration: Duration,
+) {
     let rest_client = swarm.validator(nodes[0]).unwrap().rest_client();
 
     // faucet can make our root LocalAccount sequence number get out of sync.
@@ -29,7 +33,7 @@ async fn generate_traffic_and_assert_committed(swarm: &mut dyn Swarm, nodes: &[P
         .await
         .unwrap();
 
-    let txn_stat = generate_traffic(swarm, nodes, Duration::from_secs(20), 1, vec![vec![
+    let txn_stat = generate_traffic(swarm, nodes, duration, 1, vec![vec![
         (
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
@@ -94,7 +98,7 @@ async fn update_consensus_config(
 
 // TODO: remove when quorum store becomes the in-code default
 #[tokio::test]
-async fn test_onchain_config_quorum_store_enabled() {
+async fn test_onchain_config_quorum_store_enabled_and_disabled() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         // Start with V1
@@ -106,70 +110,64 @@ async fn test_onchain_config_quorum_store_enabled() {
         .await;
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
-
-    swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
-        .await
-        .unwrap();
-
-    let root_cli_index = cli.add_account_with_address_to_cli(
-        swarm.root_key(),
-        swarm.chain_info().root_account().address(),
-    );
-    let rest_client = swarm.validators().next().unwrap().rest_client();
-
-    let current_consensus_config = get_current_consensus_config(&rest_client).await;
-    let inner = match current_consensus_config {
-        OnChainConsensusConfig::V1(inner) => inner,
-        OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
-    };
-    // Change to V2
-    let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
-    update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
-
-    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
-}
-
-// TODO: remove when quorum store becomes the in-code default
-/// Test in case of disaster whether we can roll back to non-quorum store
-#[tokio::test]
-async fn test_onchain_config_quorum_store_disabled() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_aptos()
-        // Start with V2
-        .with_init_genesis_config(Arc::new(|genesis_config| {
-            genesis_config.consensus_config =
-                OnChainConsensusConfig::V2(ConsensusConfigV1::default())
-        }))
-        .build_with_cli(0)
+    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids, Duration::from_secs(5))
         .await;
-    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-
-    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 
-    let root_cli_index = cli.add_account_with_address_to_cli(
-        swarm.root_key(),
-        swarm.chain_info().root_account().address(),
-    );
+    for _ in 0..5 {
+        let root_cli_index = cli.add_account_with_address_to_cli(
+            swarm.root_key(),
+            swarm.chain_info().root_account().address(),
+        );
+        let rest_client = swarm.validators().next().unwrap().rest_client();
 
-    let rest_client = swarm.validators().next().unwrap().rest_client();
-    let current_consensus_config = get_current_consensus_config(&rest_client).await;
-    let inner = match current_consensus_config {
-        OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
-        OnChainConsensusConfig::V2(inner) => inner,
-    };
+        let current_consensus_config = get_current_consensus_config(&rest_client).await;
+        let inner = match current_consensus_config {
+            OnChainConsensusConfig::V1(inner) => inner,
+            OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
+        };
+        // Change to V2
+        let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
+        update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
 
-    // Disaster rollback to V1
-    let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 { ..inner });
-    update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
+        generate_traffic_and_assert_committed(
+            &mut swarm,
+            &validator_peer_ids,
+            Duration::from_secs(5),
+        )
+        .await;
 
-    generate_traffic_and_assert_committed(&mut swarm, &validator_peer_ids).await;
+        swarm
+            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+            .await
+            .unwrap();
+
+        let current_consensus_config = get_current_consensus_config(&rest_client).await;
+        let inner = match current_consensus_config {
+            OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
+            OnChainConsensusConfig::V2(inner) => inner,
+        };
+
+        // Disaster rollback to V1
+        let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 { ..inner });
+        update_consensus_config(&cli, root_cli_index, new_consensus_config).await;
+
+        generate_traffic_and_assert_committed(
+            &mut swarm,
+            &validator_peer_ids,
+            Duration::from_secs(5),
+        )
+        .await;
+
+        swarm
+            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+            .await
+            .unwrap();
+    }
 }
 
 /// Checks progress even if half the nodes are not actually writing batches to the DB.
@@ -204,7 +202,12 @@ async fn test_remote_batch_reads() {
             .unwrap();
     }
 
-    generate_traffic_and_assert_committed(&mut swarm, &[validator_peer_ids[2]]).await;
+    generate_traffic_and_assert_committed(
+        &mut swarm,
+        &[validator_peer_ids[2]],
+        Duration::from_secs(20),
+    )
+    .await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
@@ -230,7 +233,8 @@ async fn test_batch_id_on_restart(do_wipe_db: bool) {
         .await
         .unwrap();
 
-    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart], Duration::from_secs(20))
+        .await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
@@ -250,7 +254,8 @@ async fn test_batch_id_on_restart(do_wipe_db: bool) {
         .await
         .unwrap();
 
-    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart], Duration::from_secs(20))
+        .await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
@@ -281,7 +286,8 @@ async fn test_batch_id_on_restart(do_wipe_db: bool) {
         .unwrap();
 
     info!("generate traffic");
-    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart]).await;
+    generate_traffic_and_assert_committed(&mut swarm, &[node_to_restart], Duration::from_secs(20))
+        .await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
