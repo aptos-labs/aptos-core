@@ -65,7 +65,7 @@ impl SignedDigestInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
     epoch: u64,
-    peer_id: PeerId,
+    signer: PeerId,
     info: SignedDigestInfo,
     signature: bls12381::Signature,
 }
@@ -85,14 +85,14 @@ impl SignedDigest {
 
         Ok(Self {
             epoch,
-            peer_id: validator_signer.author(),
+            signer: validator_signer.author(),
             info,
             signature,
         })
     }
 
-    pub fn peer_id(&self) -> PeerId {
-        self.peer_id
+    pub fn signer(&self) -> PeerId {
+        self.signer
     }
 
     pub fn epoch(&self) -> u64 {
@@ -100,7 +100,7 @@ impl SignedDigest {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
+        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn info(&self) -> &SignedDigestInfo {
