@@ -26,7 +26,7 @@ use std::{
     },
     hash::Hash,
     mem,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::time::timeout;
 
@@ -222,6 +222,7 @@ pub struct ProofQueue {
     digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of all proofs
     local_digest_queue: VecDeque<(HashValue, LogicalTime)>, // queue of local proofs, to make back pressure update more efficient
     digest_proof: HashMap<HashValue, Option<ProofOfStore>>, // None means committed
+    digest_insertion_time: HashMap<HashValue, Instant>,
 }
 
 impl ProofQueue {
@@ -230,6 +231,7 @@ impl ProofQueue {
             digest_queue: VecDeque::new(),
             local_digest_queue: VecDeque::new(),
             digest_proof: HashMap::new(),
+            digest_insertion_time: HashMap::new(),
         }
     }
 
@@ -239,6 +241,8 @@ impl ProofQueue {
                 self.digest_queue
                     .push_back((*proof.digest(), proof.expiration()));
                 entry.insert(Some(proof.clone()));
+                self.digest_insertion_time
+                    .insert(*proof.digest(), Instant::now());
             },
             Occupied(mut entry) => {
                 if entry.get().is_some()
@@ -286,6 +290,7 @@ impl ProofQueue {
                 None => {}, // Proof was already committed
             }
             claims::assert_some!(self.digest_proof.remove(&digest));
+            self.digest_insertion_time.remove(&digest);
         }
 
         let mut ret = Vec::new();
@@ -307,6 +312,9 @@ impl ProofQueue {
                             break;
                         }
                         ret.push(proof.clone());
+                        if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
+                            counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
+                        }
                     },
                     None => {}, // Proof was already committed, skip.
                 }
@@ -379,6 +387,9 @@ impl ProofQueue {
     pub(crate) fn mark_committed(&mut self, digests: Vec<HashValue>) {
         for digest in digests {
             self.digest_proof.insert(digest, None);
+            if let Some(insertion_time) = self.digest_insertion_time.get(&digest) {
+                counters::POS_TO_COMMIT.observe(insertion_time.elapsed().as_secs_f64());
+            }
         }
     }
 }
