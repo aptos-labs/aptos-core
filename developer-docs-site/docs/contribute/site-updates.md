@@ -5,14 +5,13 @@ slug: "site-updates"
 
 # Update Aptos.dev
 
-As an open source project, Aptos needs your knowledge to grow. Follow the instructions on this page to update Aptos.dev, the developer website for the Aptos blockchain. Every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom of any page for an example.
+As an open source project, Aptos needs your knowledge to grow. Follow the instructions on this page to update [Aptos.dev](https://aptos.dev/), the developer website for the Aptos blockchain. Every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom of any page for an example.
 
-See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status.
-
+See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status. See detailed instructions for making updates below.
 
 ## tl;dr
 
-Simply click *Edit this page* at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. You may then edit in browser and use the *Preview* function to view your changes.
+Simply click **Edit this page** at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. You may then edit in browser and use the *Preview* function to view your changes.
 
 Here are the basic steps for editing in your web browser:
 
@@ -32,9 +31,8 @@ When ready, [start a pull request](https://docs.github.com/en/pull-requests/coll
 
 The Aptos Docs recommends these materials for good documentation:
 
-TODO: Complete and then link to our writing style guidelines as the first item in the list:
-
-- [Google Style Guide](https://developers.google.com/style) - Augments our own [Writing Style Guide](https://www.notion.so/Writing-Style-Guide-214d08441a114064ad1200d9f57c5791).
+- [Aptos Style](./aptos-style.md) - A brief set of guidance for contributions to Aptos.dev.
+- [Google Style Guide](https://developers.google.com/style) - A Google standard adopted by companies large and small.
 - [Technical writing courses](https://developers.google.com/tech-writing) - Google offers basic courses on tech writing for engineers and others.
 - [DITA](https://en.wikipedia.org/wiki/Darwin_Information_Typing_Architecture) - The Aptos Docs team adheres to the [Darwin Information Typing Architecture](https://en.wikipedia.org/wiki/Darwin_Information_Typing_Architecture) whereby all technical documentation is broken down into concepts (overviews), tasks (procedures), and references (lists) to best suit our audiences and their mindsets (learning, doing, finding) at the time of reading.
 - [Open source templates](https://gitlab.com/tgdp/templates) - The [Good Docs Project](https://thegooddocsproject.dev/) gives us myriad templates in Markdown for various documentation types we should take advantage of in Aptos.dev.
@@ -62,7 +60,7 @@ To update [Aptos.dev](http://Aptos.dev) directly:
 12. Announce the update in [See What’s New.](https://aptos.dev/whats-new-in-docs)
 13. Monitor builds at: [https://app.netlify.com/sites/aptos-developer-docs/overview](https://app.netlify.com/sites/aptos-developer-docs/overview)
 
-## Request documentation updates
+## Request docs changes
 
 If you are unable to make the update yourself or simply need Docs team help along the way:
 

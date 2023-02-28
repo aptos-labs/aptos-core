@@ -39,6 +39,9 @@ The second example will work in [Aptos.dev](http://Aptos.dev) but not when navig
 
 When linking to code files in GitHub, use a [permanent link](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-a-permanent-link-to-a-code-snippet) to the relative line or set of lines.
 
+## Add images to `static` directory
+
+Place all images in the [`developer-docs-site/static/img`](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/img) directory and use relative links to include them. See the image paths in [Set up a React app](../tutorials/build-e2e-dapp/2-set-up-react-app.md) for examples.
 
 ## Redirect moved pages
 
@@ -47,11 +50,11 @@ https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/docusauru
 
 ## Name files succinctly
 
-hyphenate rather than underscore
+Use short, detailed names with no spaces:
+* hyphenate rather than underscore
 
-be descriptive
-
-use noun first, verb optional
+* be descriptive
+* use noun (topic) first, with verb optional: ex. accounts.md, site-updates.md
 
 ## Use active tense
 
@@ -178,12 +181,12 @@ A section heading is the title for an individual section within a document page.
 
 The below table lists the correct usage of Aptos words and phrases. 
 
-| Recommended way to use in mid-sentence.  | Avoid these forms |
+| Recommended way to use in mid-sentence  | Avoid these forms |
 | --- | --- |
 | First letter uppercase if appearing at the start of a sentence. |  |
-| fullnode | FullNode, Fullnode |
-| validator or validator node | Validator Node, ValidatorNode |
-| validator fullnode | Validator FullNode or ValidatorFullNode |
+| fullnode (FN) | FullNode, Fullnode |
+| validator or validator node (VN) | Validator Node, ValidatorNode |
+| validator fullnode (VFN) | Validator FullNode or ValidatorFullNode |
 | public fullnode | Public FullNode |
 | Aptos blockchain | Aptos Blockchain |
 | Move module | Move Module |

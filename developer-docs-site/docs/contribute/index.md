@@ -9,15 +9,19 @@ We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blo
 
 As always, adhere to the [Aptos Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md) when taking part in our ecosystem.
 
+## Develop your own project
+
+See, employ and join the growing number of delightful [community-driven projects](https://github.com/aptos-foundation/ecosystem-projects) in the Aptos ecosystem.
+
 ## Become an Aptos ambassador
 
 Help organize events, develop content and more for the ecosystem by joining the [Aptos Collective](https://aptosfoundation.org/currents/join-the-aptos-collective) with plenty of perks in return!
 
 ## Ask questions and offer answers
 
-Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
+Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to post topic-specific links, events, and more.
 
-For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location.
+For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location. To offer your own advice and find tips from others, post to and use the [Aptos Forum](https://forum.aptoslabs.com/).
 
 Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
 
