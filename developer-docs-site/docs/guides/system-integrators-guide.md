@@ -131,9 +131,10 @@ JSON-encoded transactions allow for rapid development and support seamless ABI c
 
 ### Types of transactions
 
-Within a given transaction, the target of execution can be one of two types: 
+Within a given transaction, the target of execution can be one of three types: 
 
 - An entry point (formerly known as script function)
+- module bundle (publishes multiple modules)
 - A script (payload)
 
 Both [Python](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/python/sdk/aptos_sdk/client.py#L256) and [TypeScript](https://github.com/aptos-labs/aptos-core/blob/3973311dac6bb9348bfc81cf983c2a1be11f1b48/ecosystem/typescript/sdk/src/aptos_client.test.ts#L93) support the generation of transactions that target entry points. This guide points out many of those entry points, such as `aptos_account::transfer` and `aptos_account::create_account`. 

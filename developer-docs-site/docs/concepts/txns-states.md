@@ -59,9 +59,10 @@ A [signed transaction](../guides/sign-a-transaction.md) on the blockchain contai
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
 
 ### Types of transactions
-Within a given transaction, the target of execution can be one of two types:
+Within a given transaction, the target of execution can be one of three types:
 
 - An entry point
+- module bundle (publishes multiple modules)
 - A script (payload)
 
 Currently the SDKs [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) support the generation of transactions that target entry points only. This guide points out many of those entry points, such as `coin::transfer` and `aptos_account::create_account`.
