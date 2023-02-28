@@ -115,6 +115,14 @@ sources={{
   }}
 />
 
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('../../static/img/docs/transactions-and-state.svg'),
+    dark: useBaseUrl('../../static/img/docs/transactions-and-state-dark.svg'),
+  }}
+/>
+
 The above figure shows how executing transaction T<sub>*i*</sub> changes the state of the Aptos blockchain from S<sub>*i-1*</sub> to S<sub>*i*</sub>.
 
 In the figure:
