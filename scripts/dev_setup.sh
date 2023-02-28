@@ -149,13 +149,13 @@ function install_protoc {
 
   # Install the cargo plugins
   if ! command -v protoc-gen-prost &> /dev/null; then
-    cargo install protoc-gen-prost
+    cargo install protoc-gen-prost --locked
   fi
   if ! command -v protoc-gen-prost-serde &> /dev/null; then
-    cargo install protoc-gen-prost-serde
+    cargo install protoc-gen-prost-serde --locked
   fi
   if ! command -v protoc-gen-prost-crate &> /dev/null; then
-    cargo install protoc-gen-prost-crate
+    cargo install protoc-gen-prost-crate --locked
   fi
 }
 
