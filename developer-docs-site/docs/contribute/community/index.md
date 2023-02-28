@@ -9,7 +9,7 @@ This page shines a light on exemplary contributions to Aptos from our community 
 
 To add your own contribution here, first submit a new page to Aptos.dev or a product feature in the [`aptos-core`](https://github.com/aptos-labs/aptos-core) repository. Then add a link to the new documentation or code from the table below.
 
-The source materials for both code and docs live in GitHub. See [Contribute](../index) for ways to make updates.
+The source materials for both code and docs live in GitHub. See [Contribute](../index.md) for ways to make updates.
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
