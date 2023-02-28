@@ -33,6 +33,7 @@ aptos-storage-interface = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
 criterion = { workspace = true }
@@ -45,6 +46,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 structopt = { workspace = true }
+tokio = { workspace = true }
 toml = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

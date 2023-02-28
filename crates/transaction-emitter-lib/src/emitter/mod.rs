@@ -616,7 +616,7 @@ impl TxnEmitter {
                     .collect::<Vec<_>>();
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
-                let txn_generator = txn_generator_creator.create_transaction_generator().await;
+                let txn_generator = txn_generator_creator.create_transaction_generator();
                 let worker_index = workers.len();
 
                 let worker = SubmissionWorker::new(

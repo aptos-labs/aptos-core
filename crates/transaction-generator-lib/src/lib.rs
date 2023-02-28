@@ -23,6 +23,7 @@ use std::{
 
 pub mod account_generator;
 pub mod accounts_pool_wrapper;
+pub mod args;
 pub mod call_custom_modules;
 pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
@@ -110,17 +111,17 @@ pub trait TransactionGenerator: Sync + Send {
     ) -> Vec<SignedTransaction>;
 }
 
+#[async_trait]
+pub trait TransactionGeneratorCreator: Sync + Send {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator>;
+}
+
 pub struct CounterState {
     pub submit_failures: Vec<AtomicUsize>,
     pub wait_failures: Vec<AtomicUsize>,
     pub successes: AtomicUsize,
     // (success, submit_fail, wait_fail)
     pub by_client: HashMap<String, (AtomicUsize, AtomicUsize, AtomicUsize)>,
-}
-
-#[async_trait]
-pub trait TransactionGeneratorCreator: Sync + Send {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator>;
 }
 
 #[async_trait]

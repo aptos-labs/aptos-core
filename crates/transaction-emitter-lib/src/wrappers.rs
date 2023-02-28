@@ -6,12 +6,11 @@ use crate::{
     cluster::Cluster,
     emitter::{stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter},
     instance::Instance,
-    TransactionTypeArg,
 };
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::{EntryPoints, TransactionType};
+use aptos_transaction_generator_lib::TransactionType;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -88,41 +87,7 @@ pub async fn emit_transactions_with_cluster(
     let arg_transaction_types = args
         .transaction_type
         .iter()
-        .map(|t| match t {
-            TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
-                invalid_transaction_ratio: args.invalid_tx,
-                sender_use_account_pool: false,
-            },
-            TransactionTypeArg::AccountGeneration => TransactionType::default_account_generation(),
-            TransactionTypeArg::AccountGenerationLargePool => TransactionType::AccountGeneration {
-                add_created_accounts_to_pool: true,
-                max_account_working_set: 50_000_000,
-                creation_balance: 200_000_000,
-            },
-            TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
-            TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
-                use_account_pool: false,
-            },
-            TransactionTypeArg::CustomFunctionLargeModuleWorkingSet => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::Nop,
-                    num_modules: 1000,
-                    use_account_pool: false,
-                }
-            },
-            TransactionTypeArg::CreateNewResource => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::BytesMakeOrChange {
-                    data_length: Some(32),
-                },
-                num_modules: 1,
-                use_account_pool: true,
-            },
-            TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: 1,
-                use_account_pool: false,
-            },
-        })
+        .map(|t| t.materialize())
         .collect::<Vec<_>>();
 
     let arg_transaction_weights = if args.transaction_weights.is_empty() {

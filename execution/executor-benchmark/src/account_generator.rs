@@ -84,6 +84,12 @@ impl AccountCache {
         &self.accounts
     }
 
+    pub fn accounts_mut(&mut self) -> &mut [LocalAccount] {
+        self.accounts.make_contiguous();
+
+        self.accounts.as_mut_slices().0
+    }
+
     pub fn grow(&mut self, n: usize) {
         let accounts: Vec<_> = (0..n).map(|_| self.generator.generate()).collect();
         self.accounts.extend(accounts);
