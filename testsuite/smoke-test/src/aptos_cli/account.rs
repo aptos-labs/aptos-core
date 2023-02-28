@@ -77,7 +77,7 @@ async fn test_account_flow() {
             gas_unit_price: None,
             // NOTE(Gas): This should be equal to the min gas amount allowed.
             //            Read the comment above to understand why.
-            max_gas: Some(150),
+            max_gas: Some(2),
             expiration_secs: 30,
         }),
     )

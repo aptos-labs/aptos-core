@@ -336,7 +336,7 @@ impl Default for ReleaseConfig {
         ReleaseConfig {
             testnet: true,
             framework_release: Some(FrameworkReleaseConfig {
-                bytecode_version: 6,
+                bytecode_version: 6, // TODO: remove explicit bytecode version from sources
                 git_hash: None,
             }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),

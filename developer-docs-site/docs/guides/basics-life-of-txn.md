@@ -180,7 +180,7 @@ The Move VM verifies and executes transaction scripts written in Move bytecode.
 
 ### 1. Virtual Machine → Storage
 
-When mempool requests the VM to validate a transaction via `VM::ValidateTransaction()`, the VM loads the transaction sender's account from storage and performs verifications, some of which have been described in the list below.
+When mempool requests the VM to validate a transaction via `VMValidator::validate_transaction()`, the VM loads the transaction sender's account from storage and performs verifications, some of which have been described in the list below.
 
 * Checks that the input signature on the signed transaction is correct (to reject incorrectly signed transactions).
 * Checks that the sender's account authentication key is the same as the hash of the public key (corresponding to the private key used to sign the transaction).
@@ -190,13 +190,13 @@ When mempool requests the VM to validate a transaction via `VM::ValidateTransact
 
 ### 2. Execution → Virtual Machine
 
-The execution component utilizes the VM to execute a transaction via `VM::ExecuteTransaction()`.
+The execution component utilizes the VM to execute a transaction via `ExecutorTask::execute_transaction()`.
 
 It is important to understand that executing a transaction is different from updating the state of the ledger and persisting the results in storage. A transaction T<sub>N</sub> is first executed as part of an attempt to reach agreement on blocks during consensus. If agreement is reached with the other validators on the ordering of transactions and their execution results, the results are persisted in storage and the state of the ledger is updated.
 
 ### 3. Mempool → Virtual Machine
 
-When mempool receives a transaction from other validators via shared mempool or from the REST service, mempool invokes `VM::ValidateTransaction()` on the VM to validate the transaction.
+When mempool receives a transaction from other validators via shared mempool or from the REST service, mempool invokes `VMValidator::validate_transaction()` on the VM to validate the transaction.
 
 For implementation details refer to the [Move Virtual Machine README](https://github.com/move-language/move/tree/main/language/move-vm).
 
@@ -232,7 +232,7 @@ Mempool is a shared buffer that holds the transactions that are “waiting” to
 
 ### 4. Mempool → VM
 
-When mempool receives a transaction from other validators, mempool invokes <code>VM::ValidateTransaction()</code> on the VM to validate the transaction.
+When mempool receives a transaction from other validators, mempool invokes <code>VMValidator::validate_transaction()</code> on the VM to validate the transaction.
 
 ## Consensus
 
@@ -251,7 +251,7 @@ The consensus component is responsible for ordering blocks of transactions and a
 
 ### 1. Consensus → Mempool
 
-When validator V<sub>X</sub> is a leader/proposer, the consensus component of V<sub>X</sub> pulls a block of transactions from its mempool via: `Mempool::GetBlock()`, and forms a proposed block of transactions.
+When validator V<sub>X</sub> is a leader/proposer, the consensus component of V<sub>X</sub> pulls a block of transactions from its mempool via: `Mempool::get_batch()`, and forms a proposed block of transactions.
 
 ### 2. Consensus → Other Validators
 
@@ -259,13 +259,13 @@ If V<sub>X</sub> is a proposer/leader, its consensus component replicates the pr
 
 ### 3. Consensus → Execution, Consensus → Other Validators
 
-* To execute a block of transactions, consensus interacts with the execution component. Consensus executes a block of transactions via `Execution:ExecuteBlock()` (Refer to [Consensus → execution](#1-consensus--execution))
+* To execute a block of transactions, consensus interacts with the execution component. Consensus executes a block of transactions via `BlockExecutorTrait::execute_block()` (Refer to [Consensus → execution](#1-consensus--execution))
 * After executing the transactions in the proposed block, the execution component responds to the consensus component with the result of executing these transactions.
 * The consensus component signs the execution result and attempts to reach agreement on this result with other validators.
 
 ### 4. Consensus → Execution
 
-If enough validators vote for the same execution result, the consensus component of V<sub>X</sub> informs execution via `Execution::CommitBlock()` that this block is ready to be committed.
+If enough validators vote for the same execution result, the consensus component of V<sub>X</sub> informs execution via `BlockExecutorTrait::commit_blocks()` that this block is ready to be committed.
 
 ## Execution
 
@@ -283,22 +283,22 @@ The execution component coordinates the execution of a block of transactions and
 
 ### 1. Consensus → Execution
 
-* Consensus requests execution to execute a block of transactions via: `Execution::ExecuteBlock()`.
+* Consensus requests execution to execute a block of transactions via: `BlockExecutorTrait::execute_block()`.
 * Execution maintains a “scratchpad,” which holds in-memory copies of the relevant portions of the [Merkle accumulator](../reference/glossary.md#merkle-accumulator). This information is used to calculate the root hash of the current state of the Aptos blockchain.
 * The root hash of the current state is combined with the information about the transactions in the proposed block to determine the new root hash of the accumulator. This is done prior to persisting any data, and to ensure that no state or transaction is stored until agreement is reached by a quorum of validators.
 * Execution computes the speculative root hash and then the consensus component of V<sub>X</sub> signs this root hash and attempts to reach agreement on this root hash with other validators.
 
 ### 2. Execution → VM
 
-When consensus requests execution to execute a block of transactions via `Execution::ExecuteBlock()`, execution uses the VM to determine the results of executing the block of transactions.
+When consensus requests execution to execute a block of transactions via `BlockExecutorTrait::execute_block()`, execution uses the VM to determine the results of executing the block of transactions.
 
 ### 3. Consensus → Execution
 
-If a quorum of validators agrees on the block execution results, the consensus component of each validator informs its execution component via `Execution::CommitBlock()` that this block is ready to be committed. This call to the execution component will include the signatures of the validators to provide proof of their agreement.
+If a quorum of validators agrees on the block execution results, the consensus component of each validator informs its execution component via `BlockExecutorTrait::commit_blocks()` that this block is ready to be committed. This call to the execution component will include the signatures of the validators to provide proof of their agreement.
 
 ### 4. Execution → Storage
 
-Execution takes the values from its “scratchpad” and sends them to storage for persistence via `Storage::SaveTransactions()`. Execution then prunes the old values from the “scratchpad” that are no longer needed (for example, parallel blocks that cannot be committed).
+Execution takes the values from its “scratchpad” and sends them to storage for persistence via `DbWriter::save_transactions()`. Execution then prunes the old values from the “scratchpad” that are no longer needed (for example, parallel blocks that cannot be committed).
 
 For implementation details refer to the [Execution README](https://github.com/aptos-labs/aptos-core/tree/main/execution).
 
@@ -323,15 +323,15 @@ Refer to [Merkle accumulator](../reference/glossary.md#merkle-accumulator) for i
 
 ### 1. VM → Storage
 
-When mempool invokes `VM::ValidateTransaction()` to validate a transaction, `VM::ValidateTransaction()` loads the sender's account from storage and performs read-only validity checks on the transaction.
+When mempool invokes `VMValidator::validate_transaction()` to validate a transaction, `VMValidator::validate_transaction()` loads the sender's account from storage and performs read-only validity checks on the transaction.
 
 ### 2. Execution → Storage
 
-When the consensus component calls `Execution::ExecuteBlock()`, execution reads the current state from storage combined with the in-memory “scratchpad” data to determine the execution results.
+When the consensus component calls `BlockExecutorTrait::execute_block()`, execution reads the current state from storage combined with the in-memory “scratchpad” data to determine the execution results.
 
 ### 3. Execution → Storage
 
-Once consensus is reached on a block of transactions, execution calls storage via `Storage::SaveTransactions()` to save the block of transactions and permanently record them. This will also store the signatures from the validator nodes that agreed on this block of transactions. The in-memory data in “scratchpad” for this block is passed to update storage and persist the transactions. When the storage is updated, every account that was modified by these transactions will have its sequence number incremented by one.
+Once consensus is reached on a block of transactions, execution calls storage via `DbWriter::save_transactions()` to save the block of transactions and permanently record them. This will also store the signatures from the validator nodes that agreed on this block of transactions. The in-memory data in “scratchpad” for this block is passed to update storage and persist the transactions. When the storage is updated, every account that was modified by these transactions will have its sequence number incremented by one.
 
 Note: The sequence number of an account on the Aptos blockchain increments by one for each committed transaction originating from that account.
 

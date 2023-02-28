@@ -29,8 +29,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
-    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
+    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
+    transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -167,7 +167,7 @@ impl MockSharedMempool {
                     .add_txn(
                         txn.clone(),
                         txn.gas_unit_price(),
-                        AccountSequenceInfo::Sequential(0),
+                        0,
                         TimelineState::NotReady,
                     )
                     .code

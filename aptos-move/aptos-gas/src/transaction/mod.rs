@@ -20,7 +20,7 @@ mod storage;
 
 pub use storage::{ChangeSetConfigs, StorageGasParameters};
 
-const GAS_SCALING_FACTOR: u64 = 10_000;
+const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
@@ -112,6 +112,11 @@ crate::params::define_gas_parameters!(
             free_write_bytes_quota: NumBytes,
             { 5.. => "free_write_bytes_quota" },
             1024, // 1KB free per state write
+        ],
+        [
+            free_event_bytes_quota: NumBytes,
+            { 7.. => "free_event_bytes_quota" },
+            1024, // 1KB free event bytes per transaction
         ],
         [
             max_bytes_per_write_op: NumBytes,
@@ -222,14 +227,21 @@ impl TransactionGasParameters {
         &self,
         events: impl IntoIterator<Item = &'a ContractEvent>,
     ) -> Fee {
-        events.into_iter().fold(Fee::zero(), |acc, event| {
-            acc + self.storage_fee_per_event_byte * NumBytes::new(event.size() as u64)
-        })
+        let total_bytes = events.into_iter().fold(NumBytes::zero(), |total, event| {
+            total + NumBytes::new(event.size() as u64)
+        });
+        total_bytes
+            .checked_sub(self.free_event_bytes_quota)
+            .unwrap_or(NumBytes::zero())
+            * self.storage_fee_per_event_byte
     }
 
     /// New formula to charge storage fee for transaction based on fixed APT costs.
     pub fn calculate_transaction_storage_fee(&self, txn_size: NumBytes) -> Fee {
-        self.storage_fee_per_transaction_byte * txn_size
+        txn_size
+            .checked_sub(self.large_transaction_cutoff)
+            .unwrap_or(NumBytes::zero())
+            * self.storage_fee_per_transaction_byte
     }
 
     /// Calculate the intrinsic gas for the transaction based upon its size in bytes.

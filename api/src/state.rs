@@ -7,18 +7,17 @@ use crate::{
     response::{
         api_disabled, build_not_found, module_not_found, resource_not_found, table_item_not_found,
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-        InternalError, StdApiError,
+        InternalError,
     },
     ApiTags, Context,
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo,
+    verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper,
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawTableItemRequest,
     TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_state_view::TStateView;
-use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
@@ -210,25 +209,6 @@ impl StateApi {
 }
 
 impl StateApi {
-    /// Retrieve state at the requested ledger version
-    fn preprocess_request<E: StdApiError>(
-        &self,
-        requested_ledger_version: Option<u64>,
-    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
-        let (latest_ledger_info, requested_ledger_version) = self
-            .context
-            .get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
-
-        let state_view = self
-            .context
-            .state_view_at_version(requested_ledger_version)
-            .map_err(|err| {
-                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
-            })?;
-
-        Ok((latest_ledger_info, requested_ledger_version, state_view))
-    }
-
     /// Read a resource at the ledger version
     ///
     /// JSON: Convert to MoveResource
@@ -246,7 +226,8 @@ impl StateApi {
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
             })?;
-        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
+
+        let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let resolver = state_view.as_move_resolver();
         let bytes = resolver
             .get_resource(&address.into(), &resource_type)
@@ -302,8 +283,9 @@ impl StateApi {
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
         let state_key = StateKey::access_path(access_path);
-        let (ledger_info, ledger_version, state_view) =
-            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
@@ -365,8 +347,9 @@ impl StateApi {
             })?;
 
         // Retrieve local state
-        let (ledger_info, ledger_version, state_view) =
-            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
@@ -438,8 +421,9 @@ impl StateApi {
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
         // Retrieve local state
-        let (ledger_info, ledger_version, state_view) =
-            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
 
         let state_key = StateKey::table_item(
             TableHandle(table_handle.into()),

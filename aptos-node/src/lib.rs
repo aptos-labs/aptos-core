@@ -123,7 +123,6 @@ impl AptosNodeArgs {
                     error
                 )
             });
-            println!("Using node config {:?}", &config);
 
             // Start the node
             start(config, None, true).expect("Node should start correctly");
@@ -351,6 +350,9 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
+    // Log the node config at node startup
+    info!("Using node config {:?}", &node_config);
+
     // Start the node inspection service
     services::start_node_inspection_service(&node_config);
 
