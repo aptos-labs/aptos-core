@@ -32,24 +32,8 @@ For larger changes, [report the issue](#report-issues-request-enhancements) for 
 
 ## Update the documentation
 
-You may report problems and supply other input in the [#docs-feedback](https://discord.com/channels/945856774056083548/1034215378299133974) channel of [Aptos Discord](https://discord.gg/aptoslabs).
+You may report problems and supply other input in the [#docs-feedback](https://discord.com/channels/945856774056083548/1034215378299133974) channel of [Aptos Discord](https://discord.gg/aptoslabs). To help with our contents, follow [Update Aptos.dev](./site-updates.md).
 
-Every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom of any page for an example. See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status.
-
-Simply click *Edit this page* at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. You may then edit in browser and use the *Preview* function to view your changes.
-
-Here are the basic steps for editing in your web browser:
-
-1. Click **Edit this page** at the bottom to get started.
-2. Modify and add source Markdown files in the [developer-docs-site](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site) directory.
-3. See your changes in Netlify (by swapping `prnumber` in):
- [https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/](https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/)
-4. Have at least two reviewers in the Aptos Labs examine and test the change.
-5. Merge in the change and see it go live.
-
-For more complex documentation updates, we recommend [forking the repository](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md#developer-workflow) and using a local editor to make changes. To edit at the command line and preview your changes on your localhost, see our [Developer Documentation](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/README.md) README.
-
-When ready, [start a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) with your changes. We will get back to you shortly.
 
 ## Report issues, request enhancements
 

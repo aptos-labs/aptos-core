@@ -353,14 +353,24 @@ const config = {
                 docId: "contribute/external-resources",
               },
               {
+                label: "Frequently Asked Questions",
+                type: "doc",
+                docId: "contribute/faq",
+              },
+              {
                 label: "Rust Coding Guidelines",
                 type: "doc",
                 docId: "contribute/rust-coding-guidelines",
               },
               {
-                label: "Frequently Asked Questions",
+                label: "Update Aptos.dev",
                 type: "doc",
-                docId: "contribute/faq",
+                docId: "contribute/site-updates",
+              },
+              {
+                label: "Follow Aptos Style",
+                type: "doc",
+                docId: "contribute/aptos-style",
               },
             ],
           },
