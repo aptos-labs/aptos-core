@@ -205,7 +205,7 @@ pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
 /// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
 pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_num_total_txns_left_on_commit",
+        "quorum_store_num_local_proofs_left_on_commit",
         "Histogram for the number of locally created batches/PoS left after cleaning up commit notifications.",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
