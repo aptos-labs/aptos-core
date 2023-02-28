@@ -353,11 +353,6 @@ const config = {
                 docId: "help/external-resources",
               },
               {
-                label: "Frequently Asked Questions",
-                type: "doc",
-                docId: "help/faq",
-              },
-              {
                 label: "Rust Coding Guidelines",
                 type: "doc",
                 docId: "help/rust-coding-guidelines",

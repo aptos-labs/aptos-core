@@ -418,7 +418,6 @@ const sidebars = {
     "help/index",
     "help/community/index",
     "help/external-resources",
-    "help/faq",
     "help/rust-coding-guidelines",
     "help/site-updates",
     "help/aptos-style",
