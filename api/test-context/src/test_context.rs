@@ -511,6 +511,28 @@ impl TestContext {
             .unwrap()
     }
 
+    pub async fn gen_events_by_handle(
+        &self,
+        account_address: &AccountAddress,
+        resource: &str,
+        field_name: &str,
+    ) -> Value {
+        let request = format!(
+            "/accounts/{}/events/{}/{}",
+            account_address, resource, field_name
+        );
+        self.get(&request).await
+    }
+
+    pub async fn gen_events_by_creation_num(
+        &self,
+        account_address: &AccountAddress,
+        creation_num: u64,
+    ) -> Value {
+        let request = format!("/accounts/{}/events/{}", account_address, creation_num);
+        self.get(&request).await
+    }
+
     // return a specific resource for an account. None if not found.
     pub async fn gen_resource(
         &self,
@@ -541,13 +563,8 @@ impl TestContext {
         module: &str,
         name: &str,
     ) -> serde_json::Value {
-        let resources = self
-            .get(&format!("/accounts/{}/resources", account.to_hex_literal()))
-            .await;
-        let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        vals.into_iter()
-            .find(|v| v["type"] == format!("{}::{}::{}", resource_account_address, module, name,))
-            .unwrap()
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await.unwrap()
     }
 
     // TODO: remove the helper function since we don't publish module directly anymore

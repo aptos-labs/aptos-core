@@ -128,6 +128,22 @@ impl Context {
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
 
+    pub fn state_view<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<u64>,
+    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
+        let (latest_ledger_info, requested_ledger_version) =
+            self.get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
+
+        let state_view = self
+            .state_view_at_version(requested_ledger_version)
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
+            })?;
+
+        Ok((latest_ledger_info, requested_ledger_version, state_view))
+    }
+
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
         self.db.state_view_at_version(Some(version))
     }

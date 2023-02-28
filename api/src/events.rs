@@ -75,7 +75,7 @@ impl EventsApi {
 
         // Ensure that account exists
         let account = Account::new(self.context.clone(), address.0, None, None, None)?;
-        account.get_account_resource()?;
+        account.verify_account_or_object_resource()?;
         self.list(
             account.latest_ledger_info,
             accept_type,

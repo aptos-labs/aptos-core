@@ -145,6 +145,10 @@ pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> Accou
     AccountAddress::new(array)
 }
 
+pub fn create_collection_address(creator: AccountAddress, collection: &str) -> AccountAddress {
+    create_object_address(creator, collection.as_bytes())
+}
+
 pub fn create_token_address(
     creator: AccountAddress,
     collection: &str,

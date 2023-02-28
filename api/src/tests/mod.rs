@@ -9,6 +9,7 @@ mod events_test;
 mod index_test;
 mod invalid_post_request_test;
 mod modules;
+mod objects;
 mod resource_groups;
 mod state_test;
 mod string_resource_test;
