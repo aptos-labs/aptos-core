@@ -29,7 +29,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{Features, OnChainConfig, TimedFeatures, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -582,6 +582,8 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
+                // FIXME: should probably read the timestamp from storage.
+                TimedFeatures::enable_all(),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -629,6 +631,8 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
+            // FIXME: should probably read the timestamp from storage.
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

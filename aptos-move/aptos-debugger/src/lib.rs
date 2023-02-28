@@ -11,7 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig},
+    on_chain_config::{Features, OnChainConfig, TimedFeatures},
     transaction::{ChangeSet, Transaction, TransactionInfo, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
@@ -183,6 +183,7 @@ impl AptosDebugger {
             LATEST_GAS_FEATURE_VERSION,
             ChainId::test().id(),
             features,
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
