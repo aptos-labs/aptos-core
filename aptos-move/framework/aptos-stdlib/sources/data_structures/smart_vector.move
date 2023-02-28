@@ -1,4 +1,4 @@
-module aptos_framework::smart_vector {
+module aptos_std::smart_vector {
     use std::error;
     use std::vector;
     use aptos_std::big_vector::{Self, BigVector};
