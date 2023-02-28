@@ -3,10 +3,6 @@ spec aptos_framework::coin {
         pragma verify = true;
     }
 
-    spec AggregatableCoin {
-        invariant value.limit == MAX_U64;
-    }
-
     spec mint {
         pragma opaque;
         let addr = type_info::type_of<CoinType>().account_address;
@@ -283,29 +279,5 @@ spec aptos_framework::coin {
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
-    }
-
-    spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
-        include system_addresses::AbortsIfNotAptosFramework{account: aptos_framework};
-        include aggregator_factory::CreateAggregatorInternalAbortsIf;
-    }
-
-    spec is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
-        aborts_if false;
-        ensures result == (aggregator::spec_read(coin.value) == 0);
-    }
-
-    spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
-        aborts_if aggregator::spec_read(coin.value) > MAX_U64;
-    }
-
-    spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
-        aborts_if false;
-    }
-
-    spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
-        let coin_store = global<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && !exists<CoinStore<CoinType>>(account_addr);
-        aborts_if amount > 0 && coin_store.coin.value < amount;
     }
 }

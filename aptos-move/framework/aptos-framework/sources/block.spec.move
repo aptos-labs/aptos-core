@@ -15,7 +15,6 @@ spec aptos_framework::block {
         requires timestamp >= reconfiguration::last_reconfiguration_time();
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
         aborts_if false;

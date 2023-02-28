@@ -4,7 +4,6 @@
 pub mod aggregator;
 pub mod harness;
 pub mod stake;
-pub mod transaction_fee;
 
 use anyhow::bail;
 use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
