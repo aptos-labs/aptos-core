@@ -59,7 +59,8 @@ use crate::{
     pruner::{
         db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
-        pruner_utils, state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+        pruner_utils, state_merkle_pruner_manager::StateMerklePrunerManager,
+        state_store::StateMerklePruner,
     },
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
@@ -280,11 +281,11 @@ impl AptosDB {
         } else {
             Arc::clone(&arc_ledger_rocksdb)
         };
-        let state_pruner = StatePrunerManager::new(
+        let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StatePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.epoch_snapshot_pruner_config.into(),
         );
@@ -292,7 +293,7 @@ impl AptosDB {
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             Arc::clone(&arc_state_kv_rocksdb),
-            state_pruner,
+            state_merkle_pruner,
             epoch_snapshot_pruner,
             buffered_state_target_items,
             max_nodes_per_lru_cache_shard,
@@ -979,7 +980,7 @@ impl AptosDB {
         let min_readable_version = self
             .state_store
             .state_db
-            .state_pruner
+            .state_merkle_pruner
             .get_min_readable_version();
         if version >= min_readable_version {
             return Ok(());
@@ -1655,9 +1656,13 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
-        gauged_api("is_state_pruner_enabled", || {
-            Ok(self.state_store.state_db.state_pruner.is_pruner_enabled())
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_state_merkle_pruner_enabled", || {
+            Ok(self
+                .state_store
+                .state_db
+                .state_merkle_pruner
+                .is_pruner_enabled())
         })
     }
 
@@ -2005,7 +2010,7 @@ impl DbWriter for AptosDB {
             )?;
 
             self.state_store
-                .state_pruner
+                .state_merkle_pruner
                 .pruner()
                 .save_min_readable_version(version, &state_merkle_batch)?;
             self.state_store
@@ -2023,7 +2028,7 @@ impl DbWriter for AptosDB {
 
             self.ledger_pruner.pruner().record_progress(version);
             self.state_store
-                .state_pruner
+                .state_merkle_pruner
                 .pruner()
                 .record_progress(version);
             self.state_store

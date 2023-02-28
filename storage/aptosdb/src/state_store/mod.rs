@@ -19,7 +19,7 @@ use crate::{
     },
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -84,8 +84,8 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<DB>,
-    pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
 pub(crate) struct StateStore {
@@ -276,8 +276,8 @@ impl StateStore {
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
         state_kv_db: Arc<DB>,
-        state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-        epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+        state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+        epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -346,7 +346,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             state_kv_db,
-            state_pruner,
+            state_merkle_pruner,
             epoch_snapshot_pruner,
         });
         let buffered_state = Mutex::new(
@@ -373,11 +373,11 @@ impl StateStore {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
-        let state_pruner = StatePrunerManager::new(
+        let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StatePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
@@ -387,7 +387,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             state_kv_db,
-            state_pruner,
+            state_merkle_pruner,
             epoch_snapshot_pruner,
         });
         let buffered_state = Self::create_buffered_state_from_latest_snapshot(

@@ -811,8 +811,8 @@ impl DbReader for FakeAptosDB {
             .get_state_value_chunk_with_proof(version, start_idx, chunk_size)
     }
 
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
-        self.inner.is_state_pruner_enabled()
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
+        self.inner.is_state_merkle_pruner_enabled()
     }
 
     fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {

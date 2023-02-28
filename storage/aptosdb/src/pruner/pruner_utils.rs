@@ -15,7 +15,7 @@ use aptos_schemadb::{schema::KeyCodec, DB};
 use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner
-pub fn create_state_pruner<S: StaleNodeIndexSchemaTrait>(
+pub fn create_state_merkle_pruner<S: StaleNodeIndexSchemaTrait>(
     state_merkle_db: Arc<DB>,
 ) -> Arc<StateMerklePruner<S>>
 where

@@ -24,7 +24,7 @@ use std::{
 /// Maintains the state store pruner and periodically calls the db_pruner's prune method to prune
 /// the DB. This also exposes API to report the progress to the parent thread.
 #[derive(Debug)]
-pub struct StatePrunerWorker<S> {
+pub struct StateMerklePrunerWorker<S> {
     /// The worker will sleep for this period of time after pruning each batch.
     pruning_time_interval_in_ms: u64,
     /// State store pruner.
@@ -37,17 +37,17 @@ pub struct StatePrunerWorker<S> {
     _phantom: std::marker::PhantomData<S>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StatePrunerWorker<S>
+impl<S: StaleNodeIndexSchemaTrait> StateMerklePrunerWorker<S>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
     pub(crate) fn new(
-        state_pruner: Arc<StateMerklePruner<S>>,
+        state_merkle_pruner: Arc<StateMerklePruner<S>>,
         state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> Self {
         Self {
             pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },
-            pruner: state_pruner,
+            pruner: state_merkle_pruner,
             max_node_to_prune_per_batch: state_merkle_pruner_config.batch_size as u64,
             quit_worker: AtomicBool::new(false),
             _phantom: std::marker::PhantomData,
