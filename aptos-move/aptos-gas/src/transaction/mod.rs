@@ -20,7 +20,7 @@ mod storage;
 
 pub use storage::{ChangeSetConfigs, StorageGasParameters};
 
-const GAS_SCALING_FACTOR: u64 = 10_000;
+const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
