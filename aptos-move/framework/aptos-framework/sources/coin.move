@@ -70,6 +70,15 @@ module aptos_framework::coin {
 
     /// Core data structures
 
+    struct CoinTransfer<phantom CoinType> {
+        /// Amount of coin this address has.
+        value: u128,
+    }
+
+    struct CoinBalance has key {
+        balances: aptos_std::table::Table<std::string::String, u128>,
+    }
+
     /// Main structure representing a coin/token in an account's custody.
     struct Coin<phantom CoinType> has store {
         /// Amount of coin this address has.
@@ -211,6 +220,39 @@ module aptos_framework::coin {
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
         let coin = extract(&mut coin_store.coin, amount);
         merge_aggregatable_coin(dst_coin, coin);
+    }
+
+    //
+    public fun withdraw2<T>(from: &signer, amount: u128): CoinTransfer<T> acquires CoinBalance {
+        let typename = std::type_info::type_name<T>();
+        let coin_balance = borrow_global_mut<CoinBalance>(std::signer::address_of(from));
+        let balance = aptos_std::table::borrow_mut(&mut coin_balance.balances, typename);
+        *balance = *balance - amount;
+        CoinTransfer { value: amount }
+    }
+
+    public fun deposit2<T>(to: &address, coin: CoinTransfer<T>) acquires CoinBalance {
+        let typename = std::type_info::type_name<T>();
+        let coin_balance = borrow_global_mut<CoinBalance>(*to);
+        let balance = aptos_std::table::borrow_mut(&mut coin_balance.balances, typename);
+        let CoinTransfer { value: amount } = coin;
+        *balance = *balance + amount;
+    }
+
+    public fun merge2<T>(a: CoinTransfer<T>, b: CoinTransfer<T>): CoinTransfer<T> {
+        let CoinTransfer { value: a_amount} = a;
+        let CoinTransfer { value: b_amount} = b;
+        CoinTransfer { value: a_amount + b_amount }
+    }
+
+    public fun join<T>(a: &mut CoinTransfer<T>, b: CoinTransfer<T>) {
+        let CoinTransfer { value: b_amount} = b;
+        a.value = a.value + b_amount;
+    }
+
+    public fun split<T>(a: &mut CoinTransfer<T>, amount: u128): CoinTransfer<T> {
+        a.value = a.value - amount;
+        CoinTransfer { value: amount }
     }
 
     //
