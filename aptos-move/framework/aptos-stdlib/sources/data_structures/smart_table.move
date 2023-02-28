@@ -1,7 +1,9 @@
 /// A smart table implementation based on linear hashing. (https://en.wikipedia.org/wiki/Linear_hashing)
-/// Compare to Table, it uses less storage slots but has higher chance of collision, it's a trade-off between space and time.
-/// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
-/// SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since it tolerates collisions.
+/// Compare to Table, it uses less storage slots but has higher chance of collision, a trade-off between space and time.
+/// Compare to other dynamic hashing implementation, linear hashing splits one bucket a time instead of doubling buckets
+/// when expanding to avoid unexpected gas cost.
+/// SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since
+/// it tolerates collisions.
 module aptos_std::smart_table {
     use std::error;
     use std::vector;
@@ -66,7 +68,7 @@ module aptos_std::smart_table {
             level: 0,
             size: 0,
             // The default split load threshold is 75%.
-            split_load_threshold: if (split_load_threshold == 0) {75} else {split_load_threshold},
+            split_load_threshold: if (split_load_threshold == 0) { 75 } else { split_load_threshold },
             target_bucket_size,
         };
         // The default number of initial buckets is 2.
@@ -89,18 +91,18 @@ module aptos_std::smart_table {
             vector::destroy_empty(table_with_length::remove(&mut table.buckets, i));
             i = i + 1;
         };
-        let SmartTable {buckets, num_buckets: _, level: _, size: _, split_load_threshold:_, target_bucket_size: _} = table;
+        let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
         table_with_length::destroy_empty(buckets);
     }
 
-    /// Destroy a table completely when V is dropable.
+    /// Destroy a table completely when V has `drop`.
     public fun destroy<K: drop, V: drop>(table: SmartTable<K, V>) {
         let i = 0;
         while (i < table.num_buckets) {
             table_with_length::remove(&mut table.buckets, i);
             i = i + 1;
         };
-        let SmartTable {buckets, num_buckets: _, level: _, size: _, split_load_threshold:_, target_bucket_size: _} = table;
+        let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
         table_with_length::destroy_empty(buckets);
     }
 
@@ -115,11 +117,11 @@ module aptos_std::smart_table {
         let bucket = table_with_length::borrow_mut(&mut table.buckets, index);
         // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
         assert!(vector::length(bucket) <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
-        assert!(vector::all(bucket, |entry| {
+        assert!(vector::all(bucket, | entry | {
             let e: &Entry<K, V> = entry;
             &e.key != &key
         }), error::invalid_argument(EALREADY_EXIST));
-        let e = Entry {hash, key, value};
+        let e = Entry { hash, key, value };
         if (table.target_bucket_size == 0) {
             let estimated_entry_size = max(size_of_val(&e), 1);
             table.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
@@ -238,7 +240,7 @@ module aptos_std::smart_table {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(table.level, table.num_buckets, hash);
         let bucket = table_with_length::borrow(&table.buckets, index);
-        vector::any(bucket, |entry| {
+        vector::any(bucket, | entry | {
             let e: &Entry<K, V> = entry;
             e.hash == hash && &e.key == &key
         })
@@ -254,7 +256,7 @@ module aptos_std::smart_table {
         while (i < len) {
             let entry = vector::borrow(bucket, i);
             if (&entry.key == &key) {
-                let Entry {hash:_, key:_, value} = vector::swap_remove(bucket, i);
+                let Entry { hash: _, key: _, value } = vector::swap_remove(bucket, i);
                 table.size = table.size - 1;
                 return value
             };

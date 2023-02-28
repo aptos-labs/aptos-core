@@ -28,6 +28,7 @@ mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
 mod simple_defi;
+mod smart_data_structures;
 mod stake;
 mod string_args;
 mod token_event_store;
