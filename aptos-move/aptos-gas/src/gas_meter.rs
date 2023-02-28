@@ -328,6 +328,10 @@ impl AptosGasMeter {
 }
 
 impl GasMeter for AptosGasMeter {
+    fn balance_internal(&self) -> InternalGas {
+        self.balance
+    }
+
     #[inline]
     fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
         let cost = self.gas_params.instr.simple_instr_cost(instr)?;

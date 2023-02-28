@@ -3,7 +3,7 @@
 
 use crate::natives::{
     cryptography::{ristretto255_point, ristretto255_scalar},
-    util::make_native_from_func,
+    helpers::make_native_from_func,
 };
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
