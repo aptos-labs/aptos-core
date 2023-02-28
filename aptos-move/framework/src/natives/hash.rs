@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::util::make_native_from_func;
+use crate::{
+    natives::helpers::{
+        make_native_from_func, make_safe_native, SafeNativeContext, SafeNativeResult,
+    },
+    pop_arg_safe,
+};
+use aptos_types::on_chain_config::TimedFeatures;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -10,7 +16,7 @@ use move_vm_types::{
 };
 use ripemd::Digest as RipemdDigest;
 use sha2::Digest;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, hash::Hasher};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 
@@ -83,22 +89,24 @@ pub struct Sha2_512HashGasParameters {
 
 fn native_sha2_512(
     gas_params: &Sha2_512HashGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let bytes = pop_arg!(args, Vec<u8>);
+    let bytes = pop_arg_safe!(args, Vec<u8>);
 
     let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+
+    context.charge(cost)?;
 
     let mut hasher = sha2::Sha512::new();
     hasher.update(&bytes);
     let output = hasher.finalize().to_vec();
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+    Ok(smallvec![Value::vector_u8(output)])
 }
 
 #[derive(Debug, Clone)]
@@ -193,7 +201,10 @@ pub struct GasParameters {
     pub blake2b_256: Blake2B256HashGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
             "sip_hash",
@@ -205,7 +216,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         ),
         (
             "sha2_512_internal",
-            make_native_from_func(gas_params.sha2_512, native_sha2_512),
+            make_safe_native(gas_params.sha2_512, timed_features, native_sha2_512),
         ),
         (
             "sha3_512_internal",

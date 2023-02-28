@@ -4,37 +4,49 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, PEER_MONITORING_SERVER_VERSION,
+    metrics, PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer,
+    MAX_DISTANCE_FROM_VALIDATORS, PEER_MONITORING_SERVER_VERSION,
 };
-use aptos_channels::aptos_channel;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{PeerMonitoringServiceConfig, PeerRole},
+    config::{BaseConfig, NodeConfig, PeerMonitoringServiceConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::Level;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{metadata::ConnectionState, storage::PeersAndMetadata},
+    application::{
+        interface::NetworkServiceEvents,
+        metadata::{ConnectionState, PeerMetadata, PeerMonitoringMetadata},
+        storage::PeersAndMetadata,
+    },
     peer_manager::PeerManagerNotification,
     protocols::{
-        network::NewNetworkEvents,
+        network::{NetworkEvents, NewNetworkEvents},
         rpc::InboundRpcRequest,
         wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
 use aptos_peer_monitoring_service_types::{
-    ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
-    PeerMonitoringServiceRequest, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
+    LatencyPingRequest, NetworkInformationResponse, PeerMonitoringServiceError,
+    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    ServerProtocolVersionResponse,
 };
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_time_service::{MockTimeService, TimeService};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
+use maplit::hashmap;
+use rand::{rngs::OsRng, Rng};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
+
+// Useful test constants
+const LOCAL_HOST_NET_ADDR: &str = "/ip4/127.0.0.1/tcp/8081";
 
 #[tokio::test]
 async fn test_get_server_protocol_version() {
     // Create the peer monitoring client and server
-    let (mut mock_client, service, _) = MockClient::new();
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version
@@ -50,119 +62,335 @@ async fn test_get_server_protocol_version() {
 }
 
 #[tokio::test]
-async fn test_get_connected_peers() {
+async fn test_get_network_information_fullnode() {
     // Create the peer monitoring client and server
-    let (mut mock_client, service, peers_and_metadata) = MockClient::new();
+    let base_config = BaseConfig {
+        role: RoleType::FullNode, // The server is a fullnode
+        ..Default::default()
+    };
+    let (mut mock_client, service, _, peers_and_metadata) =
+        MockClient::new(Some(base_config), None);
     tokio::spawn(service.start());
 
-    // Process a request to fetch the connected peers
-    let request = PeerMonitoringServiceRequest::GetConnectedPeers;
-    let response = mock_client.send_request(request).await.unwrap();
+    // Process a client request to fetch the network information and verify an empty response
+    verify_network_information(
+        &mut mock_client,
+        HashMap::new(),
+        MAX_DISTANCE_FROM_VALIDATORS,
+    )
+    .await;
 
-    // Verify the response is correct
-    let expected_response = PeerMonitoringServiceResponse::ConnectedPeers(ConnectedPeersResponse {
-        connected_peers: HashMap::new(),
-    });
-    assert_eq!(response, expected_response);
+    // Connect a new peer to the fullnode
+    let peer_id_1 = PeerId::random();
+    let peer_network_id_1 = PeerNetworkId::new(NetworkId::Public, peer_id_1);
+    let mut connection_metadata_1 = create_connection_metadata(peer_id_1);
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
+        .unwrap();
 
-    // Update the connected peers with a new peer
-    let peer_id = PeerId::random();
-    let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer_id);
-    let connection_metadata = ConnectionMetadata::new(
+    // Process a client request to fetch the network information and verify the response
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => PeerMetadata::new(connection_metadata_1.clone())},
+        MAX_DISTANCE_FROM_VALIDATORS,
+    )
+    .await;
+
+    // Update the peer monitoring metadata for peer 1
+    let peer_distance_1 = MAX_DISTANCE_FROM_VALIDATORS; // Peer 1 is not connected to anyone else
+    let peer_monitoring_metadata_1 = PeerMonitoringMetadata::new(None, None, Some(peer_distance_1));
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    let peer_metadata_1 =
+        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        MAX_DISTANCE_FROM_VALIDATORS,
+    )
+    .await;
+
+    // Update the peer monitoring metadata and connection metadata for peer 1
+    let peer_distance_1 = 2; // Peer 1 now has other connections
+    let peer_monitoring_metadata_1 = PeerMonitoringMetadata::new(None, None, Some(peer_distance_1));
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
+        .unwrap();
+    connection_metadata_1.connection_id = ConnectionId::from(101);
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    let peer_metadata_1 =
+        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        peer_distance_1 + 1,
+    )
+    .await;
+
+    // Connect another peer to the fullnode
+    let peer_id_2 = PeerId::random();
+    let peer_network_id_2 = PeerNetworkId::new(NetworkId::Validator, peer_id_2);
+    let peer_distance_2 = 0; // The peer is a validator
+    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let peer_monitoring_metadata_2 = PeerMonitoringMetadata::new(None, None, Some(peer_distance_2));
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
+        .unwrap();
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_2, peer_monitoring_metadata_2.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    let peer_metadata_2 =
+        PeerMetadata::new_for_test(connection_metadata_2.clone(), peer_monitoring_metadata_2);
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1.clone(), peer_network_id_2 => peer_metadata_2},
+        peer_distance_2 + 1,
+    )
+    .await;
+
+    // Disconnect peer 2
+    peers_and_metadata
+        .update_connection_state(peer_network_id_2, ConnectionState::Disconnected)
+        .unwrap();
+
+    // Process a request to fetch the network information and verify the response
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1},
+        peer_distance_1 + 1,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_get_network_information_validator() {
+    // Create the peer monitoring client and server
+    let base_config = BaseConfig {
+        role: RoleType::Validator, // The server is a validator
+        ..Default::default()
+    };
+    let (mut mock_client, service, _, peers_and_metadata) =
+        MockClient::new(Some(base_config), None);
+    tokio::spawn(service.start());
+
+    // Process a client request to fetch the network information and verify distance is 0
+    verify_network_information(&mut mock_client, HashMap::new(), 0).await;
+
+    // Connect a new peer to the validator (another validator)
+    let peer_id_1 = PeerId::random();
+    let peer_network_id_1 = PeerNetworkId::new(NetworkId::Validator, peer_id_1);
+    let connection_metadata_1 = create_connection_metadata(peer_id_1);
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => PeerMetadata::new(connection_metadata_1.clone())},
+        0,
+    )
+    .await;
+
+    // Update the peer monitoring metadata for peer 1
+    let peer_distance_1 = 0; // Peer 1 now has other connections
+    let peer_monitoring_metadata_1 = PeerMonitoringMetadata::new(None, None, Some(peer_distance_1));
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    let peer_metadata_1 =
+        PeerMetadata::new_for_test(connection_metadata_1.clone(), peer_monitoring_metadata_1);
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1.clone()},
+        0,
+    )
+    .await;
+
+    // Connect another peer to the validator
+    let peer_id_2 = PeerId::random();
+    let peer_network_id_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id_2);
+    let peer_distance_2 = 1; // The peer is a VFN
+    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let peer_monitoring_metadata_2 = PeerMonitoringMetadata::new(None, None, Some(peer_distance_2));
+    peers_and_metadata
+        .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
+        .unwrap();
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer_network_id_2, peer_monitoring_metadata_2.clone())
+        .unwrap();
+
+    // Process a client request to fetch the network information and verify the response
+    let peer_metadata_2 =
+        PeerMetadata::new_for_test(connection_metadata_2.clone(), peer_monitoring_metadata_2);
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1.clone(), peer_network_id_2 => peer_metadata_2},
+        0,
+    )
+        .await;
+
+    // Disconnect peer 2
+    peers_and_metadata
+        .update_connection_state(peer_network_id_2, ConnectionState::Disconnected)
+        .unwrap();
+
+    // Process a request to fetch the network information and verify the response
+    verify_network_information(
+        &mut mock_client,
+        hashmap! {peer_network_id_1 => peer_metadata_1},
+        0,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_latency_ping_request() {
+    // Create the peer monitoring client and server
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
+    tokio::spawn(service.start());
+
+    // Process several requests to perform latency pings
+    for i in 0..10 {
+        let request =
+            PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest { ping_counter: i });
+        let response = mock_client.send_request(request).await.unwrap();
+        match response {
+            PeerMonitoringServiceResponse::LatencyPing(latecy_ping_response) => {
+                assert_eq!(latecy_ping_response.ping_counter, i);
+            },
+            _ => panic!("Expected latency ping response but got: {:?}", response),
+        }
+    }
+}
+
+/// A simple utility function to create a new connection metadata for tests
+fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
+    ConnectionMetadata::new(
         peer_id,
         ConnectionId::default(),
-        NetworkAddress::from_str("/ip4/127.0.0.1/tcp/8081").unwrap(),
+        NetworkAddress::from_str(LOCAL_HOST_NET_ADDR).unwrap(),
         ConnectionOrigin::Inbound,
         MessagingProtocolVersion::V1,
         ProtocolIdSet::empty(),
         PeerRole::Unknown,
-    );
-    peers_and_metadata
-        .insert_connection_metadata(peer_network_id, connection_metadata)
-        .unwrap();
+    )
+}
 
-    // Process a request to fetch the connected peers
-    let request = PeerMonitoringServiceRequest::GetConnectedPeers;
-    let response = mock_client.send_request(request).await.unwrap();
+/// A simple utility function that sends a request for network info using the given
+/// client, and verifies the response is correct.
+async fn verify_network_information(
+    client: &mut MockClient,
+    expected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
+    expected_distance_from_validators: u64,
+) {
+    // Send a request to fetch the network information
+    let request = PeerMonitoringServiceRequest::GetNetworkInformation;
+    let response = client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    let mut connected_peers = HashMap::new();
-    connected_peers.insert(
-        peer_network_id,
-        peers_and_metadata
-            .get_metadata_for_peer(peer_network_id)
-            .unwrap(),
-    );
     let expected_response =
-        PeerMonitoringServiceResponse::ConnectedPeers(ConnectedPeersResponse { connected_peers });
-    assert_eq!(response, expected_response);
-
-    // Disconnect the peer
-    peers_and_metadata
-        .update_connection_state(peer_network_id, ConnectionState::Disconnected)
-        .unwrap();
-
-    // Process a request to fetch the connected peers
-    let request = PeerMonitoringServiceRequest::GetConnectedPeers;
-    let response = mock_client.send_request(request).await.unwrap();
-
-    // Verify the response is correct
-    let expected_response = PeerMonitoringServiceResponse::ConnectedPeers(ConnectedPeersResponse {
-        connected_peers: HashMap::new(),
-    });
+        PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
+            connected_peers_and_metadata: expected_peers_and_metadata,
+            distance_from_validators: expected_distance_from_validators,
+        });
     assert_eq!(response, expected_response);
 }
 
-/// A wrapper around the inbound network interface/channel for easily sending
-/// mock client requests to a [`PeerMonitoringServiceServer`].
+// A wrapper around the inbound network interface/channel for easily sending
+/// mock client requests to a peer monitoring service server.
 struct MockClient {
-    peer_notification_sender: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    peer_manager_notifiers:
+        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
 }
 
 impl MockClient {
-    fn new() -> (Self, PeerMonitoringServiceServer, Arc<PeersAndMetadata>) {
+    fn new(
+        base_config: Option<BaseConfig>,
+        peer_monitoring_config: Option<PeerMonitoringServiceConfig>,
+    ) -> (
+        Self,
+        PeerMonitoringServiceServer,
+        MockTimeService,
+        Arc<PeersAndMetadata>,
+    ) {
         initialize_logger();
 
-        // Create the peer monitoring service event stream
-        let peer_monitoring_service_config = PeerMonitoringServiceConfig::default();
-        let network_endpoint_config = crate::network::peer_monitoring_service_network_config(
-            peer_monitoring_service_config.clone(),
-        )
-        .inbound_queue_config;
-        let (peer_notification_sender, peer_notification_receiver) =
-            network_endpoint_config.build();
-        let (_connection_notifications_receiver, connection_notifications_sender) =
-            network_endpoint_config.build();
-        let network_request_stream = PeerMonitoringServiceNetworkEvents::new(
-            peer_notification_receiver,
-            connection_notifications_sender,
-        );
+        // Create the node config
+        let base_config = base_config.unwrap_or_default();
+        let peer_monitoring_config = peer_monitoring_config.unwrap_or_default();
+        let node_config = NodeConfig {
+            base: base_config,
+            peer_monitoring_service: peer_monitoring_config.clone(),
+            ..Default::default()
+        };
 
-        // Create the peer monitoring server
-        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
+        // Setup the networks and the network events
+        let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+        let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+        let mut network_and_events = HashMap::new();
+        let mut peer_manager_notifiers = HashMap::new();
+        for network_id in network_ids {
+            let queue_cfg = aptos_channel::Config::new(
+                peer_monitoring_config.max_network_channel_size as usize,
+            )
+            .queue_style(QueueStyle::FIFO)
+            .counters(&metrics::PENDING_PEER_MONITORING_SERVER_NETWORK_EVENTS);
+            let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
+            let (_, connection_notification_receiver) = queue_cfg.build();
+
+            let network_events = NetworkEvents::new(
+                peer_manager_notification_receiver,
+                connection_notification_receiver,
+            );
+            network_and_events.insert(network_id, network_events);
+            peer_manager_notifiers.insert(network_id, peer_manager_notifier);
+        }
+        let peer_monitoring_network_events =
+            PeerMonitoringServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
+
+        // Create the storage service
         let executor = tokio::runtime::Handle::current();
+        let mock_time_service = TimeService::mock();
         let peer_monitoring_server = PeerMonitoringServiceServer::new(
-            peer_monitoring_service_config,
+            node_config,
             executor,
-            network_request_stream,
+            peer_monitoring_network_events,
             peers_and_metadata.clone(),
         );
 
-        // Create the mock client
+        // Create the client
         let mock_client = Self {
-            peer_notification_sender,
+            peer_manager_notifiers,
         };
 
-        // Return the client and server
-        (mock_client, peer_monitoring_server, peers_and_metadata)
+        (
+            mock_client,
+            peer_monitoring_server,
+            mock_time_service.into_mock(),
+            peers_and_metadata,
+        )
     }
 
+    /// Sends the specified request and returns the response from the server
     async fn send_request(
         &mut self,
         request: PeerMonitoringServiceRequest,
     ) -> Result<PeerMonitoringServiceResponse, PeerMonitoringServiceError> {
-        let peer_id = PeerId::ZERO;
+        let peer_id = PeerId::random();
         let protocol_id = ProtocolId::PeerMonitoringServiceRpc;
+        let network_id = get_random_network_id();
 
         // Create an inbound RPC request
         let request_data = protocol_id
@@ -177,7 +405,9 @@ impl MockClient {
         let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Send the request to the peer monitoring service
-        self.peer_notification_sender
+        self.peer_manager_notifiers
+            .get(&network_id)
+            .unwrap()
             .push((peer_id, protocol_id), request_notification)
             .unwrap();
 
@@ -199,4 +429,16 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
+}
+
+/// Returns a random network ID
+fn get_random_network_id() -> NetworkId {
+    let mut rng = OsRng;
+    let random_number: u8 = rng.gen();
+    match random_number % 3 {
+        0 => NetworkId::Validator,
+        1 => NetworkId::Vfn,
+        2 => NetworkId::Public,
+        num => panic!("This shouldn't be possible! Got num: {:?}", num),
+    }
 }

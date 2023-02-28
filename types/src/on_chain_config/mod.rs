@@ -24,6 +24,7 @@ mod aptos_version;
 mod chain_id;
 mod consensus_config;
 mod gas_schedule;
+mod timed_features;
 mod validator_set;
 
 pub use self::{
@@ -37,6 +38,7 @@ pub use self::{
         ProposerElectionType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
@@ -241,3 +243,8 @@ impl MoveStructType for ConfigurationResource {
 }
 
 impl MoveResource for ConfigurationResource {}
+
+impl OnChainConfig for ConfigurationResource {
+    const MODULE_IDENTIFIER: &'static str = "reconfiguration";
+    const TYPE_IDENTIFIER: &'static str = "Configuration";
+}

@@ -21,7 +21,6 @@ use aptos_config::{
 };
 use aptos_crypto::x25519::PublicKey;
 use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
@@ -44,12 +43,7 @@ use aptos_network::{
 use aptos_network_discovery::DiscoveryChangeListener;
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
-use std::{
-    clone::Clone,
-    collections::{HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::{clone::Clone, collections::HashSet, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -82,7 +76,6 @@ impl NetworkBuilder {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         chain_id: ChainId,
-        trusted_peers: Arc<RwLock<PeerSet>>,
         peers_and_metadata: Arc<PeersAndMetadata>,
         network_context: NetworkContext,
         time_service: TimeService,
@@ -106,7 +99,6 @@ impl NetworkBuilder {
             time_service.clone(),
             listen_address,
             peers_and_metadata.clone(),
-            trusted_peers,
             authentication_mode,
             network_channel_size,
             max_concurrent_network_reqs,
@@ -135,7 +127,6 @@ impl NetworkBuilder {
     pub fn new_for_test(
         chain_id: ChainId,
         seeds: PeerSet,
-        trusted_peers: Arc<RwLock<PeerSet>>,
         network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
@@ -146,8 +137,7 @@ impl NetworkBuilder {
 
         let mut builder = NetworkBuilder::new(
             chain_id,
-            trusted_peers.clone(),
-            peers_and_metadata,
+            peers_and_metadata.clone(),
             network_context,
             time_service,
             listen_address,
@@ -165,7 +155,7 @@ impl NetworkBuilder {
 
         builder.add_connectivity_manager(
             seeds,
-            trusted_peers,
+            peers_and_metadata,
             MAX_FULLNODE_OUTBOUND_CONNECTIONS,
             CONNECTION_BACKOFF_BASE,
             MAX_CONNECTION_DELAY_MS,
@@ -198,12 +188,9 @@ impl NetworkBuilder {
 
         let network_context = NetworkContext::new(role, config.network_id, peer_id);
 
-        let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
-
         let mut network_builder = NetworkBuilder::new(
             chain_id,
-            trusted_peers.clone(),
-            peers_and_metadata,
+            peers_and_metadata.clone(),
             network_context,
             time_service,
             config.listen_address.clone(),
@@ -235,7 +222,7 @@ impl NetworkBuilder {
 
         network_builder.add_connectivity_manager(
             seeds,
-            trusted_peers,
+            peers_and_metadata,
             config.max_outbound_connections,
             config.connection_backoff_base,
             config.max_connection_delay_ms,
@@ -353,7 +340,7 @@ impl NetworkBuilder {
     pub fn add_connectivity_manager(
         &mut self,
         seeds: PeerSet,
-        trusted_peers: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         max_outbound_connections: usize,
         connection_backoff_base: u64,
         max_connection_delay_ms: u64,
@@ -372,7 +359,7 @@ impl NetworkBuilder {
         self.connectivity_manager_builder = Some(ConnectivityManagerBuilder::create(
             self.network_context(),
             self.time_service.clone(),
-            trusted_peers,
+            peers_and_metadata,
             seeds,
             connectivity_check_interval_ms,
             connection_backoff_base,

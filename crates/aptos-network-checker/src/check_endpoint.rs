@@ -178,7 +178,7 @@ fn build_upgrade_context(
             network_context,
             private_key,
             // If we had an incoming message, auth mode would matter.
-            HandshakeAuthMode::server_only(),
+            HandshakeAuthMode::server_only(&[network_id]),
         ),
         HANDSHAKE_VERSION,
         supported_protocols,

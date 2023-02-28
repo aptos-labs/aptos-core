@@ -15,6 +15,12 @@ pub enum Error {
     UnexpectedError(String),
 }
 
+impl From<anyhow::Error> for Error {
+    fn from(error: anyhow::Error) -> Self {
+        Error::UnexpectedError(error.to_string())
+    }
+}
+
 impl From<NetworkError> for Error {
     fn from(error: NetworkError) -> Self {
         Error::NetworkError(error.to_string())
@@ -24,11 +30,5 @@ impl From<NetworkError> for Error {
 impl From<RpcError> for Error {
     fn from(error: RpcError) -> Self {
         Error::RpcError(error.to_string())
-    }
-}
-
-impl From<anyhow::Error> for Error {
-    fn from(error: anyhow::Error) -> Self {
-        Error::UnexpectedError(error.to_string())
     }
 }

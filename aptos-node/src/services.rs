@@ -11,6 +11,11 @@ use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
+use aptos_network::application::interface::NetworkClientInterface;
+use aptos_peer_monitoring_service_server::{
+    network::PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer,
+};
+use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
@@ -128,6 +133,36 @@ pub fn start_node_inspection_service(node_config: &NodeConfig) {
     thread::spawn(move || {
         aptos_inspection_service::inspection_service::start_inspection_service(node_config)
     });
+}
+
+/// Starts the peer monitoring service and returns the runtime
+pub fn start_peer_monitoring_service(
+    node_config: &NodeConfig,
+    network_interfaces: ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
+) -> Runtime {
+    // Get the network client and events
+    let network_client = network_interfaces.network_client;
+    let network_service_events = network_interfaces.network_service_events;
+
+    // Create a new runtime for the monitoring service
+    let peer_monitoring_service_runtime =
+        aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
+
+    // TODO: spawn the client
+
+    // Create and spawn the peer monitoring server
+    let peer_monitoring_network_events =
+        PeerMonitoringServiceNetworkEvents::new(network_service_events);
+    let peer_monitoring_server = PeerMonitoringServiceServer::new(
+        node_config.clone(),
+        peer_monitoring_service_runtime.handle().clone(),
+        peer_monitoring_network_events,
+        network_client.get_peers_and_metadata(),
+    );
+    peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
+
+    // Return the runtime
+    peer_monitoring_service_runtime
 }
 
 /// Starts the telemetry service and grabs the build information
