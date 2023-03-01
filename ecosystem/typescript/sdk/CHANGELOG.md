@@ -6,7 +6,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-## 1.7.0 (2023-02-15)
+## 1.7.0 (2023-03-01)
 
 - Add Indexer support
 
