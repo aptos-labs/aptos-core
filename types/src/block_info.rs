@@ -87,6 +87,19 @@ impl BlockInfo {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn random_with_epoch(epoch: u64, round: Round) -> Self {
+        Self {
+            epoch,
+            round,
+            id: HashValue::zero(),
+            executed_state_id: HashValue::zero(),
+            version: 0,
+            timestamp_usecs: 0,
+            next_epoch_state: None,
+        }
+    }
+
     /// Create a new genesis block. The genesis block is effectively the
     /// blockchain state after executing the initial genesis transaction.
     ///
