@@ -63,7 +63,7 @@ impl Default for ConsensusConfig {
             // over 1gbps link
             max_sending_block_bytes: 600 * 1024, // 600 KB
             max_sending_block_bytes_quorum_store_override: 10 * 1024 * 1024, // 10MB
-            max_receiving_block_txns: 1.5 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
+            max_receiving_block_txns: 10000,
             max_receiving_block_txns_quorum_store_override: 2
                 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
