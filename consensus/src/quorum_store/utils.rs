@@ -274,20 +274,18 @@ impl ProofQueue {
             .count();
         let mut num_expired_but_not_committed = 0;
         for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
-            match self
+            if self
                 .digest_proof
                 .get(&digest)
                 .expect("Entry for unexpired digest must exist")
+                .is_some()
             {
-                Some(_) => {
-                    // non-committed proof that is expired
-                    num_expired_but_not_committed += 1;
-                    if expiration_time.round() < current_time.round() {
-                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                            .observe((current_time.round() - expiration_time.round()) as f64);
-                    }
-                },
-                None => {}, // Proof was already committed
+                // non-committed proof that is expired
+                num_expired_but_not_committed += 1;
+                if expiration_time.round() < current_time.round() {
+                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                        .observe((current_time.round() - expiration_time.round()) as f64);
+                }
             }
             claims::assert_some!(self.digest_proof.remove(&digest));
             self.digest_insertion_time.remove(&digest);
@@ -297,33 +295,35 @@ impl ProofQueue {
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
 
-        for (digest, expiration) in self.digest_queue.iter() {
-            if *expiration >= current_time && !excluded_proofs.contains(digest) {
-                match self
-                    .digest_proof
-                    .get(digest)
-                    .expect("Entry for unexpired digest must exist")
-                {
-                    Some(proof) => {
-                        cur_bytes += proof.info().num_bytes;
-                        cur_txns += proof.info().num_txns;
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
-                            // Exceeded the limit for requested bytes or number of transactions.
-                            break;
-                        }
-                        ret.push(proof.clone());
-                        if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
-                            counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
-                        }
-                    },
-                    None => {}, // Proof was already committed, skip.
-                }
-            }
-            if *expiration < current_time && !excluded_proofs.contains(digest) {
-                num_expired_but_not_committed += 1;
-                if expiration.round() < current_time.round() {
-                    counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
-                        .observe((current_time.round() - expiration.round()) as f64);
+        for (digest, expiration) in self
+            .digest_queue
+            .iter()
+            .filter(|(digest, _)| !excluded_proofs.contains(digest))
+        {
+            if let Some(proof) = self
+                .digest_proof
+                .get(digest)
+                .expect("Entry for unexpired digest must exist")
+            {
+                if *expiration >= current_time {
+                    // non-committed proof that has not expired
+                    cur_bytes += proof.info().num_bytes;
+                    cur_txns += proof.info().num_txns;
+                    if cur_bytes > max_bytes || cur_txns > max_txns {
+                        // Exceeded the limit for requested bytes or number of transactions.
+                        break;
+                    }
+                    ret.push(proof.clone());
+                    if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
+                        counters::POS_TO_PULL.observe(insertion_time.elapsed().as_secs_f64());
+                    }
+                } else {
+                    // non-committed proof that is expired
+                    num_expired_but_not_committed += 1;
+                    if expiration.round() < current_time.round() {
+                        counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS
+                            .observe((current_time.round() - expiration.round()) as f64);
+                    }
                 }
             }
         }
