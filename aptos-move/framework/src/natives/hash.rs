@@ -2,18 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    natives::helpers::{
-        make_native_from_func, make_safe_native, SafeNativeContext, SafeNativeResult,
-    },
-    safely_pop_arg,
+    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
+    safely_assert_eq, safely_pop_arg,
 };
 use aptos_types::on_chain_config::TimedFeatures;
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
 use smallvec::{smallvec, SmallVec};
@@ -148,22 +143,22 @@ pub struct Blake2B256HashGasParameters {
 
 fn native_blake2b_256(
     gas_params: &Blake2B256HashGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(_ty_args.is_empty());
-    debug_assert!(args.len() == 1);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(_ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 1);
 
-    let bytes = pop_arg!(args, Vec<u8>);
+    let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    context.charge(gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64))?;
 
     let output = blake2_rfc::blake2b::blake2b(32, &[], &bytes)
         .as_bytes()
         .to_vec();
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(output)]))
+    Ok(smallvec![Value::vector_u8(output)])
 }
 
 #[derive(Debug, Clone)]
@@ -236,11 +231,15 @@ pub fn make_all(
         ),
         (
             "ripemd160_internal",
-            make_safe_native(gas_params.ripemd160, timed_features, native_ripemd160),
+            make_safe_native(
+                gas_params.ripemd160,
+                timed_features.clone(),
+                native_ripemd160,
+            ),
         ),
         (
             "blake2b_256_internal",
-            make_native_from_func(gas_params.blake2b_256, native_blake2b_256),
+            make_safe_native(gas_params.blake2b_256, timed_features, native_blake2b_256),
         ),
     ];
 
