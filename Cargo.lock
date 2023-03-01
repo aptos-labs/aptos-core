@@ -1977,6 +1977,7 @@ dependencies = [
  "serde 1.0.149",
  "tokio",
  "tokio-stream",
+ "url",
 ]
 
 [[package]]
