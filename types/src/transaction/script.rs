@@ -107,11 +107,11 @@ impl fmt::Debug for Script {
 /// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EntryFunction {
-    pub module: ModuleId,
-    pub function: Identifier,
-    pub ty_args: Vec<TypeTag>,
+    module: ModuleId,
+    function: Identifier,
+    ty_args: Vec<TypeTag>,
     #[serde(with = "vec_bytes")]
-    pub args: Vec<Vec<u8>>,
+    args: Vec<Vec<u8>>,
 }
 
 impl EntryFunction {

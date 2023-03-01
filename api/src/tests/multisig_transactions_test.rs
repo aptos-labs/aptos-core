@@ -68,17 +68,18 @@ async fn test_multisig_transaction_to_update_owners() {
     assert_eq!(0, context.get_apt_balance(multisig_account).await);
 
     // Add owners 3 and 4.
-    let add_owners_payload =
-        bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(EntryFunction {
-            module: ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            function: ident_str!("add_owners").to_owned(),
-            ty_args: vec![],
-            args: serialize_values(&vec![MoveValue::vector_address(vec![
+    let add_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+        EntryFunction::new(
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
+            ident_str!("add_owners").to_owned(),
+            vec![],
+            serialize_values(&vec![MoveValue::vector_address(vec![
                 owner_account_3.address(),
                 owner_account_4.address(),
             ])]),
-        }))
-        .unwrap();
+        ),
+    ))
+    .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -103,16 +104,17 @@ async fn test_multisig_transaction_to_update_owners() {
     ])
     .await;
 
-    let remove_owners_payload =
-        bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(EntryFunction {
-            module: ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            function: ident_str!("remove_owners").to_owned(),
-            ty_args: vec![],
-            args: serialize_values(&vec![MoveValue::vector_address(vec![
+    let remove_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+        EntryFunction::new(
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
+            ident_str!("remove_owners").to_owned(),
+            vec![],
+            serialize_values(&vec![MoveValue::vector_address(vec![
                 owner_account_4.address()
             ])]),
-        }))
-        .unwrap();
+        ),
+    ))
+    .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -151,14 +153,15 @@ async fn test_multisig_transaction_update_signature_threshold() {
         .await;
 
     // Change the signature threshold from 2-of-2 to 1-of-2
-    let signature_threshold_payload =
-        bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(EntryFunction {
-            module: ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            function: ident_str!("update_signatures_required").to_owned(),
-            ty_args: vec![],
-            args: serialize_values(&vec![MoveValue::U64(1)]),
-        }))
-        .unwrap();
+    let signature_threshold_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+        EntryFunction::new(
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
+            ident_str!("update_signatures_required").to_owned(),
+            vec![],
+            serialize_values(&vec![MoveValue::U64(1)]),
+        ),
+    ))
+    .unwrap();
     context
         .create_multisig_transaction(
             owner_account_1,
@@ -466,12 +469,14 @@ async fn assert_signature_threshold(
 }
 
 fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u64) -> Vec<u8> {
-    bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(EntryFunction {
-        module: ModuleId::new(CORE_CODE_ADDRESS, ident_str!("aptos_account").to_owned()),
-        function: ident_str!("transfer").to_owned(),
-        ty_args: vec![],
-        args: serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),
-    }))
+    bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+        EntryFunction::new(
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("aptos_account").to_owned()),
+            ident_str!("transfer").to_owned(),
+            vec![],
+            serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),
+        ),
+    ))
     .unwrap()
 }
 

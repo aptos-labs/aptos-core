@@ -70,16 +70,16 @@ pub fn convert_prologue_error(
             let new_major_status = match error_split(code) {
                 // TODO: Update these after adding the appropriate error codes into StatusCode
                 // in the Move repo.
-                (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::TRANSACTION_EXPIRED,
-                (PERMISSION_DENIED, ENOT_MULTISIG_OWNER) => StatusCode::BAD_CHAIN_ID,
+                (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::ACCOUNT_NOT_MULTISIG,
+                (PERMISSION_DENIED, ENOT_MULTISIG_OWNER) => StatusCode::NOT_MULTISIG_OWNER,
                 (INVALID_ARGUMENT, EMULTISIG_TRANSACTION_NOT_FOUND) => {
-                    StatusCode::SEQUENCE_NUMBER_TOO_BIG
+                    StatusCode::MULTISIG_TRANSACTION_NOT_FOUND
                 },
                 (INVALID_ARGUMENT, EMULTISIG_NOT_ENOUGH_APPROVALS) => {
-                    StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
+                    StatusCode::MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS
                 },
                 (INVALID_ARGUMENT, EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH) => {
-                    StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
+                    StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH
                 },
                 (category, reason) => {
                     log_context.alert();

@@ -639,15 +639,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                                 .collect::<Result<_, bcs::Error>>()?;
                             Some(
                                 aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
-                                    EntryFunction {
-                                        module: module.into(),
-                                        function: function.name.into(),
-                                        ty_args: type_arguments
+                                    EntryFunction::new(
+                                        module.into(),
+                                        function.name.into(),
+                                        type_arguments
                                             .into_iter()
                                             .map(|v| v.try_into())
                                             .collect::<Result<_>>()?,
                                         args,
-                                    },
+                                    ),
                                 ),
                             )
                         },
