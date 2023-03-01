@@ -414,7 +414,7 @@ Signature:
 SignedDigest:
   STRUCT:
     - epoch: U64
-    - peer_id:
+    - signer:
         TYPENAME: AccountAddress
     - info:
         TYPENAME: SignedDigestInfo
@@ -422,6 +422,8 @@ SignedDigest:
         TYPENAME: Signature
 SignedDigestInfo:
   STRUCT:
+    - batch_author:
+        TYPENAME: AccountAddress
     - digest:
         TYPENAME: HashValue
     - expiration:

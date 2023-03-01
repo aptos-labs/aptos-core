@@ -8,7 +8,7 @@ use aptos_consensus_types::{
     request_response::{BlockProposalCommand, ConsensusResponse},
 };
 use aptos_crypto::HashValue;
-use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
 use std::collections::HashSet;
 
@@ -18,7 +18,7 @@ async fn test_block_request() {
 
     let digest = HashValue::random();
     let proof = ProofOfStore::new(
-        SignedDigestInfo::new(digest, LogicalTime::new(0, 10), 1, 1),
+        SignedDigestInfo::new(PeerId::random(), digest, LogicalTime::new(0, 10), 1, 1),
         AggregateSignature::empty(),
     );
     proof_manager.handle_remote_proof(proof.clone());

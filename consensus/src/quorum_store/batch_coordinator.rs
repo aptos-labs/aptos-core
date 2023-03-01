@@ -124,6 +124,7 @@ impl BatchCoordinator {
                 self.proof_coordinator_tx
                     .send(ProofCoordinatorCommand::InitProof(
                         SignedDigestInfo::new(
+                            self.my_peer_id,
                             digest,
                             expiration,
                             payload.len() as u64,
