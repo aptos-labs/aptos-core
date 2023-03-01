@@ -274,10 +274,11 @@ impl ProofQueue {
             .count();
         let mut num_expired_but_not_committed = 0;
         for (digest, expiration_time) in self.digest_queue.drain(0..num_expired) {
-            if let Some(_) = self
+            if self
                 .digest_proof
                 .get(&digest)
                 .expect("Entry for unexpired digest must exist")
+                .is_some()
             {
                 // non-committed proof that is expired
                 num_expired_but_not_committed += 1;
