@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 4 MiB */
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -126,7 +126,7 @@ impl Default for StorageServiceConfig {
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_state_chunk_size: 4000,
             max_subscription_period_ms: 5000,
-            max_transaction_chunk_size: 2000,
+            max_transaction_chunk_size: 5000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
         }
@@ -166,7 +166,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 20,
             max_concurrent_state_requests: 6,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
