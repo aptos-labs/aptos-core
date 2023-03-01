@@ -161,12 +161,12 @@ crate::params::define_gas_parameters!(
         [
             max_execution_gas: InternalGas,
             { 7.. => "max_execution_gas" },
-            2_000_000 * GAS_SCALING_FACTOR,
+            20_000_000_000,
         ],
         [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
-            1_000_000 * GAS_SCALING_FACTOR,
+            10_000_000_000,
         ],
         [
             max_storage_fee: Fee,
