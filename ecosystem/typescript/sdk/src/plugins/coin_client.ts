@@ -47,23 +47,10 @@ export class CoinClient {
     extraArgs?: OptionalTransactionArgs & {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
-      // If set, create the `receiver` account if it doesn't exist on-chain.
-      // This is done by calling `0x1::aptos_account::transfer` instead, which
-      // will create the account on-chain first if it doesn't exist before
-      // transferring the coins to it.
-      createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
     // If none is explicitly given, use 0x1::aptos_coin::AptosCoin as the coin type.
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
-
-    // If we should create the receiver account if it doesn't exist on-chain,
-    // use the `0x1::aptos_account::transfer` function.
-    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer" : "0x1::coin::transfer";
-
-    // If we're using the `0x1::aptos_account::transfer` function, we don't
-    // need type args.
-    const typeArgs = extraArgs?.createReceiverIfMissing ? [] : [coinTypeToTransfer];
 
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
