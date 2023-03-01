@@ -211,56 +211,89 @@ pub fn all_natives(
         };
     }
 
-    add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
+    add_natives_from_module!(
+        "account",
+        account::make_all(gas_params.account.clone(), timed_features.clone())
+    );
     add_natives_from_module!(
         "create_signer",
-        create_signer::make_all(gas_params.account.create_signer.clone())
+        create_signer::make_all(
+            gas_params.account.create_signer.clone(),
+            timed_features.clone()
+        )
     );
-    add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
+    add_natives_from_module!(
+        "ed25519",
+        ed25519::make_all(gas_params.ed25519.clone(), timed_features.clone())
+    );
     add_natives_from_module!(
         "genesis",
-        create_signer::make_all(gas_params.account.create_signer)
+        create_signer::make_all(gas_params.account.create_signer, timed_features.clone())
     );
-    add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
+    add_natives_from_module!(
+        "multi_ed25519",
+        multi_ed25519::make_all(gas_params.ed25519, timed_features.clone())
+    );
     add_natives_from_module!(
         "bls12381",
-        cryptography::bls12381::make_all(gas_params.bls12381)
+        cryptography::bls12381::make_all(gas_params.bls12381, timed_features.clone())
     );
     add_natives_from_module!(
         "secp256k1",
-        cryptography::secp256k1::make_all(gas_params.secp256k1)
+        cryptography::secp256k1::make_all(gas_params.secp256k1, timed_features.clone())
     );
     add_natives_from_module!(
         "aptos_hash",
-        hash::make_all(gas_params.hash, timed_features)
+        hash::make_all(gas_params.hash, timed_features.clone())
     );
     add_natives_from_module!(
         "ristretto255",
-        cryptography::ristretto255::make_all(gas_params.ristretto255)
+        cryptography::ristretto255::make_all(gas_params.ristretto255, timed_features.clone())
     );
-    add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
-    add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
-    add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
+    add_natives_from_module!(
+        "type_info",
+        type_info::make_all(gas_params.type_info, timed_features.clone())
+    );
+    add_natives_from_module!(
+        "util",
+        util::make_all(gas_params.util.clone(), timed_features.clone())
+    );
+    add_natives_from_module!(
+        "from_bcs",
+        util::make_all(gas_params.util, timed_features.clone())
+    );
     add_natives_from_module!(
         "transaction_context",
-        transaction_context::make_all(gas_params.transaction_context)
+        transaction_context::make_all(gas_params.transaction_context, timed_features.clone())
     );
-
-    add_natives_from_module!("code", code::make_all(gas_params.code));
+    add_natives_from_module!(
+        "code",
+        code::make_all(gas_params.code, timed_features.clone())
+    );
     add_natives_from_module!(
         "event",
-        event::make_all(gas_params.event, calc_abstract_val_size)
+        event::make_all(
+            gas_params.event,
+            calc_abstract_val_size,
+            timed_features.clone()
+        )
     );
     add_natives_from_module!(
         "state_storage",
-        state_storage::make_all(gas_params.state_storage)
+        state_storage::make_all(gas_params.state_storage, timed_features.clone())
     );
-    add_natives_from_module!("aggregator", aggregator::make_all(gas_params.aggregator));
+    add_natives_from_module!(
+        "aggregator",
+        aggregator::make_all(gas_params.aggregator, timed_features.clone())
+    );
     add_natives_from_module!(
         "aggregator_factory",
-        aggregator_factory::make_all(gas_params.aggregator_factory)
+        aggregator_factory::make_all(gas_params.aggregator_factory, timed_features.clone())
     );
-    add_natives_from_module!("object", object::make_all(gas_params.object));
+    add_natives_from_module!(
+        "object",
+        object::make_all(gas_params.object, timed_features)
+    );
 
     make_table_from_iter(framework_addr, natives)
 }
