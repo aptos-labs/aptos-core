@@ -24,7 +24,6 @@ pub mod abort_codes {
     pub const NFE_DESERIALIZE: u64 = 0x01_0001;
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_ecdsa_recover(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
@@ -99,7 +98,6 @@ pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    // See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
     let natives = [(
         "ecdsa_recover_internal",
         make_safe_native(gas_params, timed_features, native_ecdsa_recover),

@@ -687,7 +687,6 @@ pub fn make_all(
     timed_features: TimedFeatures,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
-    // See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
     natives.append(&mut vec![
         // BLS over BLS12-381
         (

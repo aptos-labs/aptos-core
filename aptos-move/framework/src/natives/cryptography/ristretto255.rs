@@ -61,7 +61,6 @@ pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    // See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
     let natives = [
         (
             "point_is_canonical_internal",
@@ -169,9 +168,6 @@ pub fn make_all(
         ),
         (
             "multi_scalar_mul_internal",
-            // See:
-            //  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
-            //  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-w6m7-x6c3-pph2
             if timed_features.is_enabled(TimedFeatureFlag::Ristretto255NativeFloatingPointFix) {
                 make_safe_native(
                     gas_params.clone(),

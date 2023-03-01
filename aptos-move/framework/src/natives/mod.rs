@@ -288,9 +288,12 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "aggregator_factory",
-        aggregator_factory::make_all(gas_params.aggregator_factory, timed_features)
+        aggregator_factory::make_all(gas_params.aggregator_factory, timed_features.clone())
     );
-    add_natives_from_module!("object", object::make_all(gas_params.object));
+    add_natives_from_module!(
+        "object",
+        object::make_all(gas_params.object, timed_features)
+    );
 
     make_table_from_iter(framework_addr, natives)
 }

@@ -642,9 +642,6 @@ mod test {
     }
 }
 
-// See:
-//  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
-//  - https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-w6m7-x6c3-pph2
 /// This upgrades 'native_multi_scalar_mul' in two ways:
 /// 1. It is a "safe" native that uses `SafeNativeContext::charge` to prevent DoS attacks.
 /// 2. It no longer uses floating-point arithmetic to compute the gas costs.

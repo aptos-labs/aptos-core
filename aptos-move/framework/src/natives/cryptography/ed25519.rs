@@ -159,7 +159,6 @@ pub fn make_all(
     let mut natives = vec![];
 
     // Always-on natives.
-    // See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
     natives.append(&mut vec![
         (
             "public_key_validate_internal",

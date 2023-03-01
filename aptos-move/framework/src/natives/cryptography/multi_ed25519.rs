@@ -113,7 +113,6 @@ fn native_public_key_validate_v2(
     Ok(smallvec![Value::bool(all_valid)])
 }
 
-// See also: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_public_key_validate_with_gas_fix(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
@@ -275,7 +274,6 @@ pub fn make_all(
         // MultiEd25519
         (
             "public_key_validate_internal",
-            // See also: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
             if timed_features
                 .is_enabled(TimedFeatureFlag::MultiEd25519NativePublicKeyValidateGasFix)
             {

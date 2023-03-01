@@ -27,7 +27,6 @@ pub struct SipHashGasParameters {
     pub per_byte: InternalGasPerByte,
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_sip_hash(
     gas_params: &SipHashGasParameters,
     context: &mut SafeNativeContext,
@@ -56,7 +55,6 @@ pub struct Keccak256HashGasParameters {
     pub per_byte: InternalGasPerByte,
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_keccak256(
     gas_params: &Keccak256HashGasParameters,
     context: &mut SafeNativeContext,
@@ -85,7 +83,6 @@ pub struct Sha2_512HashGasParameters {
     pub per_byte: InternalGasPerByte,
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_sha2_512(
     gas_params: &Sha2_512HashGasParameters,
     context: &mut SafeNativeContext,
@@ -113,7 +110,6 @@ pub struct Sha3_512HashGasParameters {
     pub per_byte: InternalGasPerByte,
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_sha3_512(
     gas_params: &Sha3_512HashGasParameters,
     context: &mut SafeNativeContext,
@@ -167,7 +163,6 @@ pub struct Ripemd160HashGasParameters {
     pub per_byte: InternalGasPerByte,
 }
 
-// See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
 fn native_ripemd160(
     gas_params: &Ripemd160HashGasParameters,
     context: &mut SafeNativeContext,
@@ -207,7 +202,6 @@ pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    // See: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
     let natives = [
         (
             "sip_hash",
