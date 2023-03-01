@@ -188,7 +188,8 @@ impl GasParameters {
             },
             object: object::GasParameters {
                 exists_at: object::ExistsAtGasParameters {
-                    base_cost: 0.into(),
+                    base: 0.into(),
+                    per_type: 0.into(),
                 },
             },
         }

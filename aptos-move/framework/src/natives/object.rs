@@ -7,7 +7,9 @@ use crate::{
 };
 use aptos_types::on_chain_config::TimedFeatures;
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::InternalGas, vm_status::StatusCode,
+    account_address::AccountAddress,
+    gas_algebra::{InternalGas, InternalGasPerArg, NumArgs},
+    vm_status::StatusCode,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -19,12 +21,13 @@ use std::collections::VecDeque;
 /***************************************************************************************************
  * native exists_at<T>
  *
- *   gas cost: base_cost
+ *   gas cost: base + number of type tags * per_abstract_value_unit
  *
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct ExistsAtGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
+    pub per_type: InternalGasPerArg,
 }
 
 fn native_exists_at(
@@ -39,7 +42,9 @@ fn native_exists_at(
     let type_ = ty_args.pop().unwrap();
     let address = safely_pop_arg!(args, AccountAddress);
 
-    context.charge(gas_params.base_cost)?;
+    // We don't need to charge for address as it's fixed length (so can be included in base).
+    context
+        .charge(gas_params.base + gas_params.per_type * NumArgs::new(u64::from(type_.size())))?;
 
     let exists = context.exists_at(address, &type_).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
@@ -61,11 +66,9 @@ pub struct GasParameters {
 }
 
 impl GasParameters {
-    pub fn new(exists_at_base: InternalGas) -> Self {
+    pub fn new(base: InternalGas, per_type: InternalGasPerArg) -> Self {
         Self {
-            exists_at: ExistsAtGasParameters {
-                base_cost: exists_at_base,
-            },
+            exists_at: ExistsAtGasParameters { base, per_type },
         }
     }
 }
