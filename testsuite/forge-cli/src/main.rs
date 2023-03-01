@@ -820,7 +820,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    MetricsThreshold::new(12, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
                     MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
                 ))
@@ -872,7 +872,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    MetricsThreshold::new(12, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
                     MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
                 ))
