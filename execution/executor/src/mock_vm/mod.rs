@@ -403,6 +403,11 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
         },
+        TransactionPayload::Multisig(_) => {
+            unimplemented!("MockVM does not support multisig transaction payload.")
+        },
+
+        // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
         },

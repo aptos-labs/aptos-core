@@ -232,8 +232,8 @@ module aptos_framework::voting {
     /// @param voting_forum_address The forum's address where the proposal will be stored.
     /// @param execution_content The execution content that will be given back at resolution time. This can contain
     /// data such as a capability resource used to scope the execution.
-    /// @param execution_hash The hash for the execution script module. Only the same exact script module can resolve
-    /// this proposal.
+    /// @param execution_hash The sha-256 hash for the execution script module. Only the same exact script module can
+    /// resolve this proposal.
     /// @param min_vote_threshold The minimum number of votes needed to consider this proposal successful.
     /// @param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.
     /// @param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.

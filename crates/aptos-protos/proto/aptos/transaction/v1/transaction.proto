@@ -223,6 +223,8 @@ message TransactionPayload {
     ENTRY_FUNCTION_PAYLOAD = 0;
     SCRIPT_PAYLOAD = 1;
     MODULE_BUNDLE_PAYLOAD = 2;
+    WRITE_SET_PAYLOAD = 3;
+    MULTISIG_PAYLOAD = 4;
   }
 
   Type type = 1;
@@ -232,6 +234,7 @@ message TransactionPayload {
     ScriptPayload script_payload = 3;
     ModuleBundlePayload module_bundle_payload = 4;
     WriteSetPayload write_set_payload = 5;
+    MultisigPayload multisig_payload = 6;
   }
 }
 
@@ -250,6 +253,23 @@ message ScriptPayload {
   MoveScriptBytecode code = 1;
   repeated MoveType type_arguments = 2;
   repeated string arguments = 3;
+}
+
+message MultisigPayload {
+  string multisig_address = 1;
+  optional MultisigTransactionPayload transaction_payload = 2;
+}
+
+message MultisigTransactionPayload {
+  enum Type {
+    ENTRY_FUNCTION_PAYLOAD = 0;
+  }
+
+  Type type = 1;
+
+  oneof payload {
+    EntryFunctionPayload entry_function_payload = 2;
+  }
 }
 
 message ModuleBundlePayload {

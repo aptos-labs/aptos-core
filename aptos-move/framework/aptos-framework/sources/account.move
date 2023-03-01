@@ -188,11 +188,6 @@ module aptos_framework::account {
         create_account_unchecked(new_address)
     }
 
-    #[test_only]
-    public fun create_account_for_test(new_address: address): signer {
-        create_account_unchecked(new_address)
-    }
-
     fun create_account_unchecked(new_address: address): signer {
         let new_account = create_signer(new_address);
         let authentication_key = bcs::to_bytes(&new_address);
@@ -459,35 +454,17 @@ module aptos_framework::account {
         let source_address = signer::address_of(account);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
-        let account_resource = borrow_global_mut<Account>(source_address);
-
         // Proof that this account intends to delegate its signer capability to another account.
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: account_resource.sequence_number,
+            sequence_number: get_sequence_number(source_address),
             source_address,
             recipient_address,
         };
-
-        // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
-        if (account_scheme == ED25519_SCHEME) {
-            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let signer_capability_sig = ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
-            assert!(ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else if (account_scheme == MULTI_ED25519_SCHEME) {
-            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signer_capability_sig_bytes);
-            assert!(multi_ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        };
+        verify_signed_message(
+            source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
 
         // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
+        let account_resource = borrow_global_mut<Account>(source_address);
         option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
     }
 
@@ -714,6 +691,51 @@ module aptos_framework::account {
 
     public fun get_signer_capability_address(capability: &SignerCapability): address {
         capability.account
+    }
+
+    public fun verify_signed_message<T: drop>(
+        account: address,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        signed_message_bytes: vector<u8>,
+        message: T,
+    ) acquires Account {
+        let account_resource = borrow_global_mut<Account>(account);
+        // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
+            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(
+                account_resource.authentication_key == expected_auth_key,
+                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+            );
+
+            let signer_capability_sig = ed25519::new_signature_from_bytes(signed_message_bytes);
+            assert!(
+                ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, message),
+                error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE),
+            );
+        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
+            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+            assert!(
+                account_resource.authentication_key == expected_auth_key,
+                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+            );
+
+            let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signed_message_bytes);
+            assert!(
+                multi_ed25519::signature_verify_strict_t(&signer_capability_sig, &pubkey, message),
+                error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE),
+            );
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        };
+    }
+
+    #[test_only]
+    public fun create_account_for_test(new_address: address): signer {
+        create_account_unchecked(new_address)
     }
 
     #[test]
