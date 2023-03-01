@@ -448,34 +448,34 @@ x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-binary-format = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-bytecode-verifier = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-bytecode-utils = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-cli = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-command-line-common = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-compiler ={ git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-core-types = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e", features = ["address32"] }
-move-docgen = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-ir-compiler = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-model = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-package = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-prover = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-prover-boogie-backend = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-stackless-bytecode = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-prover-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-resource-viewer = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-stackless-bytecode-interpreter = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-stdlib = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-symbol-pool = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-table-extension = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-transactional-test-runner = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-move-unit-test = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e", features = ["table-extension"] }
-move-vm-runtime = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-read-write-set = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
-read-write-set-dynamic = { git = "https://github.com/aptos-labs/move-private", rev = "2c9f0d8e43feb61be53bb3429fd8808328be3f0e" }
+move-abigen = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-cli = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-compiler ={ git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc", features = ["address32"] }
+move-docgen = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-model = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-package = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-prover = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-stackless-bytecode = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-symbol-pool = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc", features = ["table-extension"] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc", features = ["table-extension"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+read-write-set = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
+read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "6f2507118328e7ff3cd166d248494bbd5d7c6ebc" }
 # END MOVE DEPENDENCIES
 
 [profile.release]
