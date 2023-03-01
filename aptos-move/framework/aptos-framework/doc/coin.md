@@ -6,8 +6,6 @@
 This module provides the foundation for typesafe Coins.
 
 
--  [Struct `CoinTransfer`](#0x1_coin_CoinTransfer)
--  [Resource `CoinBalance`](#0x1_coin_CoinBalance)
 -  [Struct `Coin`](#0x1_coin_Coin)
 -  [Struct `AggregatableCoin`](#0x1_coin_AggregatableCoin)
 -  [Resource `CoinStore`](#0x1_coin_CoinStore)
@@ -26,11 +24,6 @@ This module provides the foundation for typesafe Coins.
 -  [Function `drain_aggregatable_coin`](#0x1_coin_drain_aggregatable_coin)
 -  [Function `merge_aggregatable_coin`](#0x1_coin_merge_aggregatable_coin)
 -  [Function `collect_into_aggregatable_coin`](#0x1_coin_collect_into_aggregatable_coin)
--  [Function `withdraw2`](#0x1_coin_withdraw2)
--  [Function `deposit2`](#0x1_coin_deposit2)
--  [Function `merge2`](#0x1_coin_merge2)
--  [Function `join`](#0x1_coin_join)
--  [Function `split`](#0x1_coin_split)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
@@ -106,71 +99,16 @@ This module provides the foundation for typesafe Coins.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
 
 
-<a name="0x1_coin_CoinTransfer"></a>
-
-## Struct `CoinTransfer`
-
-Core data structures
-
-
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;CoinType&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>value: u128</code>
-</dt>
-<dd>
- Amount of coin this address has.
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_coin_CoinBalance"></a>
-
-## Resource `CoinBalance`
-
-
-
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_CoinBalance">CoinBalance</a> <b>has</b> key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>balances: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, u128&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a name="0x1_coin_Coin"></a>
 
 ## Struct `Coin`
 
+Core data structures
 Main structure representing a coin/token in an account's custody.
 
 
@@ -862,138 +800,6 @@ Collects a specified amount of coin form an account into aggregatable coin.
     <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
     <a href="coin.md#0x1_coin_merge_aggregatable_coin">merge_aggregatable_coin</a>(dst_coin, <a href="coin.md#0x1_coin">coin</a>);
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_coin_withdraw2"></a>
-
-## Function `withdraw2`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_withdraw2">withdraw2</a>&lt;T&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u128): <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_withdraw2">withdraw2</a>&lt;T&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u128): <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinBalance">CoinBalance</a> {
-    <b>let</b> typename = std::type_info::type_name&lt;T&gt;();
-    <b>let</b> coin_balance = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinBalance">CoinBalance</a>&gt;(std::signer::address_of(from));
-    <b>let</b> balance = aptos_std::table::borrow_mut(&<b>mut</b> coin_balance.balances, typename);
-    *balance = *balance - amount;
-    <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: amount }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_coin_deposit2"></a>
-
-## Function `deposit2`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit2">deposit2</a>&lt;T&gt;(<b>to</b>: &<b>address</b>, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit2">deposit2</a>&lt;T&gt;(<b>to</b>: &<b>address</b>, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;) <b>acquires</b> <a href="coin.md#0x1_coin_CoinBalance">CoinBalance</a> {
-    <b>let</b> typename = std::type_info::type_name&lt;T&gt;();
-    <b>let</b> coin_balance = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinBalance">CoinBalance</a>&gt;(*<b>to</b>);
-    <b>let</b> balance = aptos_std::table::borrow_mut(&<b>mut</b> coin_balance.balances, typename);
-    <b>let</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: amount } = <a href="coin.md#0x1_coin">coin</a>;
-    *balance = *balance + amount;
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_coin_merge2"></a>
-
-## Function `merge2`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_merge2">merge2</a>&lt;T&gt;(a: <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;, b: <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;): <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_merge2">merge2</a>&lt;T&gt;(a: <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;, b: <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;): <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt; {
-    <b>let</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: a_amount} = a;
-    <b>let</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: b_amount} = b;
-    <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: a_amount + b_amount }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_coin_join"></a>
-
-## Function `join`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_join">join</a>&lt;T&gt;(a: &<b>mut</b> <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;, b: <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_join">join</a>&lt;T&gt;(a: &<b>mut</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;, b: <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;) {
-    <b>let</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: b_amount} = b;
-    a.value = a.value + b_amount;
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_coin_split"></a>
-
-## Function `split`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_split">split</a>&lt;T&gt;(a: &<b>mut</b> <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;, amount: u128): <a href="coin.md#0x1_coin_CoinTransfer">coin::CoinTransfer</a>&lt;T&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_split">split</a>&lt;T&gt;(a: &<b>mut</b> <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt;, amount: u128): <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a>&lt;T&gt; {
-    a.value = a.value - amount;
-    <a href="coin.md#0x1_coin_CoinTransfer">CoinTransfer</a> { value: amount }
 }
 </code></pre>
 

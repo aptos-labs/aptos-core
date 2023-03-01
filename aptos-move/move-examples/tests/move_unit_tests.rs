@@ -75,6 +75,11 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_coin() {
+    test_common("coin");
+}
+
+#[test]
 fn test_data_structures() {
     test_common("data_structures");
 }
