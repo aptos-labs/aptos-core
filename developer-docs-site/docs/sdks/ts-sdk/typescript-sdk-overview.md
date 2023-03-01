@@ -6,7 +6,7 @@ slug: "typescript-sdk-overview"
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Typescript SDK Architecture 
+# Typescript SDK Architecture
 
 This document describes the main features and components of the Aptos Typescript SDK.
 
@@ -78,6 +78,7 @@ A subset of BCS standards implemented in Typescript.
 ### Transaction builder
 
 The TS SDK exposes five transaction builder classes:
+
 - [TransactionBuilder](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilder.html) that takes in a Signing Message (serialized raw transaction) and returns a signature.
 - [TransactionBuilderEd25519](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderEd25519.html) extends the TransactionBuilder class and provides a signing method for raw transactions with a single public key.
 - [TransactionBuilderMultiEd25519](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderMultiEd25519.html) extends the TransactionBuilder class and provides a signing method for signing a raw transaction with a multisig public key.
@@ -89,11 +90,44 @@ The transaction builder contains the Typescript types for constructing the trans
 1. EntryFunction
 2. Script
 
+### Provider Class
+
+To help developers and to provide a better dev experience, the SDK provides a [Provider class](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/providers/provider.ts), that extends both `AptosClient` and `IndexerClient` classes and gives the end user the option to simply create a `Provider` instance and call a method by hiding the underline implementation.
+
+Provider class accepts
+
+- `network` - Netowrk enum type - `mainnet | testnet | devnet`.
+- `CustomEndpoints` of type `{fullnodeUrl: string, indexerUrl: string}`. This is to support devs who run their own nodes/indexer or to support local development against local testnet.
+- optionl `Config` - an optional argument the AptosClient accepts
+- optional `doNotFixNodeUrl` - an optional argument the AptosClient accepts
+
+An example of how to use the `Provider` class
+
+```
+import { Provider, Network } from "aptos";
+
+const provider = new Provider(Network.DEVNET)
+const account = await provider.getAccount("0x123");
+const accountNFTs = await provider.getAccountNFTs("0x123");
+```
+
 ### Aptos Client
 
 The [class AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) exposes the methods for retrieving the account resources, transactions, modules and events.
 
 In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](../../guides/sign-a-transaction.md).
+
+You can use the `AptosClient` class directly or the `Provider` class
+
+### Indexer Client
+
+The Aptos Node API provides a lower level, stable and generic API and is not designed to support data shaping or therefore such rich end-user experiences directly.
+
+The Aptos Indexer is the answer to this need, allowing the data shaping critical to real-time app use
+
+The class `IndexerClient` exposes functions to query the [Aptos Indexer](../../guides/indexing.md).
+
+You can use the `IndexerClient` class directly or the `Provider` class
 
 ### Token Client
 
@@ -101,6 +135,7 @@ The class [TokenClient](https://aptos-labs.github.io/ts-sdk-doc/classes/TokenCli
 It covers (1) write methods that support creating, transferring, mutating and burning tokens on-chain and (2) read methods performing deserialization and returning data in TS objects.
 
 The main write methods supported by the token SDK are:
+
 - Create Collection
 - Create Token
 - Offer Token
@@ -111,6 +146,7 @@ The main write methods supported by the token SDK are:
 - Burn Token by Owner or Creator
 
 The main read methods deserializing on-chain data to TS objects are:
+
 - Get CollectionData
 - Get TokenData
 - Get Token of an Account
