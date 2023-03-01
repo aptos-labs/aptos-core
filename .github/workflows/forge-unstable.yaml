@@ -94,6 +94,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       COMMENT_HEADER: forge-continuous
       # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
@@ -104,6 +105,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-graceful-overload-test
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: graceful_overload
@@ -115,6 +117,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-nft-mint-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: nft_mint
@@ -126,6 +129,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
@@ -138,6 +142,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-twin-validator
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: twin_validator_test
@@ -175,6 +180,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-validator-reboot-stress
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
