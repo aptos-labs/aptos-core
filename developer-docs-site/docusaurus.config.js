@@ -125,6 +125,11 @@ const config = {
                 type: "doc",
                 docId: "guides/system-integrators-guide",
               },
+              {
+                label: "Secure Aptos",
+                type: "doc",
+                docId: "guides/security",
+              },
             ],
           },
           {

@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 03 March 2023
+
+- Added a summary of Aptos [security features and recommendations](guides/security.md) to help developers understand existing measures and employ additional safeguards.
+
 ## 23 February 2023
 
 - Published the [Move Book](guides/move-guides/book/SUMMARY.md) to the [Move](guides/move-guides/index.md) section of Aptos.dev from the `aptos-main` branch of the [Move Language](https://github.com/move-language/move/tree/aptos-main) repository for easy access and inclusion in search results.

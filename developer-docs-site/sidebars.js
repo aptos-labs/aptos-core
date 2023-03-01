@@ -77,6 +77,7 @@ const sidebars = {
       ],
     },
     "guides/system-integrators-guide",
+    "guides/security",
   ],
   appSidebar: [
     {
