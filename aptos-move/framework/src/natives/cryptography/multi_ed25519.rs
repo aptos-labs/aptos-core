@@ -15,6 +15,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{
+    ed25519,
     ed25519::{ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH},
     multi_ed25519,
     traits::*,
@@ -84,24 +85,32 @@ fn native_public_key_validate(
 /// See `public_key_validate_v2_internal` comments in `multi_ed25519.move`.
 fn native_public_key_validate_v2(
     gas_params: &GasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(_ty_args.is_empty());
-    debug_assert!(arguments.len() == 1);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(_ty_args.len(), 0);
+    safely_assert_eq!(arguments.len(), 1);
 
-    let pks_bytes = pop_arg!(arguments, Vec<u8>);
+    let pks_bytes = safely_pop_arg!(arguments, Vec<u8>);
 
-    let mut cost = gas_params.base;
+    context.charge(gas_params.base)?;
 
-    let (all_valid, num_deserializations, num_small_order_checks) =
-        multi_ed25519::MultiEd25519PublicKey::validate_bytes_and_count_checks(pks_bytes.as_slice());
+    // Checks that these bytes correctly-encode a t-out-of-n MultiEd25519 PK
+    let (_, num_sub_pks) = match multi_ed25519::check_and_get_threshold(
+        &pks_bytes,
+        ed25519::ED25519_PUBLIC_KEY_LENGTH,
+    ) {
+        Ok((t, n)) => (t, n),
+        Err(_) => {
+            return Ok(smallvec![Value::bool(false)]);
+        },
+    };
 
-    cost += gas_params.per_pubkey_deserialize * NumArgs::new(num_deserializations as u64)
-        + gas_params.per_pubkey_small_order_check * NumArgs::new(num_small_order_checks as u64);
+    let num_valid = num_valid_subpks(gas_params, context, pks_bytes)?;
+    let all_valid = num_valid == num_sub_pks as usize;
 
-    Ok(NativeResult::ok(cost, smallvec![Value::bool(all_valid)]))
+    Ok(smallvec![Value::bool(all_valid)])
 }
 
 // See also: https://github.com/aptos-labs/aptos-core/security/advisories/GHSA-x43p-vm4h-r828
@@ -124,14 +133,28 @@ fn native_public_key_validate_with_gas_fix(
         return Ok(smallvec![Value::bool(false)]);
     };
 
+    let num_valid = num_valid_subpks(gas_params, context, pks_bytes)?;
+    let all_valid = num_valid == num_sub_pks;
+
+    Ok(smallvec![Value::bool(all_valid)])
+}
+
+fn num_valid_subpks(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    pks_bytes: Vec<u8>,
+) -> SafeNativeResult<usize> {
     // Go through all sub-PKs and check that (1) they are valid points and (2) they are NOT small order points.
     let mut num_valid = 0;
 
     for chunk in pks_bytes.chunks_exact(ED25519_PUBLIC_KEY_LENGTH) {
+        // First, we charge for the work.
         context.charge(
             (gas_params.per_pubkey_deserialize + gas_params.per_pubkey_small_order_check)
                 * NumArgs::new(1),
         )?;
+
+        // Then, we do the work.
         match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(chunk) {
             Ok(slice) => {
                 if CompressedEdwardsY(slice)
@@ -147,9 +170,7 @@ fn native_public_key_validate_with_gas_fix(
         }
     }
 
-    let all_valid = num_valid == num_sub_pks;
-
-    Ok(smallvec![Value::bool(all_valid)])
+    Ok(num_valid)
 }
 
 fn native_signature_verify_strict(
@@ -269,7 +290,11 @@ pub fn make_all(
         ),
         (
             "public_key_validate_v2_internal",
-            make_native_from_func(gas_params.clone(), native_public_key_validate_v2),
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                native_public_key_validate_v2,
+            ),
         ),
         (
             "signature_verify_strict_internal",
