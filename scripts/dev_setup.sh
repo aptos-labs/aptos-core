@@ -140,24 +140,23 @@ function install_protoc {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip"
+    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
     sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
     sudo chmod +x "/usr/local/bin/protoc"
   )
   rm -rf "$TMPFILE"
 
-  # TODO(larry): uncomment when upstream issue is resolved.
-  # # Install the cargo plugins
-  # if ! command -v protoc-gen-prost &> /dev/null; then
-  #   cargo install protoc-gen-prost
-  # fi
-  # if ! command -v protoc-gen-prost-serde &> /dev/null; then
-  #   cargo install protoc-gen-prost-serde
-  # fi
-  # if ! command -v protoc-gen-prost-crate &> /dev/null; then
-  #   cargo install protoc-gen-prost-crate
-  # fi
+  # Install the cargo plugins
+  if ! command -v protoc-gen-prost &> /dev/null; then
+    cargo install protoc-gen-prost --locked
+  fi
+  if ! command -v protoc-gen-prost-serde &> /dev/null; then
+    cargo install protoc-gen-prost-serde --locked
+  fi
+  if ! command -v protoc-gen-prost-crate &> /dev/null; then
+    cargo install protoc-gen-prost-crate --locked
+  fi
 }
 
 function install_rustup {
