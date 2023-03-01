@@ -25,6 +25,7 @@ use aptos_testcases::{
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
     performance_with_fullnode_test::PerformanceBenchmarkWithFN,
+    quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
@@ -489,6 +490,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "consensus_only_three_region_simulation" => {
             run_consensus_only_three_region_simulation(config)
         },
+        "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(config),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1415,6 +1417,28 @@ fn large_db_test(
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 20.0,
                     max_round_gap: 6,
+                }),
+        )
+}
+
+fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    forge_config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
+        .with_network_tests(vec![&QuorumStoreOnChainEnableTest {}])
+        .with_success_criteria(
+            SuccessCriteria::new(5000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
                 }),
         )
 }
