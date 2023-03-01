@@ -874,6 +874,15 @@
           "legendFormat": "transactions_per_block",
           "range": true,
           "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(aptos_execution_speculative_abort_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) /  quantile(0.67, rate(consensus_duration_count{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", op='execute_block'}[$interval]) )",
+          "hide": false,
+          "legendFormat": "speculative_abort_per_block",
+          "range": true,
+          "refId": "C"
         }
       ],
       "thresholds": [],
@@ -2420,6 +2429,6 @@
   "timezone": "",
   "title": "Execution",
   "uid": "execution",
-  "version": 61,
+  "version": 62,
   "weekStart": ""
 }
