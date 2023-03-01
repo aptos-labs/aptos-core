@@ -3063,7 +3063,7 @@ staking_contract and stake modules.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
 
 
