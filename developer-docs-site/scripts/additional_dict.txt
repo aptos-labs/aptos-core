@@ -362,7 +362,6 @@ npmjs
 octa
 octas
 offchain
-on-chain
 onchain
 onwards
 orderbook

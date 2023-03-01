@@ -5,7 +5,7 @@
 use crate::{
     backup_types::transaction::{
         backup::{TransactionBackupController, TransactionBackupOpt},
-        restore::{TransactionRestoreController, TransactionRestoreOpt},
+        restore::TransactionRestoreBatchController,
     },
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
@@ -56,9 +56,22 @@ fn end_to_end() {
     let first_ver_to_backup = (total_txns / 4) as Version;
     let num_txns_to_backup = total_txns - first_ver_to_backup as usize;
     let target_version = first_ver_to_backup + total_txns as Version / 2;
-    let num_txns_to_restore = (target_version - first_ver_to_backup + 1) as usize;
+    let transaction_backup_before_first_ver = rt
+        .block_on(
+            TransactionBackupController::new(
+                TransactionBackupOpt {
+                    start_version: 0,
+                    num_transactions: first_ver_to_backup as usize,
+                },
+                GlobalBackupOpt { max_chunk_size },
+                client.clone(),
+                Arc::clone(&store),
+            )
+            .run(),
+        )
+        .unwrap();
 
-    let manifest_handle = rt
+    let transaction_backup_after_first_ver = rt
         .block_on(
             TransactionBackupController::new(
                 TransactionBackupOpt {
@@ -74,11 +87,7 @@ fn end_to_end() {
         .unwrap();
 
     rt.block_on(
-        TransactionRestoreController::new(
-            TransactionRestoreOpt {
-                manifest_handle,
-                replay_from_version: None, // max
-            },
+        TransactionRestoreBatchController::new(
             GlobalRestoreOpt {
                 dry_run: false,
                 db_dir: Some(tgt_db_dir.path().to_path_buf()),
@@ -91,7 +100,12 @@ fn end_to_end() {
             .try_into()
             .unwrap(),
             store,
-            None, /* epoch_history */
+            vec![
+                transaction_backup_before_first_ver,
+                transaction_backup_after_first_ver,
+            ],
+            None,
+            None,
             VerifyExecutionMode::verify_all(),
         )
         .run(),
@@ -112,8 +126,8 @@ fn end_to_end() {
     );
     let recovered_transactions = tgt_db
         .get_transactions(
-            first_ver_to_backup,
-            num_txns_to_restore as u64,
+            0,
+            target_version,
             target_version,
             true, /* fetch_events */
         )
@@ -122,8 +136,7 @@ fn end_to_end() {
     assert_eq!(
         recovered_transactions.transactions,
         txns.into_iter()
-            .skip(first_ver_to_backup as usize)
-            .take(num_txns_to_restore)
+            .take(target_version as usize)
             .cloned()
             .collect::<Vec<_>>()
     );
@@ -136,8 +149,7 @@ fn end_to_end() {
                 txns.iter()
                     .map(|txn_to_commit| txn_to_commit.events().to_vec())
             })
-            .skip(first_ver_to_backup as usize)
-            .take(num_txns_to_restore)
+            .take(target_version as usize)
             .collect::<Vec<_>>()
     );
 
