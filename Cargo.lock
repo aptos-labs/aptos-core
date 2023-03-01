@@ -1531,6 +1531,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-parser"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-moving-average",
+ "aptos-protos",
+ "aptos-runtimes",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "base64 0.13.0",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "bigdecimal",
+ "chrono",
+ "clap 3.2.23",
+ "diesel",
+ "diesel_migrations",
+ "field_count",
+ "futures",
+ "hex",
+ "once_cell",
+ "prost",
+ "regex",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde 1.0.149",
+ "serde_json",
+ "sha2 0.9.9",
+ "tokio",
+ "tonic",
+ "url",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-utils"
 version = "0.1.0"
 dependencies = [
@@ -7456,13 +7500,6 @@ dependencies = [
  "proptest",
  "serde 1.0.149",
  "smallvec",
-]
-
-[[package]]
-name = "moving-average"
-version = "0.1.0"
-dependencies = [
- "chrono",
 ]
 
 [[package]]

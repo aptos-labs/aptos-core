@@ -1,0 +1,5 @@
+indexer_address: 127.0.0.1:50051
+redis_address: 127.0.0.1:6379
+chain_name: larrynet
+file_store_bucket_name: indexer-grpc-file-store
+health_check_port: 8081

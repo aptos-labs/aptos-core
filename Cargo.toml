@@ -83,10 +83,10 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-parser",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
-    "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -227,6 +227,7 @@ aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
+aptos-indexer-grpc-parser = { path = "ecosystem/indexer-grpc/indexer-grpc-parser" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
@@ -287,7 +288,9 @@ aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
 aptos-testcases = { path = "testsuite/testcases" }
-aptos-time-service = { path = "crates/aptos-time-service", features = ["async"] }
+aptos-time-service = { path = "crates/aptos-time-service", features = [
+    "async",
+] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
@@ -298,7 +301,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
-moving-average = { path = "crates/moving-average" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -382,10 +384,15 @@ indicatif = "0.15.0"
 indoc = "1.0.6"
 ipnet = "2.5.0"
 itertools = "0.10.3"
-jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+jemallocator = { version = "0.3.2", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
+k8s-openapi = { version = "0.11.0", default-features = false, features = [
+    "v1_15",
+] }
 kube = { version = "0.51.0", features = ["jsonpatch"] }
 libfuzzer-sys = "=0.3.2"
 libsecp256k1 = "0.7.0"
@@ -478,8 +485,17 @@ tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.5.9"
-tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
-ureq = { version = "1.5.4", features = ["json", "native-tls"], default_features = false }
+tonic = { version = "0.8.3", features = [
+    "tls-roots",
+    "transport",
+    "prost",
+    "gzip",
+    "codegen",
+] }
+ureq = { version = "1.5.4", features = [
+    "json",
+    "native-tls",
+], default_features = false }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.2"
