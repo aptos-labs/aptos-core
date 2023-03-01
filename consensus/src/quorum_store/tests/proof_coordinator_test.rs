@@ -26,8 +26,10 @@ async fn test_proof_coordinator_basic() {
     let (proof_manager_tx, mut proof_manager_rx) = channel(100);
     tokio::spawn(proof_coordinator.start(proof_coordinator_rx, proof_manager_tx, verifier.clone()));
 
+    let batch_author = signers[0].author();
     let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
-    let signed_digest_info = SignedDigestInfo::new(digest, LogicalTime::new(1, 20), 1, 1);
+    let signed_digest_info =
+        SignedDigestInfo::new(batch_author, digest, LogicalTime::new(1, 20), 1, 1);
     let (proof_tx, proof_rx) = oneshot::channel();
 
     assert!(proof_coordinator_tx
@@ -39,9 +41,16 @@ async fn test_proof_coordinator_basic() {
         .await
         .is_ok());
     for arc_signer in &arc_signers {
-        let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
-                .unwrap();
+        let signed_digest = SignedDigest::new(
+            batch_author,
+            1,
+            digest,
+            LogicalTime::new(1, 20),
+            1,
+            1,
+            arc_signer.clone(),
+        )
+        .unwrap();
         assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
@@ -88,9 +97,16 @@ async fn test_proof_coordinator_basic() {
         .await
         .is_ok());
     for arc_signer in &arc_signers {
-        let signed_digest =
-            SignedDigest::new(1, digest, LogicalTime::new(1, 20), 1, 1, arc_signer.clone())
-                .unwrap();
+        let signed_digest = SignedDigest::new(
+            batch_author,
+            1,
+            digest,
+            LogicalTime::new(1, 20),
+            1,
+            1,
+            arc_signer.clone(),
+        )
+        .unwrap();
         assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
             .await
@@ -117,6 +133,7 @@ async fn test_proof_coordinator_basic() {
         .is_ok());
     for _ in 0..arc_signers.len() {
         let signed_digest = SignedDigest::new(
+            batch_author,
             1,
             digest,
             LogicalTime::new(1, 20),
