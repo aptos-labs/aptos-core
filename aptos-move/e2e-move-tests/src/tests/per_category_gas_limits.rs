@@ -40,6 +40,15 @@ fn execution_limit_reached() {
 }
 
 #[test]
+fn bounded_execution_time() {
+    let mut h = MoveHarness::new();
+
+    h.modify_gas_schedule(|gas_params| {
+        assert!(gas_params.txn.max_execution_gas < gas_params.instr.add * 10_000_000.into())
+    });
+}
+
+#[test]
 fn io_limit_reached() {
     let mut h = MoveHarness::new();
 
