@@ -10,12 +10,14 @@ import sys
 # TODO: introduce a testing framework for this.
 
 # Branch name constants
+APTOS_NODE_BRANCH_NAME = "aptos-node-v1.2.0"
 DEVNET_BRANCH_NAME = "devnet"
 MAIN_BRANCH_NAME = "main"
 MAINNET_BRANCH_NAME = "mainnet"
 TESTNET_BRANCH_NAME = "testnet"
 
 # File name constants
+EXPECTED_ON_APTOS_RELEASE_NOT_MAIN = "expected_on_aptos_release_not_main.txt"
 EXPECTED_ON_DEVNET_NOT_MAIN = "expected_on_devnet_not_main.txt"
 EXPECTED_ON_MAINNET_NOT_MAIN = "expected_on_mainnet_not_main.txt"
 EXPECTED_ON_MAINNET_NOT_TESTNET = "expected_on_mainnet_not_testnet.txt"
@@ -23,11 +25,20 @@ EXPECTED_ON_TESTNET_NOT_DEVNET = "expected_on_testnet_not_devnet.txt"
 EXPECTED_ON_TESTNET_NOT_MAIN = "expected_on_testnet_not_main.txt"
 
 # Generic constants
-APTOS_CORE_DIRECTORY_NAME = "aptos-core"
-APTOS_CORE_REPOSITORY_URL = "https://github.com/aptos-labs/aptos-core.git"
-COMMIT_URL_TEMPLATE = "https://github.com/aptos-labs/aptos-core/commit/{commit_hash}"
 EXPECTED_FILE_PATHS_TEMPLATE = ".github/actions/check-branch-commits/{file_name}"
-GIT_CLONE_DIRECTORY_NAME = "aptos_core_clone"
+
+# Private repository constants
+PRIVATE_APTOS_CORE_DIRECTORY_NAME = "aptos-core-private"
+PRIVATE_APTOS_CORE_REPOSITORY_URL = "https://github.com/aptos-labs/aptos-core-private.git"
+PRIVATE_COMMIT_URL_TEMPLATE = "https://github.com/aptos-labs/aptos-core-private/commit/{commit_hash}"
+PRIVATE_GIT_CLONE_DIRECTORY_NAME = "private_aptos_core_clone"
+
+# Public repository constants
+PUBLIC_APTOS_CORE_DIRECTORY_NAME = "aptos-core"
+PUBLIC_APTOS_CORE_REPOSITORY_URL = "https://github.com/aptos-labs/aptos-core.git"
+PUBLIC_COMMIT_URL_TEMPLATE = "https://github.com/aptos-labs/aptos-core/commit/{commit_hash}"
+PUBLIC_GIT_CLONE_DIRECTORY_NAME = "public_aptos_core_clone"
+
 
 # A simple wrapper to hold all information related to a commit
 class Commit:
@@ -52,26 +63,24 @@ class Commit:
         self.closest_matching_commit = another_commit
 
 
-# Note: we clone aptos-core instead of analyzing the aptos-core repo checked out by the
-# github action because it interferes with the github action/script.
-def clone_aptos_core_to_clone_directory():
+def fetch_aptos_core_to_clone_directory(repo_url, parent_directory_name, core_directory_name, branch_names):
   """Clones aptos-core to the clone directory with all branches and git history"""
   # Get the current working directory
   working_directory = os.getcwd()
 
   # Create a clone directory and clone the repo at ../
   os.chdir("..")
-  os.mkdir(GIT_CLONE_DIRECTORY_NAME)
-  os.chdir(GIT_CLONE_DIRECTORY_NAME)
-  subprocess.run(["git", "clone", APTOS_CORE_REPOSITORY_URL])
+  os.mkdir(parent_directory_name)
+  os.chdir(parent_directory_name)
+  subprocess.run(["git", "clone", repo_url])
 
   # Ensure the clone contains all history and branches
-  os.chdir(APTOS_CORE_DIRECTORY_NAME)
+  os.chdir(core_directory_name)
   subprocess.run(["git", "fetch", "--all"])
   subprocess.run(["git", "pull", "--all"])
 
   # Checkout the various branches to update tracking and ensure they're available
-  for branch_name in [DEVNET_BRANCH_NAME, MAIN_BRANCH_NAME, MAINNET_BRANCH_NAME, TESTNET_BRANCH_NAME]:
+  for branch_name in branch_names:
     subprocess.run(["git", "checkout", branch_name])
     subprocess.run(["git", "pull"])
     subprocess.run(["git", "log", "-1", "--pretty=oneline"])
@@ -80,28 +89,28 @@ def clone_aptos_core_to_clone_directory():
   os.chdir(working_directory)
 
 
-def print_commit_list(commit_list):
+def print_commit_list(commit_url_template, commit_list):
   """Prints out the commits in the given commit list"""
   for commit in commit_list:
     # Extract all commit information
     commit_hash = commit.hash
     commit_message = commit.message
-    commit_url = COMMIT_URL_TEMPLATE.format(commit_hash=commit_hash)
+    commit_url = commit_url_template.format(commit_hash=commit_hash)
 
     # Extract all closest commit information
     closest_hash = commit.closest_matching_commit.hash
     closest_message = commit.closest_matching_commit.message
-    closest_url = COMMIT_URL_TEMPLATE.format(commit_hash=closest_hash)
+    closest_url = commit_url_template.format(commit_hash=closest_hash)
 
     # Print the commit
     print("  - Commit hash: {commit_hash}, message: {commit_message}, url: {commit_url}\n"
           "    Closest matching message: {closest_message}, closest commit: {closest_url}".format(commit_hash=commit_hash, commit_message=commit_message, commit_url=commit_url, closest_hash=closest_hash, closest_message=closest_message, closest_url=closest_url))
 
 
-def get_commits_on_branch(branch_name):
+def get_commits_on_branch(parent_directory_name, core_directory_name, branch_name):
   """Gets all the commits on the specified branch name"""
   # Construct the path to aptos-core repository
-  git_clone_path = "../{clone_directory_name}/{core_directory_name}".format(clone_directory_name=GIT_CLONE_DIRECTORY_NAME, core_directory_name=APTOS_CORE_DIRECTORY_NAME)
+  git_clone_path = "../{parent_directory_name}/{core_directory_name}".format(parent_directory_name=parent_directory_name, core_directory_name=core_directory_name)
 
   # Get all the commits from git log
   process = subprocess.Popen(["git", "-C", git_clone_path, "log", "--pretty=oneline", branch_name, "--"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -157,14 +166,14 @@ def get_commits_in_first_list_not_second(first_commit_list, second_commit_list):
   return commits_in_first_list_not_second
 
 
-def get_commits_on_first_branch_not_second(first_branch_name, second_branch_name, hashes_to_ignore_file_name):
+def get_commits_on_first_branch_not_second(parent_directory_name, core_directory_name, commit_url_template, first_branch_name, second_branch_name, hashes_to_ignore_file_name):
   """Identifies all the commits on the first branch but not on the second branch"""
   print("") # Print a new line separator
   print("Checking for commits on {first_branch_name} but not on {second_branch_name}...".format(first_branch_name=first_branch_name, second_branch_name=second_branch_name))
 
   # Get the commits
-  first_branch_commits = get_commits_on_branch(first_branch_name)
-  second_branch_commits = get_commits_on_branch(second_branch_name)
+  first_branch_commits = get_commits_on_branch(parent_directory_name, core_directory_name, first_branch_name)
+  second_branch_commits = get_commits_on_branch(parent_directory_name, core_directory_name, second_branch_name)
 
   # Identify the commits on the first branch, but not on the second
   missing_commits = get_commits_in_first_list_not_second(first_branch_commits, second_branch_commits)
@@ -190,46 +199,77 @@ def get_commits_on_first_branch_not_second(first_branch_name, second_branch_name
   print("Number of commits on {first_branch_name} but not on {second_branch_name}: {length}".format(first_branch_name=first_branch_name, second_branch_name=second_branch_name, length=num_filtered_missing_commits))
   if num_filtered_missing_commits > 0:
     print("Commits on {first_branch_name} but not on {second_branch_name}:".format(first_branch_name=first_branch_name, second_branch_name=second_branch_name))
-    print_commit_list(filtered_missing_commits)
+    print_commit_list(commit_url_template, filtered_missing_commits)
 
   # Return the commit list
   return filtered_missing_commits
 
 
-def main():
-  # Create another aptos-core clone so we can fetch all branches and history
-  clone_aptos_core_to_clone_directory()
+def check_public_repo_for_missing_commits():
+  """Identifies all the missing commits in the public aptos-core repository"""
+  # Clone aptos-core so that we can fetch all branches and history
+  branches_to_fetch = [MAIN_BRANCH_NAME, DEVNET_BRANCH_NAME, TESTNET_BRANCH_NAME, MAINNET_BRANCH_NAME]
+  fetch_aptos_core_to_clone_directory(PUBLIC_APTOS_CORE_REPOSITORY_URL, PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, branches_to_fetch)
 
   # Identify the commits on devnet/testnet/mainnet, but not on main
-  devnet_commits_not_on_main = get_commits_on_first_branch_not_second(DEVNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_DEVNET_NOT_MAIN)
-  testnet_commits_not_on_main = get_commits_on_first_branch_not_second(TESTNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_TESTNET_NOT_MAIN)
-  mainnet_commits_not_on_main = get_commits_on_first_branch_not_second(MAINNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_MAINNET_NOT_MAIN)
+  devnet_commits_not_on_main = get_commits_on_first_branch_not_second(PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, PUBLIC_COMMIT_URL_TEMPLATE, DEVNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_DEVNET_NOT_MAIN)
+  testnet_commits_not_on_main = get_commits_on_first_branch_not_second(PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, PUBLIC_COMMIT_URL_TEMPLATE, TESTNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_TESTNET_NOT_MAIN)
+  mainnet_commits_not_on_main = get_commits_on_first_branch_not_second(PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, PUBLIC_COMMIT_URL_TEMPLATE, MAINNET_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_MAINNET_NOT_MAIN)
 
   # Identify the commits on testnet but not on devnet
-  testnet_commits_not_on_devnet = get_commits_on_first_branch_not_second(TESTNET_BRANCH_NAME, DEVNET_BRANCH_NAME, EXPECTED_ON_TESTNET_NOT_DEVNET)
+  testnet_commits_not_on_devnet = get_commits_on_first_branch_not_second(PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, PUBLIC_COMMIT_URL_TEMPLATE, TESTNET_BRANCH_NAME, DEVNET_BRANCH_NAME, EXPECTED_ON_TESTNET_NOT_DEVNET)
 
   # Identify the commits on mainnet but not on testnet
-  mainnet_commits_not_on_testnet = get_commits_on_first_branch_not_second(MAINNET_BRANCH_NAME, TESTNET_BRANCH_NAME, EXPECTED_ON_MAINNET_NOT_TESTNET)
+  mainnet_commits_not_on_testnet = get_commits_on_first_branch_not_second(PUBLIC_GIT_CLONE_DIRECTORY_NAME, PUBLIC_APTOS_CORE_DIRECTORY_NAME, PUBLIC_COMMIT_URL_TEMPLATE, MAINNET_BRANCH_NAME, TESTNET_BRANCH_NAME, EXPECTED_ON_MAINNET_NOT_TESTNET)
 
   # Return an error if there were any missing commits
   missing_commits = False
   if len(devnet_commits_not_on_main) > 0:
-    print("There were commits found on devnet that were not on main!")
+    print("There were public commits found on devnet that were not on main!")
     missing_commits = True
   if len(testnet_commits_not_on_main) > 0:
-    print("There were commits found on testnet that were not on main!")
+    print("There were public commits found on testnet that were not on main!")
     missing_commits = True
   if len(mainnet_commits_not_on_main) > 0:
-    print("There were commits found on mainnet that were not on main!")
+    print("There were public commits found on mainnet that were not on main!")
     missing_commits = True
   if len(testnet_commits_not_on_devnet) > 0:
-    print("There were commits found on testnet that were not on devnet!")
+    print("There were public commits found on testnet that were not on devnet!")
     missing_commits = True
   if len(mainnet_commits_not_on_testnet) > 0:
-    print("There were commits found on mainnet that were not on testnet!")
+    print("There were public commits found on mainnet that were not on testnet!")
     missing_commits = True
 
-  if missing_commits:
+  return missing_commits
+
+
+def check_private_repo_for_missing_commits():
+  """Identifies all the missing commits in the private aptos-core repository"""
+  # Create a clone of the private aptos-core repository
+  branches_to_fetch = [MAIN_BRANCH_NAME, APTOS_NODE_BRANCH_NAME]
+  fetch_aptos_core_to_clone_directory(PRIVATE_APTOS_CORE_REPOSITORY_URL, PRIVATE_GIT_CLONE_DIRECTORY_NAME, PRIVATE_APTOS_CORE_DIRECTORY_NAME, branches_to_fetch)
+
+  # Identify the commits on aptos-node release but not on main
+  aptos_release_commits_not_on_main = get_commits_on_first_branch_not_second(PRIVATE_GIT_CLONE_DIRECTORY_NAME, PRIVATE_APTOS_CORE_DIRECTORY_NAME, PRIVATE_COMMIT_URL_TEMPLATE, APTOS_NODE_BRANCH_NAME, MAIN_BRANCH_NAME, EXPECTED_ON_APTOS_RELEASE_NOT_MAIN)
+
+  # Return an error if there were any missing commits
+  missing_commits = False
+  if len(aptos_release_commits_not_on_main) > 0:
+    print("There were private commits found on aptos release that were not on main!")
+    missing_commits = True
+
+  return missing_commits
+
+
+def main():
+  # Check the commits in the public aptos-core repository
+  missing_commits_in_public_repo = check_public_repo_for_missing_commits()
+
+  # Check the commits in the private aptos-core repository
+  missing_commits_in_private_repo = check_private_repo_for_missing_commits()
+
+  # Display an error if there's any missing commits
+  if missing_commits_in_public_repo or missing_commits_in_private_repo:
     print("Missing commits were found!")
     sys.exit(1)
   else:
