@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "1.0.6"
+version = "1.0.7"
 
 # Workspace inherited keys
 authors = { workspace = true }
