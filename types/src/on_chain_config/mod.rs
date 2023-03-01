@@ -23,6 +23,7 @@ mod aptos_version;
 mod chain_id;
 mod consensus_config;
 mod gas_schedule;
+mod timed_features;
 mod validator_set;
 
 pub use self::{
@@ -36,6 +37,7 @@ pub use self::{
         ProposerElectionType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
@@ -154,14 +156,14 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage,
     {
-        let access_path = Self::access_path();
+        let access_path = Self::access_path().ok()?;
         match storage.fetch_config(access_path) {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
     }
 
-    fn access_path() -> AccessPath {
+    fn access_path() -> anyhow::Result<AccessPath> {
         access_path_for_config(Self::CONFIG_ID)
     }
 
@@ -174,9 +176,12 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
-pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
+pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {
     let struct_tag = struct_tag_for_config(config_id);
-    AccessPath::new(CORE_CODE_ADDRESS, AccessPath::resource_path_vec(struct_tag))
+    Ok(AccessPath::new(
+        CORE_CODE_ADDRESS,
+        AccessPath::resource_path_vec(struct_tag)?,
+    ))
 }
 
 pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
@@ -240,3 +245,8 @@ impl MoveStructType for ConfigurationResource {
 }
 
 impl MoveResource for ConfigurationResource {}
+
+impl OnChainConfig for ConfigurationResource {
+    const MODULE_IDENTIFIER: &'static str = "reconfiguration";
+    const TYPE_IDENTIFIER: &'static str = "Configuration";
+}

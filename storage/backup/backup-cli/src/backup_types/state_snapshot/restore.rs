@@ -26,6 +26,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::StateSnapshotReceiver;
+use aptos_types::on_chain_config::{TimedFeatureOverride, TimedFeatures};
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
@@ -219,7 +220,11 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        let config = verifier_config(false);
+        let config = verifier_config(
+            false,
+            // FIXME: feed chain id & timestamp from the state.
+            &TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Replay),
+        );
         for (key, value) in blob {
             if let StateKey::AccessPath(p) = key {
                 if let Path::Code(module_id) = p.get_path() {

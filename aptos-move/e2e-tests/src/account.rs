@@ -133,7 +133,7 @@ impl Account {
 
     pub fn make_access_path(&self, tag: StructTag) -> AccessPath {
         let resource_tag = ResourceKey::new(self.addr, tag);
-        AccessPath::resource_access_path(resource_tag)
+        AccessPath::resource_access_path(resource_tag).expect("access path in test")
     }
 
     /// Changes the keys for this account to the provided ones.

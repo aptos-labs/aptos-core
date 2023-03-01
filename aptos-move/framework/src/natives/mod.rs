@@ -17,6 +17,7 @@ pub mod util;
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
 use aptos_gas_algebra_ext::AbstractValueSize;
+use aptos_types::on_chain_config::TimedFeatures;
 use cryptography::ed25519;
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
@@ -30,6 +31,7 @@ pub mod status {
     pub const NFE_UNABLE_TO_PARSE_ADDRESS: u64 = 0x2;
 }
 
+/// All the gas parameters required by the aptos-framework natives.
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
@@ -184,6 +186,7 @@ impl GasParameters {
 pub fn all_natives(
     framework_addr: AccountAddress,
     gas_params: GasParameters,
+    timed_features: TimedFeatures,
     calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
@@ -196,29 +199,53 @@ pub fn all_natives(
         };
     }
 
-    add_natives_from_module!("account", account::make_all(gas_params.account.clone()));
-    add_natives_from_module!("ed25519", ed25519::make_all(gas_params.ed25519.clone()));
-    add_natives_from_module!("genesis", account::make_all(gas_params.account));
-    add_natives_from_module!("multi_ed25519", multi_ed25519::make_all(gas_params.ed25519));
+    add_natives_from_module!(
+        "account",
+        account::make_all(gas_params.account.clone(), timed_features.clone())
+    );
+    add_natives_from_module!(
+        "ed25519",
+        ed25519::make_all(gas_params.ed25519.clone(), timed_features.clone())
+    );
+    add_natives_from_module!(
+        "genesis",
+        account::make_all(gas_params.account, timed_features.clone())
+    );
+    add_natives_from_module!(
+        "multi_ed25519",
+        multi_ed25519::make_all(gas_params.ed25519, timed_features.clone())
+    );
     add_natives_from_module!(
         "bls12381",
-        cryptography::bls12381::make_all(gas_params.bls12381)
+        cryptography::bls12381::make_all(gas_params.bls12381, timed_features.clone())
     );
     add_natives_from_module!(
         "secp256k1",
-        cryptography::secp256k1::make_all(gas_params.secp256k1)
+        cryptography::secp256k1::make_all(gas_params.secp256k1, timed_features.clone())
     );
-    add_natives_from_module!("aptos_hash", hash::make_all(gas_params.hash));
+    add_natives_from_module!(
+        "aptos_hash",
+        hash::make_all(gas_params.hash, timed_features.clone())
+    );
     add_natives_from_module!(
         "ristretto255",
-        cryptography::ristretto255::make_all(gas_params.ristretto255)
+        cryptography::ristretto255::make_all(gas_params.ristretto255, timed_features.clone())
     );
-    add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
-    add_natives_from_module!("util", util::make_all(gas_params.util.clone()));
-    add_natives_from_module!("from_bcs", util::make_all(gas_params.util));
+    add_natives_from_module!(
+        "type_info",
+        type_info::make_all(gas_params.type_info, timed_features.clone())
+    );
+    add_natives_from_module!(
+        "util",
+        util::make_all(gas_params.util.clone(), timed_features.clone())
+    );
+    add_natives_from_module!(
+        "from_bcs",
+        util::make_all(gas_params.util, timed_features.clone())
+    );
     add_natives_from_module!(
         "transaction_context",
-        transaction_context::make_all(gas_params.transaction_context)
+        transaction_context::make_all(gas_params.transaction_context, timed_features.clone())
     );
     add_natives_from_module!("code", code::make_all(gas_params.code));
     add_natives_from_module!(
@@ -227,12 +254,15 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "state_storage",
-        state_storage::make_all(gas_params.state_storage)
+        state_storage::make_all(gas_params.state_storage, timed_features.clone())
     );
-    add_natives_from_module!("aggregator", aggregator::make_all(gas_params.aggregator));
+    add_natives_from_module!(
+        "aggregator",
+        aggregator::make_all(gas_params.aggregator, timed_features.clone())
+    );
     add_natives_from_module!(
         "aggregator_factory",
-        aggregator_factory::make_all(gas_params.aggregator_factory)
+        aggregator_factory::make_all(gas_params.aggregator_factory, timed_features)
     );
 
     make_table_from_iter(framework_addr, natives)

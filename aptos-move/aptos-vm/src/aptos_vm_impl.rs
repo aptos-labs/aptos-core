@@ -20,16 +20,16 @@ use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::chain_id::ChainId;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     on_chain_config::{
-        ApprovedExecutionHashes, GasSchedule, GasScheduleV2, OnChainConfig, StorageGasSchedule,
-        Version,
+        ApprovedExecutionHashes, ConfigurationResource, GasSchedule, GasScheduleV2, OnChainConfig,
+        StorageGasSchedule, Version,
     },
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
+use aptos_types::{on_chain_config::TimedFeatures, transaction::AbortInfo};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -119,6 +119,15 @@ impl AptosVMImpl {
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
 
+        let timestamp = ConfigurationResource::fetch_config(&storage)
+            .map(|config| config.last_reconfiguration_time())
+            .unwrap_or(0);
+
+        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
+        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+            timed_features = timed_features.with_override_profile(profile)
+        }
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
@@ -126,6 +135,7 @@ impl AptosVMImpl {
             features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             chain_id.id(),
+            timed_features,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

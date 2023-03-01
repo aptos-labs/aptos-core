@@ -28,8 +28,7 @@ use aptos_gas::{
 };
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
-use aptos_types::chain_id::ChainId;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureOverride};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -46,6 +45,7 @@ use aptos_types::{
     vm_status::VMStatus,
     write_set::WriteSet,
 };
+use aptos_types::{chain_id::ChainId, on_chain_config::TimedFeatures};
 use aptos_vm::{
     block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
@@ -290,7 +290,8 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
+        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()))
+            .expect("access path in test");
         let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
@@ -555,6 +556,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -564,6 +568,7 @@ impl FakeExecutor {
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                 self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
                 self.chain_id,
+                timed_features,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -615,6 +620,8 @@ impl FakeExecutor {
                 .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
             self.chain_id,
+            // FIXME: should probably read the timestamp from storage.
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

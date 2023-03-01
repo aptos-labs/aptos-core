@@ -4,19 +4,19 @@
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
-use move_binary_format::errors::PartialVMResult;
+use aptos_types::on_chain_config::TimedFeatures;
 use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    pop_arg,
     values::{Struct, StructRef, Value},
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorContext};
+use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
+use crate::safely_pop_arg;
 
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
@@ -31,16 +31,18 @@ pub struct NewAggregatorGasParameters {
 
 fn native_new_aggregator(
     gas_params: &NewAggregatorGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 2);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
 
     // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
     // the parent factory.
-    let limit = pop_arg!(args, u128);
-    let handle = get_handle(&pop_arg!(args, StructRef))?;
+    let limit = safely_pop_arg!(args, u128);
+    let handle = get_handle(&safely_pop_arg!(args, StructRef))?;
 
     // Get the current aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -63,20 +65,11 @@ fn native_new_aggregator(
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
-    Ok(NativeResult::ok(
-        gas_params.base,
-        smallvec![Value::struct_(Struct::pack(vec![
-            Value::address(handle.0),
-            Value::address(key.0),
-            Value::u128(limit),
-        ]))],
-    ))
-}
-
-pub fn make_native_new_aggregator(gas_params: NewAggregatorGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| {
-        native_new_aggregator(&gas_params, context, ty_args, args)
-    })
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::address(handle.0),
+        Value::address(key.0),
+        Value::u128(limit),
+    ]))])
 }
 
 /***************************************************************************************************
@@ -88,10 +81,17 @@ pub struct GasParameters {
     pub new_aggregator: NewAggregatorGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "new_aggregator",
-        make_native_new_aggregator(gas_params.new_aggregator),
+        make_safe_native(
+            gas_params.new_aggregator,
+            timed_features,
+            native_new_aggregator,
+        ),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

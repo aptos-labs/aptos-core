@@ -160,7 +160,7 @@ pub trait VMExecutor: Send + Sync {
 }
 
 /// Get the AccessPath to a resource stored under `address` with type name `tag`
-fn create_access_path(address: AccountAddress, tag: StructTag) -> AccessPath {
+fn create_access_path(address: AccountAddress, tag: StructTag) -> anyhow::Result<AccessPath> {
     let resource_tag = ResourceKey::new(address, tag);
     AccessPath::resource_access_path(resource_tag)
 }
