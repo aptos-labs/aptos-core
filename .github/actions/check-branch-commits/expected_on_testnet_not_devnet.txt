@@ -3,8 +3,10 @@
 # hash should be on a new line, with a comment explaining why it is
 # not on the devnet branch.
 
-895ae28e4a105430d8b9d2ce2f6e48c3b2c7fcf0 # Expected divergence. Will clear when devnet is wiped and recut.
-
+cb4ba0a57c998c60cbab65af31a64875d2588ca5 # Different commit hash and message: https://github.com/aptos-labs/aptos-core/commit/d2a0d17164d978c025c04cc54be55ce08f069091
+f144de376c4c5bc04bcd945ff802c4d8ff499059 # Contains a few commits merged into one: https://github.com/aptos-labs/aptos-core/pull/6480
+84a67d185df4a9c12947f6091d0c0dc3427703f1 # Different commit hash and message: https://github.com/aptos-labs/aptos-core/commit/05eabd73b989fd733ca4b51e4f06c42088ea1e7c
+895ae28e4a105430d8b9d2ce2f6e48c3b2c7fcf0 # Contains a few commits merged into one: https://github.com/aptos-labs/aptos-core/pull/6436
 a78970aa2a6fd6fa7db94d6d5700a902807102c7 # Different commit hash and message: https://github.com/aptos-labs/aptos-core/commit/08ba4052c2e8b1de994706d1faf0f84e7c935ae1
 6aae9a3595da0321a8bda0220fcf593060d44941 # Included in https://github.com/aptos-labs/aptos-core/commit/7bd412edb762cbdc935f28f62a91fc69c8daf639
 43ec117fb2fbf879d6e816fc77c7ed5ed5cd9d7c # Included in https://github.com/aptos-labs/aptos-core/commit/9df438a1eb6e6be9d97129781543196f03e7a812 and https://github.com/aptos-labs/aptos-core/commit/91797aacf83c7f668efa9ddee575139cb4ddbb42

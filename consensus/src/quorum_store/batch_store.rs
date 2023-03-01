@@ -158,6 +158,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             .save(persist_request.digest, persist_request.value.clone()) // TODO: what is this comes from old epoch?
         {
             Ok(needs_db) => {
+                let batch_author = persist_request.value.author;
                 let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
                 let num_bytes = persist_request.value.num_bytes as u64;
                 debug!("QS: sign digest");
@@ -168,6 +169,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         .expect("Could not write to DB");
                 }
                 Some(SignedDigest::new(
+                    batch_author,
                     self.epoch,
                     persist_request.digest,
                     expiration,

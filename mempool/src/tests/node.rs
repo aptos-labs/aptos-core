@@ -34,9 +34,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{
-    account_config::AccountSequenceInfo, on_chain_config::OnChainConfigPayload, PeerId,
-};
+use aptos_types::{on_chain_config::OnChainConfigPayload, PeerId};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use enum_dispatch::enum_dispatch;
 use futures::{
@@ -380,7 +378,7 @@ impl Node {
             mempool.add_txn(
                 transaction.clone(),
                 transaction.gas_unit_price(),
-                AccountSequenceInfo::Sequential(0),
+                0,
                 TimelineState::NotReady,
             );
         }

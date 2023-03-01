@@ -25,6 +25,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `blake2b_256_enabled`](#0x1_features_blake2b_256_enabled)
 -  [Function `get_resource_groups_feature`](#0x1_features_get_resource_groups_feature)
 -  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
+-  [Function `get_multisig_accounts_feature`](#0x1_features_get_multisig_accounts_feature)
+-  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -129,6 +131,16 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_MULTISIG_ACCOUNTS"></a>
+
+Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MULTISIG_ACCOUNTS">MULTISIG_ACCOUNTS</a>: u64 = 10;
 </code></pre>
 
 
@@ -554,6 +566,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_resource_groups_enabled">resource_groups_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_multisig_accounts_feature"></a>
+
+## Function `get_multisig_accounts_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_multisig_accounts_feature">get_multisig_accounts_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_multisig_accounts_feature">get_multisig_accounts_feature</a>(): u64 { <a href="features.md#0x1_features_MULTISIG_ACCOUNTS">MULTISIG_ACCOUNTS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_multisig_accounts_enabled"></a>
+
+## Function `multisig_accounts_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_multisig_accounts_enabled">multisig_accounts_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_multisig_accounts_enabled">multisig_accounts_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MULTISIG_ACCOUNTS">MULTISIG_ACCOUNTS</a>)
 }
 </code></pre>
 

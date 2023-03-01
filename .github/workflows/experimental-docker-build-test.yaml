@@ -37,6 +37,9 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - ".github/workflows/docker-rust-build.yaml"
       - ".github/workflows/sdk-release.yaml"
       - ".github/workflows/lint-test.yaml"
+  push:
+    branches:
+      - main
 
 # cancel redundant builds
 concurrency:
@@ -120,6 +123,8 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      IMAGE_TAG: experimental_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_IMAGE_TAG: experimental_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       COMMENT_HEADER: forge-e2e
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered

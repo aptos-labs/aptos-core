@@ -4,6 +4,7 @@
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_gas::{Fee, Gas};
 use aptos_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_core_types::gas_algebra::InternalGas;
 use serde::{Deserialize, Serialize};
 
 /// Mimics `0xcafe::test::ModuleData`
@@ -39,6 +40,15 @@ fn execution_limit_reached() {
 }
 
 #[test]
+fn bounded_execution_time() {
+    let mut h = MoveHarness::new();
+
+    h.modify_gas_schedule(|gas_params| {
+        assert!(gas_params.txn.max_execution_gas < gas_params.instr.add * 10_000_000.into())
+    });
+}
+
+#[test]
 fn io_limit_reached() {
     let mut h = MoveHarness::new();
 
@@ -46,10 +56,8 @@ fn io_limit_reached() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("execution_limit.data/test"),));
 
-    // Lower the max io gas to 10 units.
-    h.modify_gas_schedule(|gas_params| {
-        gas_params.txn.max_io_gas = Gas::new(10) * gas_params.txn.gas_unit_scaling_factor
-    });
+    // Lower the max io gas to lower than a single load_resource
+    h.modify_gas_schedule(|gas_params| gas_params.txn.max_io_gas = InternalGas::new(300_000 - 1));
 
     // Execute the test function. The function will attempt to check if a resource exists and shall immediately hit the IO gas limit.
     let res = h.run_entry_function(

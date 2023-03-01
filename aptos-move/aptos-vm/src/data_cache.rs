@@ -150,7 +150,9 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
+        let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+        })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }

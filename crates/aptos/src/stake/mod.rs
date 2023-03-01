@@ -344,8 +344,9 @@ impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     }
 }
 
-/// Delegate operator capability from the current operator to another account
+/// Delegate operator capability to another account
 ///
+/// This changes teh operator capability from its current operator to a different operator.
 /// By default, the operator of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetOperator {
@@ -419,8 +420,9 @@ impl CliCommand<Vec<TransactionSummary>> for SetOperator {
     }
 }
 
-/// Delegate voting capability from the current voter to another account
+/// Delegate voting capability to another account
 ///
+/// Delegates voting capability from its current voter to a different voter.
 /// By default, the voter of a stake pool is the owner of the stake pool
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
@@ -547,7 +549,9 @@ impl CliCommand<TransactionSummary> for CreateStakingContract {
     }
 }
 
-/// Distribute any fully unlocked tokens (rewards and/or vested tokens) from the vesting contract
+/// Distribute fully unlocked coins from vesting
+///
+/// Distribute fully unlocked coins (rewards and/or vested coins) from the vesting contract
 /// to shareholders.
 #[derive(Parser)]
 pub struct DistributeVestedCoins {
@@ -574,8 +578,10 @@ impl CliCommand<TransactionSummary> for DistributeVestedCoins {
     }
 }
 
-/// Unlock any vesting tokens according to the vesting contract's schedule.
-/// This also unlock any accumulated staking rewards and pays commission to the operator of the
+/// Unlock vested coins
+///
+/// Unlock vested coins according to the vesting contract's schedule.
+/// This also unlocks any accumulated staking rewards and pays commission to the operator of the
 /// vesting contract's stake pool first.
 ///
 /// The unlocked vested tokens and staking rewards are still subject to the staking lockup and

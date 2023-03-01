@@ -9,6 +9,7 @@ use crate::{
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
@@ -23,10 +24,10 @@ use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, FeatureFlag, Features, GasSchedule, GasScheduleV2, OnChainConfig,
-        StorageGasSchedule, Version,
+        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
+        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -118,12 +119,22 @@ impl AptosVMImpl {
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
 
+        let timestamp = ConfigurationResource::fetch_config(&storage)
+            .map(|config| config.last_reconfiguration_time())
+            .unwrap_or(0);
+
+        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
+        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+            timed_features = timed_features.with_override_profile(profile)
+        }
+
         let inner = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
             gas_feature_version,
             chain_id.id(),
             features.clone(),
+            timed_features,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -417,6 +428,44 @@ impl AptosVMImpl {
                     MoveValue::U8(chain_id.id()),
                 ]),
                 &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)
+            .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
+    }
+
+    /// Run the prologue for a multisig transaction. This needs to verify that:
+    /// 1. The the multisig tx exists
+    /// 2. It has received enough approvals to meet the signature threshold of the multisig account
+    /// 3. If only the payload hash was stored on chain, the provided payload in execution should
+    /// match that hash.
+    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        txn_data: &TransactionMetadata,
+        payload: &Multisig,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let transaction_validation = self.transaction_validation();
+        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE);
+        let provided_payload = if let Some(payload) = &payload.transaction_payload {
+            bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
+        } else {
+            // Default to empty bytes if payload is not provided.
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+        };
+
+        session
+            .execute_function_bypass_visibility(
+                &MULTISIG_ACCOUNT_MODULE,
+                VALIDATE_MULTISIG_TRANSACTION,
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(payload.multisig_address),
+                    MoveValue::vector_u8(provided_payload),
+                ]),
+                &mut UnmeteredGasMeter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)

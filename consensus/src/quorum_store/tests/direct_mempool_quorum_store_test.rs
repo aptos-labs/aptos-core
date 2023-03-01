@@ -4,7 +4,7 @@
 use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_consensus_types::{
     common::PayloadFilter,
-    request_response::{BlockProposalCommand, ConsensusResponse},
+    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
@@ -29,7 +29,7 @@ async fn test_block_request_no_txns() {
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(BlockProposalCommand::GetBlockRequest(
+        .try_send(GetPayloadCommand::GetPayloadRequest(
             1,
             100,
             1000,
@@ -63,7 +63,7 @@ async fn test_block_request_no_txns() {
         .unwrap()
         .unwrap()
     {
-        ConsensusResponse::GetBlockResponse(payload) => {
+        GetPayloadResponse::GetPayloadResponse(payload) => {
             assert!(payload.is_empty());
         },
     }

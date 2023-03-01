@@ -60,3 +60,4 @@ jobs:
           FEATURES: ${{ env.FEATURES }}
           BUILD_ADDL_TESTING_IMAGES: ${{ env.BUILD_ADDL_TESTING_IMAGES }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          CUSTOM_IMAGE_TAG_PREFIX: experimental

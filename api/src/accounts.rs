@@ -20,13 +20,14 @@ use aptos_api_types::{
 };
 use aptos_types::{
     access_path::AccessPath,
-    account_config::AccountResource,
+    account_config::{AccountResource, ObjectGroupResource},
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-    value::MoveValue,
+    resolver::ResourceResolver,
 };
 use poem_openapi::{
     param::{Path, Query},
@@ -248,10 +249,16 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(AccessPath::resource_access_path(
-            self.address.into(),
-            AccountResource::struct_tag(),
-        ));
+        let state_key = StateKey::access_path(
+            AccessPath::resource_access_path(self.address.into(), AccountResource::struct_tag())
+                .map_err(|e| {
+                    BasicErrorWith404::internal_with_code(
+                        e,
+                        AptosErrorCode::InternalError,
+                        &self.latest_ledger_info,
+                    )
+                })?,
+        );
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -264,6 +271,35 @@ impl Account {
         })
     }
 
+    /// Returns an error if an object or account resource does not exist at the address specified
+    /// within the context provided.
+    pub(crate) fn verify_account_or_object_resource(&self) -> Result<(), BasicErrorWith404> {
+        if self.get_account_resource().is_ok() {
+            return Ok(());
+        }
+
+        let state_key = StateKey::access_path(AccessPath::resource_group_access_path(
+            self.address.into(),
+            ObjectGroupResource::struct_tag(),
+        ));
+
+        let state_value = self.context.get_state_value_poem(
+            &state_key,
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )?;
+
+        if state_value.is_some() {
+            Ok(())
+        } else {
+            Err(account_not_found(
+                self.address,
+                self.ledger_version,
+                &self.latest_ledger_info,
+            ))
+        }
+    }
+
     /// Retrieves the move resources associated with the account
     ///
     /// * JSON: Return a JSON encoded version of [`Vec<MoveResource>`]
@@ -273,7 +309,7 @@ impl Account {
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
         // check account exists
-        self.get_account_resource()?;
+        self.verify_account_or_object_resource()?;
         let max_account_resources_page_size = self.context.max_account_resources_page_size();
         let (resources, next_state_key) = self
             .context
@@ -342,7 +378,7 @@ impl Account {
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
     pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         // check account exists
-        self.get_account_resource()?;
+        self.verify_account_or_object_resource()?;
         let max_account_modules_page_size = self.context.max_account_modules_page_size();
         let (modules, next_state_key) = self
             .context
@@ -473,45 +509,38 @@ impl Account {
     /// Find a resource associated with an account
     fn find_resource(
         &self,
-        struct_tag: &StructTag,
-    ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(AccessPath::resource_access_path(
-            self.address.into(),
-            struct_tag.clone(),
-        ));
-        let state_value_bytes = self
-            .context
-            .db
-            .get_state_value_by_version(&state_key, self.ledger_version)
-            .context("Failed to read state value from db")
+        resource_type: &StructTag,
+    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
+        let (ledger_info, ledger_version, state_view) =
+            self.context.state_view(Some(self.ledger_version))?;
+
+        let resolver = state_view.as_move_resolver();
+        let bytes = resolver
+            .get_resource(&self.address.into(), resource_type)
+            .context(format!(
+                "Failed to query DB to check for {} at {}",
+                resource_type, self.address
+            ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    &ledger_info,
                 )
             })?
             .ok_or_else(|| {
-                resource_not_found(
-                    self.address,
-                    struct_tag,
-                    self.ledger_version,
-                    &self.latest_ledger_info,
-                )
-            })?
-            .into_bytes();
+                resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
+            })?;
 
-        // Convert to fields in move struct
-        let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
-        move_resolver
+        resolver
             .as_converter(self.context.db.clone())
-            .move_struct_fields(struct_tag, state_value_bytes.as_slice())
+            .move_struct_fields(resource_type, bytes.as_slice())
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
                     err,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    &ledger_info,
                 )
             })
     }

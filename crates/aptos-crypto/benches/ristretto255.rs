@@ -5,12 +5,12 @@
 extern crate criterion;
 
 use aptos_crypto::test_utils::random_bytes;
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use criterion::{measurement::Measurement, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE,
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
-    traits::Identity,
+    traits::{Identity, VartimeMultiscalarMul},
 };
 use rand::{distributions::Uniform, prelude::ThreadRng, thread_rng, Rng};
 use std::ops::{Add, Mul, Neg, Sub};
@@ -20,6 +20,7 @@ fn benchmark_groups(c: &mut Criterion) {
 
     group.sample_size(1000);
 
+    point_mul(&mut group);
     basepoint_mul(&mut group);
     basepoint_double_mul(&mut group);
     point_add(&mut group);
@@ -28,7 +29,6 @@ fn benchmark_groups(c: &mut Criterion) {
     point_equals(&mut group);
     point_from_64_uniform_bytes(&mut group);
     point_identity(&mut group);
-    point_mul(&mut group);
     point_neg(&mut group);
     point_sub(&mut group);
 
@@ -43,7 +43,39 @@ fn benchmark_groups(c: &mut Criterion) {
     scalar_neg(&mut group);
     scalar_sub(&mut group);
 
+    //for n in 1..=128 {
+    //for n in [256, 512, 1024, 2048, 4096] {
+    for n in [8192, 16384, 32768] {
+        multi_scalar_mul(&mut group, n);
+    }
+
     group.finish();
+}
+
+fn multi_scalar_mul<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(1));
+    g.bench_function(BenchmarkId::new("vartime_multiscalar_mul", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let points = (0..n)
+                    .map(|_| RistrettoPoint::random(&mut rng))
+                    .collect::<Vec<RistrettoPoint>>();
+                let scalars = (0..n)
+                    .map(|_| Scalar::random(&mut rng))
+                    .collect::<Vec<Scalar>>();
+
+                (points, scalars)
+            },
+            |(points, scalars)| {
+                RistrettoPoint::vartime_multiscalar_mul(
+                    scalars.iter(),
+                    points.iter().collect::<Vec<&RistrettoPoint>>().into_iter(),
+                )
+            },
+        )
+    });
 }
 
 /// Benchmarks the time for a single scalar multiplication on the Ristretto255 basepoint (with precomputation).

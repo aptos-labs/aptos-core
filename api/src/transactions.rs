@@ -32,8 +32,8 @@ use aptos_types::{
     account_view::AccountView,
     mempool_status::MempoolStatusCode,
     transaction::{
-        ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
+        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
     },
     vm_status::StatusCode,
 };
@@ -843,37 +843,10 @@ impl TransactionsApi {
                 // Verify the signed transaction
                 match signed_transaction.payload() {
                     TransactionPayload::EntryFunction(entry_function) => {
-                        verify_module_identifier(entry_function.module().name().as_str())
-                            .context("Transaction entry function module invalid")
-                            .map_err(|err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            })?;
-
-                        verify_function_identifier(entry_function.function().as_str())
-                            .context("Transaction entry function name invalid")
-                            .map_err(|err| {
-                                SubmitTransactionError::bad_request_with_code(
-                                    err,
-                                    AptosErrorCode::InvalidInput,
-                                    ledger_info,
-                                )
-                            })?;
-                        for arg in entry_function.ty_args() {
-                            let arg: MoveType = arg.into();
-                            arg.verify(0)
-                                .context("Transaction entry function type arg invalid")
-                                .map_err(|err| {
-                                    SubmitTransactionError::bad_request_with_code(
-                                        err,
-                                        AptosErrorCode::InvalidInput,
-                                        ledger_info,
-                                    )
-                                })?;
-                        }
+                        TransactionsApi::validate_entry_function_payload_format(
+                            ledger_info,
+                            entry_function,
+                        )?;
                     },
                     TransactionPayload::Script(script) => {
                         if script.code().is_empty() {
@@ -897,6 +870,20 @@ impl TransactionsApi {
                                 })?;
                         }
                     },
+                    TransactionPayload::Multisig(multisig) => {
+                        if let Some(payload) = &multisig.transaction_payload {
+                            match payload {
+                                MultisigTransactionPayload::EntryFunction(entry_function) => {
+                                    TransactionsApi::validate_entry_function_payload_format(
+                                        ledger_info,
+                                        entry_function,
+                                    )?;
+                                },
+                            }
+                        }
+                    },
+
+                    // Deprecated. Will be removed in the future.
                     TransactionPayload::ModuleBundle(_) => {},
                 }
                 // TODO: Verify script args?
@@ -917,6 +904,46 @@ impl TransactionsApi {
                     )
                 }),
         }
+    }
+
+    // Validates that the module, function, and args in EntryFunction payload are correctly
+    // formatted.
+    fn validate_entry_function_payload_format(
+        ledger_info: &LedgerInfo,
+        payload: &EntryFunction,
+    ) -> Result<(), SubmitTransactionError> {
+        verify_module_identifier(payload.module().name().as_str())
+            .context("Transaction entry function module invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                )
+            })?;
+
+        verify_function_identifier(payload.function().as_str())
+            .context("Transaction entry function name invalid")
+            .map_err(|err| {
+                SubmitTransactionError::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    ledger_info,
+                )
+            })?;
+        for arg in payload.ty_args() {
+            let arg: MoveType = arg.into();
+            arg.verify(0)
+                .context("Transaction entry function type arg invalid")
+                .map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    )
+                })?;
+        }
+        Ok(())
     }
 
     /// Parses a batch of signed transactions

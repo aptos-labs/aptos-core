@@ -25,7 +25,6 @@ use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
-    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig},
     transaction::SignedTransaction,
@@ -284,9 +283,9 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, t)| {
-            if let Ok(sequence_info) = seq_numbers[idx] {
-                if t.sequence_number() >= sequence_info.min_seq() {
-                    return Some((t, sequence_info));
+            if let Ok(sequence_num) = seq_numbers[idx] {
+                if t.sequence_number() >= sequence_num {
+                    return Some((t, sequence_num));
                 } else {
                     statuses.push((
                         t,
@@ -319,7 +318,7 @@ where
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
+    transactions: Vec<(SignedTransaction, u64)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
@@ -383,7 +382,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
+    transactions: Vec<(SignedTransaction, u64)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
