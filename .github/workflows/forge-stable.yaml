@@ -144,6 +144,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-continuous-e2e-single-vfn
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
@@ -156,6 +157,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-haproxy
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_ENABLE_HAPROXY: true
@@ -176,6 +178,7 @@ jobs:
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: testnet
+      GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   ### Chaos Forge tests
@@ -210,6 +213,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-network-partition
       # Run for 15 minutes
       FORGE_RUNNER_DURATION_SECS: 900
@@ -224,6 +228,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-changing-working-quorum-test
       FORGE_RUNNER_DURATION_SECS: 1200
       FORGE_TEST_SUITE: changing_working_quorum_test
@@ -236,6 +241,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: different_node_speed_and_reliability_test
@@ -248,6 +254,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
@@ -262,6 +269,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-state-sync-perf-validator
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
@@ -274,6 +282,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
@@ -286,6 +295,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
