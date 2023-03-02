@@ -124,8 +124,8 @@ module aptos_framework::delegation_pool {
     /// Additionally, the inactive stake does not count on the voting power of validator.
     const ESLASHED_INACTIVE_STAKE_ON_PAST_OLC: u64 = 7;
 
-    /// Cannot add less stake than `MIN_ADD_STAKE_AMOUNT`.
-    const EINVALID_ADD_STAKE_AMOUNT: u64 = 8;
+    /// Delegator's active balance cannot be less than `MIN_COINS_ON_SHARES_POOL`.
+    const EDELEGATOR_ACTIVE_BALANCE_TOO_LOW: u64 = 8;
 
     /// Creating delegation pools is not enabled yet.
     const EDELEGATION_POOLS_DISABLED: u64 = 9;
@@ -138,15 +138,21 @@ module aptos_framework::delegation_pool {
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
     const MAX_FEE: u64 = 10000;
 
-    /// Minimum stake to be added on an individual `add_stake` operation
-    const MIN_ADD_STAKE_AMOUNT: u64 = 100000000;
-
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
     /// Special shareholder temporarily owning the `add_stake` fees charged during this epoch.
     /// On each `add_stake` operation any resulted fee is used to buy active shares for this shareholder.
     /// First synchronization after this epoch ends will distribute accumulated fees to the rest of the pool as refunds.
     const NULL_SHAREHOLDER: address = @0x0;
+
+    /// Minimum coins to exist on a shares pool at all times.
+    /// Enforced per delegator for both active and pending_inactive pools.
+    /// This constraint ensures the share price cannot overly increase and lead to
+    /// substantial loses when buying shares (can lose at most 1 share which may
+    /// be worth a lot if current share price is high).
+    /// This constraint is not enforced on inactive pools as they only allow redeems
+    /// (can lose at most 1 coin regardless of current share price).
+    const MIN_COINS_ON_SHARES_POOL: u64 = 1000000000;
 
     /// Capability that represents ownership over privileged operations on the underlying stake pool.
     struct DelegationPoolOwnership has key, store {
@@ -246,6 +252,21 @@ module aptos_framework::delegation_pool {
     public fun operator_commission_percentage(pool_address: address): u64 acquires DelegationPool {
         assert_delegation_pool_exists(pool_address);
         borrow_global<DelegationPool>(pool_address).operator_commission_percentage
+    }
+
+    #[view]
+    /// Return the number of delegators owning active stake within `pool_address`.
+    public fun shareholders_count_active_pool(pool_address: address): u64 acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        pool_u64::shareholders_count(&borrow_global<DelegationPool>(pool_address).active_shares)
+    }
+
+    #[view]
+    /// Return the stake amounts on `pool_address` in the different states:
+    /// (`active`,`inactive`,`pending_active`,`pending_inactive`)
+    public fun get_delegation_pool_stake(pool_address: address): (u64, u64, u64, u64) {
+        assert_delegation_pool_exists(pool_address);
+        stake::get_stake(pool_address)
     }
 
     #[view]
@@ -434,6 +455,45 @@ module aptos_framework::delegation_pool {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
+    fun coins_to_redeem_to_ensure_min_stake(
+        src_shares_pool: &pool_u64::Pool,
+        shareholder: address,
+        amount: u64,
+    ): u64 {
+        // find how many coins would be redeemed if supplying `amount`
+        let redeemed_coins = pool_u64::shares_to_amount(
+            src_shares_pool,
+            amount_to_shares_to_redeem(src_shares_pool, shareholder, amount)
+        );
+        // if balance drops under threshold then redeem it entirely
+        let src_balance = pool_u64::balance(src_shares_pool, shareholder);
+        if (src_balance - redeemed_coins < MIN_COINS_ON_SHARES_POOL) {
+            amount = src_balance;
+        };
+        amount
+    }
+
+    fun coins_to_transfer_to_ensure_min_stake(
+        src_shares_pool: &pool_u64::Pool,
+        dst_shares_pool: &pool_u64::Pool,
+        shareholder: address,
+        amount: u64,
+    ): u64 {
+        // find how many coins would be redeemed from source if supplying `amount`
+        let redeemed_coins = pool_u64::shares_to_amount(
+            src_shares_pool,
+            amount_to_shares_to_redeem(src_shares_pool, shareholder, amount)
+        );
+        // if balance on destination would be less than threshold then redeem difference to threshold
+        let dst_balance = pool_u64::balance(dst_shares_pool, shareholder);
+        if (dst_balance + redeemed_coins < MIN_COINS_ON_SHARES_POOL) {
+            // `redeemed_coins` >= `amount` - 1 as redeem can lose at most 1 coin
+            amount = MIN_COINS_ON_SHARES_POOL - dst_balance + 1;
+        };
+        // check if new `amount` drops balance on source under threshold and adjust
+        coins_to_redeem_to_ensure_min_stake(src_shares_pool, shareholder, amount)
+    }
+
     /// Retrieves the shared resource account owning the stake pool in order
     /// to forward a stake-management operation to this underlying pool.
     fun retrieve_stake_pool_owner(pool: &DelegationPool): signer {
@@ -490,9 +550,6 @@ module aptos_framework::delegation_pool {
     public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
         // short-circuit if amount to add is 0 so no event is emitted
         if (amount == 0) { return };
-        // should add at least the symbolic minimum stake
-        assert!(amount >= MIN_ADD_STAKE_AMOUNT, error::invalid_argument(EINVALID_ADD_STAKE_AMOUNT));
-
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
 
@@ -505,8 +562,13 @@ module aptos_framework::delegation_pool {
         // stake the entire amount to the stake pool
         coin::transfer<AptosCoin>(delegator, pool_address, amount);
         stake::add_stake(&retrieve_stake_pool_owner(pool), amount);
+
         // but buy shares for delegator just for the remaining amount after fee
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount - add_stake_fee);
+        assert!(
+            pool_u64::balance(&pool.active_shares, delegator_address) >= MIN_COINS_ON_SHARES_POOL,
+            error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW)
+        );
 
         // grant temporary ownership over `add_stake` fees to a separate shareholder in order to:
         // - not mistake them for rewards to pay the operator from
@@ -541,6 +603,12 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
+        amount = coins_to_transfer_to_ensure_min_stake(
+            &pool.active_shares,
+            pending_inactive_shares_pool(pool),
+            delegator_address,
+            amount,
+        );
         amount = redeem_active_shares(pool, delegator_address, amount);
 
         stake::unlock(&retrieve_stake_pool_owner(pool), amount);
@@ -566,6 +634,12 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
 
+        amount = coins_to_transfer_to_ensure_min_stake(
+            pending_inactive_shares_pool(pool),
+            &pool.active_shares,
+            delegator_address,
+            amount,
+        );
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         amount = redeem_inactive_shares(pool, delegator_address, amount, observed_lockup_cycle);
 
@@ -602,6 +676,13 @@ module aptos_framework::delegation_pool {
                 (withdrawal_olc.index < pool.observed_lockup_cycle.index || can_withdraw_pending_inactive(pool_address))
         )) { return };
 
+        if (withdrawal_olc.index == pool.observed_lockup_cycle.index) {
+            amount = coins_to_redeem_to_ensure_min_stake(
+                pending_inactive_shares_pool(pool),
+                delegator_address,
+                amount,
+            )
+        };
         amount = redeem_inactive_shares(pool, delegator_address, amount, withdrawal_olc);
 
         let stake_pool_owner = &retrieve_stake_pool_owner(pool);
@@ -654,9 +735,13 @@ module aptos_framework::delegation_pool {
 
     /// Return a mutable reference to the shares pool of `pending_inactive` stake on the
     /// delegation pool, always the last item in `inactive_shares`.
-    fun pending_inactive_shares_pool(pool: &mut DelegationPool): &mut pool_u64::Pool {
+    fun pending_inactive_shares_pool_mut(pool: &mut DelegationPool): &mut pool_u64::Pool {
         let observed_lockup_cycle = pool.observed_lockup_cycle;
         table::borrow_mut(&mut pool.inactive_shares, observed_lockup_cycle)
+    }
+
+    fun pending_inactive_shares_pool(pool: &DelegationPool): &pool_u64::Pool {
+        table::borrow(&pool.inactive_shares, pool.observed_lockup_cycle)
     }
 
     /// Execute the pending withdrawal of `delegator_address` on delegation pool `pool`
@@ -680,7 +765,7 @@ module aptos_framework::delegation_pool {
         coins_amount: u64,
     ): u64 {
         // cannot buy inactive shares, only pending_inactive at current lockup cycle
-        let new_shares = pool_u64::buy_in(pending_inactive_shares_pool(pool), shareholder, coins_amount);
+        let new_shares = pool_u64::buy_in(pending_inactive_shares_pool_mut(pool), shareholder, coins_amount);
         // never create a new pending withdrawal unless delegator owns some pending_inactive shares
         if (new_shares == 0) { return 0 };
 
@@ -803,7 +888,7 @@ module aptos_framework::delegation_pool {
             0
         };
         // operator `pending_inactive` rewards not persisted yet to the pending_inactive shares pool
-        let commission_pending_inactive = total_coins(table::borrow(&pool.inactive_shares, pool.observed_lockup_cycle));
+        let commission_pending_inactive = total_coins(pending_inactive_shares_pool(pool));
         commission_pending_inactive = if (pending_inactive > commission_pending_inactive) {
             multiply_then_divide(&pool.active_shares,
                 pending_inactive - commission_pending_inactive, pool.operator_commission_percentage, MAX_FEE)
@@ -846,7 +931,7 @@ module aptos_framework::delegation_pool {
         pool_u64::update_total_coins(&mut pool.active_shares, active - commission_active);
         // update total coins accumulated by `pending_inactive` shares at current observed lockup cycle
         pool_u64::update_total_coins(
-            pending_inactive_shares_pool(pool),
+            pending_inactive_shares_pool_mut(pool),
             pending_inactive - commission_pending_inactive
         );
 
@@ -979,6 +1064,22 @@ module aptos_framework::delegation_pool {
         if (should_end_epoch) {
             end_aptos_epoch();
         };
+    }
+
+    #[test_only]
+    fun unlock_with_min_stake_disabled(
+        delegator: &signer,
+        pool_address: address,
+        amount: u64
+    ) acquires DelegationPool {
+        synchronize_delegation_pool(pool_address);
+
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        let delegator_address = signer::address_of(delegator);
+
+        amount = redeem_active_shares(pool, delegator_address, amount);
+        stake::unlock(&retrieve_stake_pool_owner(pool), amount);
+        buy_in_pending_inactive_shares(pool, delegator_address, amount);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -1200,7 +1301,7 @@ module aptos_framework::delegation_pool {
         delegator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
-        initialize_test_validator(validator, 1000 * ONE_APT, true, true);
+        initialize_test_validator(validator, 1000 * ONE_APT, true, false);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -1208,36 +1309,39 @@ module aptos_framework::delegation_pool {
         let delegator_address = signer::address_of(delegator);
         account::create_account_for_test(delegator_address);
 
-        stake::mint(delegator, ONE_APT);
-        add_stake(delegator, pool_address, ONE_APT);
+        // add stake without fees as validator is not active yet
+        stake::mint(delegator, 10 * ONE_APT);
+        add_stake(delegator, pool_address, 10 * ONE_APT);
+        end_aptos_epoch();
 
         unlock(validator, pool_address, 100 * ONE_APT);
 
-        stake::assert_stake_pool(pool_address, 90000000000, 0, 100000000, 10000000000);
+        stake::assert_stake_pool(pool_address, 91000000000, 0, 0, 10000000000);
         end_aptos_epoch();
-        stake::assert_stake_pool(pool_address, 91000000000, 0, 0, 10100000000);
+        stake::assert_stake_pool(pool_address, 91910000000, 0, 0, 10100000000);
 
-        unlock(delegator, pool_address, 1);
-        // redeem 1 coins * 901 / 910 = 0 shares -> 0 coins to buy in pending_inactive pool
-        assert_delegation(delegator_address, pool_address, 100000000, 0, 0);
+        unlock_with_min_stake_disabled(delegator, pool_address, 1);
+        // redeem 1 coins * 910 / 919.1 = 0 shares -> 0 coins to buy in pending_inactive pool
+        assert_delegation(delegator_address, pool_address, 1010000000, 0, 0);
         assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
 
-        unlock(delegator, pool_address, 2);
-        // redeem 2 coins * 901 / 910 = 1 shares -> 1 shares * 910 / 901 = 1 coins to buy in pending_inactive pool
+        unlock_with_min_stake_disabled(delegator, pool_address, 2);
+        // redeem 2 coins * 910 / 919.1 = 1 shares -> 1 shares * 919.1 / 910 = 1 coins to buy in pending_inactive pool
         // buy 1 coins * 100 / 101 = 0 shares in pending_inactive pool worth 0 coins
-        assert_delegation(delegator_address, pool_address, 99999999, 0, 0);
+        assert_delegation(delegator_address, pool_address, 1009999998, 0, 0);
         assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
 
-        unlock(delegator, pool_address, 3);
-        // redeem 3 coins * 901 / 910 = 2 shares -> 2 shares * 910 / 901 = 2 coins to buy in pending_inactive pool
+        // unlock min coins to receive back 1 share (have to disable min-balance checks)
+        unlock_with_min_stake_disabled(delegator, pool_address, 3);
+        // redeem 3 coins * 910 / 919.1 = 2 shares -> 2 shares * 919.1 / 910 = 2 coins to buy in pending_inactive pool
         // buy 2 coins * 100 / 101 = 1 shares in pending_inactive pool worth 1 * 101 / 100 = 1 coins
-        assert_delegation(delegator_address, pool_address, 99999996, 0, 1);
+        assert_delegation(delegator_address, pool_address, 1009999996, 0, 1);
         // the pending withdrawal has been created as > 0 pending_inactive shares have been bought
         assert_pending_withdrawal(delegator_address, pool_address, true, 0, false, 1);
 
         reactivate_stake(delegator, pool_address, 1);
         // redeem 1 coins >= delegator balance -> 1 shares are redeemed
-        assert_delegation(delegator_address, pool_address, 99999996, 0, 0);
+        assert_delegation(delegator_address, pool_address, 1009999996, 0, 0);
         // the pending withdrawal has been deleted as delegator has 0 pending_inactive shares now
         assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
     }
@@ -1249,7 +1353,7 @@ module aptos_framework::delegation_pool {
         validator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
         initialize_for_test(aptos_framework);
-        initialize_test_validator(validator, MIN_ADD_STAKE_AMOUNT - 1, false, false);
+        initialize_test_validator(validator, MIN_COINS_ON_SHARES_POOL - 1, false, false);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
@@ -1725,10 +1829,10 @@ module aptos_framework::delegation_pool {
         assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 9999999999);
 
         // reactivate the new pending withdrawal almost entirely
-        reactivate_stake(validator, pool_address, 9999999998);
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 1);
+        reactivate_stake(validator, pool_address, 8999999999);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 1000000000);
         // reactivate remaining stake of the new pending withdrawal
-        reactivate_stake(validator, pool_address, 1);
+        reactivate_stake(validator, pool_address, 1000000000);
         assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
     }
 
@@ -1793,13 +1897,13 @@ module aptos_framework::delegation_pool {
         // use too small of an unlock amount to actually transfer shares to the pending_inactive pool
         // check that no leftovers have been produced on the stake or delegation pools
         stake::assert_stake_pool(pool_address, 101909000001, 10099999998, 0, 0);
-        unlock(delegator, pool_address, 1);
+        unlock_with_min_stake_disabled(delegator, pool_address, 1);
         stake::assert_stake_pool(pool_address, 101909000001, 10099999998, 0, 0);
         assert_delegation(delegator_address, pool_address, 10100000001, 10099999998, 0);
         assert_pending_withdrawal(delegator_address, pool_address, true, 1, true, 10099999998);
 
-        // implicitly execute the pending withdrawal by unlocking enough stake
-        unlock(delegator, pool_address, 2);
+        // implicitly execute the pending withdrawal by unlocking min stake to buy 1 share
+        unlock_with_min_stake_disabled(delegator, pool_address, 2);
         stake::assert_stake_pool(pool_address, 101909000000, 0, 0, 1);
         assert_delegation(delegator_address, pool_address, 10099999999, 0, 1);
         // old pending withdrawal has been replaced
@@ -2298,11 +2402,16 @@ module aptos_framework::delegation_pool {
         assert_delegation(validator_address, pool_address, 199559338, 25536995, 0);
 
         // unlock some more stake to produce pending_inactive commission
+        // 10620884337 active stake * (1.008735 ^ 2 epochs)
+        // 10087349999 pending_inactive stake * 1.008735
+        assert_delegation(delegator2_address, pool_address, 10807241562, 10175463001, 0);
         unlock(delegator2, pool_address, 100 * ONE_APT);
+        // 10807241562 - 100 APT < `MIN_COINS_ON_SHARES_POOL` thus active stake is entirely unlocked
+        assert_delegation(delegator2_address, pool_address, 0, 0, 10807241562);
         end_aptos_epoch();
 
         // in-flight pending_inactive commission can coexist with previous inactive commission
-        assert_delegation(validator_address, pool_address, 228553871, 25536996, 12649999);
+        assert_delegation(validator_address, pool_address, 227532710, 25536996, 13671160);
         assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 25536996);
 
         // distribute in-flight pending_inactive commission, implicitly executing the inactive withdrawal of operator
@@ -2310,8 +2419,10 @@ module aptos_framework::delegation_pool {
         synchronize_delegation_pool(pool_address);
         assert!(coin::balance<AptosCoin>(validator_address) == 25536996, 0);
 
-        assert_delegation(validator_address, pool_address, 228553870, 0, 12649998);
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 12649998);
+        // in-flight commission has been synced, implicitly used to buy shares for operator
+        // expect operator stake to be slightly less than previously reported by `Self::get_stake`
+        assert_delegation(validator_address, pool_address, 227532709, 0, 13671159);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 13671159);
     }
 
     #[test(aptos_framework = @aptos_framework, old_operator = @0x123, delegator = @0x010, new_operator = @0x020)]
