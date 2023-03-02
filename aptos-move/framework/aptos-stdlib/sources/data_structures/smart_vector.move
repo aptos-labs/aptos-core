@@ -1,4 +1,4 @@
-module aptos_framework::smart_vector {
+module aptos_std::smart_vector {
     use std::error;
     use std::vector;
     use aptos_std::big_vector::{Self, BigVector};
@@ -16,7 +16,7 @@ module aptos_framework::smart_vector {
     const EZERO_BUCKET_SIZE: u64 = 4;
 
     /// A Scalable vector implementation based on tables, elements are grouped into buckets with `bucket_size`.
-    /// The vector wrapping BigVector represents an option w/o `Drop` ability requirement of T to save space of the
+    /// The vector wrapping BigVector represents an option w/o `Drop` ability requirement of T to save space in the
     /// metadata associated with BigVector when smart_vector is so small that inline_vec vector can hold all the data.
     struct SmartVector<T> has store {
         inline_vec: vector<T>,

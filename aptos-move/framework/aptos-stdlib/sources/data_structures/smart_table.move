@@ -1,7 +1,9 @@
 /// A smart table implementation based on linear hashing. (https://en.wikipedia.org/wiki/Linear_hashing)
-/// Compare to Table, it uses less storage slots but has higher chance of collision, it's a trade-off between space and time.
-/// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
-/// SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since it tolerates collisions.
+/// Compare to Table, it uses less storage slots but has higher chance of collision, a trade-off between space and time.
+/// Compare to other dynamic hashing implementation, linear hashing splits one bucket a time instead of doubling buckets
+/// when expanding to avoid unexpected gas cost.
+/// SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since
+/// it tolerates collisions.
 module aptos_std::smart_table {
     use std::error;
     use std::vector;
@@ -22,6 +24,8 @@ module aptos_std::smart_table {
     const EINVALID_LOAD_THRESHOLD_PERCENT: u64 = 5;
     /// Invalid target bucket size.
     const EINVALID_TARGET_BUCKET_SIZE: u64 = 6;
+    /// Invalid target bucket size.
+    const EEXCEED_MAX_BUCKET_SIZE: u64 = 7;
 
     /// SmartTable entry contains both the key and value.
     struct Entry<K, V> has copy, drop, store {
@@ -64,7 +68,7 @@ module aptos_std::smart_table {
             level: 0,
             size: 0,
             // The default split load threshold is 75%.
-            split_load_threshold: if (split_load_threshold == 0) {75} else {split_load_threshold},
+            split_load_threshold: if (split_load_threshold == 0) { 75 } else { split_load_threshold },
             target_bucket_size,
         };
         // The default number of initial buckets is 2.
@@ -87,18 +91,18 @@ module aptos_std::smart_table {
             vector::destroy_empty(table_with_length::remove(&mut table.buckets, i));
             i = i + 1;
         };
-        let SmartTable {buckets, num_buckets: _, level: _, size: _, split_load_threshold:_, target_bucket_size: _} = table;
+        let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
         table_with_length::destroy_empty(buckets);
     }
 
-    /// Destroy a table completely when V is dropable.
+    /// Destroy a table completely when V has `drop`.
     public fun destroy<K: drop, V: drop>(table: SmartTable<K, V>) {
         let i = 0;
         while (i < table.num_buckets) {
             table_with_length::remove(&mut table.buckets, i);
             i = i + 1;
         };
-        let SmartTable {buckets, num_buckets: _, level: _, size: _, split_load_threshold:_, target_bucket_size: _} = table;
+        let SmartTable { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = table;
         table_with_length::destroy_empty(buckets);
     }
 
@@ -111,11 +115,13 @@ module aptos_std::smart_table {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(table.level, table.num_buckets, hash);
         let bucket = table_with_length::borrow_mut(&mut table.buckets, index);
-        assert!(vector::all(bucket, |entry| {
+        // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
+        assert!(vector::length(bucket) <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
+        assert!(vector::all(bucket, | entry | {
             let e: &Entry<K, V> = entry;
             &e.key != &key
         }), error::invalid_argument(EALREADY_EXIST));
-        let e = Entry {hash, key, value};
+        let e = Entry { hash, key, value };
         if (table.target_bucket_size == 0) {
             let estimated_entry_size = max(size_of_val(&e), 1);
             table.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
@@ -234,7 +240,7 @@ module aptos_std::smart_table {
         let hash = sip_hash_from_value(&key);
         let index = bucket_index(table.level, table.num_buckets, hash);
         let bucket = table_with_length::borrow(&table.buckets, index);
-        vector::any(bucket, |entry| {
+        vector::any(bucket, | entry | {
             let e: &Entry<K, V> = entry;
             e.hash == hash && &e.key == &key
         })
@@ -250,7 +256,7 @@ module aptos_std::smart_table {
         while (i < len) {
             let entry = vector::borrow(bucket, i);
             if (&entry.key == &key) {
-                let Entry {hash:_, key:_, value} = vector::swap_remove(bucket, i);
+                let Entry { hash: _, key: _, value } = vector::swap_remove(bucket, i);
                 table.size = table.size - 1;
                 return value
             };
@@ -273,107 +279,6 @@ module aptos_std::smart_table {
     /// Returns the length of the table, i.e. the number of entries.
     public fun length<K, V>(table: &SmartTable<K, V>): u64 {
         table.size
-    }
-
-
-    /// Apply the function to each key-value pair in the table, consuming it.
-    public inline fun for_each<K: copy + drop, V>(table: SmartTable<K, V>, f: |K, V|) {
-        let SmartTable {buckets, num_buckets, level: _, size: _, split_load_threshold:_, target_bucket_size: _} = table;
-        let i = 0;
-        while (i < num_buckets) {
-            vector::for_each(table_with_length::remove(&mut buckets, i), |elem| {
-                let Entry {hash: _, key, value} = elem;
-                f(key, value)
-            });
-            i = i + 1;
-        };
-        table_with_length::destroy_empty(buckets);
-    }
-
-    /// Apply the function to a reference of each key-value pair in the table.
-    public inline fun for_each_ref<K, V>(table: &SmartTable<K, V>, f: |&K, &V|) {
-        let i = 0;
-        while (i < table.num_buckets) {
-            vector::for_each_ref(table_with_length::borrow(&table.buckets, i), |elem| {
-                let e: &Entry<K, V> = elem;
-                f(&e.key, &e.value)
-            });
-            i = i + 1;
-        }
-    }
-
-    /// Apply the function to a reference of each key-value pair in the table.
-    public inline fun for_each_mut<K, V>(table: &mut SmartTable<K, V>, f: |&K, &mut V|) {
-        let i = 0;
-        while (i < table.num_buckets) {
-            vector::for_each_mut(table_with_length::borrow_mut(&mut table.buckets, i), |elem| {
-                let e: &mut Entry<K, V> = elem;
-                f(&e.key, &mut e.value)
-            });
-            i = i + 1;
-        };
-    }
-
-    /// Fold the function over the key-value pairs of the table.
-    public inline fun fold<A, K: copy + drop, V>(
-        table: SmartTable<K, V>,
-        init: A,
-        f: |A,K,V|A
-    ): A {
-        for_each(table, |key, value| init = f(init, key, value));
-        init
-    }
-
-    /// Map the function over the key-value pairs of the table.
-    public inline fun map<K: copy + drop + store, V1, V2: store>(
-        table: SmartTable<K, V1>,
-        f: |V1|V2
-    ): SmartTable<K, V2> {
-        let new_table = new_with_config<K, V2>(0, table.split_load_threshold, 0);
-        for_each(table, |key, value| add(&mut new_table, key, f(value)));
-        new_table
-    }
-
-    /// Map the function over the references of key-value pairs in the table without modifying it.
-    public inline fun map_ref<K: copy + drop + store, V1, V2: store>(
-        table: &SmartTable<K, V1>,
-        f: |&V1|V2
-    ): SmartTable<K, V2> {
-        let new_table = new_with_config<K, V2>(0, table.split_load_threshold, 0);
-        for_each_ref(table, |key, value| add(&mut new_table, *key, f(value)));
-        new_table
-    }
-
-    /// Filter entries in the table.
-    public inline fun filter<K: copy + drop + store, V: store>(
-        table: SmartTable<K, V>,
-        p: |&V|bool
-    ): SmartTable<K, V> {
-        let new_table = new_with_config<K, V>(table.num_buckets, table.split_load_threshold, table.target_bucket_size);
-        for_each(table, |key, value| {
-            if (p(&value)) {
-                add(&mut new_table, key, value);
-            }
-        });
-        new_table
-}
-
-    /// Return true if any key-value pair in the table satisfies the predicate.
-    public inline fun any<K, V>(
-        table: &SmartTable<K, V>,
-        p: |&K, &V|bool
-    ): bool {
-        let found = false;
-        let i = 0;
-        while (i < table.num_buckets) {
-            found = vector::any(table_with_length::borrow(&table.buckets, i), |elem| {
-                let e: &Entry<K, V> = elem;
-                p(&e.key, &e.value)
-            });
-            if (found) break;
-            i = i + 1;
-        };
-        found
     }
 
     /// Return the load factor of the hashtable.
@@ -466,99 +371,5 @@ module aptos_std::smart_table {
             i = i + 1;
         };
         destroy_empty(table);
-    }
-
-    #[test_only]
-    fun make(): SmartTable<u64, u64> {
-        let table = new_with_config<u64, u64>(0, 50, 10);
-        let i = 0u64;
-        while (i < 100) {
-            add(&mut table, i, i);
-            i = i + 1;
-        };
-        table
-    }
-
-    #[test]
-    fun test_for_each() {
-        let t = make();
-        let s = 0;
-        for_each(t, |x, y| {
-            s = s + x + y;
-        });
-        assert!(s == 9900, 0)
-    }
-
-    #[test]
-    fun test_for_each_ref() {
-        let t = make();
-        let s = 0;
-        for_each_ref(&t, |x, y| {
-            s = s + *x + *y;
-        });
-        assert!(s == 9900, 0);
-        destroy(t);
-    }
-
-    #[test]
-    fun test_for_each_mut() {
-        let t = make();
-        for_each_mut(&mut t, |_key, val| {
-            let val : &mut u64 = val;
-            *val = *val + 1
-        });
-        for_each_ref(&t, |key, val| {
-            assert!(*key + 1 == *val, *key);
-        });
-        destroy(t);
-    }
-
-    #[test]
-    fun test_fold() {
-        let t = make();
-        let r = fold(t, 1, |accu, key, val| {
-            accu + key + val
-        });
-        assert!(r == 9901, 0);
-    }
-
-    #[test]
-    fun test_map() {
-        let t = make();
-        let r = map(t, |val| val + 1);
-        for_each_ref(&r, |key, val| {
-            assert!(*key + 1 == *val, *key);
-        });
-        destroy(r);
-    }
-
-    #[test]
-    fun test_map_ref() {
-        let t = make();
-        let r = map_ref(&t, |val| *val + 1);
-        for_each_ref(&r, |key, val| {
-            assert!(*key + 1 == *val, *key);
-        });
-        destroy(t);
-        destroy(r);
-    }
-
-    #[test]
-    fun test_filter() {
-        let t = make();
-        let r = filter(t, |val| *val < 50);
-        assert!(length(&r) == 50, 0);
-        assert!(
-            fold(r, 0, |accu, _key, val| {
-                accu + val
-            }) == 1225, 1);
-    }
-
-    #[test]
-    fun test_any() {
-        let t = make();
-        let r = any(&t, |_k, v| *v >= 99);
-        assert!(r, 1);
-        destroy(t);
     }
 }
