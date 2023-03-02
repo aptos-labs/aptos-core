@@ -960,7 +960,7 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 64
+    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
