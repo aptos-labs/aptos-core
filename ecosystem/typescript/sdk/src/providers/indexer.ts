@@ -37,7 +37,7 @@ export class IndexerClient {
   private async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
     const { data } = await axios.post(this.endpoint, graphqlQuery);
     if (data.errors) {
-      throw new Error(`Indexer data error ${data.errors}`);
+      throw new Error(`Indexer data error ${JSON.stringify(data.errors)}`);
     }
     return data.data;
   }
