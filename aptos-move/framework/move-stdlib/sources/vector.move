@@ -71,10 +71,13 @@ module std::vector {
         pragma intrinsic = true;
     }
 
-    /// Reverses the order of the elements in the vector `v` in place.
+    /// Reverses the order of the elements [left, right) in the vector `v` in place.
     public fun reverse_slice<Element>(v: &mut vector<Element>, left: u64, right: u64) {
-        while (left + 1 < right) {
-            swap(v, left, right - 1);
+        assert!(left >= right, EINVALID_RANGE);
+        if (left == right) return;
+        right = right - 1;
+        while (left < right) {
+            swap(v, left, right);
             left = left + 1;
             right = right - 1;
         }
@@ -251,7 +254,9 @@ module std::vector {
         result
     }
 
-    /// Partition, sorts all elements for which p is true to the front. Not stable
+    /// Partition, sorts all elements for which pred is true to the front.
+    /// Preserves the relative order of the elements for which pred is true,
+    /// BUT NOT for the elements for which pred is false.
     public inline fun partition<Element>(
         v: &mut vector<Element>,
         pred: |&Element|bool
@@ -274,6 +279,8 @@ module std::vector {
         p
     }
 
+    /// rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
+    /// ie. 3 in the example above
     public fun rotate<Element>(
         v: &mut vector<Element>,
         rot: u64
@@ -282,6 +289,8 @@ module std::vector {
         rotate_slice(v, 0, rot, len)
     }
 
+    /// Same as above but on a sub-slice of an array [left, right) with left <= rot <= right
+    /// returns the
     public fun rotate_slice<Element>(
         v: &mut vector<Element>,
         left: u64,
@@ -294,6 +303,10 @@ module std::vector {
         left + (right - rot)
     }
 
+    /// For in-place stable partition we need recursion so we cannot use inline functions
+    /// and thus we cannot use lambdas. Luckily it so happens that we can precompute the predicate
+    /// in a secondary array. Note how the algorithm belows only start shuffling items after the
+    /// predicate is checked.
     public fun stable_partition_internal<Element>(
         v: &mut vector<Element>,
         pred: &vector<bool>,
@@ -312,6 +325,8 @@ module std::vector {
         }
     }
 
+    /// Partition the array based on a predicate p, this routine is stable and thus
+    /// preserves the relative order of the elements in the two partitions.
     public inline fun stable_partition<Element>(
         v: &mut vector<Element>,
         p: |&Element|bool
@@ -355,7 +370,7 @@ module std::vector {
         result
     }
 
-    /// Destroy a vector
+    /// Destroy a vector, just a wrapper around for_each_reverse but with a clear name.
     public inline fun destroy<Element>(
         v: vector<Element>,
         d: |Element|
