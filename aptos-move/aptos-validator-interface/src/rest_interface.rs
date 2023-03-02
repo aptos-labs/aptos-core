@@ -52,7 +52,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
     ) -> Result<Option<StateValue>> {
         match state_key.inner() {
             StateKeyInner::AccessPath(path) => match path.get_path() {
-                Path::Code(module_id) => Ok(Some(StateValue::new(
+                Path::Code(module_id) => Ok(Some(StateValue::new_legacy(
                     self.0
                         .get_account_module_bcs_at_version(
                             *module_id.address(),
@@ -73,9 +73,9 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                     )
                     .await
                     .ok()
-                    .map(|inner| StateValue::new(inner.into_inner()))),
+                    .map(|inner| StateValue::new_legacy(inner.into_inner()))),
             },
-            StateKeyInner::TableItem { handle, key } => Ok(Some(StateValue::new(
+            StateKeyInner::TableItem { handle, key } => Ok(Some(StateValue::new_legacy(
                 self.0
                     .get_raw_table_item(handle.0, key, version)
                     .await

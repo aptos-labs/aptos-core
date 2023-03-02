@@ -220,14 +220,17 @@ module aptos_framework::account {
         new_account
     }
 
+    #[view]
     public fun exists_at(addr: address): bool {
         exists<Account>(addr)
     }
 
+    #[view]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).guid_creation_num
     }
 
+    #[view]
     public fun get_sequence_number(addr: address): u64 acquires Account {
         borrow_global<Account>(addr).sequence_number
     }
@@ -243,6 +246,7 @@ module aptos_framework::account {
         *sequence_number = *sequence_number + 1;
     }
 
+    #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
         *&borrow_global<Account>(addr).authentication_key
     }

@@ -229,6 +229,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -427,6 +436,23 @@ WriteOp:
         NEWTYPE: BYTES
     2:
       Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
   ENUM:
     0:

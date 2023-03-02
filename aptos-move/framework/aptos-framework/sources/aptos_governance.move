@@ -196,14 +196,17 @@ module aptos_framework::aptos_governance {
         );
     }
 
+    #[view]
     public fun get_voting_duration_secs(): u64 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).voting_duration_secs
     }
 
+    #[view]
     public fun get_min_voting_threshold(): u128 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).min_voting_threshold
     }
 
+    #[view]
     public fun get_required_proposer_stake(): u64 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).required_proposer_stake
     }
