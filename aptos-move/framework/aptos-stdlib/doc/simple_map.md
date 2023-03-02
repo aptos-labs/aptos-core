@@ -21,6 +21,9 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `contains_key`](#0x1_simple_map_contains_key)
 -  [Function `destroy_empty`](#0x1_simple_map_destroy_empty)
 -  [Function `add`](#0x1_simple_map_add)
+-  [Function `to_vec`](#0x1_simple_map_to_vec)
+-  [Function `split_element`](#0x1_simple_map_split_element)
+-  [Function `upsert`](#0x1_simple_map_upsert)
 -  [Function `remove`](#0x1_simple_map_remove)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
@@ -315,6 +318,97 @@ Map key is not found
     <b>assert</b>!(<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&maybe_idx), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="simple_map.md#0x1_simple_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
 
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_to_vec"></a>
+
+## Function `to_vec`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_to_vec">to_vec</a>&lt;Key: store, Value: store&gt;(map: <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="simple_map.md#0x1_simple_map_Element">simple_map::Element</a>&lt;Key, Value&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_to_vec">to_vec</a>&lt;Key: store, Value: store&gt;(
+    map: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="simple_map.md#0x1_simple_map_Element">Element</a>&lt;Key, Value&gt;&gt; {
+    <b>let</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a> { data } = map;
+    data
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_split_element"></a>
+
+## Function `split_element`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_split_element">split_element</a>&lt;Key: store, Value: store&gt;(e: <a href="simple_map.md#0x1_simple_map_Element">simple_map::Element</a>&lt;Key, Value&gt;): (Key, Value)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_split_element">split_element</a>&lt;Key: store, Value: store&gt;(e: <a href="simple_map.md#0x1_simple_map_Element">Element</a>&lt;Key, Value&gt;): (Key, Value) {
+    <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value} = e;
+    (key, value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_upsert"></a>
+
+## Function `upsert`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store, Value: store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: Key, value: Value): (<a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Key&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Value&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store, Value: store&gt;(
+    map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
+    key: Key,
+    value: Value
+): (Option&lt;Key&gt;, Option&lt;Value&gt;) {
+    <b>let</b> len = std::vector::length(&map.data);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<b>mut</b> map.data, i);
+        <b>if</b> (&element.key == &key) {
+            <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> {key: _k, value: _v} = <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> map.data, i);
+            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value});
+            <b>return</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(_k), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(_v))
+        };
+        i = i + 1;
+    };
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value });
+    <b>return</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
 }
 </code></pre>
 
