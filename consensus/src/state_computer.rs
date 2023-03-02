@@ -256,6 +256,13 @@ impl StateComputer for ExecutionProxy {
             .collect();
         self.payload_manager.lock().replace(payload_manager);
     }
+
+    // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
+    // on the next epoch.
+    fn end_epoch(&self) {
+        *self.validators.lock() = vec![];
+        self.payload_manager.lock().take();
+    }
 }
 
 #[tokio::test]

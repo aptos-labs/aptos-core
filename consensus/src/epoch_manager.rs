@@ -546,6 +546,8 @@ impl EpochManager {
                 .expect("Could not send shutdown indicator to QuorumStore");
             ack_rx.await.expect("Failed to stop QuorumStore");
         }
+
+        self.commit_state_computer.end_epoch();
     }
 
     async fn start_recovery_manager(
