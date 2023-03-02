@@ -77,6 +77,7 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
+    /// Insert key/value pair or update an existing key to a new value
     public fun upsert<Key: store + drop + copy, Value: store + drop + copy>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
