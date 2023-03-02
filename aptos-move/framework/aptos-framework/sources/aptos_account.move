@@ -150,6 +150,7 @@ module aptos_framework::aptos_account {
         };
     }
 
+    #[view]
     /// Return true if `account` can receive direct transfers of coins that they have not explicitly registered to
     /// receive.
     ///
