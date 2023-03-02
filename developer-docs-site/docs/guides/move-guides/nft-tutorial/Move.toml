@@ -1,0 +1,20 @@
+[package]
+name = "NFT-tutorial"
+version = "0.0.0"
+
+[addresses]
+aptos_framework = "0x1"
+# change it to the actual source address when publishing the module
+source_addr = "0xa911e7374107ad434bbc5369289cf5855c3b1a2938a6bfce0776c1d296271cde"
+# change it to the actual admin address when publishing the module
+admin_addr = "0xbd0838054fbfb44e26496f238be752686819d460ea4f997de0c9d33d4cbf38f4"
+
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/aptos-framework'
+
+[dependencies.AptosToken]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/aptos-token'

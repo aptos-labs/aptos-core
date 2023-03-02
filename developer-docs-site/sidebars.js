@@ -164,6 +164,7 @@ const sidebars = {
     "guides/interacting-with-the-blockchain",
     "tutorials/first-move-module",
     "guides/move-guides/upgrading-move-code",
+    "guides/move-guides/nft-tutorial/tutorial/README",
     {
       type: "category",
       label: "Aptos Move Book",

@@ -205,6 +205,11 @@ const config = {
                 docId: "guides/move-guides/upgrading-move-code",
               },
               {
+                label: "Aptos NFT Tutorial",
+                type: "doc",
+                docId: "guides/move-guides/nft-tutorial/tutorial/README",
+              },
+              {
                 label: "Aptos Move Book",
                 type: "doc",
                 docId: "guides/move-guides/book/SUMMARY",
