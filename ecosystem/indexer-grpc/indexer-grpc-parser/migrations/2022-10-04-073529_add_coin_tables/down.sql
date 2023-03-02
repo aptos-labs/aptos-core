@@ -1,5 +1,4 @@
 -- This file should undo anything in `up.sql`
-DROP INDEX IF EXISTS ps_name_succ_ver_index;
 DROP TABLE IF EXISTS coin_infos;
 DROP TABLE IF EXISTS coin_balances;
 DROP TABLE IF EXISTS current_coin_balances;

@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{processors::default_processor::DefaultTransactionProcessor,
-    indexer::transaction_processor::TransactionProcessor};
+use crate::{
+    indexer::transaction_processor::TransactionProcessor,
+    processors::default_processor::DefaultTransactionProcessor,
+};
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, PooledConnection},
-    RunQueryDsl,
 };
 use std::sync::Arc;
 
@@ -17,7 +18,10 @@ pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
-    datastream::v1::{self as datastream},
+    datastream::v1::{
+        indexer_stream_client::IndexerStreamClient, raw_datastream_response::Response,
+        RawDatastreamRequest,
+    },
     transaction::v1::Transaction as TransactionProto,
 };
 use futures::StreamExt;
@@ -65,32 +69,54 @@ impl Worker {
     pub async fn run(&self) {
         let (tx, mut rx) = mpsc::channel::<TransactionProto>(TRANSACTION_CHANNEL_SIZE);
         let mut ma = MovingAverage::new(10_000);
-        let default_transaction_processor = Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()));
+        let default_transaction_processor =
+            Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()));
         // Re-connect if lost.
         tokio::spawn(async move {
             // Nothing speicial.
-            let default_transaction_processor :Arc<dyn TransactionProcessor> = default_transaction_processor.clone();
+            let default_transaction_processor: Arc<dyn TransactionProcessor> =
+                default_transaction_processor.clone();
             loop {
                 let mut current_transactions = vec![];
                 for _ in 0..MAX_TRANSACTION_BATCH_SIZE {
                     let transaction = match rx.recv().await {
                         Some(t) => t,
                         None => {
-                            info!("[Datastream Indexer] Channel is empty now.");
                             break;
                         },
                     };
                     current_transactions.push(transaction);
                 }
                 if current_transactions.is_empty() {
+                    info!("[Datastream Indexer] Channel is empty now.");
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     continue;
                 }
-                let starting_version = current_transactions.as_slice().first().unwrap().version;
+                let start_version = current_transactions.as_slice().first().unwrap().version;
+                let end_version = current_transactions.as_slice().last().unwrap().version;
                 let batch_size = current_transactions.len();
-                default_transaction_processor.process_transactions_with_status(current_transactions).await.unwrap();
+                match default_transaction_processor
+                    .process_transactions(current_transactions, start_version, end_version)
+                    .await
+                {
+                    Ok(result) => {
+                        default_transaction_processor
+                            .update_last_processed_version(result.end_version)
+                            .await
+                            .unwrap();
+                    },
+                    Err(error) => {
+                        panic!(
+                            "[Datastream Indexer] Error processing transactions. Versions {} to {}. Error: {:?}",
+                            start_version,
+                            end_version,
+                            error
+                        );
+                    },
+                };
                 ma.tick_now(batch_size as u64);
                 info!(
-                    starting_version = starting_version,
+                    start_version = start_version,
                     batch_size = batch_size,
                     tps = (ma.avg() * 1000.0) as u64,
                     "[Datastream Indexer] Batch inserted.",
@@ -100,24 +126,16 @@ impl Worker {
 
         loop {
             let mut rpc_client =
-                match datastream::indexer_stream_client::IndexerStreamClient::connect(format!(
-                    "http://{}:50052",
-                    self.datastream_service_address,
-                ))
-                .await
-                {
+                match IndexerStreamClient::connect(self.datastream_service_address.clone()).await {
                     Ok(client) => client,
                     Err(e) => {
-                        error!(
-                            "[Datasteram Worker]Error connecting to indexer address {}, postgres uri {}",
-                            self.datastream_service_address, self.postgres_uri
-                        );
                         panic!("[Datastream Worker] Error connecting to indexer: {}", e);
                     },
                 };
-            let request = tonic::Request::new(datastream::RawDatastreamRequest {
+            let request = tonic::Request::new(RawDatastreamRequest {
                 // Loads from the recent successful starting version.
                 starting_version: get_starting_version(),
+                transactions_count: None,
             });
 
             let response = rpc_client.raw_datastream(request).await.unwrap();
@@ -137,11 +155,10 @@ impl Worker {
                     },
                 };
                 match received.response.unwrap() {
-                    datastream::raw_datastream_response::Response::Status(status) => {
+                    Response::Status(status) => {
                         match status.r#type {
                             0 => {
                                 if init_signal_received {
-                                    error!("[Datastream Indexer] No signal is expected; panic.");
                                     panic!("[Datastream Indexer] No signal is expected; panic.");
                                 } else {
                                     // The first signal is the initialization signal.
@@ -150,17 +167,16 @@ impl Worker {
                             },
                             1 => {
                                 // No BATCH_END signal is expected.
-                                error!("[Datastream Indexer] No signal is expected; panic.");
                                 panic!("[Datastream Indexer] No signal is expected; panic.");
                             },
                             _ => {
                                 // There might be protobuf inconsistency between server and client.
                                 // Panic to block running.
-                                panic!("[Datastream Worker] Unknown RawDatastreamResponse status type.");
+                                panic!("[Datastream Indexer] Unknown RawDatastreamResponse status type.");
                             },
                         }
                     },
-                    datastream::raw_datastream_response::Response::Data(data) => {
+                    Response::Data(data) => {
                         let transaction_sender = tx.clone();
 
                         let transactions: Vec<TransactionProto> = data

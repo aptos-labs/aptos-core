@@ -302,17 +302,4 @@ CREATE TABLE table_metadatas (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX tm_insat_index ON table_metadatas (inserted_at);
--- Tracks processor version status
-CREATE TABLE processor_statuses (
-  name VARCHAR(50) NOT NULL,
-  version BIGINT NOT NULL,
-  success BOOLEAN NOT NULL,
-  details TEXT,
-  last_updated TIMESTAMP NOT NULL DEFAULT NOW(),
-  -- Constraints
-  PRIMARY KEY (name, version)
-);
-CREATE INDEX ps_succ_ver_index ON processor_statuses (success, version ASC);
-CREATE INDEX ps_ver_index ON processor_statuses (version ASC);
-CREATE INDEX ps_lastup_index ON processor_statuses (last_updated);
 CREATE TABLE ledger_infos (chain_id BIGINT UNIQUE PRIMARY KEY NOT NULL);

@@ -8,7 +8,7 @@ use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 #[derive(AsChangeset, Debug, Insertable)]
 #[diesel(table_name = processor_status)]
 /// Only tracking the latest version successfully processed
-pub struct ProcessorStatusV2 {
+pub struct ProcessorStatus {
     pub processor: String,
     pub last_success_version: i64,
 }
@@ -16,13 +16,13 @@ pub struct ProcessorStatusV2 {
 #[derive(AsChangeset, Debug, Queryable)]
 #[diesel(table_name = processor_status)]
 /// Only tracking the latest version successfully processed
-pub struct ProcessorStatusV2Query {
+pub struct ProcessorStatusQuery {
     pub processor: String,
     pub last_success_version: i64,
     pub last_updated: chrono::NaiveDateTime,
 }
 
-impl ProcessorStatusV2Query {
+impl ProcessorStatusQuery {
     pub fn get_by_processor(
         processor_name: &String,
         conn: &mut PgPoolConnection,

@@ -12,7 +12,6 @@ SELECT transaction_version,
   is_deleted,
   inserted_at
 FROM move_resources;
-CREATE INDEX ps_name_succ_ver_index ON processor_statuses (name, success, version ASC);
 -- adding timestamp to all token tables
 ALTER TABLE token_activities
 ADD COLUMN transaction_timestamp TIMESTAMP NOT NULL;

@@ -7,6 +7,5 @@ DROP TABLE IF EXISTS move_modules;
 DROP TABLE IF EXISTS move_resources;
 DROP TABLE IF EXISTS table_items;
 DROP TABLE IF EXISTS table_metadatas;
-DROP TABLE IF EXISTS processor_statuses;
 DROP TABLE IF EXISTS ledger_infos;
 DROP TABLE IF EXISTS transactions;

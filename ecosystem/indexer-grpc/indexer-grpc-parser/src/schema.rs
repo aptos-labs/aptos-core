@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
 // @generated automatically by Diesel CLI.
 
@@ -296,16 +295,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    processor_statuses (name, version) {
-        name -> Varchar,
-        version -> Int8,
-        success -> Bool,
-        details -> Nullable<Text>,
-        last_updated -> Timestamp,
-    }
-}
-
-diesel::table! {
     proposal_votes (transaction_version, proposal_id, voter_address) {
         transaction_version -> Int8,
         proposal_id -> Int8,
@@ -516,7 +505,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     move_modules,
     move_resources,
     processor_status,
-    processor_statuses,
     proposal_votes,
     signatures,
     table_items,
