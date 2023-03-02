@@ -23,7 +23,6 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `add`](#0x1_simple_map_add)
 -  [Function `to_vec`](#0x1_simple_map_to_vec)
 -  [Function `split_element`](#0x1_simple_map_split_element)
--  [Function `upsert`](#0x1_simple_map_upsert)
 -  [Function `remove`](#0x1_simple_map_remove)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
@@ -369,44 +368,6 @@ Map key is not found
 <pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_split_element">split_element</a>&lt;Key: store, Value: store&gt;(e: <a href="simple_map.md#0x1_simple_map_Element">Element</a>&lt;Key, Value&gt;): (Key, Value) {
     <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value} = e;
     (key, value)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_simple_map_upsert"></a>
-
-## Function `upsert`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: <b>copy</b>, drop, store, Value: <b>copy</b>, drop, store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key, value: &Value)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store + drop + <b>copy</b>, Value: store + drop + <b>copy</b>&gt;(
-    map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
-    key: &Key,
-    value: &Value
-) {
-    <b>let</b> len = std::vector::length(&map.data);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> map.data, i);
-        <b>if</b> (&element.key == key) {
-            element.value = *value;
-            <b>return</b>
-        };
-        i = i + 1;
-    };
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key: *key, value: *value });
 }
 </code></pre>
 

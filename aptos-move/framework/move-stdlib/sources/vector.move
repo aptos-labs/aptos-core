@@ -64,20 +64,24 @@ module std::vector {
     /// Reverses the order of the elements in the vector `v` in place.
     public fun reverse<Element>(v: &mut vector<Element>) {
         let len = length(v);
-        if (len == 0) return ();
-
-        let front_index = 0;
-        let back_index = len -1;
-        while (front_index < back_index) {
-            swap(v, front_index, back_index);
-            front_index = front_index + 1;
-            back_index = back_index - 1;
-        }
+        reverse_slice(v, 0, len);
     }
+
     spec reverse {
         pragma intrinsic = true;
     }
 
+    /// Reverses the order of the elements in the vector `v` in place.
+    public fun reverse_slice<Element>(v: &mut vector<Element>, left: u64, right: u64) {
+        while (left + 1 < right) {
+            swap(v, left, right - 1);
+            left = left + 1;
+            right = right - 1;
+        }
+    }
+    spec reverse_slice {
+        pragma intrinsic = true;
+    }
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {
@@ -159,6 +163,11 @@ module std::vector {
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each<Element>(v: vector<Element>, f: |Element|) {
         reverse(&mut v); // We need to reverse the vector to consume it efficiently
+        for_each_reverse(v, f);
+    }
+
+    /// Apply the function to each element in the vector, consuming it.
+    public inline fun for_each_reverse<Element>(v: vector<Element>, f: |Element|) {
         while (!is_empty(&v)) {
             let e = pop_back(&mut v);
             f(e);
@@ -168,7 +177,8 @@ module std::vector {
     /// Apply the function to a reference of each element in the vector.
     public inline fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
         let i = 0;
-        while (i < length(v)) {
+        let len = length(v);
+        while (i < len) {
             f(borrow(v, i));
             i = i + 1
         }
@@ -177,7 +187,8 @@ module std::vector {
     /// Apply the function to a mutable reference to each element in the vector.
     public inline fun for_each_mut<Element>(v: &mut vector<Element>, f: |&mut Element|) {
         let i = 0;
-        while (i < length(v)) {
+        let len = length(v);
+        while (i < len) {
             f(borrow_mut(v, i));
             i = i + 1
         }
@@ -192,6 +203,18 @@ module std::vector {
     ): Accumulator {
         let accu = init;
         for_each(v, |elem| accu = f(accu, elem));
+        accu
+    }
+
+    // Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
+    //     /// `f(1, f(2, f(3, 0)))`
+    public inline fun foldr<Accumulator, Element>(
+        v: vector<Element>,
+        init: Accumulator,
+        f: |Element, Accumulator|Accumulator
+    ): Accumulator {
+        let accu = init;
+        for_each_reverse(v, |elem| accu = f(elem, accu));
         accu
     }
 
@@ -227,6 +250,76 @@ module std::vector {
         });
         result
     }
+
+    /// Partition, sorts all elements for which p is true to the front. Not stable
+    public inline fun partition<Element>(
+        v: &mut vector<Element>,
+        pred: |&Element|bool
+    ): u64 {
+        let i = 0;
+        let len = length(v);
+        while (i < len) {
+            if (!pred(borrow(v, i))) break;
+            i = i + 1;
+        };
+        let p = i;
+        i = i + 1;
+        while (i < len) {
+            if (pred(borrow(v, i))) {
+                swap(v, p, i);
+                p = p + 1;
+            };
+            i = i + 1;
+        };
+        p
+    }
+
+    public fun rotate<Element>(
+        v: &mut vector<Element>,
+        rot: u64
+    ): u64 {
+        let len = length(v);
+        rotate_slice(v, 0, rot, len)
+    }
+
+    public fun rotate_slice<Element>(
+        v: &mut vector<Element>,
+        left: u64,
+        rot: u64,
+        right: u64
+    ): u64 {
+        reverse_slice(v, left, rot);
+        reverse_slice(v, rot, right);
+        reverse_slice(v, left, right);
+        left + (right - rot)
+    }
+
+    public fun stable_partition_internal<Element>(
+        v: &mut vector<Element>,
+        pred: &vector<bool>,
+        left: u64,
+        right: u64
+    ): u64 {
+        if (left == right) {
+            left
+        } else if (left + 1 == right) {
+            if (*borrow(pred, left)) right else left
+        } else {
+            let mid = left + ((right - left) >> 1);
+            let p1 = stable_partition_internal(v, pred, left, mid);
+            let p2 = stable_partition_internal(v, pred, mid, right);
+            rotate_slice(v, p1, mid, p2)
+        }
+    }
+
+    public inline fun stable_partition<Element>(
+        v: &mut vector<Element>,
+        p: |&Element|bool
+    ): u64 {
+        let pred = map_ref(v, p);
+        stable_partition_internal(v, &pred,0, length(v))
+    }
+
 
     /// Return true if any element in the vector satisfies the predicate.
     public inline fun any<Element>(
@@ -267,12 +360,7 @@ module std::vector {
         v: vector<Element>,
         d: |Element|
     ) {
-        let len = length(&v);
-        while (len != 0) {
-            d(pop_back(&mut v));
-            len = len - 1;
-        };
-        destroy_empty(v);
+        for_each_reverse(v, d)
     }
 
     // =================================================================

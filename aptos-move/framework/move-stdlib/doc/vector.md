@@ -26,16 +26,21 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `swap`](#0x1_vector_swap)
 -  [Function `singleton`](#0x1_vector_singleton)
 -  [Function `reverse`](#0x1_vector_reverse)
+-  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
+-  [Function `rotate`](#0x1_vector_rotate)
+-  [Function `rotate_slice`](#0x1_vector_rotate_slice)
+-  [Function `stable_partition_internal`](#0x1_vector_stable_partition_internal)
 -  [Specification](#@Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
+    -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
     -  [Function `append`](#@Specification_1_append)
     -  [Function `is_empty`](#@Specification_1_is_empty)
     -  [Function `contains`](#@Specification_1_contains)
@@ -297,14 +302,35 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
-    <b>if</b> (len == 0) <b>return</b> ();
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, 0, len);
+}
+</code></pre>
 
-    <b>let</b> front_index = 0;
-    <b>let</b> back_index = len -1;
-    <b>while</b> (front_index &lt; back_index) {
-        <a href="vector.md#0x1_vector_swap">swap</a>(v, front_index, back_index);
-        front_index = front_index + 1;
-        back_index = back_index - 1;
+
+
+</details>
+
+<a name="0x1_vector_reverse_slice"></a>
+
+## Function `reverse_slice`
+
+Reverses the order of the elements in the vector <code>v</code> in place.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64) {
+    <b>while</b> (left + 1 &lt; right) {
+        <a href="vector.md#0x1_vector_swap">swap</a>(v, left, right - 1);
+        left = left + 1;
+        right = right - 1;
     }
 }
 </code></pre>
@@ -491,6 +517,103 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<a name="0x1_vector_rotate"></a>
+
+## Function `rotate`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, rot: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    rot: u64
+): u64 {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>(v, 0, rot, len)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_rotate_slice"></a>
+
+## Function `rotate_slice`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, rot: u64, right: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    left: u64,
+    rot: u64,
+    right: u64
+): u64 {
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, rot);
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, rot, right);
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, right);
+    left + (right - rot)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_stable_partition_internal"></a>
+
+## Function `stable_partition_internal`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, pred: &<a href="vector.md#0x1_vector">vector</a>&lt;bool&gt;, left: u64, right: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    pred: &<a href="vector.md#0x1_vector">vector</a>&lt;bool&gt;,
+    left: u64,
+    right: u64
+): u64 {
+    <b>if</b> (left == right) <b>return</b> left;
+    <b>if</b> (left + 1 == right) {
+        <b>if</b> (*<a href="vector.md#0x1_vector_borrow">borrow</a>(pred, left)) right <b>else</b> left
+    } <b>else</b> {
+        <b>let</b> mid = left + ((right - left) &gt;&gt; 1);
+        <b>let</b> p1 = <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(v, pred, left, mid);
+        <b>let</b> p2 = <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(v, pred, mid, right);
+        <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>(v, p1, mid, p2)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="@Specification_1"></a>
 
 ## Specification
@@ -593,6 +716,22 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_reverse_slice"></a>
+
+### Function `reverse_slice`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
 </code></pre>
 
 
