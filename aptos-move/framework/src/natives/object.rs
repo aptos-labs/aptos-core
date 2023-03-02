@@ -7,7 +7,9 @@ use crate::{
 };
 use aptos_types::on_chain_config::TimedFeatures;
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::InternalGas, vm_status::StatusCode,
+    account_address::AccountAddress,
+    gas_algebra::{InternalGas, InternalGasPerByte},
+    vm_status::StatusCode,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -25,6 +27,8 @@ use std::collections::VecDeque;
 #[derive(Clone, Debug)]
 pub struct ExistsAtGasParameters {
     pub base_cost: InternalGas,
+    pub per_byte: InternalGasPerByte,
+    pub per_item: InternalGas,
 }
 
 fn native_exists_at(
@@ -41,12 +45,16 @@ fn native_exists_at(
 
     context.charge(gas_params.base_cost)?;
 
-    let exists = context.exists_at(address, &type_).map_err(|err| {
+    let (exists, num_bytes) = context.exists_at(address, &type_).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
             "Failed to read resource: {:?} at {}. With error: {}",
             type_, address, err
         ))
     })?;
+
+    if let Some(num_bytes) = num_bytes {
+        context.charge(gas_params.per_item + gas_params.per_byte * num_bytes)?;
+    }
 
     Ok(smallvec![Value::bool(exists)])
 }
@@ -61,10 +69,16 @@ pub struct GasParameters {
 }
 
 impl GasParameters {
-    pub fn new(exists_at_base: InternalGas) -> Self {
+    pub fn new(
+        exists_at_base: InternalGas,
+        exists_at_per_item: InternalGas,
+        exists_at_per_byte: InternalGasPerByte,
+    ) -> Self {
         Self {
             exists_at: ExistsAtGasParameters {
                 base_cost: exists_at_base,
+                per_item: exists_at_per_item,
+                per_byte: exists_at_per_byte,
             },
         }
     }
