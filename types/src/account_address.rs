@@ -15,8 +15,9 @@ use std::{
     str::FromStr,
 };
 
-const SALT: &[u8] = b"aptos_framework::staking_contract";
-const VESTING_POOL_SALT: &[u8] = b"aptos_framework::vesting";
+const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::multisig_account";
+const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::staking_contract";
+const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::vesting";
 
 /// A wrapper struct that gives better error messages when the account address
 /// can't be deserialized in a human readable format
@@ -145,6 +146,10 @@ pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> Accou
     AccountAddress::new(array)
 }
 
+pub fn create_collection_address(creator: AccountAddress, collection: &str) -> AccountAddress {
+    create_object_address(creator, collection.as_bytes())
+}
+
 pub fn create_token_address(
     creator: AccountAddress,
     collection: &str,
@@ -184,7 +189,7 @@ pub fn create_stake_pool_address(
     let mut full_seed = vec![];
     full_seed.extend(bcs::to_bytes(&owner).unwrap());
     full_seed.extend(bcs::to_bytes(&operator).unwrap());
-    full_seed.extend(SALT);
+    full_seed.extend(STAKING_CONTRACT_DOMAIN_SEPARATOR);
     full_seed.extend(seed);
     create_resource_address(owner, &full_seed)
 }
@@ -197,7 +202,7 @@ pub fn create_vesting_contract_address(
     let mut full_seed = vec![];
     full_seed.extend(bcs::to_bytes(&admin).unwrap());
     full_seed.extend(bcs::to_bytes(&nonce).unwrap());
-    full_seed.extend(VESTING_POOL_SALT);
+    full_seed.extend(VESTING_POOL_DOMAIN_SEPARATOR);
     full_seed.extend(seed);
     create_resource_address(admin, &full_seed)
 }
@@ -218,6 +223,16 @@ pub fn create_resource_address(address: AccountAddress, seed: &[u8]) -> AccountA
     input.push(Scheme::DeriveResourceAccountAddress as u8);
     let hash = HashValue::sha3_256_of(&input);
     AccountAddress::from_bytes(hash.as_ref()).unwrap()
+}
+
+pub fn create_multisig_account_address(
+    creator: AccountAddress,
+    creator_nonce: u64,
+) -> AccountAddress {
+    let mut full_seed = vec![];
+    full_seed.extend(MULTISIG_ACCOUNT_DOMAIN_SEPARATOR);
+    full_seed.extend(bcs::to_bytes(&creator_nonce).unwrap());
+    create_resource_address(creator, &full_seed)
 }
 
 // Define the Hasher used for hashing AccountAddress types. In order to properly use the

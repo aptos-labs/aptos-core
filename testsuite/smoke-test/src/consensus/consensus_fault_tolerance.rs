@@ -26,6 +26,9 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
         .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
             config.consensus.max_sending_block_txns = max_block_txns;
+            config
+                .consensus
+                .max_sending_block_txns_quorum_store_override = max_block_txns;
             config.consensus.round_initial_timeout_ms = 1000;
             // no increase in timeout, to have stable round/second rate.
             config.consensus.round_timeout_backoff_exponent_base = 1.0;

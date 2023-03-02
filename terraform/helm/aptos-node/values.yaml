@@ -17,6 +17,9 @@ numFullnodeGroups: 1
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
 overrideNodeConfig: false
 
+# -- If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout)
+manageImages: true
+
 haproxy:
   # -- Enable HAProxy deployment in front of validator and fullnodes
   enabled: true

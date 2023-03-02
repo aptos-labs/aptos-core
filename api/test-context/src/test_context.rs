@@ -33,7 +33,7 @@ use aptos_sdk::{
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    account_address::AccountAddress,
+    account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
@@ -355,16 +355,150 @@ impl TestContext {
         )
     }
 
+    pub async fn execute_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        expected_status_code: u16,
+    ) {
+        self.api_execute_txn_expecting(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+            }),
+            expected_status_code,
+        )
+        .await;
+    }
+
+    pub async fn execute_multisig_transaction_with_payload(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        function: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) {
+        self.api_execute_txn_expecting(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await;
+    }
+
+    pub async fn create_multisig_account(
+        &mut self,
+        account: &mut LocalAccount,
+        additional_owners: Vec<AccountAddress>,
+        signatures_required: u64,
+        initial_balance: u64,
+    ) -> AccountAddress {
+        let factory = self.transaction_factory();
+        let multisig_address =
+            create_multisig_account_address(account.address(), account.sequence_number());
+        let create_multisig_txn = account.sign_with_transaction_builder(
+            factory
+                .create_multisig_account(additional_owners, signatures_required)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![
+            create_multisig_txn,
+            self.account_transfer_to(account, multisig_address, initial_balance),
+        ])
+        .await;
+        multisig_address
+    }
+
+    pub async fn create_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .create_multisig_transaction(multisig_account, payload)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
+    pub async fn approve_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .approve_multisig_transaction(multisig_account, transaction_id)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
+    pub async fn reject_multisig_transaction(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .reject_multisig_transaction(multisig_account, transaction_id)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
+    pub async fn create_multisig_transaction_with_payload_hash(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = owner.sign_with_transaction_builder(
+            factory
+                .create_multisig_transaction_with_payload_hash(multisig_account, payload)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![txn]).await;
+    }
+
     pub fn account_transfer(
         &self,
         sender: &mut LocalAccount,
         receiver: &LocalAccount,
         amount: u64,
     ) -> SignedTransaction {
+        self.account_transfer_to(sender, receiver.address(), amount)
+    }
+
+    pub fn account_transfer_to(
+        &self,
+        sender: &mut LocalAccount,
+        receiver: AccountAddress,
+        amount: u64,
+    ) -> SignedTransaction {
         let factory = self.transaction_factory();
         sender.sign_with_transaction_builder(
             factory
-                .account_transfer(receiver.address(), amount)
+                .account_transfer(receiver, amount)
                 .expiration_timestamp_secs(u64::MAX),
         )
     }
@@ -511,6 +645,44 @@ impl TestContext {
             .unwrap()
     }
 
+    pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
+        let coin_balance = self
+            .api_get_account_resource(
+                account,
+                "0x1",
+                "coin",
+                "CoinStore<0x1::aptos_coin::AptosCoin>",
+            )
+            .await;
+        coin_balance["data"]["coin"]["value"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+    }
+
+    pub async fn gen_events_by_handle(
+        &self,
+        account_address: &AccountAddress,
+        resource: &str,
+        field_name: &str,
+    ) -> Value {
+        let request = format!(
+            "/accounts/{}/events/{}/{}",
+            account_address, resource, field_name
+        );
+        self.get(&request).await
+    }
+
+    pub async fn gen_events_by_creation_num(
+        &self,
+        account_address: &AccountAddress,
+        creation_num: u64,
+    ) -> Value {
+        let request = format!("/accounts/{}/events/{}", account_address, creation_num);
+        self.get(&request).await
+    }
+
     // return a specific resource for an account. None if not found.
     pub async fn gen_resource(
         &self,
@@ -541,13 +713,8 @@ impl TestContext {
         module: &str,
         name: &str,
     ) -> serde_json::Value {
-        let resources = self
-            .get(&format!("/accounts/{}/resources", account.to_hex_literal()))
-            .await;
-        let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        vals.into_iter()
-            .find(|v| v["type"] == format!("{}::{}::{}", resource_account_address, module, name,))
-            .unwrap()
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await.unwrap()
     }
 
     // TODO: remove the helper function since we don't publish module directly anymore
@@ -583,7 +750,16 @@ impl TestContext {
         .await;
     }
 
-    async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
+    pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
+        self.api_execute_txn_expecting(account, payload, 202).await;
+    }
+
+    pub async fn api_execute_txn_expecting(
+        &mut self,
+        account: &mut LocalAccount,
+        payload: Value,
+        status_code: u16,
+    ) {
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),
@@ -614,11 +790,78 @@ impl TestContext {
             "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
         });
 
-        self.expect_status_code(202)
+        self.expect_status_code(status_code)
             .post("/transactions", request)
             .await;
         self.commit_mempool_txns(1).await;
         *account.sequence_number_mut() += 1;
+    }
+
+    pub async fn simulate_multisig_transaction(
+        &mut self,
+        owner: &LocalAccount,
+        multisig_account: AccountAddress,
+        function: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) -> Value {
+        self.simulate_transaction(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await
+    }
+
+    pub async fn simulate_transaction(
+        &mut self,
+        sender: &LocalAccount,
+        payload: Value,
+        status_code: u16,
+    ) -> Value {
+        let mut request = json!({
+            "sender": sender.address(),
+            "sequence_number": sender.sequence_number().to_string(),
+            "gas_unit_price": "0",
+            "max_gas_amount": "1000000",
+            "expiration_timestamp_secs": "16373698888888",
+            "payload": payload,
+        });
+
+        // We're intentionally using invalid signatures since simulation API rejects valid ones.
+        let random_account = self.gen_account();
+        let resp = self
+            .post(
+                self.api_specific_config.signing_message_endpoint(),
+                request.clone(),
+            )
+            .await;
+
+        let signing_msg = self
+            .api_specific_config
+            .unwrap_signing_message_response(resp);
+
+        let sig = random_account
+            .private_key()
+            .sign_arbitrary_message(signing_msg.inner());
+        request["signature"] = json!({
+            "type": "ed25519_signature",
+            "public_key": HexEncodedBytes::from(sender.public_key().to_bytes().to_vec()),
+            "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
+        });
+
+        self.expect_status_code(status_code)
+            .post("/transactions/simulate", request)
+            .await
     }
 
     pub fn prepend_path(&self, path: &str) -> String {

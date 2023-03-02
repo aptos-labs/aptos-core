@@ -29,8 +29,8 @@ impl AggregatorValue {
 
 /// Extension of `ChangeSet` that also holds deltas.
 pub struct ChangeSetExt {
-    delta_change_set: DeltaChangeSet,
-    change_set: ChangeSet,
+    pub delta_change_set: DeltaChangeSet,
+    pub change_set: ChangeSet,
     checker: Arc<dyn CheckChangeSet>,
 }
 

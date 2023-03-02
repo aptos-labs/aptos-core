@@ -606,7 +606,7 @@ fn compile_in_temp_dir(
     script_path: &Path,
     framework_package_args: &FrameworkPackageArgs,
     prompt_options: PromptOptions,
-    bytecode_version: u32,
+    bytecode_version: Option<u32>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
     let temp_dir = TempDir::new().map_err(|err| {
@@ -652,7 +652,7 @@ fn compile_in_temp_dir(
 fn compile_script(
     skip_fetch_latest_git_deps: bool,
     package_dir: &Path,
-    bytecode_version: u32,
+    bytecode_version: Option<u32>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
@@ -660,7 +660,7 @@ fn compile_script(
         with_source_maps: false,
         with_error_map: false,
         skip_fetch_latest_git_deps,
-        bytecode_version: Some(bytecode_version),
+        bytecode_version,
         ..BuildOptions::default()
     };
 
@@ -777,7 +777,7 @@ impl CompileScriptFunction {
             script_path,
             &self.framework_package_args,
             prompt_options,
-            self.bytecode_version.unwrap_or(6),
+            self.bytecode_version,
         )
     }
 }
@@ -833,7 +833,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         let options = included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;

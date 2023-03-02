@@ -121,6 +121,15 @@ module std::features {
         is_enabled(RESOURCE_GROUPS)
     }
 
+    /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+    const MULTISIG_ACCOUNTS: u64 = 10;
+
+    public fun get_multisig_accounts_feature(): u64 { MULTISIG_ACCOUNTS }
+
+    public fun multisig_accounts_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_ACCOUNTS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

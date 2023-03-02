@@ -30,8 +30,9 @@ pub const PUBLIC_KEYS_FILE: &str = "public-keys.yaml";
 const VALIDATOR_FILE: &str = "validator-identity.yaml";
 const VFN_FILE: &str = "validator-full-node-identity.yaml";
 
-/// Generate account key, consensus key, and network key for a validator
+/// Generate keys for a new validator
 ///
+/// Generates account key, consensus key, and network key for a validator
 /// These keys are used for running a validator or operator in a network
 #[derive(Parser)]
 pub struct GenerateKeys {
@@ -103,7 +104,10 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 }
 
-/// Set validator configuration for a single validator in the git repository
+/// Set validator configuration for a single validator
+///
+/// This will set the validator configuration for a single validator in the git repository.
+/// It will have to be run for each validator expected at genesis.
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
     /// Name of the validator
@@ -262,7 +266,7 @@ pub fn read_public_identity_file(public_identity_file: &Path) -> CliTypedResult<
     from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)
 }
 
-/// Generate a Layout template file with empty values
+/// Generate a Layout template file
 ///
 /// This will generate a layout template file for genesis with some default values.  To start a
 /// new chain, these defaults should be carefully thought through and chosen.
@@ -294,7 +298,7 @@ impl CliCommand<()> for GenerateLayoutTemplate {
     }
 }
 
-/// Generate a WriteSet genesis compiled from a script file.
+/// Generate a WriteSet genesis
 ///
 /// This will compile a Move script and generate a writeset from that script.
 #[derive(Parser)]

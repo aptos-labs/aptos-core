@@ -417,6 +417,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
         FeatureFlag::BLAKE2B_256_NATIVE,
         FeatureFlag::RESOURCE_GROUPS,
+        FeatureFlag::MULTISIG_ACCOUNTS,
     ]
 }
 
@@ -1107,7 +1108,8 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::access_path(ValidatorSet::access_path());
+    let state_key =
+        StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
     let bytes = writeset
         .get(&state_key)
         .unwrap()

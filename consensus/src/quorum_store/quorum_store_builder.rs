@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
     network::NetworkSender,
     payload_manager::PayloadManager,
     quorum_store::{
@@ -21,7 +20,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::BlockProposalCommand};
+use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -37,7 +36,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
-    InQuorumStore(InnerBuilder),
+    QuorumStore(InnerBuilder),
 }
 
 impl QuorumStoreBuilder {
@@ -49,30 +48,30 @@ impl QuorumStoreBuilder {
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
-            QuorumStoreBuilder::InQuorumStore(inner) => inner.init_payload_manager(),
+            QuorumStoreBuilder::QuorumStore(inner) => inner.init_payload_manager(),
         }
     }
 
-    pub fn start(self, block_store: Arc<BlockStore>) -> Option<Sender<CoordinatorCommand>> {
+    pub fn start(self) -> Option<Sender<CoordinatorCommand>> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
                 None
             },
-            QuorumStoreBuilder::InQuorumStore(inner) => Some(inner.start(block_store)),
+            QuorumStoreBuilder::QuorumStore(inner) => Some(inner.start()),
         }
     }
 }
 
 pub struct DirectMempoolInnerBuilder {
-    consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+    consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
 }
 
 impl DirectMempoolInnerBuilder {
     pub fn new(
-        consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+        consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -107,7 +106,7 @@ pub struct InnerBuilder {
     epoch: u64,
     author: Author,
     config: QuorumStoreConfig,
-    consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+    consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
     aptos_db: Arc<dyn DbReader>,
@@ -143,7 +142,7 @@ impl InnerBuilder {
         epoch: u64,
         author: Author,
         config: QuorumStoreConfig,
-        consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+        consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
         aptos_db: Arc<dyn DbReader>,
@@ -277,10 +276,7 @@ impl InnerBuilder {
         batch_reader
     }
 
-    fn spawn_quorum_store_wrapper(
-        mut self,
-        block_store: Arc<dyn BlockReader + Send + Sync>,
-    ) -> Sender<CoordinatorCommand> {
+    fn spawn_quorum_store_wrapper(mut self) -> Sender<CoordinatorCommand> {
         let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
 
         // TODO: parameter? bring back back-off?
@@ -308,17 +304,11 @@ impl InnerBuilder {
         let back_pressure_rx = self.back_pressure_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
             self.epoch,
+            self.config.clone(),
             quorum_store_storage,
             self.quorum_store_to_mempool_sender,
             self.batch_coordinator_cmd_tx.clone(),
             self.mempool_txn_pull_timeout_ms,
-            self.config.mempool_txn_pull_max_count,
-            self.config.mempool_txn_pull_max_bytes,
-            self.config.max_batch_counts,
-            self.config.max_batch_bytes,
-            self.config.batch_expiry_round_gap_when_init,
-            self.config.end_batch_ms,
-            block_store,
         );
         spawn_named!(
             "batch_generator",
@@ -366,8 +356,10 @@ impl InnerBuilder {
         );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
-        let proof_manager =
-            ProofManager::new(self.epoch, self.config.back_pressure_local_batch_num);
+        let proof_manager = ProofManager::new(
+            self.epoch,
+            self.config.back_pressure.backlog_txn_limit_count,
+        );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
@@ -413,7 +405,7 @@ impl InnerBuilder {
         )
     }
 
-    fn start(self, block_store: Arc<BlockStore>) -> Sender<CoordinatorCommand> {
-        self.spawn_quorum_store_wrapper(block_store)
+    fn start(self) -> Sender<CoordinatorCommand> {
+        self.spawn_quorum_store_wrapper()
     }
 }

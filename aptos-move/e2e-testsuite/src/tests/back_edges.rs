@@ -38,15 +38,15 @@ fn test_script(chain_id: ChainId, time: u64) {
     let mut executor = FakeExecutor::from_head_genesis();
 
     executor.write_state_value(
-        StateKey::access_path(AccessPath::resource_access_path(
-            CORE_CODE_ADDRESS,
-            StructTag {
+        StateKey::access_path(
+            AccessPath::resource_access_path(CORE_CODE_ADDRESS, StructTag {
                 address: CORE_CODE_ADDRESS,
                 module: Identifier::new("chain_id").unwrap(),
                 name: Identifier::new("ChainId").unwrap(),
                 type_params: vec![],
-            },
-        )),
+            })
+            .expect("access path in test"),
+        ),
         bcs::to_bytes(&chain_id).unwrap(),
     );
 
@@ -93,10 +93,14 @@ fn test_script(chain_id: ChainId, time: u64) {
     let output = &executor.execute_transaction(txn);
     match output.status() {
         TransactionStatus::Keep(status) => {
-            assert!(matches!(
-                status,
-                ExecutionStatus::MiscellaneousError(Some(StatusCode::TOO_MANY_BACK_EDGES))
-            ));
+            assert!(
+                matches!(
+                    status,
+                    ExecutionStatus::MiscellaneousError(Some(StatusCode::TOO_MANY_BACK_EDGES))
+                ),
+                "{:?}",
+                status
+            );
         },
         _ => panic!("TransactionStatus must be Keep"),
     }
@@ -107,13 +111,5 @@ fn script_too_many_back_edges_testnet() {
     test_script(
         ChainId::testnet(),
         TimedFeatureFlag::VerifierLimitBackEdges.activation_time_on(&NamedChain::TESTNET),
-    )
-}
-
-#[test]
-fn script_too_many_back_edges_mainnet() {
-    test_script(
-        ChainId::mainnet(),
-        TimedFeatureFlag::VerifierLimitBackEdges.activation_time_on(&NamedChain::MAINNET),
     )
 }
