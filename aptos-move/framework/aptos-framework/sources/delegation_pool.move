@@ -1658,6 +1658,22 @@ module aptos_framework::delegation_pool {
         stake::assert_stake_pool(pool_address, 5100500000, 0, 0, 0);
         // pending_inactive shares pool has not been deleted (as can still `unlock` this OLC)
         assert_inactive_shares_pool(pool_address, observed_lockup_cycle(pool_address), true, 0);
+
+        stake::mint(validator, 30 * ONE_APT);
+        add_stake(validator, pool_address, 30 * ONE_APT);
+        unlock(validator, pool_address, 10 * ONE_APT);
+
+        assert_delegation(validator_address, pool_address, 1999999998, 0, 1000000000);
+        // the pending withdrawal should be reported as still pending
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 1000000000);
+
+        balance = coin::balance<AptosCoin>(validator_address);
+        // pending_inactive balance would be under threshold => redeem entire balance
+        withdraw(validator, pool_address, 1);
+        // pending_inactive balance has been withdrawn and the pending withdrawal executed
+        assert_delegation(validator_address, pool_address, 1999999998, 0, 0);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+        assert!(coin::balance<AptosCoin>(validator_address) == balance + 1000000000, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
@@ -2485,6 +2501,111 @@ module aptos_framework::delegation_pool {
         // 103030100 active rewards * 0.1265 and 12904265 active stake * 1.008735
         // 103030100 pending_inactive rewards * 0.1265 and 12904265 pending_inactive stake * 1.008735
         assert_delegation(new_operator_address, pool_address, 26050289, 0, 26050289);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
+    public entry fun test_min_stake_is_preserved(
+        aptos_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool {
+        initialize_for_test(aptos_framework);
+        initialize_test_validator(validator, 100 * ONE_APT, true, false);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let delegator1_address = signer::address_of(delegator1);
+        account::create_account_for_test(delegator1_address);
+
+        let delegator2_address = signer::address_of(delegator2);
+        account::create_account_for_test(delegator2_address);
+
+        // add stake without fees as validator is not active yet
+        stake::mint(delegator1, 50 * ONE_APT);
+        add_stake(delegator1, pool_address, 50 * ONE_APT);
+        stake::mint(delegator2, 16 * ONE_APT);
+        add_stake(delegator2, pool_address, 16 * ONE_APT);
+
+        // validator becomes active and share price is 1
+        end_aptos_epoch();
+
+        assert_delegation(delegator1_address, pool_address, 5000000000, 0, 0);
+        // pending_inactive balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
+        unlock(delegator1, pool_address, MIN_COINS_ON_SHARES_POOL - 1);
+        assert_delegation(delegator1_address, pool_address, 3999999999, 0, 1000000001);
+
+        // pending_inactive balance is over threshold
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 4000000000, 0, 1000000000);
+
+        // pending_inactive balance would be under threshold => move entire balance
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 5000000000, 0, 0);
+
+        // active balance would be under threshold => move entire balance
+        unlock(delegator1, pool_address, 5000000000 - (MIN_COINS_ON_SHARES_POOL - 1));
+        assert_delegation(delegator1_address, pool_address, 0, 0, 5000000000);
+
+        // active balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 1000000001, 0, 3999999999);
+
+        // active balance is over threshold
+        unlock(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 1000000000, 0, 4000000000);
+
+        // pending_inactive balance would be under threshold => move entire balance
+        reactivate_stake(delegator1, pool_address, 4000000000 - (MIN_COINS_ON_SHARES_POOL - 1));
+        assert_delegation(delegator1_address, pool_address, 5000000000, 0, 0);
+
+        // active + pending_inactive balance < 2 * MIN_COINS_ON_SHARES_POOL
+        // stake can live on only one of the shares pools
+        assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
+        unlock(delegator2, pool_address, 1);
+        assert_delegation(delegator2_address, pool_address, 0, 0, 16 * ONE_APT);
+        reactivate_stake(delegator2, pool_address, 1);
+        assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
+
+        unlock(delegator2, pool_address, ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 0, 0, 16 * ONE_APT);
+        reactivate_stake(delegator2, pool_address, 2 * ONE_APT);
+        assert_delegation(delegator2_address, pool_address, 16 * ONE_APT, 0, 0);
+
+        // share price becomes 1.01 on both pools
+        unlock(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 3999999999, 0, 1000000001);
+        end_aptos_epoch();
+        assert_delegation(delegator1_address, pool_address, 4039999998, 0, 1010000001);
+
+        // pending_inactive balance is over threshold
+        reactivate_stake(delegator1, pool_address, 10000001);
+        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000001);
+
+        // 1 coin < 1.01 so no shares are redeemed
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000001);
+
+        // request 2 coins will redeem 1 share worth 1.01 coins
+        reactivate_stake(delegator1, pool_address, 2);
+        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000000);
+
+        // 1 coin < 1.01 so no shares are redeemed
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000000);
+
+        // pending_inactive balance would be under threshold => move entire balance
+        reactivate_stake(delegator1, pool_address, 2);
+        assert_delegation(delegator1_address, pool_address, 5049999998, 0, 0);
+
+        // pending_inactive balance would be under threshold => move MIN_COINS_ON_SHARES_POOL coins
+        unlock(delegator1, pool_address, MIN_COINS_ON_SHARES_POOL - 1);
+        assert_delegation(delegator1_address, pool_address, 4049999998, 0, 1000000000);
+
+        // pending_inactive balance would be under threshold => move entire balance
+        reactivate_stake(delegator1, pool_address, 1);
+        assert_delegation(delegator1_address, pool_address, 5049999997, 0, 0);
     }
 
     #[test_only]

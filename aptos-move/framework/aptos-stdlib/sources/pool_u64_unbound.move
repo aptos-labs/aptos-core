@@ -117,7 +117,7 @@ module aptos_std::pool_u64_unbound {
 
         let new_shares = amount_to_shares(pool, coins_amount);
         assert!(MAX_U64 - pool.total_coins >= coins_amount, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
-        assert!(MAX_U64 - pool.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
+        assert!(MAX_U64 - pool.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_SHARES_OVERFLOW));
 
         pool.total_coins = pool.total_coins + coins_amount;
         pool.total_shares = pool.total_shares + new_shares;
