@@ -77,17 +77,6 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
-    public fun to_vec<Key: store, Value: store>(
-        map: SimpleMap<Key, Value>): vector<Element<Key, Value>> {
-        let SimpleMap { data } = map;
-        data
-    }
-
-    public fun split_element<Key: store, Value: store>(e: Element<Key, Value>): (Key, Value) {
-        let Element { key, value} = e;
-        (key, value)
-    }
-
     public fun upsert<Key: store + drop + copy, Value: store + drop + copy>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
