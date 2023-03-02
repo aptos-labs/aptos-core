@@ -41,3 +41,49 @@ subjects:
   namespace: {{ .Release.Namespace }}
 
 ---
+# Grant some basic permissions to the dashboard and controller manager
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ include "chaos.fullname" . }}
+spec:
+  privileged: false  # Don't allow privileged pods!
+  # The rest fills in some required fields.
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  volumes:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "chaos.fullname" . }}-psp
+rules:
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  verbs: ["use"]
+  resourceNames:
+  - {{ include "chaos.fullname" . }}
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "chaos.fullname" . }}-psp
+roleRef:
+  kind: ClusterRole
+  name: {{ include "chaos.fullname" . }}-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: chaos-controller-manager
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: chaos-dashboard

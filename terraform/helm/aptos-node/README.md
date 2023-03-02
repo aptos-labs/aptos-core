@@ -50,8 +50,7 @@ Aptos blockchain node deployment
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |
 | numValidators | int | `1` | Number of validators to deploy |
 | overrideNodeConfig | bool | `false` | Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart. |
-| pyroscope.enabled | bool | `false` | Enable Pyroscope profiling |
-| pyroscope.secretName | string | `"pyroscope"` | Secret which contains the Pyroscope API key and other configuration |
+| podSecurityPolicy | bool | `true` | LEGACY: create PodSecurityPolicy, which exists at the cluster-level |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
 | service.fullnode.enableMetricsPort | bool | `true` | Enable the metrics port on fullnodes |
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |
@@ -116,6 +115,10 @@ ServiceAccounts:
 * [optional] `<RELEASE_NAME>` - The default service account
 * `<RELEASE_NAME>-validator` - The validator service account
 * `<RELEASE_NAME>-fullnode` - The fullnode service account
+
+[optional] PodSecurityPolicy:
+* `<RELEASE_NAME>` - The default PodSecurityPolicy for validators and fullnodes
+* `<RELEASE_NAME>-haproxy` - The PodSecurityPolicy for HAProxy
 
 ## Common Operations
 
