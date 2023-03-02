@@ -262,19 +262,6 @@ module std::vector {
         result
     }
 
-    /// Destroy a vector
-    public inline fun destroy<Element>(
-        v: vector<Element>,
-        d: |Element|
-    ) {
-        let len = length(&v);
-        while (len != 0) {
-            d(pop_back(&mut v));
-            len = len - 1;
-        };
-        destroy_empty(v);
-    }
-
     // =================================================================
     // Module Specification
 
