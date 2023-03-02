@@ -344,7 +344,7 @@ Insert key/value pair or update an existing key to a new value
     key: &Key,
     value: &Value
 ) {
-    <b>let</b> len = std::vector::length(&map.data);
+    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&map.data);
     <b>let</b> i = 0;
     <b>while</b> (i &lt; len) {
         <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> map.data, i);

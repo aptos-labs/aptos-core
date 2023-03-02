@@ -83,7 +83,7 @@ module aptos_std::simple_map {
         key: &Key,
         value: &Value
     ) {
-        let len = std::vector::length(&map.data);
+        let len = vector::length(&map.data);
         let i = 0;
         while (i < len) {
             let element = vector::borrow_mut(&mut map.data, i);
