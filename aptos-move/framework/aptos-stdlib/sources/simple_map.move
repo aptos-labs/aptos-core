@@ -77,6 +77,38 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
+    public inline fun upsert<Key: store, Value: store>(
+        map: &mut SimpleMap<Key, Value>,
+        key: Key,
+        value: Value,
+        drop: |Key, Value|
+    ) {
+        let len = std::vector::length(&map.data);
+        let i = 0;
+        while (i < len) {
+            let element = vector::borrow(&mut map.data, i);
+            if (&element.key == &key) {
+                break
+            };
+            i = i + 1;
+        };
+        if (i == len) {
+            vector::push_back(&mut map.data, Element { key, value });
+        } else {
+            let Element {key: _k, value: _v} = vector::swap_remove(&mut map.data, i);
+            vector::push_back(&mut map.data, Element { key, value});
+            drop(_k, _v);
+        }
+    }
+
+    public inline fun destroy<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>,
+        d: |Key, Value|
+    ) {
+        let SimpleMap { data } = map;
+        std::vector::destroy(data, |e| { let Element { key, value } = e; d(key, value) });
+    }
+
     public fun remove<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
@@ -157,5 +189,34 @@ module aptos_std::simple_map {
         remove(&mut map, &3);
 
         destroy_empty(map);
+    }
+
+    struct OnlyMove has store { val: u64 }
+
+    #[test]
+    public fun upsert_test() {
+        let map = create<u64, OnlyMove>();
+        // test adding 3 elements using upsert
+        upsert(&mut map, 1, OnlyMove { val: 1 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
+        upsert(&mut map, 2, OnlyMove { val: 2 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
+        upsert(&mut map, 3, OnlyMove { val: 3 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
+
+        assert!(length(&map) == 3, 0);
+        assert!(contains_key(&map, &1), 1);
+        assert!(contains_key(&map, &2), 2);
+        assert!(contains_key(&map, &3), 3);
+        assert!(borrow(&map, &1).val == 1, 4);
+        assert!(borrow(&map, &2).val == 2, 5);
+        assert!(borrow(&map, &3).val == 3, 6);
+
+        // change mapping 1->1 to 1->4
+        upsert(&mut map, 1, OnlyMove { val: 4 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
+
+        assert!(length(&map) == 3, 7);
+        assert!(contains_key(&map, &1), 8);
+        assert!(borrow(&map, &1).val == 4, 9);
+
+        std::debug::print(&b"done");
+        destroy(map, |_k, _v| { let OnlyMove { val: _ } = _v; });
     }
 }
