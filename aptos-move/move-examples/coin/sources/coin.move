@@ -2,6 +2,9 @@
 module coin_example::coin {
     /// Core data structures
 
+    const EFROZEN_ACCOUNT: u64 = 0;
+    const EREVOKE_UNFROZEN_ACCOUNT: u64 = 1;
+
     struct Coin<phantom CoinType> {
         /// Amount of coin this address has.
         value: u128,
@@ -62,41 +65,64 @@ module coin_example::coin {
         amount
     }
 
-    public entry fun mint<T>(amount: u128, _: &MintCapability<T>): Coin<T> acquires CoinInfo {
+    public fun mint<T>(amount: u128, _: &MintCapability<T>): Coin<T> acquires CoinInfo {
         let coin_info = borrow_global_mut<CoinInfo<T>>(@coin_example);
         coin_info.supply = coin_info.supply + amount;
         mint_internal<T>(amount)
     }
 
-    public entry fun burn<T>(coin: Coin<T>, _: &BurnCapability<T>) acquires CoinInfo {
+    public fun burn<T>(coin: Coin<T>, _: &BurnCapability<T>) acquires CoinInfo {
         let amount = burn_internal(coin);
         let coin_info = borrow_global_mut<CoinInfo<T>>(@coin_example);
         coin_info.supply = coin_info.supply - amount;
     }
 
-    /*public entry fun freeze_coin<T>(addr: &address, cap: &FreezeCapability<T>) {
+    public fun freeze_address<T>(addr: address, _: &FreezeCapability<T>) acquires CoinStore {
+        let typename = std::type_info::type_name<T>();
+        let coin_store = borrow_global_mut<CoinStore>(addr);
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
+        coin_data.frozen = true;
+    }
 
-    }*/
+    public fun revoke_from<T>(addr: address, _: &FreezeCapability<T>): Coin<T> acquires CoinStore {
+        let typename = std::type_info::type_name<T>();
+        let coin_store = borrow_global_mut<CoinStore>(addr);
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
+        assert!(coin_data.frozen, EREVOKE_UNFROZEN_ACCOUNT);
+        let amount = coin_data.balance;
+        coin_data.balance = 0;
+        Coin { value: amount}
+    }
+
+    public fun unfreeze_address<T>(addr: address, _: &FreezeCapability<T>) acquires CoinStore {
+        let typename = std::type_info::type_name<T>();
+        let coin_store = borrow_global_mut<CoinStore>(addr);
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
+        coin_data.frozen = false;
+    }
 
     public fun withdraw<T>(from: &signer, amount: u128): Coin<T> acquires CoinStore {
         let typename = std::type_info::type_name<T>();
-        let coin_balance = borrow_global_mut<CoinStore>(std::signer::address_of(from));
-        let coin_data = aptos_std::table::borrow_mut(&mut coin_balance.balances, typename);
+        let coin_store = borrow_global_mut<CoinStore>(std::signer::address_of(from));
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
+        assert!(!coin_data.frozen, EFROZEN_ACCOUNT);
         coin_data.balance = coin_data.balance - amount;
-        aptos_framework::event::emit_event(&mut coin_balance.withdraw_event, WithdrawEvent { amount });
+        aptos_framework::event::emit_event(&mut coin_store.withdraw_event, WithdrawEvent { amount });
         Coin { value: amount }
     }
 
     public fun deposit<T>(to: &address, coin: Coin<T>): u128 acquires CoinStore {
         let typename = std::type_info::type_name<T>();
-        let coin_balance = borrow_global_mut<CoinStore>(*to);
-        let coin_data = aptos_std::table::borrow_mut(&mut coin_balance.balances, typename);
+        let coin_store = borrow_global_mut<CoinStore>(*to);
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
+        assert!(!coin_data.frozen, EFROZEN_ACCOUNT);
         let Coin { value: amount } = coin;
-        aptos_framework::event::emit_event(&mut coin_balance.deposit_event, DepositEvent { amount });
+        aptos_framework::event::emit_event(&mut coin_store.deposit_event, DepositEvent { amount });
         coin_data.balance = coin_data.balance + amount;
         amount
     }
 
+    // Pure functions
     public fun merge<T>(a: Coin<T>, b: Coin<T>): Coin<T> {
         join(&mut a, b);
         a
@@ -112,31 +138,28 @@ module coin_example::coin {
         Coin { value: amount }
     }
 
-    /// A helper function that returns the address of CoinType.
-    fun coin_address<CoinType>(): address {
-        let type_info = std::type_info::type_of<CoinType>();
-        std::type_info::account_address(&type_info)
-    }
-
     #[view]
     /// Returns the balance of `owner` for provided `CoinType`.
     public fun balance<T>(owner: address): u128 acquires CoinStore {
         let typename = std::type_info::type_name<T>();
-        let coin_balance = borrow_global_mut<CoinStore>(owner);
-        let coin_data = aptos_std::table::borrow_mut(&mut coin_balance.balances, typename);
+        let coin_store = borrow_global_mut<CoinStore>(owner);
+        let coin_data = aptos_std::table::borrow_mut(&mut coin_store.balances, typename);
         coin_data.balance
     }
 
+    #[view]
     /// Returns the name of the coin.
     public fun name<CoinType>(): std::string::String acquires CoinInfo {
         borrow_global<CoinInfo<CoinType>>(@coin_example).name
     }
 
+    #[view]
     /// Returns the symbol of the coin, usually a shorter version of the name.
     public fun symbol<CoinType>(): std::string::String acquires CoinInfo {
         borrow_global<CoinInfo<CoinType>>(@coin_example).symbol
     }
 
+    #[view]
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -144,19 +167,10 @@ module coin_example::coin {
         borrow_global<CoinInfo<CoinType>>(@coin_example).decimals
     }
 
+    #[view]
     /// Returns the amount of coin in existence.
     public fun supply<CoinType>(): u128 acquires CoinInfo {
         borrow_global<CoinInfo<CoinType>>(@coin_example).supply
-    }
-
-    /// Transfers `amount` of coins `CoinType` from `from` to `to`.
-    public entry fun transfer<CoinType>(
-        from: &signer,
-        to: address,
-        amount: u128,
-    ) acquires CoinStore {
-        let coin = withdraw<CoinType>(from, amount);
-        deposit(&to, coin);
     }
 
     /// Returns the `value` passed in `coin`.
