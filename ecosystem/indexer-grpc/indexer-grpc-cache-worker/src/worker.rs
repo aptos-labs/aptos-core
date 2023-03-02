@@ -10,15 +10,21 @@ use aptos_indexer_grpc_utils::{
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::datastream::v1::{
-    self as datastream, raw_datastream_response::Response, RawDatastreamRequest,
-    RawDatastreamResponse,
+    self as datastream, raw_datastream_response::Response, stream_status::StatusType,
+    RawDatastreamRequest, RawDatastreamResponse,
 };
 use futures::{self, StreamExt};
+
+type ChainID = u32;
+type StartingVersion = u64;
+
+const WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS: u64 = 60;
+
 pub struct Worker {
     /// Redis client.
     redis_client: redis::Client,
     /// Fullnode grpc address.
-    grpc_address: String,
+    fullnode_grpc_address: String,
     /// File store bucket name.
     pub file_store_bucket_name: String,
 }
@@ -51,7 +57,7 @@ impl Worker {
         Self {
             redis_client,
             // The fullnode grpc address is required.
-            grpc_address: format!("http://{}", config.fullnode_grpc_address.unwrap()),
+            fullnode_grpc_address: format!("http://{}", config.fullnode_grpc_address.unwrap()),
             file_store_bucket_name: config.file_store_bucket_name,
         }
     }
@@ -73,31 +79,31 @@ impl Worker {
                 .await
                 .expect("Get redis connection failed.");
 
-            let mut rpc_client = create_grpc_client(self.grpc_address.clone()).await;
+            let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
 
             // 1. Fetch metadata.
             let file_store_operator = FileStoreOperator::new(self.file_store_bucket_name.clone());
-            file_store_operator.bootstrap().await;
-
+            file_store_operator.verify_storage_bucket_existence().await;
+            let mut starting_version = 0;
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-            if file_store_metadata.is_none() {
+
+            if let Some(metadata) = file_store_metadata {
+                info!("[Indexer Cache] File store metadata: {:?}", metadata);
+                starting_version = metadata.version;
+            } else {
                 error!("[Indexer Cache] File store is empty. Exit after 1 minute.");
                 tokio::spawn(async move {
-                    // Wait for 1 minute and then exit.
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS,
+                    ))
+                    .await;
                     std::process::exit(1);
                 });
-            };
+            }
 
             // 2. Start streaming RPC.
-            let current_version = match file_store_metadata {
-                Some(metadata) => metadata.version,
-                // File store is empty.
-                None => 0,
-            };
             let request = tonic::Request::new(RawDatastreamRequest {
-                starting_version: current_version,
-                // Worker fetches all transactions without end.
+                starting_version,
                 ..Default::default()
             });
 
@@ -109,49 +115,93 @@ impl Worker {
     }
 }
 
-/// Handles the INIT frame from RawDatastreamResponse: check cache and file store to start from correct state.
-/// Returns a cache operator if it's ok; otherwise, error out.
-async fn init_signal_handling(
-    start_version: &mut u64,
-    chain_id: &mut u64,
-    file_store_metadata: Option<FileStoreMetadata>,
+async fn process_raw_datastream_response(
+    response: RawDatastreamResponse,
+    cache_operator: &mut CacheOperator<redis::aio::Connection>,
+) -> anyhow::Result<GrpcDataStatus> {
+    match response.response.unwrap() {
+        datastream::raw_datastream_response::Response::Status(status) => {
+            match StatusType::from_i32(status.r#type).expect("[Indexer Cache] Invalid status type.")
+            {
+                StatusType::Init => Ok(GrpcDataStatus::StreamInit(status.start_version)),
+                StatusType::BatchEnd => {
+                    let start_version = status.start_version;
+                    let num_of_transactions = status
+                        .end_version
+                        .expect("RawDatastreamResponse status end_version is None")
+                        - start_version
+                        + 1;
+                    Ok(GrpcDataStatus::BatchEnd {
+                        start_version,
+                        num_of_transactions,
+                    })
+                },
+            }
+        },
+        datastream::raw_datastream_response::Response::Data(data) => {
+            let transaction_len = data.transactions.len();
+            let start_version = data.transactions.first().unwrap().version;
+
+            for e in data.transactions {
+                let version = e.version;
+                let timestamp_in_seconds = match e.timestamp {
+                    Some(t) => t.seconds,
+                    // For Genesis block, there is no timestamp.
+                    None => 0,
+                };
+                // Push to cache.
+                match cache_operator
+                    .update_cache_transaction(
+                        version,
+                        e.encoded_proto_data,
+                        timestamp_in_seconds as u64,
+                    )
+                    .await
+                {
+                    Ok(_) => {},
+                    Err(e) => {
+                        anyhow::bail!("Update cache with version failed: {}", e);
+                    },
+                }
+            }
+            Ok(GrpcDataStatus::ChunkDataOk {
+                start_version,
+                num_of_transactions: transaction_len as u64,
+            })
+        },
+    }
+}
+
+/// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
+async fn setup_cache_with_init_signal(
     conn: redis::aio::Connection,
     init_signal: RawDatastreamResponse,
-) -> CacheOperator<redis::aio::Connection> {
-    let fullnode_chain_id = match init_signal.response.expect("Response type not exists.") {
-        Response::Status(status_frame) => match status_frame.r#type {
-            0 => init_signal.chain_id as u64,
-            _ => {
-                panic!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
+) -> (
+    CacheOperator<redis::aio::Connection>,
+    ChainID,
+    StartingVersion,
+) {
+    let (fullnode_chain_id, starting_version) =
+        match init_signal.response.expect("Response type not exists.") {
+            Response::Status(status_frame) => match status_frame.r#type {
+                0 => (init_signal.chain_id, status_frame.start_version),
+                _ => {
+                    panic!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
+                },
             },
-        },
-        _ => {
-            panic!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
-        },
-    };
+            _ => {
+                panic!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
+            },
+        };
 
     let mut cache_operator = CacheOperator::new(conn);
     cache_operator.cache_setup_if_needed().await;
     cache_operator
-        .update_or_verify_chain_id(fullnode_chain_id)
+        .update_or_verify_chain_id(fullnode_chain_id as u64)
         .await
         .expect("[Indexer Cache] Chain id mismatch between cache and fullnode.");
 
-    match file_store_metadata {
-        Some(metadata) => {
-            // 1. If metadata is present, start from file store version.
-            *start_version = metadata.version;
-            if metadata.chain_id != fullnode_chain_id {
-                panic!("[Indexer Cache] Chain id mismatch between file store and fullnode.");
-            }
-        },
-        None => {
-            // 1. If metadata is not present, start from 0.
-            *start_version = 0;
-        },
-    }
-    *chain_id = fullnode_chain_id;
-    cache_operator
+    (cache_operator, fullnode_chain_id, starting_version)
 }
 
 // Infinite streaming processing. Retry if error happens; crash if fatal.
@@ -161,25 +211,27 @@ async fn process_streaming_response(
     mut resp_stream: impl futures_core::Stream<Item = Result<RawDatastreamResponse, tonic::Status>>
         + std::marker::Unpin,
 ) {
-    let mut current_version = 0;
-    let mut current_chain_id = 0;
-    let mut ma = MovingAverage::new(10_000);
+    let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
-    // 3. Handle the INIT frame from RawDatastreamResponse:
+    // 3. Set up the cache operator with init signal.
     let init_signal = match resp_stream.next().await {
         Some(Ok(r)) => r,
         _ => {
             panic!("[Indexer Cache] Streaming error: no response.");
         },
     };
-    let mut cache_operator = init_signal_handling(
-        &mut current_version,
-        &mut current_chain_id,
-        file_store_metadata,
-        conn,
-        init_signal,
-    )
-    .await;
+    let (mut cache_operator, fullnode_chain_id, starting_version) =
+        setup_cache_with_init_signal(conn, init_signal).await;
+    // It's required to start the worker with the same version as file store.
+    if let Some(file_store_metadata) = file_store_metadata {
+        if file_store_metadata.version != starting_version {
+            panic!("[Indexer Cache] File store version mismatch with fullnode.");
+        }
+        if file_store_metadata.chain_id != fullnode_chain_id as u64 {
+            panic!("[Indexer Cache] Chain id mismatch between file store and fullnode.");
+        }
+    }
+    let mut current_version = starting_version;
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
@@ -191,7 +243,7 @@ async fn process_streaming_response(
             },
         };
 
-        if received.chain_id as u64 != current_chain_id {
+        if received.chain_id as u64 != fullnode_chain_id as u64 {
             panic!("[Indexer Cache] Chain id mismatch happens during data streaming.");
         }
 
@@ -203,7 +255,7 @@ async fn process_streaming_response(
                 } => {
                     current_version += num_of_transactions;
                     transaction_count += num_of_transactions;
-                    ma.tick_now(num_of_transactions);
+                    tps_calculator.tick_now(num_of_transactions);
                     aptos_logger::info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
@@ -241,8 +293,8 @@ async fn process_streaming_response(
                     transaction_count = 0;
                     info!(
                         current_version = current_version,
-                        chain_id = current_chain_id,
-                        tps = (ma.avg() * 1000.0) as u64,
+                        chain_id = fullnode_chain_id,
+                        tps = (tps_calculator.avg() * 1000.0) as u64,
                         "[Indexer Cache] Successfully process current batch."
                     );
                 },
@@ -255,62 +307,5 @@ async fn process_streaming_response(
                 break;
             },
         }
-    }
-}
-
-async fn process_raw_datastream_response(
-    response: RawDatastreamResponse,
-    cache_operator: &mut CacheOperator<redis::aio::Connection>,
-) -> anyhow::Result<GrpcDataStatus> {
-    match response.response.unwrap() {
-        datastream::raw_datastream_response::Response::Status(status) => match status.r#type {
-            0 => Ok(GrpcDataStatus::StreamInit(status.start_version)),
-            1 => {
-                let start_version = status.start_version;
-                let num_of_transactions = status
-                    .end_version
-                    .expect("RawDatastreamResponse status end_version is None")
-                    - start_version
-                    + 1;
-                Ok(GrpcDataStatus::BatchEnd {
-                    start_version,
-                    num_of_transactions,
-                })
-            },
-            _ => {
-                anyhow::bail!("Unknown status type: {}", status.r#type);
-            },
-        },
-        datastream::raw_datastream_response::Response::Data(data) => {
-            let transaction_len = data.transactions.len();
-            let start_version = data.transactions.first().unwrap().version;
-
-            for e in data.transactions {
-                let version = e.version;
-                let timestamp_in_seconds = match e.timestamp {
-                    Some(t) => t.seconds,
-                    // For Genesis block, there is no timestamp.
-                    None => 0,
-                };
-                // Push to cache.
-                match cache_operator
-                    .update_cache_transaction(
-                        version,
-                        e.encoded_proto_data,
-                        timestamp_in_seconds as u64,
-                    )
-                    .await
-                {
-                    Ok(_) => {},
-                    Err(e) => {
-                        anyhow::bail!("Update cache with version failed: {}", e);
-                    },
-                }
-            }
-            Ok(GrpcDataStatus::ChunkDataOk {
-                start_version,
-                num_of_transactions: transaction_len as u64,
-            })
-        },
     }
 }

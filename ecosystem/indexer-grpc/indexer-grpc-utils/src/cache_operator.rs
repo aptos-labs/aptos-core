@@ -62,8 +62,6 @@ const CACHE_SCRIPT_UPDATE_LATEST_VERSION: &str = r#"
 pub enum CacheBatchGetStatus {
     /// OK with batch of encoded transactions.
     Ok(Vec<String>),
-    /// Ok but cache head is hit; wait and retry for next batch.
-    HitTheHead(Vec<String>),
     /// Requested version is already evicted from cache. Visit file store instead.
     EvictedFromCache,
     /// Not ready yet. Wait and retry.
@@ -240,18 +238,10 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
                 let versions = (start_version..start_version + v)
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>();
-                let len = versions.len();
-
                 let encoded_transactions: Result<Vec<String>, RedisError> =
                     self.conn.mget(versions).await;
                 match encoded_transactions {
-                    Ok(v) => {
-                        if len == BLOB_STORAGE_SIZE {
-                            Ok(CacheBatchGetStatus::Ok(v))
-                        } else {
-                            Ok(CacheBatchGetStatus::HitTheHead(v))
-                        }
-                    },
+                    Ok(v) => Ok(CacheBatchGetStatus::Ok(v)),
                     Err(err) => Err(err.into()),
                 }
             },
@@ -396,11 +386,7 @@ mod tests {
                 .batch_get_encoded_proto_data(0)
                 .await
                 .unwrap(),
-            CacheBatchGetStatus::HitTheHead(vec![
-                "t0".to_string(),
-                "t1".to_string(),
-                "t2".to_string()
-            ])
+            CacheBatchGetStatus::Ok(vec!["t0".to_string(), "t1".to_string(), "t2".to_string()])
         );
     }
 

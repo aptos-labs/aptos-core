@@ -4136,7 +4136,9 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "multisig_address",
             "multisigAddress",
+            "transaction_payload",
             "transactionPayload",
         ];
 
@@ -4165,8 +4167,8 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
                         E: serde::de::Error,
                     {
                         match value {
-                            "multisigAddress" => Ok(GeneratedField::MultisigAddress),
-                            "transactionPayload" => Ok(GeneratedField::TransactionPayload),
+                            "multisigAddress" | "multisig_address" => Ok(GeneratedField::MultisigAddress),
+                            "transactionPayload" | "transaction_payload" => Ok(GeneratedField::TransactionPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4200,7 +4202,7 @@ impl<'de> serde::Deserialize<'de> for MultisigPayload {
                             if transaction_payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionPayload"));
                             }
-                            transaction_payload__ = Some(map.next_value()?);
+                            transaction_payload__ = map.next_value()?;
                         }
                     }
                 }
@@ -4251,6 +4253,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
     {
         const FIELDS: &[&str] = &[
             "type",
+            "entry_function_payload",
             "entryFunctionPayload",
         ];
 
@@ -4280,7 +4283,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "entryFunctionPayload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4314,7 +4317,8 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("entryFunctionPayload"));
                             }
-                            payload__ = Some(multisig_transaction_payload::Payload::EntryFunctionPayload(map.next_value()?));
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::EntryFunctionPayload)
+;
                         }
                     }
                 }
@@ -5552,6 +5556,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "moduleBundlePayload",
             "write_set_payload",
             "writeSetPayload",
+            "multisig_payload",
             "multisigPayload",
         ];
 
@@ -5585,11 +5590,11 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
-                            "entryFunctionPayload" => Ok(GeneratedField::EntryFunctionPayload),
-                            "scriptPayload" => Ok(GeneratedField::ScriptPayload),
-                            "moduleBundlePayload" => Ok(GeneratedField::ModuleBundlePayload),
-                            "writeSetPayload" => Ok(GeneratedField::WriteSetPayload),
-                            "multisigPayload" => Ok(GeneratedField::MultisigPayload),
+                            "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
+                            "moduleBundlePayload" | "module_bundle_payload" => Ok(GeneratedField::ModuleBundlePayload),
+                            "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
+                            "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -5651,7 +5656,8 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("multisigPayload"));
                             }
-                            payload__ = Some(transaction_payload::Payload::MultisigPayload(map.next_value()?));
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::MultisigPayload)
+;
                         }
                     }
                 }
