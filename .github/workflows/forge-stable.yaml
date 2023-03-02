@@ -108,7 +108,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-consensus-stress-test
+      FORGE_NAMESPACE: forge-consensus-stress-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: consensus_stress_test
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -120,7 +120,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-account-creation-test
+      FORGE_NAMESPACE: forge-account-creation-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: account_creation
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -132,7 +132,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-performance
+      FORGE_NAMESPACE: forge-performance-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 7200
       FORGE_TEST_SUITE: land_blocking
       FORGE_ENABLE_PERFORMANCE: true
@@ -145,7 +145,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn
+      FORGE_NAMESPACE: forge-continuous-e2e-single-vfn-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
       FORGE_TEST_SUITE: single_vfn_perf
@@ -158,7 +158,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-haproxy
+      FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_ENABLE_HAPROXY: true
       FORGE_TEST_SUITE: land_blocking
@@ -172,7 +172,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-compat
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 5 minutes
       FORGE_RUNNER_DURATION_SECS: 300
       # This will upgrade from testnet branch to the latest main
@@ -190,7 +190,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-three-region
+      FORGE_NAMESPACE: forge-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: three_region_simulation
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -202,7 +202,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-fullnode-reboot-stress
+      FORGE_NAMESPACE: forge-fullnode-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: fullnode_reboot_stress_test
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -214,7 +214,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-network-partition
+      FORGE_NAMESPACE: forge-network-partition-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 15 minutes
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: network_partition
@@ -229,7 +229,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-changing-working-quorum-test
+      FORGE_NAMESPACE: forge-changing-working-quorum-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1200
       FORGE_TEST_SUITE: changing_working_quorum_test
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -242,7 +242,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test
+      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: different_node_speed_and_reliability_test
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -255,7 +255,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load
+      FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
@@ -270,7 +270,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-validator
+      FORGE_NAMESPACE: forge-state-sync-perf-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_validators
@@ -283,7 +283,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
@@ -296,7 +296,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
@@ -309,7 +309,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply
+      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
