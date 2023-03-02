@@ -1,5 +1,11 @@
 # Aptos Indexer
 
+Will fix readme but just remember command for now
+```
+APTOS_POSTGRES_CONNECTION_STRING_VAR=postgresql://localhost:5432/indexer_v2 APTOS_DATASTREAM_SERVICE_ADDRESS_VAR=http://localhost:50051 STARTING_VERSION=0 cargo run
+```
+
+
 > Tails the blockchain's transactions and pushes them into a postgres DB
 
 A fullnode can run an indexer with the proper configs. If enabled, the indexer will tail
