@@ -220,7 +220,7 @@ module aptos_framework::transaction_validation {
         if (features::collect_and_distribute_gas_fees()) {
             // If transaction fees are redistributed to validators, collect them here for
             // later redistribution.
-            transaction_fee::collect_fee_for_batch(addr, transaction_fee_amount, batch_index); // batch_index
+            transaction_fee::collect_fee_for_batch(addr, transaction_fee_amount, batch_index);
         } else {
             // Otherwise, just burn the fee.
             // TODO: this branch should be removed completely when transaction fee collection

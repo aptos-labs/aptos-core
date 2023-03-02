@@ -400,7 +400,7 @@ The runtime always runs this before executing the transactions in a block.
         // Assign the fees collected from the previous <a href="block.md#0x1_block">block</a> <b>to</b> the previous <a href="block.md#0x1_block">block</a> proposer.
         // If for <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> reason the fees cannot be assigned, this function burns the collected coins.
         <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
-        // Set the proposer of this <a href="block.md#0x1_block">block</a> <b>as</b> the receiver of the fees, so that the fees for this
+        // Set <a href="block.md#0x1_block">block</a> and batch proposers <b>to</b> receivers the fees. This way, the fees for this
         // <a href="block.md#0x1_block">block</a> are assigned <b>to</b> the right <a href="account.md#0x1_account">account</a>.
         <a href="transaction_fee.md#0x1_transaction_fee_register_proposers_for_fee_collection">transaction_fee::register_proposers_for_fee_collection</a>(block_proposer, batch_proposers);
     };

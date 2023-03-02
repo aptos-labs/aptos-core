@@ -141,7 +141,7 @@ module aptos_framework::block {
             // Assign the fees collected from the previous block to the previous block proposer.
             // If for any reason the fees cannot be assigned, this function burns the collected coins.
             transaction_fee::process_collected_fees();
-            // Set the proposer of this block as the receiver of the fees, so that the fees for this
+            // Set block and batch proposers to receivers the fees. This way, the fees for this
             // block are assigned to the right account.
             transaction_fee::register_proposers_for_fee_collection(block_proposer, batch_proposers);
         };
