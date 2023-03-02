@@ -1367,6 +1367,7 @@ Limit addition overflow.
 <b>aborts_if</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> register_account.guid_creation_num + 7 &gt; MAX_U64;
+<b>aborts_if</b> register_account.guid_creation_num + 7 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;GovernanceProposal&gt;();
 <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_InitializeAbortIf">InitializeAbortIf</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;<a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a>&gt;&gt;(addr);
@@ -1520,37 +1521,6 @@ The same as spec of <code><a href="aptos_governance.md#0x1_aptos_governance_crea
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a>;
-</code></pre>
-
-
-<code>stake_pool</code> must exist StakePool.
-The delegated voter under the resource StakePool of the stake_pool must be the proposer address.
-Address @aptos_framework must exist GovernanceEvents.
-
-
-<a name="0x1_aptos_governance_CreateProposalAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a> {
-    proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    stake_pool: <b>address</b>;
-    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>let</b> proposer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(proposer);
-    <b>let</b> governance_config = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
-    <b>let</b> stake_pool_res = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool);
-    <b>aborts_if</b> <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool).delegated_voter != proposer_address;
-    <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
-    <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
-    <b>let</b> proposal_expiration = current_time + governance_config.voting_duration_secs;
-    <b>aborts_if</b> stake_pool_res.locked_until_secs &lt; proposal_expiration;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
-    <b>let</b> allow_validator_set_change = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework).allow_validator_set_change;
-    <b>aborts_if</b> !allow_validator_set_change && !<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework);
-}
 </code></pre>
 
 
