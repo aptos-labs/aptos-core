@@ -106,6 +106,14 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key: *key, value: *value });
     }
 
+    public inline fun destroy<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>,
+        d: |Key, Value|
+    ) {
+        let vec = to_vec(map);
+        std::vector::destroy(vec, |e| { let (_k, _v) = split_element(e); d(_k, _v) });
+    }
+
     public fun remove<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
@@ -188,6 +196,9 @@ module aptos_std::simple_map {
         destroy_empty(map);
     }
 
+    #[test_only]
+    struct OnlyMove has store { val: u64 }
+
     #[test]
     public fun upsert_test() {
         let map = create<u64, u64>();
@@ -211,4 +222,5 @@ module aptos_std::simple_map {
         assert!(contains_key(&map, &1), 8);
         assert!(borrow(&map, &1) == &4, 9);
     }
+
 }
