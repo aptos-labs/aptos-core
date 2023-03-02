@@ -174,7 +174,7 @@ variable "utility_instance_type" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.4xlarge"
+  default     = "c6i.16xlarge"
 }
 
 ### Forge

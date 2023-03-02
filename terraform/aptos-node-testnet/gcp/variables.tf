@@ -116,7 +116,7 @@ variable "utility_instance_type" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "n2-standard-32"
+  default     = "t2d-standard-48"
 }
 
 ### Addons
