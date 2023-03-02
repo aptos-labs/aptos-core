@@ -26,9 +26,9 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct ExistsAtGasParameters {
-    pub base_cost: InternalGas,
-    pub per_byte: InternalGasPerByte,
-    pub per_item: InternalGas,
+    pub base: InternalGas,
+    pub per_byte_loaded: InternalGasPerByte,
+    pub per_item_loaded: InternalGas,
 }
 
 fn native_exists_at(
@@ -43,7 +43,7 @@ fn native_exists_at(
     let type_ = ty_args.pop().unwrap();
     let address = safely_pop_arg!(args, AccountAddress);
 
-    context.charge(gas_params.base_cost)?;
+    context.charge(gas_params.base)?;
 
     let (exists, num_bytes) = context.exists_at(address, &type_).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
@@ -53,7 +53,15 @@ fn native_exists_at(
     })?;
 
     if let Some(num_bytes) = num_bytes {
-        context.charge(gas_params.per_item + gas_params.per_byte * num_bytes)?;
+        match num_bytes {
+            Some(num_bytes) => {
+                context
+                    .charge(gas_params.per_item_loaded + num_bytes * gas_params.per_byte_loaded)?;
+            },
+            None => {
+                context.charge(gas_params.per_item_loaded)?;
+            },
+        }
     }
 
     Ok(smallvec![Value::bool(exists)])
@@ -66,22 +74,6 @@ fn native_exists_at(
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub exists_at: ExistsAtGasParameters,
-}
-
-impl GasParameters {
-    pub fn new(
-        exists_at_base: InternalGas,
-        exists_at_per_item: InternalGas,
-        exists_at_per_byte: InternalGasPerByte,
-    ) -> Self {
-        Self {
-            exists_at: ExistsAtGasParameters {
-                base_cost: exists_at_base,
-                per_item: exists_at_per_item,
-                per_byte: exists_at_per_byte,
-            },
-        }
-    }
 }
 
 pub fn make_all(

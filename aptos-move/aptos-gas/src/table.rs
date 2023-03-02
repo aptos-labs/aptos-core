@@ -6,7 +6,8 @@ use move_table_extension::GasParameters;
 
 crate::natives::define_gas_parameters_for_natives!(GasParameters, "table", [
     // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
-    [.common.load_base, "common.load.base", 8000],
+    [.common.load_base_legacy, "common.load.base", 8000],
+    [.common.load_base_new, { 7.. => "common.load.base_new" }, 8000],
     [.common.load_per_byte, "common.load.per_byte", 1000],
     [.common.load_failure, "common.load.failure", 0],
 
