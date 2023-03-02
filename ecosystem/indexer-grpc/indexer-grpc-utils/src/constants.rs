@@ -1,6 +1,4 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
-pub mod service;
+pub const BLOB_STORAGE_SIZE: usize = 1_000;

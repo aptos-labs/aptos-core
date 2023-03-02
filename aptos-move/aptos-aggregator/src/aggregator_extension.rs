@@ -395,7 +395,11 @@ mod test {
         type Key = StateKey;
 
         fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.data.get(state_key).cloned().map(StateValue::new))
+            Ok(self
+                .data
+                .get(state_key)
+                .cloned()
+                .map(StateValue::new_legacy))
         }
 
         fn is_genesis(&self) -> bool {

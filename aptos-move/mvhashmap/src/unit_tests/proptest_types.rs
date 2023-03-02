@@ -7,7 +7,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{state_store::state_value::StateValue, write_set::TransactionWrite};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -51,6 +51,10 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
             bytes.resize(16, 0);
             Some(bytes)
         }
+    }
+
+    fn as_state_value(&self) -> Option<StateValue> {
+        unimplemented!()
     }
 }
 

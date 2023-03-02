@@ -73,14 +73,14 @@ impl StoragePricingV1 {
             }
 
             match op {
-                Creation(data) => {
+                Creation(data) | CreationWithMetadata { data, .. } => {
                     num_new_items += 1.into();
                     num_bytes_val += NumBytes::new(data.len() as u64);
                 },
-                Modification(data) => {
+                Modification(data) | ModificationWithMetadata { data, .. } => {
                     num_bytes_val += NumBytes::new(data.len() as u64);
                 },
-                Deletion => (),
+                Deletion | DeletionWithMetadata { .. } => (),
             }
         }
 
@@ -183,15 +183,15 @@ impl StoragePricingV2 {
 
         for (key, op) in ops {
             match &op {
-                Creation(data) => {
+                Creation(data) | CreationWithMetadata { data, .. } => {
                     num_items_create += 1.into();
                     num_bytes_create += self.write_op_size(key, data);
                 },
-                Modification(data) => {
+                Modification(data) | ModificationWithMetadata { data, .. } => {
                     num_items_write += 1.into();
                     num_bytes_write += self.write_op_size(key, data);
                 },
-                Deletion => (),
+                Deletion | DeletionWithMetadata { .. } => (),
             }
         }
 
@@ -306,15 +306,12 @@ impl CheckChangeSet for ChangeSetConfigs {
 
         let mut write_set_size = 0;
         for (key, op) in change_set.write_set() {
-            match op {
-                WriteOp::Creation(data) | WriteOp::Modification(data) => {
-                    let write_op_size = (data.len() + key.size()) as u64;
-                    if write_op_size > self.max_bytes_per_write_op {
-                        return Err(VMStatus::Error(ERR));
-                    }
-                    write_set_size += write_op_size;
-                },
-                WriteOp::Deletion => (),
+            if let Some(bytes) = op.bytes() {
+                let write_op_size = (bytes.len() + key.size()) as u64;
+                if write_op_size > self.max_bytes_per_write_op {
+                    return Err(VMStatus::Error(ERR));
+                }
+                write_set_size += write_op_size;
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
                 return Err(VMStatus::Error(ERR));

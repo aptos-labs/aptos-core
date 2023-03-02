@@ -283,6 +283,20 @@ impl MoveHarness {
         self.run(txn)
     }
 
+    /// Run the specified entry point `fun` and return the gas used.
+    pub fn evaluate_entry_function_gas(
+        &mut self,
+        account: &Account,
+        fun: MemberId,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> u64 {
+        let txn = self.create_entry_function(account, fun, ty_args, args);
+        let output = self.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        output.gas_used()
+    }
+
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
     ///

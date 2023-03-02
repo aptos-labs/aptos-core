@@ -798,7 +798,10 @@ impl TransactionToCommitGen {
                     .map(move |(key, value)| {
                         let state_key = StateKey::access_path(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), Some(StateValue::from(value.clone()))),
+                            (
+                                state_key.clone(),
+                                Some(StateValue::new_legacy(value.clone())),
+                            ),
                             (state_key, WriteOp::Modification(value)),
                         )
                     })
