@@ -69,6 +69,10 @@ impl WriteOp {
         }
     }
 
+    /// Merges two write ops on the same state item.
+    ///
+    /// returns `false` if the result indicates no op has happened -- that's when the first op
+    ///   creates the item and the second deletes it.
     pub fn squash(op: &mut Self, other: Self) -> Result<bool> {
         use WriteOp::*;
 
