@@ -382,7 +382,7 @@ Map key is not found
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store, Value: store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: Key, value: Value): (<a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Key&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;Value&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: <b>copy</b>, drop, store, Value: <b>copy</b>, drop, store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key, value: &Value)
 </code></pre>
 
 
@@ -391,24 +391,22 @@ Map key is not found
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store, Value: store&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: store + drop + <b>copy</b>, Value: store + drop + <b>copy</b>&gt;(
     map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
-    key: Key,
-    value: Value
-): (Option&lt;Key&gt;, Option&lt;Value&gt;) {
+    key: &Key,
+    value: &Value
+) {
     <b>let</b> len = std::vector::length(&map.data);
     <b>let</b> i = 0;
     <b>while</b> (i &lt; len) {
-        <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<b>mut</b> map.data, i);
-        <b>if</b> (&element.key == &key) {
-            <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> {key: _k, value: _v} = <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> map.data, i);
-            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value});
-            <b>return</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(_k), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(_v))
+        <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> map.data, i);
+        <b>if</b> (&element.key == key) {
+            element.value = *value;
+            <b>return</b>
         };
         i = i + 1;
     };
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value });
-    <b>return</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key: *key, value: *value });
 }
 </code></pre>
 

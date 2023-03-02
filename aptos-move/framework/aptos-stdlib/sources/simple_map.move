@@ -8,7 +8,6 @@ module aptos_std::simple_map {
     use std::error;
     use std::option;
     use std::vector;
-    use std::option::Option;
 
     /// Map key already exists
     const EKEY_ALREADY_EXISTS: u64 = 1;
@@ -89,48 +88,22 @@ module aptos_std::simple_map {
         (key, value)
     }
 
-    public fun upsert<Key: store, Value: store>(
+    public fun upsert<Key: store + drop + copy, Value: store + drop + copy>(
         map: &mut SimpleMap<Key, Value>,
-        key: Key,
-        value: Value
-    ): (Option<Key>, Option<Value>) {
-        let len = std::vector::length(&map.data);
-        let i = 0;
-        while (i < len) {
-            let element = vector::borrow(&mut map.data, i);
-            if (&element.key == &key) {
-                let Element {key: _k, value: _v} = vector::swap_remove(&mut map.data, i);
-                vector::push_back(&mut map.data, Element { key, value});
-                return (option::some(_k), option::some(_v))
-            };
-            i = i + 1;
-        };
-        vector::push_back(&mut map.data, Element { key, value });
-        return (option::none(), option::none())
-    }
-
-    public inline fun upsert_drop<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
-        key: Key,
-        value: Value,
-        drop: |Key, Value|
+        key: &Key,
+        value: &Value
     ) {
         let len = std::vector::length(&map.data);
         let i = 0;
         while (i < len) {
-            let element = vector::borrow(&mut map.data, i);
-            if (&element.key == &key) {
-                break
+            let element = vector::borrow_mut(&mut map.data, i);
+            if (&element.key == key) {
+                element.value = *value;
+                return
             };
             i = i + 1;
         };
-        if (i == len) {
-            vector::push_back(&mut map.data, Element { key, value });
-        } else {
-            let Element {key: _k, value: _v} = vector::swap_remove(&mut map.data, i);
-            vector::push_back(&mut map.data, Element { key, value});
-            drop(_k, _v);
-        }
+        vector::push_back(&mut map.data, Element { key: *key, value: *value });
     }
 
     public inline fun destroy<Key: store, Value: store>(
@@ -223,63 +196,27 @@ module aptos_std::simple_map {
         destroy_empty(map);
     }
 
-    #[test_only]
-    struct OnlyMove has store { val: u64 }
-
     #[test]
     public fun upsert_test() {
-        let map = create<u64, OnlyMove>();
+        let map = create<u64, u64>();
         // test adding 3 elements using upsert
-        let (_, o1) = upsert(&mut map, 1, OnlyMove { val: 1 } );
-        let (_, o2) = upsert(&mut map, 2, OnlyMove { val: 2 } );
-        let (_, o3) = upsert(&mut map, 3, OnlyMove { val: 3 } );
+        upsert<u64, u64>(&mut map, &1, &1 );
+        upsert(&mut map, &2, &2 );
+        upsert(&mut map, &3, &3 );
 
         assert!(length(&map) == 3, 0);
         assert!(contains_key(&map, &1), 1);
         assert!(contains_key(&map, &2), 2);
         assert!(contains_key(&map, &3), 3);
-        assert!(borrow(&map, &1).val == 1, 4);
-        assert!(borrow(&map, &2).val == 2, 5);
-        assert!(borrow(&map, &3).val == 3, 6);
+        assert!(borrow(&map, &1) == &1, 4);
+        assert!(borrow(&map, &2) == &2, 5);
+        assert!(borrow(&map, &3) == &3, 6);
 
         // change mapping 1->1 to 1->4
-        let (_, o4) = upsert(&mut map, 1, OnlyMove { val: 4 } );
+        upsert(&mut map, &1, &4 );
 
         assert!(length(&map) == 3, 7);
         assert!(contains_key(&map, &1), 8);
-        assert!(borrow(&map, &1).val == 4, 9);
-
-        option::destroy(o1, |o| { let OnlyMove { val: _ } = o; });
-        option::destroy(o2, |o| { let OnlyMove { val: _ } = o; });
-        option::destroy(o3, |o| { let OnlyMove { val: _ } = o; });
-        option::destroy(o4, |o| { let OnlyMove { val: _ } = o; });
-
-        destroy(map, |_k, _v| { let OnlyMove { val: _ } = _v; });
-    }
-
-    #[test]
-    public fun upsert_drop_test() {
-        let map = create<u64, OnlyMove>();
-        // test adding 3 elements using upsert
-        upsert_drop(&mut map, 1, OnlyMove { val: 1 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
-        upsert_drop(&mut map, 2, OnlyMove { val: 2 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
-        upsert_drop(&mut map, 3, OnlyMove { val: 3 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
-
-        assert!(length(&map) == 3, 0);
-        assert!(contains_key(&map, &1), 1);
-        assert!(contains_key(&map, &2), 2);
-        assert!(contains_key(&map, &3), 3);
-        assert!(borrow(&map, &1).val == 1, 4);
-        assert!(borrow(&map, &2).val == 2, 5);
-        assert!(borrow(&map, &3).val == 3, 6);
-
-        // change mapping 1->1 to 1->4
-        upsert_drop(&mut map, 1, OnlyMove { val: 4 }, |_k, _v| { let OnlyMove { val: _ } = _v; });
-
-        assert!(length(&map) == 3, 7);
-        assert!(contains_key(&map, &1), 8);
-        assert!(borrow(&map, &1).val == 4, 9);
-
-        destroy(map, |_k, _v| { let OnlyMove { val: _ } = _v; });
+        assert!(borrow(&map, &1) == &4, 9);
     }
 }
