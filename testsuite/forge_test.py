@@ -751,7 +751,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         namespace = sanitize_forge_resource_name(namespace_too_long)
         self.assertEqual(
             namespace,
-            "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
 
 
