@@ -327,6 +327,7 @@ Map key is not found
 
 ## Function `upsert`
 
+Insert key/value pair or update an existing key to a new value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_upsert">upsert</a>&lt;Key: <b>copy</b>, drop, store, Value: <b>copy</b>, drop, store&gt;(map: &<b>mut</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, key: &Key, value: &Value)
