@@ -532,10 +532,20 @@ pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(
     .unwrap()
 });
 
-/// Counters related to pending commit votes
-pub static BUFFER_MANAGER_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counters related to pending randomness messages
+pub static BUFFER_MANAGER_RAND_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_consensus_buffer_manager_msgs_count",
+        "aptos_consensus_buffer_manager_rand_msgs_count",
+        "Counters(queued,dequeued,dropped) related to pending randomness messages",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters related to pending commit votes
+pub static BUFFER_MANAGER_COMMIT_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_buffer_manager_commit_msgs_count",
         "Counters(queued,dequeued,dropped) related to pending commit votes",
         &["state"]
     )
@@ -547,6 +557,16 @@ pub static CONSENSUS_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_channel_msgs_count",
         "Counters(queued,dequeued,dropped) related to consensus channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to buffer manager channel
+pub static BUFFER_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_buffer_manager_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to buffer manager channel",
         &["state"]
     )
     .unwrap()

@@ -16,7 +16,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShares, rand_decision::RandDecisions},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -58,6 +58,10 @@ pub struct IncomingBlockRetrievalRequest {
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
     pub consensus_messages: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
+    pub buffer_manager_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
@@ -301,6 +305,32 @@ impl NetworkSender {
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.broadcast(msg).await
     }
+
+    pub async fn send_rand_shares(&mut self, rand_shares: RandShares, recipient: Author) {
+        fail_point!("consensus::send::rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_shares));
+        self.send(msg, vec![recipient]).await
+    }
+
+    pub async fn broadcast_rand_shares(&mut self, rand_shares: RandShares) {
+        fail_point!("consensus::send::broadcast_rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_shares));
+        self.broadcast(msg).await
+    }
+
+    // /// Sends the randomness to self buffer manager
+    // pub async fn send_rand_decisions(&self, rand_decisions: RandDecisions) {
+    //     fail_point!("consensus::send::rand_decision", |_| ());
+    //     // this requires re-verification of the ledger info we can probably optimize it later
+    //     let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decisions));
+    //     self.send(msg, vec![self.author]).await
+    // }
+
+    pub async fn broadcast_rand_decisions(&mut self, rand_decisions: RandDecisions) {
+        fail_point!("consensus::send::broadcast_rand_decision", |_| ());
+        let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decisions));
+        self.broadcast(msg).await
+    }
 }
 
 #[async_trait::async_trait]
@@ -341,6 +371,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
+    buffer_manager_messages_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
+    >,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -358,6 +392,11 @@ impl NetworkTask {
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            50,
+            Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
+        );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
@@ -386,12 +425,14 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
+                buffer_manager_messages_tx,
                 quorum_store_messages_tx,
                 block_retrieval_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
+                buffer_manager_messages,
                 quorum_store_messages,
                 block_retrieval,
             },
@@ -431,6 +472,16 @@ impl NetworkTask {
                                 peer_id,
                                 quorum_store_msg,
                                 &self.quorum_store_messages_tx,
+                            );
+                        },
+                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+                        | ConsensusMsg::CommitDecisionMsg(_)
+                        | ConsensusMsg::RandShareMsg(_)
+                        | ConsensusMsg::RandDecisionMsg(_)) => {
+                            Self::push_msg(
+                                peer_id,
+                                buffer_manager_msg,
+                                &self.buffer_manager_messages_tx,
                             );
                         },
                         consensus_msg => {

@@ -9,7 +9,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShares, rand_decision::RandDecisions},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -63,6 +63,10 @@ pub enum ConsensusMsg {
     SignedDigestMsg(Box<SignedDigest>),
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes).
     ProofOfStoreMsg(Box<ProofOfStore>),
+    /// Randomness: send VRF evaluation shares for generating the distributed randomness of a given round
+    RandShareMsg(Box<RandShares>),
+    /// Randomness: send VRF evaluation results (aggregated from 2/3 shares) as the distributed randomness for a given round
+    RandDecisionMsg(Box<RandDecisions>),
 }
 
 /// Network type for consensus
@@ -85,6 +89,8 @@ impl ConsensusMsg {
             ConsensusMsg::BatchMsg(_) => "BatchMsg",
             ConsensusMsg::SignedDigestMsg(_) => "SignedDigestMsg",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
+            ConsensusMsg::RandShareMsg(_) => "RandShareMsg",
+            ConsensusMsg::RandDecisionMsg(_) => "RandDecisionMsg",
         }
     }
 }
