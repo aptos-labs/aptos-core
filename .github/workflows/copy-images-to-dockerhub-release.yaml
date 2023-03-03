@@ -2,9 +2,12 @@ name: Copy images to dockerhub on release
 on:
   push:
     branches:
+      # release branches
       - devnet
       - testnet
       - mainnet
+      # preview branches
+      - preview
     tags:
       - aptos-node-v*
 
