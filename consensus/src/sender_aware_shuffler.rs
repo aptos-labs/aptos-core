@@ -43,33 +43,30 @@ impl TransactionShuffler for SenderAwareShuffler {
         let mut pending_txns = PendingTransactions::new();
         let num_transactions = txns.len();
         let mut orig_txns = VecDeque::from(txns);
-        let mut next_to_add =
-            |sliding_window: &mut SlidingWindowState| -> Option<SignedTransaction> {
-                if sliding_window.num_txns() == num_transactions {
-                    return None;
+        let mut next_to_add = |sliding_window: &mut SlidingWindowState| -> SignedTransaction {
+            // First check if we have a sender dropped off of conflict window in previous step, if so,
+            // we try to find pending transaction from the corresponding sender and add it to the block.
+            if let Some(sender) = sliding_window.last_dropped_sender() {
+                if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
+                    return txn;
                 }
-                // First check if we have a sender dropped off of conflict window in previous step, if so,
-                // we try to find pending transaction from the corresponding sender and add it to the block.
-                if let Some(sender) = sliding_window.last_dropped_sender() {
-                    if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
-                        return Some(txn);
-                    }
+            }
+            // If we can't find any transaction from a sender dropped off of conflict window, then
+            // iterate through the original transactions and try to find the next candidate
+            while let Some(txn) = orig_txns.pop_front() {
+                if !sliding_window.has_conflict(&txn.sender()) {
+                    return txn;
                 }
-                // If we can't find any transaction from a sender dropped off of conflict window, then
-                // iterate through the original transactions and try to find the next candidate
-                while let Some(txn) = orig_txns.pop_front() {
-                    if !sliding_window.has_conflict(&txn.sender()) {
-                        return Some(txn);
-                    }
-                    pending_txns.add_transaction(txn);
-                }
+                pending_txns.add_transaction(txn);
+            }
 
-                // If we can't find any candidate in above steps, then lastly
-                // add pending transactions in the order if we can't find any other candidate
-                Some(pending_txns.remove_first_pending().unwrap())
-            };
-        while let Some(txn) = next_to_add(&mut sliding_window) {
-            sliding_window.add_transaction(txn);
+            // If we can't find any candidate in above steps, then lastly
+            // add pending transactions in the order if we can't find any other candidate
+            pending_txns.remove_first_pending().unwrap()
+        };
+        while sliding_window.num_txns() < num_transactions {
+            let txn = next_to_add(&mut sliding_window);
+            sliding_window.add_transaction(txn)
         }
         sliding_window.finalize()
     }
