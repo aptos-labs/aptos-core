@@ -10,10 +10,12 @@ pub mod aptos {
         }
     }
     pub mod transaction {
-        // @@protoc_insertion_point(attribute:aptos.transaction.v1)
-        pub mod v1 {
-            include!("aptos.transaction.v1.rs");
-            // @@protoc_insertion_point(aptos.transaction.v1)
+        pub mod testing1 {
+            // @@protoc_insertion_point(attribute:aptos.transaction.testing1.v1)
+            pub mod v1 {
+                include!("aptos.transaction.testing1.v1.rs");
+                // @@protoc_insertion_point(aptos.transaction.testing1.v1)
+            }
         }
     }
     pub mod util {

@@ -11,7 +11,7 @@ use aptos_api_types::{
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
-use aptos_protos::{transaction::v1 as transaction, util::timestamp};
+use aptos_protos::{transaction::testing1::v1 as transaction, util::timestamp};
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
