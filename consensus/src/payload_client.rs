@@ -25,8 +25,8 @@ pub struct QuorumStoreClient {
     poll_count: u64,
     /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
     pull_timeout_ms: u64,
-    create_empty_blocks_for_pending_ordering: bool,
-    create_partial_blocks_before_poll_ends: bool,
+    wait_for_full_blocks_above_recent_fill_threshold: f32,
+    wait_for_full_blocks_above_num_pending_uncommitted_blocks: usize,
 }
 
 impl QuorumStoreClient {
@@ -34,8 +34,8 @@ impl QuorumStoreClient {
         consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
         poll_count: u64,
         pull_timeout_ms: u64,
-        create_empty_blocks_for_pending_ordering: bool,
-        create_partial_blocks_before_poll_ends: bool,
+        wait_for_full_blocks_above_recent_fill_threshold: f32,
+        wait_for_full_blocks_above_num_pending_uncommitted_blocks: usize,
     ) -> Self {
         assert!(
             poll_count > 0,
@@ -45,8 +45,8 @@ impl QuorumStoreClient {
             consensus_to_quorum_store_sender,
             poll_count,
             pull_timeout_ms,
-            create_empty_blocks_for_pending_ordering, 
-            create_partial_blocks_before_poll_ends,
+            wait_for_full_blocks_above_recent_fill_threshold,
+            wait_for_full_blocks_above_num_pending_uncommitted_blocks,
         }
     }
 
@@ -97,9 +97,11 @@ impl PayloadClient for QuorumStoreClient {
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
+        pending_uncommitted_blocks: usize,
+        recent_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError> {
-        let return_empty = pending_ordering && self.create_empty_blocks_for_pending_ordering;
-        let return_non_full = self.create_partial_blocks_before_poll_ends;
+        let return_non_full = recent_fill_fraction < self.wait_for_full_blocks_above_recent_fill_threshold && pending_uncommitted_blocks < self.wait_for_full_blocks_above_num_pending_uncommitted_blocks;
+        let return_empty = pending_ordering && return_non_full;
 
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())

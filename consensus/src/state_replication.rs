@@ -31,6 +31,8 @@ pub trait PayloadClient: Send + Sync {
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
+        pending_uncommitted_blocks: usize,
+        recent_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError>;
 
     fn trace_payloads(&self) {}

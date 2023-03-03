@@ -36,8 +36,10 @@ pub struct ConsensusConfig {
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
-    pub quorum_store_create_empty_blocks_for_pending_ordering: bool,
-    pub quorum_store_create_partial_blocks_before_poll_ends: bool,
+    // Whether to create partial blocks when few transactions exist, or empty blocks when there is
+    // pending ordering, or to wait for (quorum_store_poll_count - 1) * 30ms to collect transactions for a block
+    pub wait_for_full_blocks_above_recent_fill_threshold: f32,
+    pub wait_for_full_blocks_above_num_pending_uncommitted_blocks: usize,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
     // Used to decide if backoff is needed.
@@ -82,8 +84,10 @@ impl Default for ConsensusConfig {
             channel_size: 30, // hard-coded
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 15,
-            quorum_store_create_empty_blocks_for_pending_ordering: true,
-            quorum_store_create_partial_blocks_before_poll_ends: true,
+            // Whether to create partial blocks when few transactions exist, or empty blocks when there is
+            // pending ordering, or to wait for quorum_store_poll_count * 30ms to collect transactions for a block
+            wait_for_full_blocks_above_recent_fill_threshold: 0.7,
+            wait_for_full_blocks_above_num_pending_uncommitted_blocks: 8,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
 

@@ -178,6 +178,24 @@ pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// How many pending blocks are there, when we make a proposal
+pub static PROPOSER_PENDING_BLOCKS_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proposer_pending_blocks_count",
+        "How many pending blocks are there, when we make a proposal",
+    )
+    .unwrap()
+});
+
+/// How full is a largest pending block, as a fraction of max len/bytes (between 0 and 1)
+pub static PROPOSER_PENDING_BLOCKS_FILL_FRACTION: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_proposer_pending_blocks_fill_fraction",
+        "How full is a largest recent pending block, as a fraction of max len/bytes (between 0 and 1)",
+    )
+    .unwrap()
+});
+
 /// Next set of counters are computed at leader election time, with some delay.
 
 /// Current voting power fraction that participated in consensus
