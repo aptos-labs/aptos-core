@@ -49,7 +49,7 @@ To update [Aptos.dev](http://Aptos.dev) directly:
        ![v-fn-network.svg](../../static/img/docs/trigger-edits-aptosdev.png)
          Then click the pencil icon and select **Edit this file** to work in the GitHub web editor, and create a pull request to have it reviewed:
        ![v-fn-network.svg](../../static/img/docs/edit-file-in-GH.png)
-       * To add a new page, navigate to the [developer-docs-site/docs/](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/docs/) directory, click **Add file**, give it a name, append the `.md` file extension, include your contents, and create a pull request to have it reviewed:
+       * To add a new page, navigate to the relevant subdirectory of the [developer-docs-site/docs/](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/docs/) directory, click **Add file**, give it a name, append the `.md` file extension, include your contents, and create a pull request to have it reviewed:
        ![v-fn-network.svg](../../static/img/docs/add-file-in-GH.png)
     2. Via local editor - for more complex, multi-page changes, use your preferred source code editor to navigate to and update the source Markdown files in GitHub. See our [CONTRIBUTING](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) README for `git clone` instructions.
 2. For web edits, use the *Preview* function at top to see your updates in browser.
