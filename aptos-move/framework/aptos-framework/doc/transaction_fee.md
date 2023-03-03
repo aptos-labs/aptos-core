@@ -14,6 +14,9 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
 -  [Function `upgrade_distribution_percentages`](#0x1_transaction_fee_upgrade_distribution_percentages)
 -  [Function `register_proposers_for_fee_collection`](#0x1_transaction_fee_register_proposers_for_fee_collection)
+-  [Function `burn`](#0x1_transaction_fee_burn)
+-  [Function `try_burn_coin`](#0x1_transaction_fee_try_burn_coin)
+-  [Function `process_collected_coin_for_block_proposer`](#0x1_transaction_fee_process_collected_coin_for_block_proposer)
 -  [Function `process_collected_fees`](#0x1_transaction_fee_process_collected_fees)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `collect_fee_for_batch`](#0x1_transaction_fee_collect_fee_for_batch)
@@ -356,6 +359,120 @@ This function should only be called at the beginning of the block.
 
 </details>
 
+<a name="0x1_transaction_fee_burn"></a>
+
+## Function `burn`
+
+Destroys a zero-valued coin or burns it if the value is not zero.
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn">burn</a>(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn">burn</a>(<a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) == 0) {
+        <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>)
+    } <b>else</b> {
+        <a href="coin.md#0x1_coin_burn">coin::burn</a>(
+            <a href="coin.md#0x1_coin">coin</a>,
+            &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
+        )
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_try_burn_coin"></a>
+
+## Function `try_burn_coin`
+
+If the block proposer is not set, or the block is proposed by VM, burn
+the coin. Otherwise, the coin is returned back.
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_try_burn_coin">try_burn_coin</a>(block_proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_try_burn_coin">try_burn_coin</a>(
+    block_proposer: &Option&lt;<b>address</b>&gt;,
+    <a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;,
+): Option&lt;Coin&lt;AptosCoin&gt;&gt; <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    // No proposer - burn the <a href="coin.md#0x1_coin">coin</a>.
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(block_proposer)) {
+        <a href="transaction_fee.md#0x1_transaction_fee_burn">burn</a>(<a href="coin.md#0x1_coin">coin</a>);
+        <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    };
+
+    // VM proposed this <a href="block.md#0x1_block">block</a>, so also burn the <a href="coin.md#0x1_coin">coin</a>.
+    <b>let</b> block_proposer = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(block_proposer);
+    <b>if</b> (block_proposer == @vm_reserved) {
+        <a href="transaction_fee.md#0x1_transaction_fee_burn">burn</a>(<a href="coin.md#0x1_coin">coin</a>);
+        <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    };
+
+    // Otherwise we have <b>to</b> process the fee, so <b>return</b> the <a href="coin.md#0x1_coin">coin</a>.
+    <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="coin.md#0x1_coin">coin</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_fee_process_collected_coin_for_block_proposer"></a>
+
+## Function `process_collected_coin_for_block_proposer`
+
+Processes the fee for the block proposer, either burning them or
+assigning to the proposer.
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_coin_for_block_proposer">process_collected_coin_for_block_proposer</a>(block_proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_coin_for_block_proposer">process_collected_coin_for_block_proposer</a>(
+    block_proposer: &Option&lt;<b>address</b>&gt;,
+    <a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;,
+    amount: u64,
+) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+    <b>let</b> maybe_coin = <a href="transaction_fee.md#0x1_transaction_fee_try_burn_coin">try_burn_coin</a>(block_proposer, <a href="coin.md#0x1_coin">coin</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_coin)) {
+        <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(maybe_coin);
+        <b>if</b> (amount &gt; 0) {
+            <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(block_proposer), <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, amount));
+        };
+        <a href="transaction_fee.md#0x1_transaction_fee_burn">burn</a>(<a href="coin.md#0x1_coin">coin</a>);
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(maybe_coin);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_transaction_fee_process_collected_fees"></a>
 
 ## Function `process_collected_fees`
@@ -374,100 +491,62 @@ at the beginning of the block or during reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlockAndBatches">CollectedFeesPerBlockAndBatches</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlockAndBatches">CollectedFeesPerBlockAndBatches</a> {
     <b>if</b> (!<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) {
         <b>return</b>
     };
+
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlockAndBatches">CollectedFeesPerBlockAndBatches</a>&gt;(@aptos_framework);
-
-    // All collected fees are burnt <b>if</b> the <a href="block.md#0x1_block">block</a> proposer is not set or when
-    // the <a href="block.md#0x1_block">block</a> is proposed by the VM.
-    <b>let</b> burn_all = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&config.block_proposer) || (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&config.block_proposer) && *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&config.block_proposer) == @vm_reserved);
-
-    <b>let</b> i = 0;
-    <b>let</b> amount_for_block_proposer = 0;
-    <b>let</b> undistributed_coin = <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
     <b>let</b> num_batch_proposers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config.batch_proposers);
 
-    // If the <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a> of batch proposers is empty, we still have <b>to</b> process fees for
     <b>if</b> (num_batch_proposers == 0) {
-        // TODO: refactor!
-        <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(undistributed_coin);
+        // If there are no batch proposers, it means we are processing fees
+        // using V1 of <a href="block.md#0x1_block">block</a> prologue. In this case, all collected fees are
+        // stored in the first aggregatable <a href="coin.md#0x1_coin">coin</a>.
         <b>let</b> aggregatable_coin = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> config.amounts, 0);
-        <b>if</b> (<a href="coin.md#0x1_coin_is_aggregatable_coin_zero">coin::is_aggregatable_coin_zero</a>(aggregatable_coin)) {
-            <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&config.block_proposer)) {
-                <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
-            };
-            <b>return</b>
-        };
         <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(aggregatable_coin);
 
-        <b>if</b> (burn_all) {
-            <a href="coin.md#0x1_coin_burn">coin::burn</a>(
-                <a href="coin.md#0x1_coin">coin</a>,
-                &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
-            );
-            <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&config.block_proposer)) {
-                <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
+        // Distribute fees only for the <a href="block.md#0x1_block">block</a> proposer, and burn the rest.
+        <b>let</b> amount = (config.block_distribution_percentage <b>as</b> u64) * <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) / 100;
+        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_coin_for_block_proposer">process_collected_coin_for_block_proposer</a>(&config.block_proposer, <a href="coin.md#0x1_coin">coin</a>, amount);
+    } <b>else</b> {
+        // Otherwise, we <b>use</b> V2 <a href="version.md#0x1_version">version</a> of <a href="block.md#0x1_block">block</a> prologue and each transaction
+        // <b>has</b> its batch proposer. Here, we have <b>to</b> process fees for each batch
+        // proposer and keep track of what was the total amount and what is the
+        // remaning amount for the <a href="block.md#0x1_block">block</a> proposer.
+        <b>let</b> total_amount = 0;
+        <b>let</b> remaining_coin = <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
+
+        <b>let</b> i = 0;
+        <b>while</b> (i &lt; num_batch_proposers) {
+            <b>let</b> aggregatable_coin = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> config.amounts, i);
+            <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(aggregatable_coin);
+
+            // Update total amount <b>to</b> calculate fees for the <a href="block.md#0x1_block">block</a> proposer later.
+            total_amount = total_amount + <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>);
+
+            <b>let</b> batch_proposer = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&config.batch_proposers, i);
+            <b>let</b> amount = (config.batch_distribution_percentage <b>as</b> u64) * <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) / 100;
+
+            // Process the fee for the batch proposer and also record the
+            // remaining amount that will be used later for fees for the
+            // <a href="block.md#0x1_block">block</a> proposer.
+            <b>let</b> maybe_coin = <a href="transaction_fee.md#0x1_transaction_fee_try_burn_coin">try_burn_coin</a>(&config.block_proposer, <a href="coin.md#0x1_coin">coin</a>);
+            <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_coin)) {
+                <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(maybe_coin);
+                <b>if</b> (amount &gt; 0) {
+                    <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(batch_proposer, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, amount));
+                };
+                <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> remaining_coin, <a href="coin.md#0x1_coin">coin</a>);
+            } <b>else</b> {
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(maybe_coin);
             };
-            <b>return</b>
-        };
-
-        <b>let</b> block_proposer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
-        amount_for_block_proposer = (config.block_distribution_percentage <b>as</b> u64) * <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) / 100;
-        <b>if</b> (amount_for_block_proposer &gt; 0) {
-            <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(block_proposer_addr, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, amount_for_block_proposer));
-        };
-
-        <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) == 0) {
-            <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>);
-        } <b>else</b> {
-            <a href="coin.md#0x1_coin_burn">coin::burn</a>(
-                <a href="coin.md#0x1_coin">coin</a>,
-                &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
-            );
-        };
-        <b>return</b>
-    };
-
-    <b>while</b> (i &lt; num_batch_proposers) {
-        // First, get the collected amount and check <b>if</b> we can avoid calculations.
-        <b>let</b> aggregatable_coin = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> config.amounts, i);
-        <b>if</b> (<a href="coin.md#0x1_coin_is_aggregatable_coin_zero">coin::is_aggregatable_coin_zero</a>(aggregatable_coin)) {
             i = i + 1;
-            <b>continue</b>
-        };
-        <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(aggregatable_coin);
-
-        <b>if</b> (burn_all) {
-            <a href="coin.md#0x1_coin_burn">coin::burn</a>(
-                <a href="coin.md#0x1_coin">coin</a>,
-                &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
-            );
-            i = i + 1;
-            <b>continue</b>
         };
 
-        // Otherwise, some portion of fees <b>has</b> <b>to</b> go <b>to</b> the batch proposer
-        // and the remaining amount is accumulated for later <b>use</b>.
-        <b>let</b> batch_proposer_addr = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&config.batch_proposers, i);
-        <b>let</b> amount_for_batch_proposer = (config.batch_distribution_percentage <b>as</b> u64) * <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) / 100;
-        amount_for_block_proposer = amount_for_block_proposer + (config.block_distribution_percentage <b>as</b> u64) * <a href="coin.md#0x1_coin_value">coin::value</a>(&<a href="coin.md#0x1_coin">coin</a>) / 100;
-        <b>if</b> (amount_for_batch_proposer &gt; 0) {
-            <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(batch_proposer_addr, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, amount_for_batch_proposer));
-        };
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> undistributed_coin, <a href="coin.md#0x1_coin">coin</a>);
-        i = i + 1;
-    };
-
-    <b>if</b> (burn_all || <a href="coin.md#0x1_coin_value">coin::value</a>(&undistributed_coin) == 0) {
-        <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(undistributed_coin);
-        // Also unset the proposer. See the rationale for setting proposer
-        // <b>to</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() below.
-        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&config.block_proposer)) {
-            <b>let</b> _ = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
-        };
-        <b>return</b>
+        // Finally, process fees for the <a href="block.md#0x1_block">block</a> proposer.
+        <b>let</b> amount = (config.block_distribution_percentage <b>as</b> u64) * total_amount / 100;
+        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_coin_for_block_proposer">process_collected_coin_for_block_proposer</a>(&config.block_proposer, remaining_coin, amount);
     };
 
     // Extract the <b>address</b> of proposer here and reset it <b>to</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(). This
@@ -477,18 +556,8 @@ at the beginning of the block or during reconfiguration.
     // unless the <a href="block.md#0x1_block">block</a> proposer is specified in the <a href="block.md#0x1_block">block</a> prologue. When we have a governance
     // proposal that triggers <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>, we distribute pending fees and burn the
     // fee for the proposal. Otherwise, that fee would be leaked <b>to</b> the next <a href="block.md#0x1_block">block</a>.
-    <b>let</b> block_proposer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
-    <b>if</b> (amount_for_block_proposer &gt; 0) {
-        <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(block_proposer_addr, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> undistributed_coin, amount_for_block_proposer));
-    };
-
-    <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&undistributed_coin) == 0) {
-        <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(undistributed_coin);
-    } <b>else</b> {
-        <a href="coin.md#0x1_coin_burn">coin::burn</a>(
-            undistributed_coin,
-            &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
-        );
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&config.block_proposer)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> config.block_proposer);
     };
 }
 </code></pre>

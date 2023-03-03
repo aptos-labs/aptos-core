@@ -1,6 +1,6 @@
 /// This module provides an interface to burn or collect and redistribute transaction fees.
 module aptos_framework::transaction_fee {
-    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability};
+    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
@@ -117,103 +117,119 @@ module aptos_framework::transaction_fee {
         }
     }
 
+    /// Destroys a zero-valued coin or burns it if the value is not zero.
+    fun burn(coin: Coin<AptosCoin>) acquires AptosCoinCapabilities {
+        if (coin::value(&coin) == 0) {
+            coin::destroy_zero(coin)
+        } else {
+            coin::burn(
+                coin,
+                &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
+            )
+        }
+    }
+
+    /// If the block proposer is not set, or the block is proposed by VM, burn
+    /// the coin. Otherwise, the coin is returned back. 
+    fun try_burn_coin(
+        block_proposer: &Option<address>,
+        coin: Coin<AptosCoin>,
+    ): Option<Coin<AptosCoin>> acquires AptosCoinCapabilities {
+        // No proposer - burn the coin.
+        if (option::is_none(block_proposer)) {
+            burn(coin);
+            return option::none()
+        };
+
+        // VM proposed this block, so also burn the coin.
+        let block_proposer = *option::borrow(block_proposer);
+        if (block_proposer == @vm_reserved) {
+            burn(coin);
+            return option::none()
+        };
+
+        // Otherwise we have to process the fee, so return the coin.
+        return option::some(coin)
+    }
+
+    /// Processes the fee for the block proposer, either burning them or
+    /// assigning to the proposer.
+    fun process_collected_coin_for_block_proposer(
+        block_proposer: &Option<address>,
+        coin: Coin<AptosCoin>,
+        amount: u64,
+    ) acquires AptosCoinCapabilities {
+        let maybe_coin = try_burn_coin(block_proposer, coin);
+        if (option::is_some(&maybe_coin)) {
+            let coin = option::destroy_some(maybe_coin);
+            if (amount > 0) {
+                stake::add_transaction_fee(*option::borrow(block_proposer), coin::extract(&mut coin, amount));
+            };
+            burn(coin);
+        } else {
+            option::destroy_none(maybe_coin);
+        }
+    }
+
     /// Calculates the fee which should be distributed to block/batch proposers at the
     /// end of an epoch, and records it in the system. This function should only be called
     /// at the beginning of the block or during reconfiguration.
-    public(friend) fun process_collected_fees() acquires CollectedFeesPerBlockAndBatches, AptosCoinCapabilities {
+    public(friend) fun process_collected_fees() acquires AptosCoinCapabilities, CollectedFeesPerBlockAndBatches {
         if (!is_fees_collection_enabled()) {
             return
         };
+
         let config = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
-
-        // All collected fees are burnt if the block proposer is not set or when
-        // the block is proposed by the VM.
-        let burn_all = option::is_none(&config.block_proposer) || (option::is_some(&config.block_proposer) && *option::borrow(&config.block_proposer) == @vm_reserved);
-
-        let i = 0;
-        let amount_for_block_proposer = 0;
-        let undistributed_coin = coin::zero<AptosCoin>();
         let num_batch_proposers = vector::length(&config.batch_proposers);
 
-        // If the vector of batch proposers is empty, we still have to process fees for 
         if (num_batch_proposers == 0) {
-            // TODO: refactor!
-            coin::destroy_zero(undistributed_coin);
+            // If there are no batch proposers, it means we are processing fees
+            // using V1 of block prologue. In this case, all collected fees are
+            // stored in the first aggregatable coin.
             let aggregatable_coin = vector::borrow_mut(&mut config.amounts, 0);
-            if (coin::is_aggregatable_coin_zero(aggregatable_coin)) {
-                if (option::is_some(&config.block_proposer)) {
-                    let _ = option::extract(&mut config.block_proposer);
-                };
-                return
-            };
             let coin = coin::drain_aggregatable_coin(aggregatable_coin);
 
-            if (burn_all) {
-                coin::burn(
-                    coin,
-                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-                );
-                if (option::is_some(&config.block_proposer)) {
-                    let _ = option::extract(&mut config.block_proposer);
+            // Distribute fees only for the block proposer, and burn the rest.
+            let amount = (config.block_distribution_percentage as u64) * coin::value(&coin) / 100;
+            process_collected_coin_for_block_proposer(&config.block_proposer, coin, amount);
+        } else {
+            // Otherwise, we use V2 version of block prologue and each transaction
+            // has its batch proposer. Here, we have to process fees for each batch
+            // proposer and keep track of what was the total amount and what is the
+            // remaning amount for the block proposer.
+            let total_amount = 0;
+            let remaining_coin = coin::zero<AptosCoin>();
+
+            let i = 0;
+            while (i < num_batch_proposers) {
+                let aggregatable_coin = vector::borrow_mut(&mut config.amounts, i);
+                let coin = coin::drain_aggregatable_coin(aggregatable_coin);
+
+                // Update total amount to calculate fees for the block proposer later.
+                total_amount = total_amount + coin::value(&coin);
+
+                let batch_proposer = *vector::borrow(&config.batch_proposers, i);
+                let amount = (config.batch_distribution_percentage as u64) * coin::value(&coin) / 100;
+
+                // Process the fee for the batch proposer and also record the
+                // remaining amount that will be used later for fees for the
+                // block proposer.
+                let maybe_coin = try_burn_coin(&config.block_proposer, coin);
+                if (option::is_some(&maybe_coin)) {
+                    let coin = option::destroy_some(maybe_coin);
+                    if (amount > 0) {
+                        stake::add_transaction_fee(batch_proposer, coin::extract(&mut coin, amount));
+                    };
+                    coin::merge(&mut remaining_coin, coin);
+                } else {
+                    option::destroy_none(maybe_coin);
                 };
-                return
-            };
-
-            let block_proposer_addr = option::extract(&mut config.block_proposer);
-            amount_for_block_proposer = (config.block_distribution_percentage as u64) * coin::value(&coin) / 100;
-            if (amount_for_block_proposer > 0) {
-                stake::add_transaction_fee(block_proposer_addr, coin::extract(&mut coin, amount_for_block_proposer));
-            };
-
-            if (coin::value(&coin) == 0) {
-                coin::destroy_zero(coin);
-            } else {
-                coin::burn(
-                    coin,
-                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-                );
-            };
-            return
-        };
-
-        while (i < num_batch_proposers) {
-            // First, get the collected amount and check if we can avoid calculations.
-            let aggregatable_coin = vector::borrow_mut(&mut config.amounts, i);
-            if (coin::is_aggregatable_coin_zero(aggregatable_coin)) {
                 i = i + 1;
-                continue
-            };
-            let coin = coin::drain_aggregatable_coin(aggregatable_coin);
-
-            if (burn_all) {
-                coin::burn(
-                    coin,
-                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-                );
-                i = i + 1;
-                continue
             };
 
-            // Otherwise, some portion of fees has to go to the batch proposer
-            // and the remaining amount is accumulated for later use.
-            let batch_proposer_addr = *vector::borrow(&config.batch_proposers, i);
-            let amount_for_batch_proposer = (config.batch_distribution_percentage as u64) * coin::value(&coin) / 100;
-            amount_for_block_proposer = amount_for_block_proposer + (config.block_distribution_percentage as u64) * coin::value(&coin) / 100;
-            if (amount_for_batch_proposer > 0) {
-                stake::add_transaction_fee(batch_proposer_addr, coin::extract(&mut coin, amount_for_batch_proposer));
-            };
-            coin::merge(&mut undistributed_coin, coin);
-            i = i + 1;
-        };
-
-        if (burn_all || coin::value(&undistributed_coin) == 0) {
-            coin::destroy_zero(undistributed_coin);
-            // Also unset the proposer. See the rationale for setting proposer
-            // to option::none() below.
-            if (option::is_some(&config.block_proposer)) {
-                let _ = option::extract(&mut config.block_proposer);
-            };
-            return
+            // Finally, process fees for the block proposer.
+            let amount = (config.block_distribution_percentage as u64) * total_amount / 100;
+            process_collected_coin_for_block_proposer(&config.block_proposer, remaining_coin, amount);
         };
 
         // Extract the address of proposer here and reset it to option::none(). This
@@ -223,18 +239,8 @@ module aptos_framework::transaction_fee {
         // unless the block proposer is specified in the block prologue. When we have a governance
         // proposal that triggers reconfiguration, we distribute pending fees and burn the
         // fee for the proposal. Otherwise, that fee would be leaked to the next block.
-        let block_proposer_addr = option::extract(&mut config.block_proposer);
-        if (amount_for_block_proposer > 0) {
-            stake::add_transaction_fee(block_proposer_addr, coin::extract(&mut undistributed_coin, amount_for_block_proposer));
-        };
-
-        if (coin::value(&undistributed_coin) == 0) {
-            coin::destroy_zero(undistributed_coin);
-        } else {
-            coin::burn(
-                undistributed_coin,
-                &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-            );
+        if (option::is_some(&config.block_proposer)) {
+            option::extract(&mut config.block_proposer);
         };
     }
 
@@ -266,6 +272,12 @@ module aptos_framework::transaction_fee {
 
     #[test_only]
     use aptos_framework::aggregator_factory;
+
+    #[test_only]
+    fun assert_block_proposer_unset() acquires CollectedFeesPerBlockAndBatches {
+        let config = borrow_global<CollectedFeesPerBlockAndBatches>(@aptos_framework);
+        assert!(option::is_none(&config.block_proposer), 0);
+    }
 
     #[test_only]
     fun assert_collected_amount_is_zero(config: &CollectedFeesPerBlockAndBatches) {
@@ -325,6 +337,7 @@ module aptos_framework::transaction_fee {
 
         // Block 1 starts.
         process_collected_fees();
+        assert_block_proposer_unset();
         register_proposers_for_fee_collection(alice_addr, vector[bob_addr, carol_addr]);
 
         // Check that there was no fees distribution in the first block.
@@ -346,6 +359,7 @@ module aptos_framework::transaction_fee {
 
         // Block 2 starts.
         process_collected_fees();
+        assert_block_proposer_unset();
         register_proposers_for_fee_collection(bob_addr, vector[alice_addr, bob_addr, carol_addr]);
 
         // 10% of all fees must have been assigned to Alice.
@@ -374,6 +388,7 @@ module aptos_framework::transaction_fee {
 
         // Block 3 starts.
         process_collected_fees();
+        assert_block_proposer_unset();
         register_proposers_for_fee_collection(carol_addr, vector[bob_addr]);
 
         // 10% of fees (9000) should have been assigned to Bob because he was
@@ -399,6 +414,7 @@ module aptos_framework::transaction_fee {
 
         // Block 4 starts.
         process_collected_fees();
+        assert_block_proposer_unset();
 
         // Check that 20_000 was collected from Alice, and so 8000 was burnt.
         assert!(stake::get_validator_fee(carol_addr) == 6500, 0);
