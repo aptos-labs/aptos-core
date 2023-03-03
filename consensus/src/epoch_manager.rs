@@ -665,8 +665,8 @@ impl EpochManager {
             consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
-            self.config.quorum_store_create_empty_blocks_for_pending_ordering,
-            self.config.quorum_store_create_partial_blocks_before_poll_ends,
+            self.config.wait_for_full_blocks_above_recent_fill_threshold,
+            self.config.wait_for_full_blocks_above_pending_blocks,
         );
         self.commit_state_computer.new_epoch(
             &epoch_state,

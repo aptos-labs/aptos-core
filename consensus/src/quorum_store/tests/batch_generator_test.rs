@@ -26,6 +26,7 @@ async fn queue_mempool_batch_response(
     if let QuorumStoreRequest::GetBatchRequest(
         _max_batch_size,
         _max_bytes,
+        _return_non_full,
         exclude_txns,
         callback,
     ) = timeout(

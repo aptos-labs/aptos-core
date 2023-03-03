@@ -236,10 +236,6 @@ impl Mempool {
             }
         }
 
-        if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
-            block.clear();
-        }
-
         debug!(
             LogSchema::new(LogEntry::GetBlock),
             seen_consensus = seen_size,
@@ -252,6 +248,10 @@ impl Mempool {
             block_size = block.len(),
             return_non_full = return_non_full,
         );
+
+        if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
+            block.clear();
+        }
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);

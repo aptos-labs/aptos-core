@@ -30,7 +30,14 @@ pub enum GetPayloadCommand {
 impl fmt::Display for GetPayloadCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            GetPayloadCommand::GetPayloadRequest(round, max_txns, max_bytes, return_non_full, excluded, _) => {
+            GetPayloadCommand::GetPayloadRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
                 write!(
                     f,
                     "GetPayloadRequest [round: {}, max_txns: {}, max_bytes: {}, return_non_full: {},  excluded: {}]",

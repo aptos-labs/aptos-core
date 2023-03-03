@@ -191,7 +191,13 @@ impl MempoolProxy {
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, return_non_full, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(
+            max_items,
+            max_bytes,
+            return_non_full,
+            exclude_txns,
+            callback,
+        );
         self.mempool_tx
             .clone()
             .try_send(msg)
@@ -332,7 +338,7 @@ impl ProofQueue {
                     }
                 }
             }
-            size = size - 1;
+            size -= 1;
         }
         info!(
             // before non full check
@@ -350,7 +356,7 @@ impl ProofQueue {
             counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
-            counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);    
+            counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             ret
         } else {
             Vec::new()

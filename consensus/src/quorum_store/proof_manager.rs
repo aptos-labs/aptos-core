@@ -76,7 +76,14 @@ impl ProofManager {
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
             // TODO: check what max_txns consensus is using
-            GetPayloadCommand::GetPayloadRequest(round, max_txns, max_bytes, return_non_full, filter, callback) => {
+            GetPayloadCommand::GetPayloadRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                filter,
+                callback,
+            ) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),

@@ -28,6 +28,7 @@ async fn test_block_request() {
         1,
         100,
         1000000,
+        true,
         PayloadFilter::InQuorumStore(HashSet::new()),
         callback_tx,
     );
