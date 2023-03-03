@@ -225,7 +225,7 @@ module std::vector {
 
     // Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
     //     /// `f(1, f(2, f(3, 0)))`
-    public inline fun foldr<Accumulator, Element>(
+    /*public inline fun foldr<Accumulator, Element>(
         v: vector<Element>,
         init: Accumulator,
         f: |Element, Accumulator|Accumulator
@@ -233,7 +233,7 @@ module std::vector {
         let accu = init;
         for_each_reverse(v, |elem| accu = f(elem, accu));
         accu
-    }
+    }*/
 
     /// Map the function over the references of the elements of the vector, producing a new vector without modifying the
     /// original map.
@@ -267,7 +267,7 @@ module std::vector {
         });
         result
     }
-
+/*
     /// Partition, sorts all elements for which pred is true to the front.
     /// Preserves the relative order of the elements for which pred is true,
     /// BUT NOT for the elements for which pred is false.
@@ -348,7 +348,7 @@ module std::vector {
         let pred = map_ref(v, p);
         stable_partition_internal(v, &pred,0, length(v))
     }
-
+*/
 
     /// Return true if any element in the vector satisfies the predicate.
     public inline fun any<Element>(

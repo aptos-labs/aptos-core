@@ -77,7 +77,7 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
-    public fun to_vec_pair<Key: store, Value: store>(
+    /*public fun to_vec_pair<Key: store, Value: store>(
         map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         let keys = vector::empty();
         let values = vector::empty();
@@ -94,7 +94,7 @@ module aptos_std::simple_map {
         let (keys, values) = to_vec_pair(map);
         vector::destroy(keys, dk);
         vector::destroy(values, dv);
-    }
+    }*/
 
     public fun remove<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
