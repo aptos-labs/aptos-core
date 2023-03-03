@@ -369,9 +369,9 @@ spec aptos_framework::account {
     /// The guid_creation_num of the ccount resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
-        let account = global<Account>(addr);
-        aborts_if !exists<Account>(addr);
-        aborts_if account.guid_creation_num + 1 > MAX_U64;
+        include NewEventHandleAbortsIf {
+            account: account_signer,
+        };
         modifies global<Account>(addr);
     }
 
@@ -386,6 +386,7 @@ spec aptos_framework::account {
         let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
+        aborts_if account.guid_creation_num + 1 >= MAX_GUID_CREATION_NUM;
     }
 
     spec register_coin<CoinType>(account_addr: address) {
@@ -427,5 +428,16 @@ spec aptos_framework::account {
             table::spec_get(address_map, curr_auth_key) != originating_addr;
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+    }
+
+    spec verify_signed_message<T: drop>(
+        account: address,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        signed_message_bytes: vector<u8>,
+        message: T,
+    ) {
+        pragma verify = false;
+        modifies global<Account>(account);
     }
 }

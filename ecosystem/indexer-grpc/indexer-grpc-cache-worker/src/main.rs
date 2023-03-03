@@ -24,10 +24,12 @@ fn main() {
 
     // Load config.
     let args = Args::parse();
-    let config = aptos_indexer_grpc_cache_worker::IndexerGrpcCacheWorkerConfig::load(
+    let config = aptos_indexer_grpc_utils::config::IndexerGrpcConfig::load(
         std::path::PathBuf::from(args.config_path),
     )
     .unwrap();
+
+    let health_port = config.health_check_port;
 
     let runtime = aptos_runtimes::spawn_named_runtime("indexercache".to_string(), None);
 
@@ -41,7 +43,9 @@ fn main() {
     runtime.spawn(async move {
         let readiness = warp::path("readiness")
             .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
-        warp::serve(readiness).run(([0, 0, 0, 0], 8080)).await;
+        warp::serve(readiness)
+            .run(([0, 0, 0, 0], health_port))
+            .await;
     });
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {

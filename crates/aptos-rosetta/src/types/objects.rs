@@ -845,10 +845,9 @@ async fn parse_operations_from_write_set(
         },
     };
 
-    let data = match write_op {
-        WriteOp::Creation(inner) => inner,
-        WriteOp::Modification(inner) => inner,
-        WriteOp::Deletion => return Ok(vec![]),
+    let data = match write_op.bytes() {
+        Some(bytes) => bytes,
+        None => return Ok(vec![]),
     };
 
     // Determine operation
@@ -1158,11 +1157,7 @@ async fn parse_staking_contract_resource_changes(
         let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
             .iter()
             .filter_map(|(state_key, write_op)| {
-                let data = match write_op {
-                    WriteOp::Creation(data) => Some(data),
-                    WriteOp::Modification(data) => Some(data),
-                    WriteOp::Deletion => None,
-                };
+                let data = write_op.bytes();
 
                 let mut ret = None;
                 if let (StateKeyInner::AccessPath(path), Some(data)) = (state_key.inner(), data) {

@@ -17,6 +17,7 @@ pub enum FeatureFlag {
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
     RESOURCE_GROUPS = 9,
+    MULTISIG_ACCOUNTS = 10,
 }
 
 /// Representation of features on chain as a bitset.

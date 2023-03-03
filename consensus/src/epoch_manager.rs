@@ -546,6 +546,8 @@ impl EpochManager {
                 .expect("Could not send shutdown indicator to QuorumStore");
             ack_rx.await.expect("Failed to stop QuorumStore");
         }
+
+        self.commit_state_computer.end_epoch();
     }
 
     async fn start_recovery_manager(
@@ -628,7 +630,7 @@ impl EpochManager {
 
         let mut quorum_store_builder = if self.quorum_store_enabled {
             info!("Building QuorumStore");
-            QuorumStoreBuilder::InQuorumStore(InnerBuilder::new(
+            QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
                 self.epoch(),
                 self.author,
                 self.config.quorum_store_configs.clone(),

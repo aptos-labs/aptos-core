@@ -54,7 +54,6 @@ group "forge-images" {
 
 target "debian-base" {
   dockerfile = "docker/experimental/debian-base.Dockerfile"
-  context = "."
   contexts = {
     debian = "docker-image://debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9"
   }
@@ -81,7 +80,6 @@ target "builder-base" {
 target "aptos-node-builder" {
   dockerfile = "docker/experimental/builder.Dockerfile"
   target = "aptos-node-builder"
-  context = "."
   contexts = {
     rust = "docker-image://rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
     builder-base = "target:builder-base"
@@ -100,7 +98,6 @@ target "aptos-node-builder" {
 target "tools-builder" {
   dockerfile = "docker/experimental/builder.Dockerfile"
   target = "tools-builder"
-  context = "."
   contexts = {
     rust = "docker-image://rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
     builder-base =  "target:builder-base"

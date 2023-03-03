@@ -5,8 +5,9 @@
 use crate::{
     transaction::{
         DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
-        WriteResource, WriteTableItem,
+        ModuleBundlePayload, MultisigPayload, MultisigTransactionPayload,
+        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
+        WriteTableItem,
     },
     view::ViewRequest,
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
@@ -27,7 +28,8 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
+        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
+        SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -164,12 +166,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
-            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
-                modules: modules
-                    .into_iter()
-                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
-                    .collect::<Result<Vec<_>>>()?,
-            }),
             EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
@@ -195,6 +191,58 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
             },
+            Multisig(multisig) => {
+                let transaction_payload = if let Some(payload) = multisig.transaction_payload {
+                    match payload {
+                        aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+                            entry_function,
+                        ) => {
+                            let (module, function, ty_args, args) = entry_function.into_inner();
+                            let func_args = self
+                                .inner
+                                .view_function_arguments(&module, &function, &args);
+                            let json_args = match func_args {
+                                Ok(values) => values
+                                    .into_iter()
+                                    .map(|v| MoveValue::try_from(v)?.json())
+                                    .collect::<Result<_>>()?,
+                                Err(_e) => args
+                                    .into_iter()
+                                    .map(|arg| HexEncodedBytes::from(arg).json())
+                                    .collect::<Result<_>>()?,
+                            };
+
+                            Some(MultisigTransactionPayload::EntryFunctionPayload(
+                                EntryFunctionPayload {
+                                    arguments: json_args,
+                                    function: EntryFunctionId {
+                                        module: module.into(),
+                                        name: function.into(),
+                                    },
+                                    type_arguments: ty_args
+                                        .into_iter()
+                                        .map(|arg| arg.into())
+                                        .collect(),
+                                },
+                            ))
+                        },
+                    }
+                } else {
+                    None
+                };
+                TransactionPayload::MultisigPayload(MultisigPayload {
+                    multisig_address: multisig.multisig_address.into(),
+                    transaction_payload,
+                })
+            },
+
+            // Deprecated. Will be removed in the future.
+            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
+                modules: modules
+                    .into_iter()
+                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
+                    .collect::<Result<Vec<_>>>()?,
+            }),
         };
         Ok(ret)
     }
@@ -256,8 +304,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let ret = match op {
-            WriteOp::Deletion => match access_path.get_path() {
+        let ret = match op.into_bytes() {
+            None => match access_path.get_path() {
                 Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
@@ -274,21 +322,21 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     resource: typ.into(),
                 }),
             },
-            WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
+            Some(bytes) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: MoveModuleBytecode::new(val).try_parse_abi()?,
+                    data: MoveModuleBytecode::new(bytes).try_parse_abi()?,
                 }),
                 Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &val)?,
+                    data: self.try_into_resource(&typ, &bytes)?,
                 }),
                 Path::ResourceGroup(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
-                    data: self.try_into_resource(&typ, &val)?,
+                    data: self.try_into_resource(&typ, &bytes)?,
                 }),
             },
         };
@@ -304,8 +352,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
-        let ret = match op {
-            WriteOp::Deletion => {
+        let ret = match op.into_bytes() {
+            None => {
                 let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
 
                 WriteSetChange::DeleteTableItem(DeleteTableItem {
@@ -315,15 +363,15 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             },
-            WriteOp::Modification(value) | WriteOp::Creation(value) => {
+            Some(bytes) => {
                 let data =
-                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &bytes)?;
 
                 WriteSetChange::WriteTableItem(WriteTableItem {
                     state_key_hash,
                     handle: hex_handle,
                     key,
-                    value: value.into(),
+                    value: bytes.into(),
                     data,
                 })
             },
@@ -533,15 +581,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     args,
                 ))
             },
-            TransactionPayload::ModuleBundlePayload(payload) => {
-                Target::ModuleBundle(ModuleBundle::new(
-                    payload
-                        .modules
-                        .into_iter()
-                        .map(|m| m.bytecode.into())
-                        .collect(),
-                ))
-            },
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
                     code,
@@ -566,6 +605,71 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     },
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
+            },
+            TransactionPayload::MultisigPayload(multisig) => {
+                let transaction_payload = if let Some(payload) = multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunctionPayload(entry_function) => {
+                            let EntryFunctionPayload {
+                                function,
+                                type_arguments,
+                                arguments,
+                            } = entry_function;
+
+                            let module = function.module.clone();
+                            let code =
+                                self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+                            let func = code
+                                .find_entry_function(function.name.0.as_ident_str())
+                                .ok_or_else(|| {
+                                    format_err!("could not find entry function by {}", function)
+                                })?;
+                            ensure!(
+                                func.generic_type_params.len() == type_arguments.len(),
+                                "expect {} type arguments for entry function {}, but got {}",
+                                func.generic_type_params.len(),
+                                function,
+                                type_arguments.len()
+                            );
+
+                            let args = self
+                                .try_into_vm_values(func, arguments)?
+                                .iter()
+                                .map(bcs::to_bytes)
+                                .collect::<Result<_, bcs::Error>>()?;
+                            Some(
+                                aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
+                                    EntryFunction::new(
+                                        module.into(),
+                                        function.name.into(),
+                                        type_arguments
+                                            .into_iter()
+                                            .map(|v| v.try_into())
+                                            .collect::<Result<_>>()?,
+                                        args,
+                                    ),
+                                ),
+                            )
+                        },
+                    }
+                } else {
+                    None
+                };
+                Target::Multisig(Multisig {
+                    multisig_address: multisig.multisig_address.into(),
+                    transaction_payload,
+                })
+            },
+
+            // Deprecated. Will be removed in the future.
+            TransactionPayload::ModuleBundlePayload(payload) => {
+                Target::ModuleBundle(ModuleBundle::new(
+                    payload
+                        .modules
+                        .into_iter()
+                        .map(|m| m.bytecode.into())
+                        .collect(),
+                ))
             },
         };
         Ok(ret)

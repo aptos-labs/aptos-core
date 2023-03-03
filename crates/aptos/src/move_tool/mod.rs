@@ -127,8 +127,6 @@ pub(crate) fn set_bytecode_version(version: Option<u32>) {
     //       environment variables.
     if let Some(ver) = version {
         env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
-    } else if env::var(VAR_BYTECODE_VERSION) == Err(env::VarError::NotPresent) {
-        env::set_var(VAR_BYTECODE_VERSION, "6");
     }
 }
 
@@ -305,7 +303,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .build_options(
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
-                    self.move_options.bytecode_version_or_detault(),
+                    self.move_options.bytecode_version,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -364,7 +362,7 @@ impl CompileScript {
             ..IncludedArtifacts::None.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.bytecode_version_or_detault(),
+                self.move_options.bytecode_version,
             )
         };
         let package_dir = self.move_options.get_package_path()?;
@@ -576,7 +574,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
-            bytecode_version: Some(move_options.bytecode_version_or_detault()),
+            bytecode_version: move_options.bytecode_version,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -650,7 +648,7 @@ impl IncludedArtifacts {
         self,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
-        bytecode_version: u32,
+        bytecode_version: Option<u32>,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -662,7 +660,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
@@ -672,7 +670,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
             All => BuildOptions {
@@ -682,7 +680,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
         }
@@ -709,7 +707,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -796,7 +794,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -891,7 +889,9 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 }
 
-/// Downloads a package and verifies that the bytecode matches a local compilation of the Move code
+/// Downloads a package and verifies the bytecode
+///
+/// Downloads the package from onchain and verifies the bytecode matches a local compilation of the Move code
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
@@ -921,11 +921,11 @@ impl CliCommand<&'static str> for VerifyPackage {
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            bytecode_version: Some(self.move_options.bytecode_version_or_detault()),
+            bytecode_version: self.move_options.bytecode_version,
             ..self.included_artifacts.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.bytecode_version_or_detault(),
+                self.move_options.bytecode_version,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)

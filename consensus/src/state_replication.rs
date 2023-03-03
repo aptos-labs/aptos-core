@@ -68,4 +68,7 @@ pub trait StateComputer: Send + Sync {
 
     // Reconfigure to execute transactions for a new epoch.
     fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>);
+
+    // Reconfigure to clear epoch state at end of epoch.
+    fn end_epoch(&self);
 }

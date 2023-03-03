@@ -9,6 +9,7 @@ use crate::{
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::transaction::TransactionOutputExt;
@@ -26,7 +27,7 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
         GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -84,17 +85,31 @@ impl AptosVMImpl {
             0 => None,
             _ => StorageGasSchedule::fetch_config(&storage),
         };
-        if gas_feature_version >= 2 {
-            if let (Some(gas_params), Some(storage_gas_schedule)) =
-                (&mut gas_params, &storage_gas_schedule)
-            {
-                gas_params.natives.table.common.load_base =
-                    storage_gas_schedule.per_item_read.into();
-                gas_params.natives.table.common.load_per_byte =
-                    storage_gas_schedule.per_byte_read.into();
-                gas_params.natives.table.common.load_failure = 0.into();
+
+        if let (Some(gas_params), Some(storage_gas_schedule)) =
+            (&mut gas_params, &storage_gas_schedule)
+        {
+            match gas_feature_version {
+                2..=6 => {
+                    gas_params.natives.table.common.load_base_legacy =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_base_new = 0.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                7.. => {
+                    gas_params.natives.table.common.load_base_legacy = 0.into();
+                    gas_params.natives.table.common.load_base_new =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                _ => (),
             }
         }
+
         let storage_gas_params = StorageGasParameters::new(
             gas_feature_version,
             gas_params.as_ref(),
@@ -427,6 +442,44 @@ impl AptosVMImpl {
                     MoveValue::U8(chain_id.id()),
                 ]),
                 &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)
+            .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
+    }
+
+    /// Run the prologue for a multisig transaction. This needs to verify that:
+    /// 1. The the multisig tx exists
+    /// 2. It has received enough approvals to meet the signature threshold of the multisig account
+    /// 3. If only the payload hash was stored on chain, the provided payload in execution should
+    /// match that hash.
+    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        txn_data: &TransactionMetadata,
+        payload: &Multisig,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let transaction_validation = self.transaction_validation();
+        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE);
+        let provided_payload = if let Some(payload) = &payload.transaction_payload {
+            bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
+        } else {
+            // Default to empty bytes if payload is not provided.
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+        };
+
+        session
+            .execute_function_bypass_visibility(
+                &MULTISIG_ACCOUNT_MODULE,
+                VALIDATE_MULTISIG_TRANSACTION,
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(payload.multisig_address),
+                    MoveValue::vector_u8(provided_payload),
+                ]),
+                &mut UnmeteredGasMeter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)

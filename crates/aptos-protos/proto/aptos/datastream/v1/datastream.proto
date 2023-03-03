@@ -27,10 +27,11 @@ message TransactionOutput {
 
 message StreamStatus {
   enum StatusType {
+    STATUS_TYPE_UNSPECIFIED = 0;
     // Signal for the start of the stream.
-    INIT = 0;
+    STATUS_TYPE_INIT = 1;
     // Signal for the end of the batch.
-    BATCH_END = 1;
+    STATUS_TYPE_BATCH_END = 2;
   }
   StatusType type = 1;
   // Required. Start version of current batch/stream, inclusive.
@@ -42,13 +43,13 @@ message StreamStatus {
 message RawDatastreamRequest {
   // Required; start version of current stream.
   uint64 starting_version = 1;
+
+  // Optional; number of transactions to return in current stream. 
+  // If not set, response streams infinitely.
+  optional uint64 transactions_count = 2;
 }
 
 message RawDatastreamResponse {
-  enum response_type {
-    STATUS = 0;
-    DATA = 1;
-  }
   oneof response {
     StreamStatus status = 1;
     TransactionsOutput data = 2;

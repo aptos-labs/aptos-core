@@ -94,6 +94,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       COMMENT_HEADER: forge-continuous
       # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
@@ -104,7 +105,8 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-graceful-overload-test
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-graceful-overload-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_TEST_SUITE: graceful_overload
       POST_TO_SLACK: true
@@ -115,7 +117,8 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-nft-mint-test
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-nft-mint-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: nft_mint
       POST_TO_SLACK: true
@@ -126,7 +129,8 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
       POST_TO_SLACK: true
@@ -138,7 +142,8 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-twin-validator
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-twin-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: twin_validator_test
       POST_TO_SLACK: true
@@ -150,7 +155,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-three-region-with-different-node-speed
+      FORGE_NAMESPACE: forge-three-region-with-different-node-speed-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 3600
       FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
       FORGE_ENABLE_FAILPOINTS: true
@@ -163,7 +168,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test
+      FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_failures_catching_up
       FORGE_ENABLE_FAILPOINTS: true
@@ -175,7 +180,8 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-validator-reboot-stress
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-validator-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: validator_reboot_stress_test

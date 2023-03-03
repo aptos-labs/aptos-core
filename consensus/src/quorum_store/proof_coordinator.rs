@@ -59,13 +59,13 @@ impl IncrementalProofState {
 
         if self
             .aggregated_signature
-            .contains_key(&signed_digest.peer_id())
+            .contains_key(&signed_digest.signer())
         {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
         self.aggregated_signature
-            .insert(signed_digest.peer_id(), signed_digest.signature());
+            .insert(signed_digest.signer(), signed_digest.signature());
         Ok(())
     }
 
@@ -207,7 +207,7 @@ impl ProofCoordinator {
                             self.init_proof(info, batch_id, tx);
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_digest) => {
-                            let peer_id = signed_digest.peer_id();
+                            let peer_id = signed_digest.signer();
                             match self.add_signature(signed_digest, &validator_verifier) {
                                 Ok(result) => {
                                     if let Some(proof) = result {

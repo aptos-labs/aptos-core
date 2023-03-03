@@ -20,7 +20,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::BlockProposalCommand};
+use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -36,7 +36,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
-    InQuorumStore(InnerBuilder),
+    QuorumStore(InnerBuilder),
 }
 
 impl QuorumStoreBuilder {
@@ -48,7 +48,7 @@ impl QuorumStoreBuilder {
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
-            QuorumStoreBuilder::InQuorumStore(inner) => inner.init_payload_manager(),
+            QuorumStoreBuilder::QuorumStore(inner) => inner.init_payload_manager(),
         }
     }
 
@@ -58,20 +58,20 @@ impl QuorumStoreBuilder {
                 inner.start();
                 None
             },
-            QuorumStoreBuilder::InQuorumStore(inner) => Some(inner.start()),
+            QuorumStoreBuilder::QuorumStore(inner) => Some(inner.start()),
         }
     }
 }
 
 pub struct DirectMempoolInnerBuilder {
-    consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+    consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
 }
 
 impl DirectMempoolInnerBuilder {
     pub fn new(
-        consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+        consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -106,7 +106,7 @@ pub struct InnerBuilder {
     epoch: u64,
     author: Author,
     config: QuorumStoreConfig,
-    consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+    consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     mempool_txn_pull_timeout_ms: u64,
     aptos_db: Arc<dyn DbReader>,
@@ -142,7 +142,7 @@ impl InnerBuilder {
         epoch: u64,
         author: Author,
         config: QuorumStoreConfig,
-        consensus_to_quorum_store_receiver: Receiver<BlockProposalCommand>,
+        consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
         aptos_db: Arc<dyn DbReader>,

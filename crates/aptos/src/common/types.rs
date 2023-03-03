@@ -955,10 +955,6 @@ impl MovePackageDir {
             .collect()
     }
 
-    pub fn bytecode_version_or_detault(&self) -> u32 {
-        self.bytecode_version.unwrap_or(5)
-    }
-
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());

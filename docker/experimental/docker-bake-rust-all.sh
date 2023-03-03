@@ -22,6 +22,7 @@ export NORMALIZED_GIT_BRANCH_OR_PR=$(printf "$TARGET_CACHE_ID" | sed -e 's/[^a-z
 export PROFILE=${PROFILE:-release}
 export FEATURES=${FEATURES:-""}
 export NORMALIZED_FEATURES_LIST=$(printf "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/g')
+export CUSTOM_IMAGE_TAG_PREFIX=${CUSTOM_IMAGE_TAG_PREFIX:-""}
 
 if [ "$PROFILE" = "release" ]; then
   # Do not prefix image tags if we're building the default profile "release"
@@ -31,10 +32,16 @@ else
   profile_prefix="${PROFILE}_"
 fi
 
-if [ -n "$FEATURES" ]; then
-  export IMAGE_TAG_PREFIX="${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
+if [ -n "$CUSTOM_IMAGE_TAG_PREFIX" ]; then
+  export IMAGE_TAG_PREFIX="${CUSTOM_IMAGE_TAG_PREFIX}_"
 else
-  export IMAGE_TAG_PREFIX="${profile_prefix}"
+  export IMAGE_TAG_PREFIX=""
+fi
+
+if [ -n "$FEATURES" ]; then
+  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
+else
+  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
 fi
 
 BUILD_TARGET="${1:-forge-images}"
