@@ -3,7 +3,7 @@
 
 syntax = "proto3";
 
-package aptos.transaction.v1;
+package aptos.transaction.testing1.v1;
 
 import "aptos/util/timestamp/timestamp.proto";
 
@@ -45,10 +45,11 @@ message Transaction {
   uint64 block_height = 5;
 
   enum TransactionType {
-    GENESIS = 0;
-    BLOCK_METADATA = 1;
-    STATE_CHECKPOINT = 2;
-    USER = 3;
+    TRANSACTION_TYPE_UNSPECIFIED = 0;
+    TRANSACTION_TYPE_GENESIS = 1;
+    TRANSACTION_TYPE_BLOCK_METADATA = 2;
+    TRANSACTION_TYPE_STATE_CHECKPOINT = 3;
+    TRANSACTION_TYPE_USER = 4;
   }
 
   TransactionType type = 6;
@@ -121,8 +122,9 @@ message UserTransactionRequest {
 message WriteSet {
 
   enum WriteSetType {
-    SCRIPT_WRITE_SET = 0;
-    DIRECT_WRITE_SET = 1;
+    WRITE_SET_TYPE_UNSPECIFIED = 0;
+    WRITE_SET_TYPE_SCRIPT_WRITE_SET = 1;
+    WRITE_SET_TYPE_DIRECT_WRITE_SET = 2;
   }
 
   WriteSetType write_set_type = 1;
@@ -145,12 +147,13 @@ message DirectWriteSet {
 message WriteSetChange {
 
   enum Type {
-    DELETE_MODULE = 0;
-    DELETE_RESOURCE = 1;
-    DELETE_TABLE_ITEM = 2;
-    WRITE_MODULE = 3;
-    WRITE_RESOURCE = 4;
-    WRITE_TABLE_ITEM = 5;
+    TYPE_UNSPECIFIED = 0;
+    TYPE_DELETE_MODULE = 1;
+    TYPE_DELETE_RESOURCE = 2;
+    TYPE_DELETE_TABLE_ITEM = 3;
+    TYPE_WRITE_MODULE = 4;
+    TYPE_WRITE_RESOURCE = 5;
+    TYPE_WRITE_TABLE_ITEM = 6;
   }
 
   Type type = 1;
@@ -220,11 +223,12 @@ message WriteTableItem {
 
 message TransactionPayload {
   enum Type {
-    ENTRY_FUNCTION_PAYLOAD = 0;
-    SCRIPT_PAYLOAD = 1;
-    MODULE_BUNDLE_PAYLOAD = 2;
-    WRITE_SET_PAYLOAD = 3;
-    MULTISIG_PAYLOAD = 4;
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ENTRY_FUNCTION_PAYLOAD = 1;
+    TYPE_SCRIPT_PAYLOAD = 2;
+    TYPE_MODULE_BUNDLE_PAYLOAD = 3;
+    TYPE_WRITE_SET_PAYLOAD = 4;
+    TYPE_MULTISIG_PAYLOAD = 5;
   }
 
   Type type = 1;
@@ -262,7 +266,8 @@ message MultisigPayload {
 
 message MultisigTransactionPayload {
   enum Type {
-    ENTRY_FUNCTION_PAYLOAD = 0;
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ENTRY_FUNCTION_PAYLOAD = 1;
   }
 
   Type type = 1;
@@ -290,9 +295,10 @@ message MoveModule {
 }
 message MoveFunction {
   enum Visibility {
-    PRIVATE = 0;
-    PUBLIC = 1;
-    FRIEND = 2;
+    VISIBILITY_UNSPECIFIED = 0;
+    VISIBILITY_PRIVATE = 1;
+    VISIBILITY_PUBLIC = 2;
+    VISIBILITY_FRIEND = 3;
   }
   string name = 1;
   MoveFunction.Visibility visibility = 2;
@@ -324,22 +330,22 @@ message MoveFunctionGenericTypeParam {
   repeated MoveAbility constraints = 1;
 }
 
-// Next id: 12
 enum MoveTypes {
-  Bool = 0;
-  U8 = 1;
-  U16 = 11;
-  U32 = 12;
-  U64 = 2;
-  U128 = 3;
-  U256 = 13;
-  Address = 4;
-  Signer = 5;
-  Vector = 6; // { items: Box<MoveType> },
-  Struct = 7; //(MoveStructTag),
-  GenericTypeParam = 8; // { index: u16 },
-  Reference = 9; // { mutable: bool, to: Box<MoveType> },
-  Unparsable = 10; //(String),
+  MOVE_TYPES_UNSPECIFIED = 0;
+  MOVE_TYPES_BOOL = 1;
+  MOVE_TYPES_U8 = 2;
+  MOVE_TYPES_U16 = 12;
+  MOVE_TYPES_U32 = 13;
+  MOVE_TYPES_U64 = 3;
+  MOVE_TYPES_U128 = 4;
+  MOVE_TYPES_U256 = 14;
+  MOVE_TYPES_ADDRESS = 5;
+  MOVE_TYPES_SIGNER = 6;
+  MOVE_TYPES_VECTOR = 7; // { items: Box<MoveType> },
+  MOVE_TYPES_STRUCT = 8; //(MoveStructTag),
+  MOVE_TYPES_GENERIC_TYPE_PARAM = 9; // { index: u16 },
+  MOVE_TYPES_REFERENCE = 10; // { mutable: bool, to: Box<MoveType> },
+  MOVE_TYPES_UNPARSABLE = 11; //(String),
 }
 
 message MoveType{
@@ -360,10 +366,11 @@ message MoveType{
 }
 
 enum MoveAbility {
-  COPY = 0;
-  DROP = 1;
-  STORE = 2;
-  KEY = 3;
+  MOVE_ABILITY_UNSPECIFIED = 0;
+  MOVE_ABILITY_COPY = 1;
+  MOVE_ABILITY_DROP = 2;
+  MOVE_ABILITY_STORE = 3;
+  MOVE_ABILITY_KEY = 4;
 }
 
 message WriteSetPayload {
@@ -390,9 +397,10 @@ message MoveStructTag {
 message Signature {
 
   enum Type {
-    ED25519 = 0;
-    MULTI_ED25519 = 1;
-    MULTI_AGENT = 2;
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ED25519 = 1;
+    TYPE_MULTI_ED25519 = 2;
+    TYPE_MULTI_AGENT = 3;
   }
 
   Type type = 1;
@@ -423,8 +431,9 @@ message MultiAgentSignature {
 
 message AccountSignature {
   enum Type {
-    ED25519 = 0;
-    MULTI_ED25519 = 1;
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ED25519 = 1;
+    TYPE_MULTI_ED25519 = 2;
   }
 
   Type type = 1;
