@@ -13,6 +13,9 @@ module std::vector {
     /// The index into the vector is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 0x20000;
 
+    /// The index into the vector is out of bounds
+    const EINVALID_RANGE: u64 = 0x20001;
+
     #[bytecode_instruction]
     /// Create an empty vector.
     native public fun empty<Element>(): vector<Element>;
@@ -97,6 +100,17 @@ module std::vector {
     }
     spec is_empty {
         pragma intrinsic = true;
+    }
+
+    /// Trim a vector to a smaller size, returning the evicted elements in reverse order
+    public fun trim<Element>(v: &mut vector<Element>, new_len: u64): vector<Element> {
+        let len = length(v);
+        let result = empty();
+        while (new_len < len) {
+            push_back(&mut result, pop_back(v));
+            len = len - 1;
+        };
+        result
     }
 
 

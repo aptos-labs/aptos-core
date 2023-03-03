@@ -77,23 +77,23 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
-    public fun to_vec<Key: store, Value: store>(
-        map: SimpleMap<Key, Value>): vector<Element<Key, Value>> {
+    public fun to_vec_pair<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
+        let keys = vector::empty();
+        let values = vector::empty();
         let SimpleMap { data } = map;
-        data
-    }
-
-    public fun split_element<Key: store, Value: store>(e: Element<Key, Value>): (Key, Value) {
-        let Element { key, value} = e;
-        (key, value)
+        vector::for_each(data, |e| { let Element { key, value } = e; vector::push_back(&mut keys, key); vector::push_back(&mut values, value); });
+        (keys, values)
     }
 
     public inline fun destroy<Key: store, Value: store>(
         map: SimpleMap<Key, Value>,
-        d: |Key, Value|
+        dk: |Key|,
+        dv: |Value|
     ) {
-        let vec = to_vec(map);
-        std::vector::destroy(vec, |e| { let (_k, _v) = split_element(e); d(_k, _v) });
+        let (keys, values) = to_vec_pair(map);
+        vector::destroy(keys, dk);
+        vector::destroy(values, dv);
     }
 
     public fun remove<Key: store, Value: store>(

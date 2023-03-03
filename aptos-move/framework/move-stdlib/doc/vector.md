@@ -28,6 +28,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `reverse`](#0x1_vector_reverse)
 -  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
+-  [Function `trim`](#0x1_vector_trim)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
@@ -64,6 +65,16 @@ The index into the vector is out of bounds
 
 
 <pre><code><b>const</b> <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>: u64 = 131072;
+</code></pre>
+
+
+
+<a name="0x1_vector_EINVALID_RANGE"></a>
+
+The index into the vector is out of bounds
+
+
+<pre><code><b>const</b> <a href="vector.md#0x1_vector_EINVALID_RANGE">EINVALID_RANGE</a>: u64 = 131073;
 </code></pre>
 
 
@@ -314,7 +325,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 ## Function `reverse_slice`
 
-Reverses the order of the elements in the vector <code>v</code> in place.
+Reverses the order of the elements [left, right) in the vector <code>v</code> in place.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
@@ -327,8 +338,11 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64) {
-    <b>while</b> (left + 1 &lt; right) {
-        <a href="vector.md#0x1_vector_swap">swap</a>(v, left, right - 1);
+    <b>assert</b>!(left &gt;= right, <a href="vector.md#0x1_vector_EINVALID_RANGE">EINVALID_RANGE</a>);
+    <b>if</b> (left == right) <b>return</b>;
+    right = right - 1;
+    <b>while</b> (left &lt; right) {
+        <a href="vector.md#0x1_vector_swap">swap</a>(v, left, right);
         left = left + 1;
         right = right - 1;
     }
@@ -359,6 +373,37 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
     <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
     <b>while</b> (!<a href="vector.md#0x1_vector_is_empty">is_empty</a>(&other)) <a href="vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
     <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(other);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_trim"></a>
+
+## Function `trim`
+
+Trim a vector to a smaller size, returning the evicted elements in reverse order
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>let</b> result = <a href="vector.md#0x1_vector_empty">empty</a>();
+    <b>while</b> (new_len &lt; len) {
+        <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v));
+        len = len - 1;
+    };
+    result
 }
 </code></pre>
 
@@ -521,6 +566,8 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `rotate`
 
+rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
+ie. 3 in the example above
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, rot: u64): u64
@@ -549,6 +596,8 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `rotate_slice`
 
+Same as above but on a sub-slice of an array [left, right) with left <= rot <= right
+returns the
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, rot: u64, right: u64): u64
@@ -581,6 +630,10 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `stable_partition_internal`
 
+For in-place stable partition we need recursion so we cannot use inline functions
+and thus we cannot use lambdas. Luckily it so happens that we can precompute the predicate
+in a secondary array. Note how the algorithm belows only start shuffling items after the
+predicate is checked.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, pred: &<a href="vector.md#0x1_vector">vector</a>&lt;bool&gt;, left: u64, right: u64): u64
@@ -598,8 +651,9 @@ Aborts if <code>i</code> is out of bounds.
     left: u64,
     right: u64
 ): u64 {
-    <b>if</b> (left == right) <b>return</b> left;
-    <b>if</b> (left + 1 == right) {
+    <b>if</b> (left == right) {
+        left
+    } <b>else</b> <b>if</b> (left + 1 == right) {
         <b>if</b> (*<a href="vector.md#0x1_vector_borrow">borrow</a>(pred, left)) right <b>else</b> left
     } <b>else</b> {
         <b>let</b> mid = left + ((right - left) &gt;&gt; 1);
