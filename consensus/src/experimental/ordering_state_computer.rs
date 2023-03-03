@@ -127,4 +127,6 @@ impl StateComputer for OrderingStateComputer {
         _: Arc<dyn TransactionShuffler>,
     ) {
     }
+
+    fn end_epoch(&self) {}
 }

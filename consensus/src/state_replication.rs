@@ -74,4 +74,7 @@ pub trait StateComputer: Send + Sync {
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
     );
+
+    // Reconfigure to clear epoch state at end of epoch.
+    fn end_epoch(&self);
 }

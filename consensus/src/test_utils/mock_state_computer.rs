@@ -134,6 +134,8 @@ impl StateComputer for MockStateComputer {
     }
 
     fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
+
+    fn end_epoch(&self) {}
 }
 
 pub struct EmptyStateComputer;
@@ -162,6 +164,8 @@ impl StateComputer for EmptyStateComputer {
     }
 
     fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
+
+    fn end_epoch(&self) {}
 }
 
 /// Random Compute Result State Computer
@@ -214,4 +218,6 @@ impl StateComputer for RandomComputeResultStateComputer {
     }
 
     fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
+
+    fn end_epoch(&self) {}
 }
