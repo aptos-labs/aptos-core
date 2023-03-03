@@ -34,10 +34,12 @@ module aptos_std::pool_u64_unbound {
 
     const MAX_U64: u64 = 18446744073709551615;
 
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+
     struct Pool has store {
         total_coins: u64,
-        total_shares: u64,
-        shares: Table<address, u64>,
+        total_shares: u128,
+        shares: Table<address, u128>,
         // Default to 1. This can be used to minimize rounding errors when computing shares and coins amount.
         // However, users need to make sure the coins amount don't overflow when multiplied by the scaling factor.
         scaling_factor: u64,
@@ -54,7 +56,7 @@ module aptos_std::pool_u64_unbound {
         Pool {
             total_coins: 0,
             total_shares: 0,
-            shares: table::new<address, u64>(),
+            shares: table::new<address, u128>(),
             scaling_factor,
         }
     }
@@ -68,7 +70,7 @@ module aptos_std::pool_u64_unbound {
             shares,
             scaling_factor: _,
         } = pool;
-        table::destroy_empty<address, u64>(shares);
+        table::destroy_empty<address, u128>(shares);
     }
 
     /// Return `pool`'s total balance of coins.
@@ -77,7 +79,7 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Return the total number of shares across all shareholders in `pool`.
-    public fun total_shares(pool: &Pool): u64 {
+    public fun total_shares(pool: &Pool): u128 {
         pool.total_shares
     }
 
@@ -87,7 +89,7 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Return the number of shares of `stakeholder` in `pool`.
-    public fun shares(pool: &Pool, shareholder: address): u64 {
+    public fun shares(pool: &Pool, shareholder: address): u128 {
         if (contains(pool, shareholder)) {
             *table::borrow(&pool.shares, shareholder)
         } else {
@@ -112,12 +114,12 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Allow an existing or new shareholder to add their coins to the pool in exchange for new shares.
-    public fun buy_in(pool: &mut Pool, shareholder: address, coins_amount: u64): u64 {
+    public fun buy_in(pool: &mut Pool, shareholder: address, coins_amount: u64): u128 {
         if (coins_amount == 0) return 0;
 
         let new_shares = amount_to_shares(pool, coins_amount);
         assert!(MAX_U64 - pool.total_coins >= coins_amount, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
-        assert!(MAX_U64 - pool.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_SHARES_OVERFLOW));
+        assert!(MAX_U128 - pool.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_SHARES_OVERFLOW));
 
         pool.total_coins = pool.total_coins + coins_amount;
         pool.total_shares = pool.total_shares + new_shares;
@@ -127,11 +129,11 @@ module aptos_std::pool_u64_unbound {
 
     /// Add the number of shares directly for `shareholder` in `pool`.
     /// This would dilute other shareholders if the pool's balance of coins didn't change.
-    fun add_shares(pool: &mut Pool, shareholder: address, new_shares: u64): u64 {
+    fun add_shares(pool: &mut Pool, shareholder: address, new_shares: u128): u128 {
         if (contains(pool, shareholder)) {
             let existing_shares = table::borrow_mut(&mut pool.shares, shareholder);
             let current_shares = *existing_shares;
-            assert!(MAX_U64 - current_shares >= new_shares, error::invalid_argument(ESHAREHOLDER_SHARES_OVERFLOW));
+            assert!(MAX_U128 - current_shares >= new_shares, error::invalid_argument(ESHAREHOLDER_SHARES_OVERFLOW));
 
             *existing_shares = current_shares + new_shares;
             *existing_shares
@@ -144,7 +146,7 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Allow `shareholder` to redeem their shares in `pool` for coins.
-    public fun redeem_shares(pool: &mut Pool, shareholder: address, shares_to_redeem: u64): u64 {
+    public fun redeem_shares(pool: &mut Pool, shareholder: address, shares_to_redeem: u128): u64 {
         assert!(contains(pool, shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
         assert!(shares(pool, shareholder) >= shares_to_redeem, error::invalid_argument(EINSUFFICIENT_SHARES));
 
@@ -163,7 +165,7 @@ module aptos_std::pool_u64_unbound {
         pool: &mut Pool,
         shareholder_1: address,
         shareholder_2: address,
-        shares_to_transfer: u64,
+        shares_to_transfer: u128,
     ) {
         assert!(contains(pool, shareholder_1), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
         assert!(shares(pool, shareholder_1) >= shares_to_transfer, error::invalid_argument(EINSUFFICIENT_SHARES));
@@ -174,7 +176,7 @@ module aptos_std::pool_u64_unbound {
     }
 
     /// Directly deduct `shareholder`'s number of shares in `pool` and return the number of remaining shares.
-    fun deduct_shares(pool: &mut Pool, shareholder: address, num_shares: u64): u64 {
+    fun deduct_shares(pool: &mut Pool, shareholder: address, num_shares: u128): u128 {
         assert!(contains(pool, shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
         assert!(shares(pool, shareholder) >= num_shares, error::invalid_argument(EINSUFFICIENT_SHARES));
 
@@ -192,35 +194,35 @@ module aptos_std::pool_u64_unbound {
 
     /// Return the number of new shares `coins_amount` can buy in `pool`.
     /// `amount` needs to big enough to avoid rounding number.
-    public fun amount_to_shares(pool: &Pool, coins_amount: u64): u64 {
+    public fun amount_to_shares(pool: &Pool, coins_amount: u64): u128 {
         amount_to_shares_with_total_coins(pool, coins_amount, pool.total_coins)
     }
 
     /// Return the number of new shares `coins_amount` can buy in `pool` with a custom total coins number.
     /// `amount` needs to big enough to avoid rounding number.
-    public fun amount_to_shares_with_total_coins(pool: &Pool, coins_amount: u64, total_coins: u64): u64 {
+    public fun amount_to_shares_with_total_coins(pool: &Pool, coins_amount: u64, total_coins: u64): u128 {
         // No shares yet so amount is worth the same number of shares.
         if (pool.total_coins == 0 || pool.total_shares == 0) {
             // Multiply by scaling factor to minimize rounding errors during internal calculations for buy ins/redeems.
             // This can overflow but scaling factor is expected to be chosen carefully so this would not overflow.
-            coins_amount * pool.scaling_factor
+            to_u128(coins_amount) * to_u128(pool.scaling_factor)
         } else {
             // Shares price = total_coins / total existing shares.
             // New number of shares = new_amount / shares_price = new_amount * existing_shares / total_amount.
             // We rearrange the calc and do multiplication first to avoid rounding errors.
-            multiply_then_divide(pool, coins_amount, pool.total_shares, total_coins)
+            multiply_then_divide(pool, to_u128(coins_amount), pool.total_shares, to_u128(total_coins))
         }
     }
 
     /// Return the number of coins `shares` are worth in `pool`.
     /// `shares` needs to big enough to avoid rounding number.
-    public fun shares_to_amount(pool: &Pool, shares: u64): u64 {
+    public fun shares_to_amount(pool: &Pool, shares: u128): u64 {
         shares_to_amount_with_total_coins(pool, shares, pool.total_coins)
     }
 
     /// Return the number of coins `shares` are worth in `pool` with a custom total coins number.
     /// `shares` needs to big enough to avoid rounding number.
-    public fun shares_to_amount_with_total_coins(pool: &Pool, shares: u64, total_coins: u64): u64 {
+    public fun shares_to_amount_with_total_coins(pool: &Pool, shares: u128, total_coins: u64): u64 {
         // No shares or coins yet so shares are worthless.
         if (pool.total_coins == 0 || pool.total_shares == 0) {
             0
@@ -228,16 +230,34 @@ module aptos_std::pool_u64_unbound {
             // Shares price = total_coins / total existing shares.
             // Shares worth = shares * shares price = shares * total_coins / total existing shares.
             // We rearrange the calc and do multiplication first to avoid rounding errors.
-            multiply_then_divide(pool, shares, total_coins, pool.total_shares)
+            (multiply_then_divide(pool, shares, to_u128(total_coins), pool.total_shares) as u64)
         }
     }
 
-    public fun multiply_then_divide(_pool: &Pool, x: u64, y: u64, z: u64): u64 {
-        let result = (to_u128(x) * to_u128(y)) / to_u128(z);
-        (result as u64)
+    /// Return the number of coins `shares` are worth in `pool` with custom total coins and shares numbers.
+    public fun shares_to_amount_with_total_stats(
+        pool: &Pool,
+        shares: u128,
+        total_coins: u64,
+        total_shares: u128,
+    ): u64 {
+        if (pool.total_coins == 0 || total_shares == 0) {
+            0
+        } else {
+            (multiply_then_divide(pool, shares, to_u128(total_coins), total_shares) as u64)
+        }
+    }
+
+    public fun multiply_then_divide(_pool: &Pool, x: u128, y: u128, z: u128): u128 {
+        let result = (to_u256(x) * to_u256(y)) / to_u256(z);
+        (result as u128)
     }
 
     fun to_u128(num: u64): u128 {
         (num as u128)
+    }
+
+    fun to_u256(num: u128): u256 {
+        (num as u256)
     }
 }

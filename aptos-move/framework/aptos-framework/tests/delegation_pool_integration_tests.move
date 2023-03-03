@@ -269,8 +269,8 @@ module aptos_framework::delegation_pool_integration_tests {
 
         // Validator withdraws from inactive stake multiple times.
         dp::withdraw(validator, pool_address, 50 * ONE_APT);
-        assert!(coin::balance<AptosCoin>(validator_address) == 84999999998, 6);
-        stake::assert_validator_state(pool_address, 10201000001, 5100000000, 0, 0, 0);
+        assert!(coin::balance<AptosCoin>(validator_address) == 84999999999, 6);
+        stake::assert_validator_state(pool_address, 10201000001, 5099999999, 0, 0, 0);
         dp::withdraw(validator, pool_address, 51 * ONE_APT);
         assert!(coin::balance<AptosCoin>(validator_address) == 90099999998, 7);
         stake::assert_validator_state(pool_address, 10201000001, 0, 0, 0, 0);
