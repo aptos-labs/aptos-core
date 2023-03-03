@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- `CoinClient` and `TokenClient` to use remote ABI instead of local ABIs
+
 ## 1.7.1 (2023-03-02)
 
 - Fix IndexerClient error parsing using JSON.stringify() to display the error message correctly on the console
