@@ -494,9 +494,11 @@ move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = 
 move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-cli = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-command-line-common = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
+move-coverage = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-compiler ={ git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-core-types = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc", features = ["address32"] }
 move-docgen = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
+move-disassembler = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-ir-compiler = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-model = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-package = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
