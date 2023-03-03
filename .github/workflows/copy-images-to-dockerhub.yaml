@@ -6,6 +6,10 @@ on:
         required: true
         type: string
         description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
+      GIT_SHA:
+        required: false
+        type: string
+        description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
   workflow_dispatch:
     inputs:
       image_tag_prefix:
@@ -13,6 +17,10 @@ on:
         type: string
         default: adhoc
         description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
+      GIT_SHA:
+        required: false
+        type: string
+        description: the git sha to use for the image tag. If not provided, the git sha of the triggering branch will be used
 
 permissions:
   contents: read
@@ -47,7 +55,7 @@ jobs:
       - name: Release Images
         env:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
-          GIT_SHA: ${{ github.sha }}
+          GIT_SHA: ${{ inputs.GIT_SHA || github.sha }} # If GIT_SHA is not provided, use the sha of the triggering branch
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ECR_ACCOUNT_NUM }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
