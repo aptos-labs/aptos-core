@@ -571,16 +571,16 @@ module std::vector_tests {
     }
 
     #[test_only]
-    struct Pair<K, V> { key: K, value: V }
+    struct Pair<K, V> has drop { key: K, value: V }
 
     #[test]
-    fun test_map_ref() {
+    fun test_map_ref2() {
         let x = Pair<u64,u64> { key: 1, value: 1};
         let y = Pair<u64,u64> { key: 1, value: 1};
         let z = Pair<u64,u64> { key: 1, value: 1};
 
         let v = vector[x, y, z];
-        let v2 = vector::map_ref(&v, |p| p.value);
+        vector::map_ref(&v, |p| { let pp: &Pair<u64, u64> = p; pp.value });
     }
 
 }

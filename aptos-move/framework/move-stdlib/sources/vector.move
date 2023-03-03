@@ -76,7 +76,7 @@ module std::vector {
 
     /// Reverses the order of the elements [left, right) in the vector `v` in place.
     public fun reverse_slice<Element>(v: &mut vector<Element>, left: u64, right: u64) {
-        assert!(left >= right, EINVALID_RANGE);
+        assert!(left <= right, EINVALID_RANGE);
         if (left == right) return;
         right = right - 1;
         while (left < right) {
@@ -180,15 +180,15 @@ module std::vector {
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each<Element>(v: vector<Element>, f: |Element|) {
         reverse(&mut v); // We need to reverse the vector to consume it efficiently
-        for_each_reverse(v, f);
+        for_each_reverse(v, |e| f(e));
     }
 
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each_reverse<Element>(v: vector<Element>, f: |Element|) {
         while (!is_empty(&v)) {
-            let e = pop_back(&mut v);
-            f(e);
+            f(pop_back(&mut v));
         };
+        destroy_empty(v)
     }
 
     /// Apply the function to a reference of each element in the vector.
@@ -223,9 +223,9 @@ module std::vector {
         accu
     }
 
-    // Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
-    //     /// `f(1, f(2, f(3, 0)))`
-    /*public inline fun foldr<Accumulator, Element>(
+    /// Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
+    /// `f(1, f(2, f(3, 0)))`
+    public inline fun foldr<Accumulator, Element>(
         v: vector<Element>,
         init: Accumulator,
         f: |Element, Accumulator|Accumulator
@@ -233,7 +233,7 @@ module std::vector {
         let accu = init;
         for_each_reverse(v, |elem| accu = f(elem, accu));
         accu
-    }*/
+    }
 
     /// Map the function over the references of the elements of the vector, producing a new vector without modifying the
     /// original map.
@@ -267,7 +267,7 @@ module std::vector {
         });
         result
     }
-/*
+
     /// Partition, sorts all elements for which pred is true to the front.
     /// Preserves the relative order of the elements for which pred is true,
     /// BUT NOT for the elements for which pred is false.
@@ -348,7 +348,6 @@ module std::vector {
         let pred = map_ref(v, p);
         stable_partition_internal(v, &pred,0, length(v))
     }
-*/
 
     /// Return true if any element in the vector satisfies the predicate.
     public inline fun any<Element>(
