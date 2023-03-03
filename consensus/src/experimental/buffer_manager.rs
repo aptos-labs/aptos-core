@@ -16,12 +16,12 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock};
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecision, rand_share::RandShare}};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier, block_info::BlockInfo,
 };
 use futures::{
     channel::{
@@ -31,10 +31,10 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
 };
 use once_cell::sync::OnceCell;
-use std::sync::{
+use std::{sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
-};
+}, collections::{HashMap, HashSet}};
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
@@ -70,7 +70,21 @@ pub struct BufferManager {
 
     buffer: Buffer<BufferItem>,
 
-    // the roots point to the first *unprocessed* item.
+    // map from block_id to the partially aggregated randomness
+    block_to_rand_share_map: HashMap<HashValue, RandShare>,
+    // map from block_id to the authors of the randomness shares
+    block_to_rand_authors_map: HashMap<HashValue, HashSet<Author>>,
+    // map from block_id to the aggregated randomness
+    block_to_rand_decision_map: HashMap<HashValue, RandDecision>,
+    // map from block_id to the buffer_item hash it belongs to
+    block_to_buffer_map: HashMap<HashValue, BufferItemRootType>,
+
+    // the roots point to the first ordered item that has randomness.
+    rand_root: BufferItemRootType,
+    rand_msg_tx: NetworkSender,
+    rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
+
+    // the roots point to the first *unprocessed* item that has randomness.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
     execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
@@ -107,6 +121,8 @@ pub struct BufferManager {
 impl BufferManager {
     pub fn new(
         author: Author,
+        rand_msg_tx: NetworkSender,
+        rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
         execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
         execution_phase_rx: Receiver<ExecutionResponse>,
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
@@ -125,6 +141,14 @@ impl BufferManager {
             author,
 
             buffer,
+            block_to_rand_share_map: HashMap::new(),
+            block_to_rand_authors_map: HashMap::new(),
+            block_to_rand_decision_map: HashMap::new(),
+            block_to_buffer_map: HashMap::new(),
+
+            rand_root: None,
+            rand_msg_tx,
+            rand_msg_rx,
 
             execution_root: None,
             execution_phase_tx,
@@ -171,32 +195,167 @@ impl BufferManager {
 
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
-    fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
+    async fn process_ordered_blocks(&mut self, blocks: OrderedBlocks) {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
             callback,
-        } = ordered_blocks;
+        } = blocks;
 
         info!(
             "Receive ordered block {}, the queue size is {}",
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
+        let item_hash = item.get_hash();
         self.buffer.push_back(item);
+
+        // Disseminate the VRF shares for the ordered blocks
+        // Happy path: each validator sends its VRF shares to the leader
+        // Unhappy path 1: if no leader (NIL block, broadcast the randomness share)
+        // todo: Unhappy path 2: if the leader timeout, broadcast the randomness share
+        for block in ordered_blocks {
+            self.block_to_buffer_map.insert(block.id(), Some(item_hash));
+
+            let maybe_proposer = block.block().author();
+            let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
+
+            if let Some(proposer) = maybe_proposer {
+                self.rand_msg_tx
+                    .send_rand_share(rand_share, proposer)
+                    .await;
+            } else {
+                self.rand_msg_tx.broadcast_rand_share(rand_share).await;
+            }
+        }
+    }
+
+    /// process the VRF share messages
+    /// once receiving rand shares, aggregate to the existing ones
+    /// once the randomness is aggregated
+    /// it scans the whole buffer for a matching blockinfo
+    /// if found, try adding randomness to the item
+    async fn process_rand_message(&mut self, rand_msg: VerifiedEvent) -> Option<HashValue> {
+        match rand_msg {
+            VerifiedEvent::RandShareMsg(rand_share) => {
+                // aggregate the randomness shares
+                let author = rand_share.author();
+                let block_info = rand_share.block_info().clone();
+                let target_block_id = rand_share.block_info().id();
+                debug!("Receive random share from author {:?} for block {:?}", author, block_info);
+
+                // todo: ignore the rand message if the round is execution already or beyond
+
+                // todo: aggregate the randomness shares
+                // should insert the new aggregated randomness share
+                self.block_to_rand_share_map.insert(target_block_id, *rand_share.clone());
+                let authors = self.block_to_rand_authors_map.entry(target_block_id).or_insert(HashSet::new());
+                (*authors).insert(author);
+
+                if self.verifier.check_voting_power(authors.iter()).is_ok() {
+                    // enough randomness shares, can produce randomness for the block
+                    // todo: aggregate the randomness
+                    let rand = vec![u8::MAX; 96]; // self.block_to_rand_share_map.get(&target_block_id).unwrap().share();
+
+                    let current_cursor = self.get_cursor_for_block(target_block_id);
+                    if current_cursor.is_some() {
+                        let mut item = self.buffer.take(&current_cursor);
+                        if !item.is_ordered() {
+                            return None;
+                        }
+
+                        if let Some(idx) = item.find_block_idx_from_ordered(target_block_id) {
+                            assert!(idx < item.get_blocks().len());
+                            if let BufferItem::Ordered(ref mut ordered_item) = item {
+                                if ordered_item.maybe_rand_vec[idx].is_none() {
+                                    (*ordered_item).maybe_rand_vec[idx] = Some(vec![u8::MAX; 96]); // the aggregated share is 96 bytes
+                                    (*ordered_item).num_rand_ready += 1;
+
+                                    // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
+                                    if ordered_item.ordered_blocks[idx].block().author() == Some(self.author) {
+                                        let rand_decision = RandDecision::new(block_info, rand);
+                                        self.rand_msg_tx
+                                            .broadcast_rand_decision(rand_decision)
+                                            .await;
+                                    }
+                                }
+                            }
+                        }
+
+                        if item.is_rand_ready() {
+                            self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
+                            return Some(target_block_id)
+                        } else {
+                            self.buffer.set(&current_cursor, item);
+                        }
+                    } else {
+                        debug!("Buffer cursor is none when receiving randomness share!");
+                    }
+                }
+            },
+            VerifiedEvent::RandDecisionMsg(rand_decision) => {
+                // add the randomness to block
+                debug!(
+                    "Receive randomness decision {:?} for block_info {}",
+                    rand_decision.rand(),
+                    rand_decision.block_info(),
+                );
+                let target_block_id = rand_decision.block_info().id();
+                self.block_to_rand_decision_map.insert(target_block_id, *rand_decision.clone());
+
+                let cursor = self.get_cursor_for_block(target_block_id);
+                if cursor.is_some() {
+                    let item = self.buffer.take(&cursor).into_execution_ready(*rand_decision);
+                    let is_execution_ready = item.is_execution_ready();
+                    self.buffer.set(&cursor, item);
+                    if is_execution_ready {
+                        return Some(target_block_id);
+                    }
+                }
+            },
+            _ => {
+                unreachable!();
+            },
+        }
+        None
+    }
+
+    fn get_cursor_for_block(&mut self, block_id: HashValue) -> Cursor {
+        if self.block_to_buffer_map.contains_key(&block_id) {
+            let buffer_item = self.block_to_buffer_map.get(&block_id).unwrap();
+            if let Some(buffer_hash) = *buffer_item {
+                return self.buffer.find_elem_by_key(*self.buffer.head_cursor(), buffer_hash);
+            }
+        }
+        None
+    }
+
+    // Set the randomness root to the first ordered item that has randomness
+    async fn advance_rand_root(&mut self) {
+        let cursor = self.rand_root;
+        self.rand_root = self
+            .buffer
+            .find_last_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_execution_ready()
+            });
+        println!(
+            "Advance randomness root from {:?} to {:?}",
+            cursor, self.rand_root
+        );
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
         let cursor = self.execution_root;
+        let rand_cursor = self.rand_root;
         self.execution_root = self
             .buffer
-            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
-                item.is_ordered()
-            });
-        info!(
+            .find_elem_until_cursor(cursor.or_else(|| *self.buffer.head_cursor()), rand_cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_execution_ready()});
+                // only execute the block that below rand_cursor (which has randomness)
+        println!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -224,7 +383,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        info!(
+        println!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
         );
@@ -300,7 +459,7 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                info!("Advance head to {:?}", self.buffer.head_cursor());
+                println!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
             }
@@ -381,6 +540,7 @@ impl BufferManager {
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);
         if aggregated {
+            println!("aggregated advance head!");
             self.advance_head(block_id).await;
         }
     }
@@ -398,7 +558,7 @@ impl BufferManager {
                 return;
             },
         };
-        info!(
+        println!(
             "Receive signing response {}",
             commit_ledger_info.commit_info()
         );
@@ -423,10 +583,12 @@ impl BufferManager {
 
                 self.buffer.set(&current_cursor, signed_item);
                 if let Some(proposer) = maybe_proposer {
+                    println!("send commit msg!");
                     self.commit_msg_tx
                         .send_commit_vote(commit_vote, proposer)
                         .await;
                 } else {
+                    println!("broadcast commit msg!");
                     self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
                 }
             } else {
@@ -444,7 +606,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                info!("Receive commit vote {} from {}", commit_info, author);
+                println!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -471,7 +633,7 @@ impl BufferManager {
             },
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                info!(
+                println!(
                     "Receive commit decision {}",
                     commit_proof.ledger_info().commit_info()
                 );
@@ -529,6 +691,7 @@ impl BufferManager {
     fn update_buffer_manager_metrics(&self) {
         let mut cursor = *self.buffer.head_cursor();
         let mut pending_ordered = 0;
+        let mut pending_execution_ready = 0;
         let mut pending_executed = 0;
         let mut pending_signed = 0;
         let mut pending_aggregated = 0;
@@ -538,6 +701,9 @@ impl BufferManager {
                 BufferItem::Ordered(_) => {
                     pending_ordered += 1;
                 },
+                BufferItem::ExecutionReady(_) => {
+                    pending_execution_ready += 1;
+                }
                 BufferItem::Executed(_) => {
                     pending_executed += 1;
                 },
@@ -554,6 +720,9 @@ impl BufferManager {
         counters::NUM_BLOCKS_IN_PIPELINE
             .with_label_values(&["ordered"])
             .set(pending_ordered as i64);
+        counters::NUM_BLOCKS_IN_PIPELINE
+            .with_label_values(&["execution_ready"])
+            .set(pending_execution_ready as i64);
         counters::NUM_BLOCKS_IN_PIPELINE
             .with_label_values(&["executed"])
             .set(pending_executed as i64);
@@ -572,9 +741,16 @@ impl BufferManager {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
-                    self.process_ordered_blocks(blocks);
-                    if self.execution_root.is_none() {
-                        self.advance_execution_root().await;
+                    self.process_ordered_blocks(blocks).await;
+                },
+                rand_msg = self.rand_msg_rx.select_next_some() => {
+                    if let Some(_) = self.process_rand_message(rand_msg).await {
+                        if self.rand_root.is_none() {
+                            self.advance_rand_root().await;
+                        }
+                        if self.execution_root.is_none() {
+                            self.advance_execution_root().await;
+                        }
                     }
                 },
                 reset_event = self.reset_rx.select_next_some() => {
@@ -592,6 +768,7 @@ impl BufferManager {
                     self.advance_signing_root().await;
                 },
                 commit_msg = self.commit_msg_rx.select_next_some() => {
+                    println!("receive commit msg aggregated head!");
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {

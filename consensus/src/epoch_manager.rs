@@ -112,7 +112,8 @@ pub struct EpochManager {
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
     // channels to buffer manager
-    buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_rand_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_commit_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to round manager
     round_manager_tx: Option<
@@ -157,7 +158,8 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            buffer_manager_msg_tx: None,
+            buffer_manager_rand_msg_tx: None,
+            buffer_manager_commit_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
@@ -476,13 +478,20 @@ impl EpochManager {
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
         let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
 
+        let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
+            QueueStyle::FIFO,
+            self.config.channel_size,
+            Some(&counters::BUFFER_MANAGER_RAND_MSGS),
+        );
+
         let (commit_msg_tx, commit_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
             QueueStyle::FIFO,
             self.config.channel_size,
-            Some(&counters::BUFFER_MANAGER_MSGS),
+            Some(&counters::BUFFER_MANAGER_COMMIT_MSGS),
         );
 
-        self.buffer_manager_msg_tx = Some(commit_msg_tx);
+        self.buffer_manager_rand_msg_tx = Some(rand_msg_tx);
+        self.buffer_manager_commit_msg_tx = Some(commit_msg_tx);
         self.buffer_manager_reset_tx = Some(reset_tx.clone());
 
         let (execution_phase, signing_phase, persisting_phase, buffer_manager) =
@@ -491,6 +500,7 @@ impl EpochManager {
                 self.commit_state_computer.clone(),
                 safety_rules_container,
                 network_sender,
+                rand_msg_rx,
                 commit_msg_rx,
                 self.commit_state_computer.clone(),
                 block_rx,
@@ -520,7 +530,8 @@ impl EpochManager {
         self.round_manager_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
-        self.buffer_manager_msg_tx = None;
+        self.buffer_manager_rand_msg_tx = None;
+        self.buffer_manager_commit_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
@@ -830,6 +841,8 @@ impl EpochManager {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::RandShareMsg(_)
+            | ConsensusMsg::RandDecisionMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::FragmentMsg(_)
@@ -927,9 +940,17 @@ impl EpochManager {
                     sender.push(peer_id, quorum_store_event)?;
                 }
             },
+            buffer_manager_event @ (VerifiedEvent::RandShareMsg(_)
+            | VerifiedEvent::RandDecisionMsg(_)) => {
+                if let Some(sender) = &mut self.buffer_manager_rand_msg_tx {
+                    sender.push(peer_id, buffer_manager_event)?;
+                } else {
+                    bail!("Randomness Phase not started but received Randomness Message (RandShare/RandDecision)");
+                }
+            },
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
-                if let Some(sender) = &mut self.buffer_manager_msg_tx {
+                if let Some(sender) = &mut self.buffer_manager_commit_msg_tx {
                     sender.push(peer_id, buffer_manager_event)?;
                 } else {
                     bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");

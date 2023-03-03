@@ -509,6 +509,7 @@ impl Scheduler {
         {
             let (_, wave) = Self::unpack_validation_idx(prev_val_idx);
             // Note that 'wave' is the previous wave value, and we must update it to 'wave + 1'.
+            // Note that 'wave' is the previous wave value, and we must update it to 'wave + 1'.
             Some(wave + 1)
         } else {
             None

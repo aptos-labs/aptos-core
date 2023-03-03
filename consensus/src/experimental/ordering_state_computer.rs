@@ -91,6 +91,8 @@ impl StateComputer for OrderingStateComputer {
             debug!("Failed to send to buffer manager, maybe epoch ends");
         }
 
+        // send the VRF shares
+
         Ok(())
     }
 

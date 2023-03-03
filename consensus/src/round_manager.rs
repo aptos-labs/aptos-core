@@ -29,7 +29,7 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -72,6 +72,8 @@ pub enum UnverifiedEvent {
     BatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
+    RandShareMsg(Box<RandShare>),
+    RandDecisionMsg(Box<RandDecision>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -124,6 +126,16 @@ impl UnverifiedEvent {
                 p.verify(validator)?;
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
+            UnverifiedEvent::RandShareMsg(r) => {
+                // verify the validity of the VRF share
+                r.verify(validator)?;
+                VerifiedEvent::RandShareMsg(r)
+            },
+            UnverifiedEvent::RandDecisionMsg(r) => {
+                // verify the validity of the aggregated VRF
+                r.verify(validator)?;
+                VerifiedEvent::RandDecisionMsg(r)
+            },
         })
     }
 
@@ -139,6 +151,8 @@ impl UnverifiedEvent {
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
+            UnverifiedEvent::RandShareMsg(r) => r.epoch(),
+            UnverifiedEvent::RandDecisionMsg(r) => r.epoch(),
         }
     }
 }
@@ -156,6 +170,8 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
+            ConsensusMsg::RandShareMsg(m) => UnverifiedEvent::RandShareMsg(m),
+            ConsensusMsg::RandDecisionMsg(m) => UnverifiedEvent::RandDecisionMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -175,6 +191,8 @@ pub enum VerifiedEvent {
     UnverifiedBatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
+    RandShareMsg(Box<RandShare>),
+    RandDecisionMsg(Box<RandDecision>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

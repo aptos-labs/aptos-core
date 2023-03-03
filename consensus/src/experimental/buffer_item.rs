@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
+
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
+    common::Author, executed_block::ExecutedBlock, experimental::{commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -89,6 +91,19 @@ pub struct OrderedItem {
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
+    pub maybe_rand_vec: Vec<Option<Vec<u8>>>, // place holder for aggregated randomness
+    pub num_rand_ready: usize,  // number of blocks that have randomness ready
+}
+
+pub struct ExecutionReadyItem {
+    pub unverified_signatures: PartialSignatures,
+    // This can happen in the fast forward sync path, where we can receive the commit proof
+    // from peers.
+    pub commit_proof: Option<LedgerInfoWithSignatures>,
+    pub callback: StateComputerCommitCallBackType,
+    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_proof: LedgerInfoWithSignatures,
+    pub rand_vec: Vec<Vec<u8>>, // place holder for randomness
 }
 
 pub struct ExecutedItem {
@@ -114,6 +129,7 @@ pub struct AggregatedItem {
 
 pub enum BufferItem {
     Ordered(Box<OrderedItem>),
+    ExecutionReady(Box<ExecutionReadyItem>),
     Executed(Box<ExecutedItem>),
     Signed(Box<SignedItem>),
     Aggregated(Box<AggregatedItem>),
@@ -131,12 +147,15 @@ impl BufferItem {
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Self {
+        let num = ordered_blocks.len();
         Self::Ordered(Box::new(OrderedItem {
             unverified_signatures: PartialSignatures::empty(),
             commit_proof: None,
             callback,
             ordered_blocks,
             ordered_proof,
+            maybe_rand_vec: vec![None; num],
+            num_rand_ready: 0,
         }))
     }
 
@@ -148,14 +167,15 @@ impl BufferItem {
         epoch_end_timestamp: Option<u64>,
     ) -> Self {
         match self {
-            Self::Ordered(ordered_item) => {
-                let OrderedItem {
+            Self::ExecutionReady(execution_ready_item) => {
+                let ExecutionReadyItem {
                     ordered_blocks,
                     commit_proof,
                     unverified_signatures,
                     callback,
                     ordered_proof,
-                } = *ordered_item;
+                    rand_vec: _,
+                } = *execution_ready_item;
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
@@ -310,6 +330,22 @@ impl BufferItem {
                     ..ordered
                 }))
             },
+            Self::ExecutionReady(execution_ready_item) => {
+                let ordered = *execution_ready_item;
+                assert!(ordered
+                    .ordered_proof
+                    .commit_info()
+                    .match_ordered_only(commit_proof.commit_info()));
+                // can't aggregate it without execution, only store the signatures
+                debug!(
+                    "{} received commit decision in execution ready stage",
+                    commit_proof.commit_info()
+                );
+                Self::ExecutionReady(Box::new(ExecutionReadyItem {
+                    commit_proof: Some(commit_proof),
+                    ..ordered
+                }))
+            },
             Self::Aggregated(_) => {
                 unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
             },
@@ -362,6 +398,7 @@ impl BufferItem {
     pub fn get_blocks(&self) -> &Vec<ExecutedBlock> {
         match self {
             Self::Ordered(ordered) => &ordered.ordered_blocks,
+            Self::ExecutionReady(execution_ready) => &execution_ready.ordered_blocks,
             Self::Executed(executed) => &executed.executed_blocks,
             Self::Signed(signed) => &signed.executed_blocks,
             Self::Aggregated(aggregated) => &aggregated.executed_blocks,
@@ -378,6 +415,22 @@ impl BufferItem {
         let signature = vote.signature().clone();
         match self {
             Self::Ordered(ordered) => {
+                if ordered
+                    .ordered_proof
+                    .commit_info()
+                    .match_ordered_only(target_commit_info)
+                {
+                    // we optimistically assume the vote will be valid in the future.
+                    // when advancing to executed item, we will check if the sigs are valid.
+                    // each author at most stores a single sig for each item,
+                    // so an adversary will not be able to flood our memory.
+                    ordered
+                        .unverified_signatures
+                        .add_signature(author, signature);
+                    return Ok(());
+                }
+            },
+            Self::ExecutionReady(ordered) => {
                 if ordered
                     .ordered_proof
                     .commit_info()
@@ -422,6 +475,10 @@ impl BufferItem {
         matches!(self, Self::Ordered(_))
     }
 
+    pub fn is_execution_ready(&self) -> bool {
+        matches!(self, Self::ExecutionReady(_))
+    }
+
     pub fn is_executed(&self) -> bool {
         matches!(self, Self::Executed(_))
     }
@@ -432,6 +489,20 @@ impl BufferItem {
 
     pub fn is_aggregated(&self) -> bool {
         matches!(self, Self::Aggregated(_))
+    }
+
+    pub fn unwrap_ordered_ref(&self) -> &OrderedItem {
+        match self {
+            BufferItem::Ordered(item) => item.as_ref(),
+            _ => panic!("Not ordered item"),
+        }
+    }
+
+    pub fn unwrap_execution_ready_ref(&self) -> &ExecutionReadyItem {
+        match self {
+            BufferItem::ExecutionReady(item) => item.as_ref(),
+            _ => panic!("Not execution ready item"),
+        }
     }
 
     pub fn unwrap_signed_ref(&self) -> &SignedItem {
@@ -454,4 +525,70 @@ impl BufferItem {
             _ => panic!("Not aggregated item"),
         }
     }
+
+    // the following functions are prototyping VRF-based randomness
+    pub fn into_execution_ready(
+        self,
+        rand_decision: RandDecision,
+    ) -> Self {
+        match self {
+            Self::Ordered(ordered_item) => {
+                println!(
+                    "{} advanced with randomness decision",
+                    rand_decision.block_info()
+                );
+                let num = ordered_item.ordered_blocks.len();
+                Self::ExecutionReady(Box::new(ExecutionReadyItem { unverified_signatures: ordered_item.unverified_signatures, commit_proof: ordered_item.commit_proof, callback: ordered_item.callback, ordered_blocks: ordered_item.ordered_blocks, ordered_proof: ordered_item.ordered_proof, rand_vec: vec![vec![u8::MAX; 96]; num] }))    // the aggregated share is 96 bytes
+            }
+            _ => {
+                self
+            }
+        }
+    }
+
+    pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) {
+        if let Some(idx) = self.find_block_idx_from_ordered(block_id) {
+            assert!(idx < self.get_blocks().len());
+            if let Self::Ordered(ref mut ordered_item) = *self {
+                if ordered_item.maybe_rand_vec[idx].is_none() {
+                    (*ordered_item).maybe_rand_vec[idx] = Some(rand);
+                    (*ordered_item).num_rand_ready += 1;
+                }
+            }
+        }
+    }
+
+    // return None if not found
+    pub fn find_block_idx_from_ordered(&self, block_id: HashValue) -> Option<usize> {
+        match self {
+            BufferItem::Ordered(item) => {
+                item.ordered_blocks.iter().position(|block| (*block).id() == block_id)
+            }
+            _ => panic!("Not ordered item"),
+        }
+    }
+
+    pub fn is_rand_ready(&self) -> bool {
+        matches!(self, Self::Ordered(item) if item.num_rand_ready == self.get_blocks().len())
+    }
+
+    pub fn try_advance_to_execution_ready(self) -> Self {
+        if let Self::Ordered(ordered_item) = self {
+            println!("advance to execution ready");
+            return Self::ExecutionReady(Box::new(ExecutionReadyItem {
+                unverified_signatures: ordered_item.unverified_signatures,
+                commit_proof: ordered_item.commit_proof,
+                callback: ordered_item.callback,
+                ordered_blocks: ordered_item.ordered_blocks,
+                ordered_proof: ordered_item.ordered_proof,
+                rand_vec: ordered_item.maybe_rand_vec.iter().map(|x| x.clone().unwrap()).collect(),
+            }));
+        }
+        self
+    }
+
+    pub fn get_hash(&self) -> HashValue {
+        self.hash()
+    }
+
 }

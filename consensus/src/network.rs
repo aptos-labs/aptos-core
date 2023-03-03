@@ -15,7 +15,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -251,7 +251,20 @@ impl NetworkSender {
 
     pub async fn send_commit_vote(&mut self, commit_vote: CommitVote, recipient: Author) {
         fail_point!("consensus::send::commit_vote", |_| ());
+        println!("network send commit msg!");
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
+        self.send(msg, vec![recipient]).await
+    }
+
+    pub async fn broadcast_rand_share(&mut self, rand_share: RandShare) {
+        fail_point!("consensus::send::broadcast_rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
+        self.broadcast(msg).await
+    }
+
+    pub async fn send_rand_share(&mut self, rand_share: RandShare, recipient: Author) {
+        fail_point!("consensus::send::rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
         self.send(msg, vec![recipient]).await
     }
 
@@ -298,6 +311,21 @@ impl NetworkSender {
     pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::broadcast_commit_proof", |_| ());
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
+        self.broadcast(msg).await
+    }
+
+    /// Sends the randomness to self buffer manager
+    pub async fn send_rand_decision(&self, rand_decision: RandDecision) {
+        fail_point!("consensus::send::rand_decision", |_| ());
+
+        // this requires re-verification of the ledger info we can probably optimize it later
+        let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decision));
+        self.send(msg, vec![self.author]).await
+    }
+
+    pub async fn broadcast_rand_decision(&mut self, rand_decision: RandDecision) {
+        fail_point!("consensus::send::broadcast_rand_decision", |_| ());
+        let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decision));
         self.broadcast(msg).await
     }
 }

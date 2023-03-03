@@ -3,3 +3,5 @@
 
 pub mod commit_decision;
 pub mod commit_vote;
+pub mod rand_share;
+pub mod rand_decision;
