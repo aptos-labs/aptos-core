@@ -39,36 +39,37 @@ impl TransactionShuffler for SenderAwareShuffler {
         let _timer = TXN_SHUFFLE_SECONDS.start_timer();
 
         // maintains the intermediate state of the shuffled transactions
-        let mut sliding_window = SlidingWindowState::new(self.conflict_window_size);
+        let mut sliding_window = SlidingWindowState::new(self.conflict_window_size, txns.len());
         let mut pending_txns = PendingTransactions::new();
         let num_transactions = txns.len();
         let mut orig_txns = VecDeque::from(txns);
-        'outer: loop {
-            if sliding_window.num_txns() == num_transactions {
-                break;
-            }
-            // First check if we have a sender dropped off of conflict window in previous step, if so,
-            // we try to find pending transaction from the corresponding sender and add it to the block.
-            if let Some(sender) = sliding_window.last_dropped_sender() {
-                if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
-                    sliding_window.add_transaction(txn);
-                    continue 'outer;
+        let mut next_to_add =
+            |sliding_window: &mut SlidingWindowState| -> Option<SignedTransaction> {
+                if sliding_window.num_txns() == num_transactions {
+                    return None;
                 }
-            }
+                // First check if we have a sender dropped off of conflict window in previous step, if so,
+                // we try to find pending transaction from the corresponding sender and add it to the block.
+                if let Some(sender) = sliding_window.last_dropped_sender() {
+                    if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
+                        return Some(txn);
+                    }
+                }
+                // If we can't find any transaction from a sender dropped off of conflict window, then
+                // iterate through the original transactions and try to find the next candidate
+                while let Some(txn) = orig_txns.pop_front() {
+                    if !sliding_window.has_conflict(&txn.sender()) {
+                        return Some(txn);
+                    }
+                    pending_txns.add_transaction(txn);
+                }
 
-            // Iterate through the original transactions and try to find the next candidate
-            let mut txn_opt = orig_txns.pop_front();
-            while txn_opt.is_some() {
-                let txn = txn_opt.unwrap();
-                if !sliding_window.has_conflict(&txn.sender()) {
-                    sliding_window.add_transaction(txn);
-                    continue 'outer;
-                }
-                pending_txns.add_transaction(txn);
-                txn_opt = orig_txns.pop_front();
-            }
-            // Add pending transactions in the order if we can't find any other candidate
-            sliding_window.add_transaction(pending_txns.remove_first_pending().unwrap())
+                // If we can't find any candidate in above steps, then lastly
+                // add pending transactions in the order if we can't find any other candidate
+                Some(pending_txns.remove_first_pending().unwrap())
+            };
+        while let Some(txn) = next_to_add(&mut sliding_window) {
+            sliding_window.add_transaction(txn);
         }
         sliding_window.finalize()
     }
@@ -123,22 +124,20 @@ impl PendingTransactions {
     }
 
     pub fn remove_first_pending(&mut self) -> Option<SignedTransaction> {
-        let mut txn_opt = self.ordered_txns.pop_front();
-        while txn_opt.is_some() {
-            let sender = txn_opt.as_ref().unwrap().sender();
+        while let Some(txn) = self.ordered_txns.pop_front() {
+            let sender = txn.sender();
             // We don't remove the txns from ordered_txns when remove_pending_from_sender is called.
             // So it is possible that the ordered_txns has some transactions that are not pending
             // anymore.
-            if txn_opt.as_ref() == self.txns_by_senders.get(&sender).unwrap().front() {
+            if Some(txn).as_ref() == self.txns_by_senders.get(&sender).unwrap().front() {
                 return self.remove_pending_from_sender(sender);
             }
-            txn_opt = self.ordered_txns.pop_front();
         }
         None
     }
 }
 
-/// A state full data structure maintained by the transaction shuffler during shuffling. On a
+/// A stateful data structure maintained by the transaction shuffler during shuffling. On a
 /// high level, it maintains a sliding window of the conflicting transactions, which helps the payload
 /// generator include a set of transactions which are non-conflicting with each other within a particular
 /// window size.
@@ -154,11 +153,11 @@ struct SlidingWindowState {
 }
 
 impl SlidingWindowState {
-    pub fn new(window_size: usize) -> Self {
+    pub fn new(window_size: usize, num_txns: usize) -> Self {
         Self {
             start_index: -(window_size as i64),
             senders_in_window: HashMap::new(),
-            txns: Vec::new(),
+            txns: Vec::with_capacity(num_txns),
         }
     }
 
