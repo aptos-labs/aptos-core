@@ -217,7 +217,7 @@ impl StateComputer for ExecutionProxy {
 
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
-        // Might be none if called in the recovery path.
+        // Might be none if called in the recovery path, or between epoch stop and start.
         let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
         if let Some(payload_manager) = maybe_payload_manager {
             payload_manager
