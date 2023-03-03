@@ -5,9 +5,13 @@ slug: "external-resources"
 
 # Aptos External Resources
 
-This page contains links to external resources supplied by the Aptos community. These may be useful, technical posts to the [Aptos Forum](https://forum.aptoslabs.com/) or links to Aptos-related technologies documented elsewhere. **Aptos neither endorses nor supports these contributions. Nor can we guarantee their effects.**
+:::caution Proceed with caution
+This page links to third-party contents. Aptos neither endorses nor supports these contributions. Nor can we guarantee their effects.
+:::
 
-To add your own resource, click **Edit this page** at the bottom, add your resource in Markdown, and create a pull request for review. To instead [contribute](./index.md) to Aptos directly, see the [Community Highlights](./community/index.md) list.
+This page contains links to external resources supplied by the Aptos community. These may be useful, technical posts to the [Aptos Forum](https://forum.aptoslabs.com/) or links to Aptos-related technologies documented elsewhere.
+
+To add your own resource, click **Edit this page** at the bottom, add your resource in Markdown, and create a pull request for review. To instead [contribute](./index.md) to Aptos directly, see the [Community Highlights](./contributions/index.md) list.
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |

@@ -126,17 +126,11 @@ The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos D
 
 :::
 
-## Join the team
-
-Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us!
-
-Just want to pitch in? Think about [helping](./help/index.md) with a feature, document, or both.
-
 ## Find the ecosystem
 
 We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us and exchange ideas at:
 
-* [Aptos Discord](https://discord.gg/aptoslabs)
+* [Discord](https://discord.gg/aptoslabs)
 * [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos)
 * [Forum](https://forum.aptoslabs.com/)
 * [Medium](https://medium.com/aptoslabs)
@@ -145,4 +139,6 @@ We are excited that you are here, and we look forward to getting to know you. We
 
 ## Community projects on Aptos
 
-Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/).  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/). If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
+
+Want to pitch in on smaller tasks, such as doc updates and code fixes? See our [Community](./community/index.md) list for opportunities to help the Aptos ecosystem.

@@ -409,18 +409,18 @@ const sidebars = {
     "reference/glossary",
     "issues-and-workarounds",
   ],
-  helpSidebar: [
+  comSidebar: [
     {
       type: "html",
-      value: "Help Aptos",
+      value: "Aptos Community",
       className: "sidebar-title",
     },
-    "help/index",
-    "help/community/index",
-    "help/external-resources",
-    "help/rust-coding-guidelines",
-    "help/site-updates",
-    "help/aptos-style",
+    "community/index",
+    "community/contributions/index",
+    "community/external-resources",
+    "community/rust-coding-guidelines",
+    "community/site-updates",
+    "community/aptos-style",
   ],
 };
 

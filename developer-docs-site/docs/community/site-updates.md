@@ -44,8 +44,14 @@ Whenever possible, update [Aptos.dev](http://Aptos.dev) directly to reflect your
 To update [Aptos.dev](http://Aptos.dev) directly:
 
 1. Trigger an edit to the source files in the [developer-docs-site](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site) directory:
-    1. In web browser - for simple, one-page changes, use the ***Edit this page*** link on the bottom of any page to access the source Markdown file in GitHub and its edit (pencil icon) web editor.
-    2. Via local editor - for more complex, multi-page changes, use your preferred source code editor to navigate to and update the source Markdown files in GitHub. Ask the Docs team for help!
+    1. In web browser:
+       * for simple, one-page changes, use the ***Edit this page*** link on the bottom of any page to access the source Markdown file in GitHub:
+       ![v-fn-network.svg](../../static/img/docs/trigger-edits-aptosdev.png)
+         Then click the pencil icon and select **Edit this file** to work in the GitHub web editor, and create a pull request to have it reviewed:
+       ![v-fn-network.svg](../../static/img/docs/edit-file-in-GH.png)
+       * To add a new page, navigate to the [developer-docs-site/docs/](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/docs/) directory, click **Add file**, give it a name, append the `.md` file extension, include your contents, and create a pull request to have it reviewed:
+       ![v-fn-network.svg](../../static/img/docs/add-file-in-GH.png)
+    2. Via local editor - for more complex, multi-page changes, use your preferred source code editor to navigate to and update the source Markdown files in GitHub. See our [CONTRIBUTING](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) README for `git clone` instructions.
 2. For web edits, use the *Preview* function at top to see your updates in browser.
 3. For local edits, use the [local doc build instructions](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/README.md) to see your updates at: [http://localhost:3000](http://localhost:3000)
 4. After creating the pull request, use the *Deploy Preview* in Netlify to see your updates made in web browser or via local editor by replacing the *prnumber* with your own in:
