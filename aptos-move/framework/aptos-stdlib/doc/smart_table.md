@@ -32,6 +32,7 @@ it tolerates collisions.
 -  [Function `load_factor`](#0x1_smart_table_load_factor)
 -  [Function `update_split_load_threshold`](#0x1_smart_table_update_split_load_threshold)
 -  [Function `update_target_bucket_size`](#0x1_smart_table_update_target_bucket_size)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
@@ -826,6 +827,15 @@ Update <code>target_bucket_size</code>.
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
