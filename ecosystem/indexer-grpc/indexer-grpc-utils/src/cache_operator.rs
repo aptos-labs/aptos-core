@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::constants::BLOB_STORAGE_SIZE;
-use redis::{AsyncCommands, RedisError};
+use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
 // The cache size is estimated to be 10M transactions.
@@ -195,6 +195,29 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             )
             .await
         {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    pub async fn update_cache_transactions(
+        &mut self,
+        transactions: Vec<(u64, String, u64)>,
+    ) -> anyhow::Result<()> {
+        let mut redis_pipeline = redis::pipe();
+        for (version, encoded_proto_data, timestamp_in_seconds) in transactions {
+            redis_pipeline
+                .cmd("SET")
+                .arg(version)
+                .arg(encoded_proto_data)
+                .arg("EX")
+                .arg(get_ttl_in_seconds(timestamp_in_seconds))
+                .ignore();
+        }
+        let redis_result: RedisResult<()> =
+            redis_pipeline.query_async::<_, _>(&mut self.conn).await;
+
+        match redis_result {
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
         }

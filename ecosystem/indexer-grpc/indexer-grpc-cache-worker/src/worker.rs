@@ -142,28 +142,24 @@ async fn process_raw_datastream_response(
         datastream::raw_datastream_response::Response::Data(data) => {
             let transaction_len = data.transactions.len();
             let start_version = data.transactions.first().unwrap().version;
+            let transactions = data
+                .transactions
+                .into_iter()
+                .map(|tx| {
+                    let timestamp_in_seconds = match tx.timestamp {
+                        Some(timestamp) => timestamp.seconds as u64,
+                        None => 0,
+                    };
+                    (tx.version, tx.encoded_proto_data, timestamp_in_seconds)
+                })
+                .collect::<Vec<(u64, String, u64)>>();
 
-            for e in data.transactions {
-                let version = e.version;
-                let timestamp_in_seconds = match e.timestamp {
-                    Some(t) => t.seconds,
-                    // For Genesis block, there is no timestamp.
-                    None => 0,
-                };
-                // Push to cache.
-                match cache_operator
-                    .update_cache_transaction(
-                        version,
-                        e.encoded_proto_data,
-                        timestamp_in_seconds as u64,
-                    )
-                    .await
-                {
-                    Ok(_) => {},
-                    Err(e) => {
-                        anyhow::bail!("Update cache with version failed: {}", e);
-                    },
-                }
+            // Push to cache.
+            match cache_operator.update_cache_transactions(transactions).await {
+                Ok(_) => {},
+                Err(e) => {
+                    anyhow::bail!("Update cache with version failed: {}", e);
+                },
             }
             Ok(GrpcDataStatus::ChunkDataOk {
                 start_version,
@@ -184,11 +180,13 @@ async fn setup_cache_with_init_signal(
 ) {
     let (fullnode_chain_id, starting_version) =
         match init_signal.response.expect("Response type not exists.") {
-            Response::Status(status_frame) => match status_frame.r#type {
-                0 => (init_signal.chain_id, status_frame.start_version),
-                _ => {
-                    panic!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
-                },
+            Response::Status(status_frame) => {
+                match StatusType::from_i32(status_frame.r#type).expect("Invalid status type.") {
+                    StatusType::Init => (init_signal.chain_id, status_frame.start_version),
+                    _ => {
+                        panic!("[Indexer Cache] Streaming error: first frame is not INIT signal.");
+                    },
+                }
             },
             _ => {
                 panic!("[Indexer Cache] Streaming error: first frame is not siganl frame.");
