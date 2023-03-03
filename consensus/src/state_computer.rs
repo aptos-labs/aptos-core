@@ -217,7 +217,7 @@ impl StateComputer for ExecutionProxy {
 
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
-        // Might be none if called in the recovery path.
+        // Might be none if called in the recovery path, or between epoch stop and start.
         let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
         if let Some(payload_manager) = maybe_payload_manager {
             payload_manager
@@ -255,6 +255,13 @@ impl StateComputer for ExecutionProxy {
             .get_ordered_account_addresses_iter()
             .collect();
         self.payload_manager.lock().replace(payload_manager);
+    }
+
+    // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
+    // on the next epoch.
+    fn end_epoch(&self) {
+        *self.validators.lock() = vec![];
+        self.payload_manager.lock().take();
     }
 }
 

@@ -120,4 +120,6 @@ impl StateComputer for OrderingStateComputer {
     }
 
     fn new_epoch(&self, _: &EpochState, _payload_manager: Arc<PayloadManager>) {}
+
+    fn end_epoch(&self) {}
 }
