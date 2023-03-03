@@ -77,6 +77,8 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
+    /// Transform the map into two vectors with the keys and values respectively
+    /// Primarily used to destroy a map
     public fun to_vec_pair<Key: store, Value: store>(
         map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         let keys: vector<Key> = vector::empty();
@@ -86,6 +88,8 @@ module aptos_std::simple_map {
         (keys, values)
     }
 
+    /// For maps that cannot be dropped this is a utility to destroy them
+    /// using lambdas to destroy the individual keys and values.
     public inline fun destroy<Key: store, Value: store>(
         map: SimpleMap<Key, Value>,
         dk: |Key|,

@@ -324,6 +324,7 @@ module std::option {
         is_some(o) && p(borrow(o))
     }
 
+    /// Utility function to destroy an option that is not droppable.
     public inline fun destroy<Element>(o: Option<Element>, d: |Element|) {
         let vec = to_vec(o);
         vector::destroy(vec, |e| d(e));

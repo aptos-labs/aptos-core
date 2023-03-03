@@ -570,17 +570,24 @@ module std::vector_tests {
         assert!(r, 0)
     }
 
-    #[test_only]
-    struct Pair<K, V> has drop { key: K, value: V }
-
     #[test]
-    fun test_map_ref2() {
-        let x = Pair<u64,u64> { key: 1, value: 1};
-        let y = Pair<u64,u64> { key: 1, value: 1};
-        let z = Pair<u64,u64> { key: 1, value: 1};
-
-        let v = vector[x, y, z];
-        vector::map_ref(&v, |p| { let pp: &Pair<u64, u64> = p; pp.value });
+    fun test_rotate() {
+        let v = vector[1, 2, 3, 4, 5];
+        assert!(vector::rotate(&mut v, 2) == 3, 0);
+        assert!(&v == &vector[3, 4, 5, 1, 2], 1);
     }
 
+    #[test]
+    fun test_partition() {
+        let v = vector[1, 2, 3, 4, 5];
+        assert!(vector::partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        assert!(&v == &vector[2, 4, 3, 1, 5], 1);
+    }
+
+    #[test]
+    fun test_stable_partition() {
+            let v = vector[1, 2, 3, 4, 5];
+            assert!(vector::stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+            assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+    }
 }

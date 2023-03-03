@@ -345,8 +345,9 @@ module std::vector {
         v: &mut vector<Element>,
         p: |&Element|bool
     ): u64 {
-        let pred = map_ref(v, p);
-        stable_partition_internal(v, &pred,0, length(v))
+        let pred = map_ref(v, |e| p(e));
+        let len = length(v);
+        stable_partition_internal(v, &pred,0, len)
     }
 
     /// Return true if any element in the vector satisfies the predicate.
@@ -383,7 +384,8 @@ module std::vector {
         result
     }
 
-    /// Destroy a vector, just a wrapper around for_each_reverse but with a clear name.
+    /// Destroy a vector, just a wrapper around for_each_reverse with a descriptive name
+    /// when used in the context of destroying a vector.
     public inline fun destroy<Element>(
         v: vector<Element>,
         d: |Element|
