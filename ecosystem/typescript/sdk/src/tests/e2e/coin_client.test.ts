@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "./providers/aptos_client";
-import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
-import { AptosAccount } from "./aptos_account";
-import { CoinClient } from "./coin_client";
+import { AptosClient } from "../../providers/aptos_client";
+import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
+import { AptosAccount } from "../../account/aptos_account";
+import { CoinClient } from "../../plugins/coin_client";
 
 test(
   "transfer and checkBalance works",

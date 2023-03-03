@@ -13,7 +13,7 @@ import {
   sleep,
   APTOS_COIN,
 } from "../utils";
-import { AptosAccount } from "../aptos_account";
+import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
 import {
   TxnBuilderTypes,

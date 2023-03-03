@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from "./aptos_account";
-import { AptosClient } from "./providers/aptos_client";
-import { TokenClient } from "./token_client";
+import { AptosAccount } from "../../account/aptos_account";
+import { AptosClient } from "../../providers/aptos_client";
+import { TokenClient } from "../../plugins/token_client";
 
-import { getFaucetClient, longTestTimeout, NODE_URL } from "./utils/test_helper.test";
-import { bcsSerializeBool } from "./bcs";
+import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
+import { bcsSerializeBool } from "../../bcs";
 
 test(
   "full tutorial nft token flow",

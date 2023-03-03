@@ -3,11 +3,11 @@
 
 import { AptosClient } from "../../providers/aptos_client";
 import { FaucetClient } from "../../providers/faucet_client";
-import { AptosAccount } from "../../aptos_account";
+import { AptosAccount } from "../../account/aptos_account";
 import { HexString } from "../../hex_string";
 import * as Gen from "../../generated/index";
 
-import { NODE_URL, getFaucetClient, longTestTimeout } from "../../utils/test_helper.test";
+import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 

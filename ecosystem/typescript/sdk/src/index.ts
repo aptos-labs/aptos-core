@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-export * from "./aptos_account";
+export * from "./account";
 export * from "./providers/index";
 export * as BCS from "./bcs";
-export * from "./coin_client";
+export * from "./plugins/coin_client";
 export * from "./hex_string";
-export * from "./token_client";
+export * from "./plugins";
 export * from "./transaction_builder";
 export * as TokenTypes from "./token_types";
 export * as Types from "./generated/index";

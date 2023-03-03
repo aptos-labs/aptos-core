@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from "./abi";
-export * from "./account_address";
+export * from "../account";
 export * from "./authenticator";
 export * from "./transaction";
 export * from "./type_tag";

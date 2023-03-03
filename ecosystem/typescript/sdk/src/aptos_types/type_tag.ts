@@ -5,7 +5,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-classes-per-file */
 import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
-import { AccountAddress } from "./account_address";
+import { AccountAddress } from "../account";
 import { Identifier } from "./identifier";
 
 export abstract class TypeTag {
