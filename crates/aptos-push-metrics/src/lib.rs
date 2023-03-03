@@ -28,15 +28,17 @@ pub struct MetricsPusher {
     note = "The aptos-push-metrics crate is deprecrated. In future prefer to use aptos-metrics-core directly (pull) or use aptos-telemetry (push)."
 )]
 impl MetricsPusher {
-    fn push(push_metrics_endpoint: &str) {
+    fn push(push_metrics_endpoint: &str, api_token: Option<&str>) {
         let mut buffer = Vec::new();
 
         if let Err(e) = TextEncoder::new().encode(&aptos_metrics_core::gather(), &mut buffer) {
             error!("Failed to encode push metrics: {}.", e.to_string());
         } else {
-            let response = ureq::post(push_metrics_endpoint)
-                .timeout_connect(10_000)
-                .send_bytes(&buffer);
+            let mut request = ureq::post(push_metrics_endpoint);
+            if let Some(token) = api_token {
+                request.set("Authorization", format!("Bearer {}", token).as_str());
+            }
+            let response = request.timeout_connect(10_000).send_bytes(&buffer);
             if let Some(error) = response.synthetic_error() {
                 warn!(
                     "Failed to push metrics to {}. Error: {}",
@@ -50,16 +52,17 @@ impl MetricsPusher {
         quit_receiver: mpsc::Receiver<()>,
         push_metrics_endpoint: String,
         push_metrics_frequency_secs: u64,
+        push_metrics_api_token: Option<String>,
     ) {
         while quit_receiver
             .recv_timeout(Duration::from_secs(push_metrics_frequency_secs))
             .is_err()
         {
             // Timeout, no quit signal received.
-            Self::push(&push_metrics_endpoint);
+            Self::push(&push_metrics_endpoint, push_metrics_api_token.as_deref());
         }
         // final push
-        Self::push(&push_metrics_endpoint);
+        Self::push(&push_metrics_endpoint, push_metrics_api_token.as_deref());
     }
 
     fn start_worker_thread(quit_receiver: mpsc::Receiver<()>) -> Option<JoinHandle<()>> {
@@ -81,6 +84,7 @@ impl MetricsPusher {
             },
             Err(_) => DEFAULT_PUSH_FREQUENCY_SECS,
         };
+        let push_metrics_api_token = env::var("PUSH_METRICS_API_TOKEN").ok();
         info!(
             "Starting push metrics loop. Sending metrics to {} with a frequency of {} seconds",
             push_metrics_endpoint, push_metrics_frequency_secs
@@ -90,6 +94,7 @@ impl MetricsPusher {
                 quit_receiver,
                 push_metrics_endpoint,
                 push_metrics_frequency_secs,
+                push_metrics_api_token,
             )
         }))
     }
