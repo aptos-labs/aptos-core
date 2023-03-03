@@ -41,6 +41,7 @@ async fn test_block_request_no_txns() {
     if let QuorumStoreRequest::GetBatchRequest(
         _max_batch_size,
         _max_bytes,
+        _eager_expire_time,
         _exclude_txns,
         callback,
     ) = timeout(

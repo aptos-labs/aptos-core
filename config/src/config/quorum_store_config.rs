@@ -4,6 +4,7 @@
 use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
 use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -14,6 +15,7 @@ pub struct QuorumStoreBackPressureConfig {
     pub decrease_fraction: f64,
     pub dynamic_min_batch_count: u64,
     pub dynamic_max_batch_count: u64,
+    pub eager_expire_time: Duration,
 }
 
 impl Default for QuorumStoreBackPressureConfig {
@@ -26,6 +28,7 @@ impl Default for QuorumStoreBackPressureConfig {
             decrease_fraction: 0.5,
             dynamic_min_batch_count: 40,
             dynamic_max_batch_count: 500,
+            eager_expire_time: Duration::from_secs(3),
         }
     }
 }

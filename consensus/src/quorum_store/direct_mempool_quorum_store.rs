@@ -46,7 +46,13 @@ impl DirectMempoolQuorumStore {
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(
+            max_items,
+            max_bytes,
+            Duration::ZERO,
+            exclude_txns,
+            callback,
+        );
         self.mempool_sender
             .clone()
             .try_send(msg)

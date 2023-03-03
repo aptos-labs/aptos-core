@@ -36,7 +36,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::Waker,
-    time::{Instant, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::runtime::Handle;
 
@@ -165,6 +165,8 @@ pub enum QuorumStoreRequest {
         u64,
         // max byte size
         u64,
+        // exclude transactions (via gc) if their expiration will happen within this time
+        Duration,
         // transactions to exclude from the requested batch
         Vec<TransactionSummary>,
         // callback to respond to
@@ -183,11 +185,18 @@ pub enum QuorumStoreRequest {
 impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(
+                max_txns,
+                max_bytes,
+                eager_expire_time,
+                excluded_txns,
+                _,
+            ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, eager_expire_ms: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
+                    eager_expire_time.as_millis(),
                     excluded_txns.len()
                 )
             },

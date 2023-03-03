@@ -446,7 +446,13 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     let start_time = Instant::now();
 
     let (resp, callback, counter_label) = match req {
-        QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(
+            max_txns,
+            max_bytes,
+            eager_expire_time,
+            transactions,
+            callback,
+        ) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
@@ -468,7 +474,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     // gc before pulling block as extra protection against txns that may expire in consensus
                     // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                     let curr_time = aptos_infallible::duration_since_epoch();
-                    mempool.gc_by_expiration_time(curr_time);
+                    mempool.gc_by_expiration_time(curr_time.saturating_add(eager_expire_time));
                 }
 
                 let max_txns = cmp::max(max_txns, 1);

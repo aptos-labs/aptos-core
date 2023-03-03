@@ -30,7 +30,7 @@ use std::{
     cmp::max,
     collections::HashMap,
     mem::size_of,
-    ops::{Add, Bound},
+    ops::Bound,
     time::{Duration, SystemTime},
 };
 
@@ -651,7 +651,7 @@ impl TransactionStore {
             .with_label_values(&[metric_label])
             .inc();
 
-        let mut gc_txns = index.gc(now.add(Duration::from_secs(10)));
+        let mut gc_txns = index.gc(now);
         // sort the expired txns by order of sequence number per account
         gc_txns.sort_by_key(|key| (key.address, key.sequence_number));
         let mut gc_iter = gc_txns.iter().peekable();

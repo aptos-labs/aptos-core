@@ -187,10 +187,17 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
+        eager_expire_time: Duration,
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(
+            max_items,
+            max_bytes,
+            eager_expire_time,
+            exclude_txns,
+            callback,
+        );
         self.mempool_tx
             .clone()
             .try_send(msg)

@@ -108,12 +108,17 @@ impl BatchGenerator {
 
         debug!("QS: excluding txs len: {:?}", exclude_txns.len());
         let mut end_batch = false;
-        // TODO: size and unwrap or not?
+        let eager_expire_time = if self.back_pressure {
+            self.config.back_pressure.eager_expire_time
+        } else {
+            Duration::ZERO
+        };
         let pulled_txns = self
             .mempool_proxy
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
+                eager_expire_time,
                 exclude_txns,
             )
             .await
