@@ -390,7 +390,7 @@ module std::vector {
         v: vector<Element>,
         d: |Element|
     ) {
-        for_each_reverse(v, d)
+        for_each_reverse(v, |e| d(e))
     }
 
     // =================================================================

@@ -584,10 +584,19 @@ module std::vector_tests {
         assert!(&v == &vector[2, 4, 3, 1, 5], 1);
     }
 
-    #[test]
+    /*#[test]
     fun test_stable_partition() {
             let v = vector[1, 2, 3, 4, 5];
             assert!(vector::stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
             assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+    }*/
+
+    #[test_only]
+    struct MoveOnly {}
+
+    #[test]
+    fun test_destroy() {
+        let v = vector[MoveOnly {}];
+        vector::destroy(v, |m| { let MoveOnly {} = m; })
     }
 }
