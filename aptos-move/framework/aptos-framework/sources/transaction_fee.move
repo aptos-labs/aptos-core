@@ -29,11 +29,13 @@ module aptos_framework::transaction_fee {
         burn_cap: BurnCapability<AptosCoin>,
     }
 
+    /// Length of `amounts` vector.
+    const NUM_BATCH_PROPOSERS: u64 = 300;
+
     /// Stores information about the block proposer and the amount of fees
     /// collected when executing the block.
     struct CollectedFeesPerBlockAndBatches has key {
         block_proposer: Option<address>,
-        max_num_batch_proposers: u16,
         batch_proposers: vector<address>,
         amounts: vector<AggregatableCoin<AptosCoin>>,
         block_distribution_percentage: u8,
@@ -42,7 +44,7 @@ module aptos_framework::transaction_fee {
 
     /// Initializes the resource storing information about gas fees collection and
     /// distribution. Should be called by on-chain governance.
-    public fun initialize_fee_collection_and_distributions(aptos_framework: &signer, max_num_batch_proposers: u16, block_distribution_percentage: u8, batch_distribution_percentage: u8) {
+    public fun initialize_fee_collection_and_distributions(aptos_framework: &signer, block_distribution_percentage: u8, batch_distribution_percentage: u8) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             !exists<CollectedFeesPerBlockAndBatches>(@aptos_framework),
@@ -56,7 +58,7 @@ module aptos_framework::transaction_fee {
         // All aggregators are pre-initialized in order to avoid creating/deleting more table items.
         let i = 0;
         let amounts = vector::empty();
-        while (i < max_num_batch_proposers) {
+        while (i < NUM_BATCH_PROPOSERS) {
             let amount = coin::initialize_aggregatable_coin(aptos_framework);
             vector::push_back(&mut amounts, amount);
             i = i + 1;
@@ -65,7 +67,6 @@ module aptos_framework::transaction_fee {
         // Initially, no fees are collected, so the block proposer is not set.
         let collected_fees = CollectedFeesPerBlockAndBatches {
             block_proposer: option::none(),
-            max_num_batch_proposers,
             batch_proposers: vector::empty(),
             amounts,
             block_distribution_percentage,
@@ -81,8 +82,8 @@ module aptos_framework::transaction_fee {
     /// Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
     public fun upgrade_distribution_percentages(
         aptos_framework: &signer,
-        new_batch_distribution_percentage: u8,
         new_block_distribution_percentage: u8,
+        new_batch_distribution_percentage: u8,
     ) acquires CollectedFeesPerBlockAndBatches, AptosCoinCapabilities {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(new_block_distribution_percentage + new_batch_distribution_percentage <= 100, error::out_of_range(EINVALID_PERCENTAGE));
@@ -108,7 +109,7 @@ module aptos_framework::transaction_fee {
     ) acquires CollectedFeesPerBlockAndBatches {
         if (is_fees_collection_enabled()) {
             let config = borrow_global_mut<CollectedFeesPerBlockAndBatches>(@aptos_framework);
-            assert!(vector::length(&batch_proposers_addr) <= (config.max_num_batch_proposers as u64), error::invalid_argument(ETOO_MANY_BATCH_PROPOSERS));
+            assert!(vector::length(&batch_proposers_addr) <= NUM_BATCH_PROPOSERS, error::invalid_argument(ETOO_MANY_BATCH_PROPOSERS));
             
             let _ = option::swap_or_fill(&mut config.block_proposer, block_proposer_addr);
             let batch_proposers = &mut config.batch_proposers;
@@ -133,6 +134,48 @@ module aptos_framework::transaction_fee {
         let amount_for_block_proposer = 0;
         let undistributed_coin = coin::zero<AptosCoin>();
         let num_batch_proposers = vector::length(&config.batch_proposers);
+
+        // If the vector of batch proposers is empty, we still have to process fees for 
+        if (num_batch_proposers == 0) {
+            // TODO: refactor!
+            coin::destroy_zero(undistributed_coin);
+            let aggregatable_coin = vector::borrow_mut(&mut config.amounts, 0);
+            if (coin::is_aggregatable_coin_zero(aggregatable_coin)) {
+                if (option::is_some(&config.block_proposer)) {
+                    let _ = option::extract(&mut config.block_proposer);
+                };
+                return
+            };
+            let coin = coin::drain_aggregatable_coin(aggregatable_coin);
+
+            if (burn_all) {
+                coin::burn(
+                    coin,
+                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
+                );
+                if (option::is_some(&config.block_proposer)) {
+                    let _ = option::extract(&mut config.block_proposer);
+                };
+                return
+            };
+
+            let block_proposer_addr = option::extract(&mut config.block_proposer);
+            amount_for_block_proposer = (config.block_distribution_percentage as u64) * coin::value(&coin) / 100;
+            if (amount_for_block_proposer > 0) {
+                stake::add_transaction_fee(block_proposer_addr, coin::extract(&mut coin, amount_for_block_proposer));
+            };
+
+            if (coin::value(&coin) == 0) {
+                coin::destroy_zero(coin);
+            } else {
+                coin::burn(
+                    coin,
+                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
+                );
+            };
+            return
+        };
+
         while (i < num_batch_proposers) {
             // First, get the collected amount and check if we can avoid calculations.
             let aggregatable_coin = vector::borrow_mut(&mut config.amounts, i);
@@ -185,10 +228,14 @@ module aptos_framework::transaction_fee {
             stake::add_transaction_fee(block_proposer_addr, coin::extract(&mut undistributed_coin, amount_for_block_proposer));
         };
 
-        coin::burn(
-            undistributed_coin,
-            &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-        );
+        if (coin::value(&undistributed_coin) == 0) {
+            coin::destroy_zero(undistributed_coin);
+        } else {
+            coin::burn(
+                undistributed_coin,
+                &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
+            );
+        };
     }
 
     /// Burn transaction fees in epilogue.
@@ -234,8 +281,7 @@ module aptos_framework::transaction_fee {
     #[test(aptos_framework = @aptos_framework)]
     fun test_initialize_fee_collection_and_distribution(aptos_framework: signer) acquires CollectedFeesPerBlockAndBatches {
         aggregator_factory::initialize_aggregator_factory_for_test(&aptos_framework);
-        let max_num_batch_proposers: u16 = 20;
-        initialize_fee_collection_and_distributions(&aptos_framework, max_num_batch_proposers, 10, 70);
+        initialize_fee_collection_and_distributions(&aptos_framework, 10, 70);
 
         // Check struct has been published.
         assert!(exists<CollectedFeesPerBlockAndBatches>(@aptos_framework), 0);
@@ -262,9 +308,8 @@ module aptos_framework::transaction_fee {
         // Initialization.
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         store_aptos_coin_burn_cap(&aptos_framework, burn_cap);
-        let max_num_batch_proposers: u16 = 20;
         // 50 % to batch proposers, 10% to block proposer, 40% burnt.
-        initialize_fee_collection_and_distributions(&aptos_framework, max_num_batch_proposers, 10, 50);
+        initialize_fee_collection_and_distributions(&aptos_framework, 10, 50);
 
         // Create dummy accounts.
         let alice_addr = signer::address_of(&alice);

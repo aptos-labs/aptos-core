@@ -27,7 +27,7 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
         "initialize_collection",
         "enable_collection",
         "disable_collection",
-        "upgrade_burn_percentage",
+        "upgrade_distribution_percentage",
         "remove_validator",
     ];
     for package_name in package_names {
@@ -176,12 +176,13 @@ fn calculate_gas_used(outputs: Vec<(TransactionStatus, u64)>) -> (u64, u64) {
 }
 
 /// Tests a standard flow of collecting fees without any edge cases.
-fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
+fn test_fee_collection_and_distribution_flow(block_distribution_percentage: u8) {
     let num_validators = 1;
     let mut universe = TestUniverse::new(num_validators);
-    transaction_fee::initialize_fee_collection_and_distribution(
+    transaction_fee::initialize_fee_collection_and_distributions(
         &mut universe.harness,
-        burn_percentage,
+        block_distribution_percentage,
+        0,
     );
     universe
         .harness
@@ -204,8 +205,8 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     let (p2p_gas, proposal_gas) = calculate_gas_used(outputs);
     assert_eq!(proposal_gas, 0);
 
-    let burnt_amount = (burn_percentage as u64) * p2p_gas / 100;
-    let collected_amount = p2p_gas - burnt_amount;
+    let collected_amount = (block_distribution_percentage as u64) * p2p_gas / 100;
+    let burnt_amount = p2p_gas - collected_amount;
 
     // Drain aggregatable coin in the next block.
     universe
@@ -228,7 +229,7 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
 
 /// Tests if fees collection can be enabled by the governance proposal and how
 /// fees are collected on the block boundary.
-fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u8) {
+fn test_initialize_and_enable_fee_collection_and_distribution(block_distribution_percentage: u8) {
     let num_validators = 1;
     let mut universe = TestUniverse::new(num_validators);
 
@@ -245,7 +246,8 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
     //   5. Remaining transactions are p2p (should end up being Retry).
     let mut txns = universe.create_block(50);
     universe.inject_proposal_into_block(&mut txns, 10, "initialize_collection", vec![
-        TransactionArgument::U8(burn_percentage),
+        TransactionArgument::U8(block_distribution_percentage),
+        TransactionArgument::U8(0),
     ]);
     universe.inject_proposal_into_block(&mut txns, 21, "enable_collection", vec![]);
 
@@ -285,12 +287,13 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
 
 /// Tests fee collection can be safely disabled. The corner case here is that by disabling
 /// the flag, we cannot distribute fees anymore unless it is done beforehand.
-fn test_disable_fee_collection(burn_percentage: u8) {
+fn test_disable_fee_collection(block_distribution_percentage: u8) {
     let num_validators = 1;
     let mut universe = TestUniverse::new(num_validators);
-    transaction_fee::initialize_fee_collection_and_distribution(
+    transaction_fee::initialize_fee_collection_and_distributions(
         &mut universe.harness,
-        burn_percentage,
+        block_distribution_percentage,
+        0,
     );
     universe
         .harness
@@ -318,8 +321,8 @@ fn test_disable_fee_collection(burn_percentage: u8) {
 
     // Calculate the fees taht are supposed to be collected before the feature
     // is disabled.
-    let burnt_amount = (burn_percentage as u64) * p2p_gas / 100;
-    let collected_amount = p2p_gas - burnt_amount;
+    let collected_amount = (block_distribution_percentage as u64) * p2p_gas / 100;
+    let burnt_amount = p2p_gas - collected_amount;
 
     // Reconfiguration triggers distribution of both rewards and fees.
     stake_amount += rewards_per_epoch + collected_amount;
@@ -341,12 +344,13 @@ fn test_disable_fee_collection(burn_percentage: u8) {
 
 /// Tests that the fees collected prior to the upgrade use the right burn
 /// percentage for calculations.
-fn test_upgrade_burn_percentage(burn_percentage: u8) {
+fn test_upgrade_burn_percentage(block_distribution_percentage: u8) {
     let num_validators = 2;
     let mut universe = TestUniverse::new(num_validators);
-    transaction_fee::initialize_fee_collection_and_distribution(
+    transaction_fee::initialize_fee_collection_and_distributions(
         &mut universe.harness,
-        burn_percentage,
+        block_distribution_percentage,
+        0,
     );
     universe
         .harness
@@ -356,15 +360,16 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     universe.set_up_validators(stake_amount);
 
     // Upgrade to the opposite value.
-    let new_burn_percentage = 100 - burn_percentage;
+    let new_block_distribution_percentage = 100 - block_distribution_percentage;
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
     //   2. A single transaction upgrading the burn percentage.
     //   3. Remaining transactions are p2p (should end up being Retry).
     let mut txns = universe.create_block(100);
-    universe.inject_proposal_into_block(&mut txns, 10, "upgrade_burn_percentage", vec![
-        TransactionArgument::U8(new_burn_percentage),
+    universe.inject_proposal_into_block(&mut txns, 10, "upgrade_distribution_percentage", vec![
+        TransactionArgument::U8(new_block_distribution_percentage),
+        TransactionArgument::U8(0),
     ]);
     let validator_addr = *universe.validators[0].address();
 
@@ -375,8 +380,8 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
         .run_block_with_metadata(validator_addr, vec![], txns);
     let (p2p_gas, proposal_gas) = calculate_gas_used(outputs);
 
-    let burnt_amount = (burn_percentage as u64) * p2p_gas / 100;
-    let collected_amount = p2p_gas - burnt_amount;
+    let collected_amount = (block_distribution_percentage as u64) * p2p_gas / 100;
+    let burnt_amount = p2p_gas - collected_amount;
 
     // Compute rewards for this epoch.
     let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
@@ -407,8 +412,8 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     let (gas_used, proposal_gas) = calculate_gas_used(outputs);
     assert_eq!(proposal_gas, 0);
 
-    let burnt_amount = (new_burn_percentage as u64) * gas_used / 100;
-    let collected_amount = gas_used - burnt_amount;
+    let collected_amount = (new_block_distribution_percentage as u64) * gas_used / 100;
+    let burnt_amount = gas_used - collected_amount;
 
     // Check that the new fraction of fees is burnt.
     universe
@@ -432,12 +437,13 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
 
 /// Tests that if validator running the block is removed, it still receives
 /// previously collected fees.
-fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
+fn test_leaving_validator_is_rewarded(block_distribution_percentage: u8) {
     let num_validators = 2;
     let mut universe = TestUniverse::new(num_validators);
-    transaction_fee::initialize_fee_collection_and_distribution(
+    transaction_fee::initialize_fee_collection_and_distributions(
         &mut universe.harness,
-        burn_percentage,
+        block_distribution_percentage,
+        0,
     );
     universe
         .harness
@@ -466,8 +472,8 @@ fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
         .run_block_with_metadata(removed_validator_addr, vec![], txns);
     let (p2p_gas, proposal_gas) = calculate_gas_used(outputs);
 
-    let burnt_amount = (burn_percentage as u64) * p2p_gas / 100;
-    let collected_amount = p2p_gas - burnt_amount;
+    let collected_amount = (block_distribution_percentage as u64) * p2p_gas / 100;
+    let burnt_amount = p2p_gas - collected_amount;
 
     // Reconfiguration triggers distributing rewards and fees.
     stake_amount += rewards_per_epoch + collected_amount;
@@ -487,14 +493,14 @@ fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
 }
 
 #[test]
-fn test_fee_collection_and_distribution_for_burn_percentages() {
+fn test_fee_collection_and_distribution_for_block_percentages() {
     // Test multiple burn percentages including the cases of 0 and 100.
-    for burn_percentage in [0, 25, 75, 100] {
-        test_fee_collection_and_distribution_flow(burn_percentage);
-        test_initialize_and_enable_fee_collection_and_distribution(burn_percentage);
-        test_disable_fee_collection(burn_percentage);
-        test_upgrade_burn_percentage(burn_percentage);
-        test_leaving_validator_is_rewarded(burn_percentage);
+    for block_distribution_percentage in [0, 25, 75, 100] {
+        test_fee_collection_and_distribution_flow(block_distribution_percentage);
+        test_initialize_and_enable_fee_collection_and_distribution(block_distribution_percentage);
+        test_disable_fee_collection(block_distribution_percentage);
+        test_upgrade_burn_percentage(block_distribution_percentage);
+        test_leaving_validator_is_rewarded(block_distribution_percentage);
     }
 }
 
@@ -504,7 +510,7 @@ fn test_fee_collection_and_distribution_for_burn_percentages() {
 fn test_block_single_proposal() {
     let num_validators = 1;
     let mut universe = TestUniverse::new(num_validators);
-    transaction_fee::initialize_fee_collection_and_distribution(&mut universe.harness, 100);
+    transaction_fee::initialize_fee_collection_and_distributions(&mut universe.harness, 0, 0);
 
     let stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);

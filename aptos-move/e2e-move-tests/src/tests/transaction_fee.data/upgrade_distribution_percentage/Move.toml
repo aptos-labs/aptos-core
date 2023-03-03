@@ -1,5 +1,5 @@
 [package]
-name = "UpgradeBurnPercentage"
+name = "UpgradeDistributionPercentage"
 version = "0.0.0"
 
 [dependencies]
