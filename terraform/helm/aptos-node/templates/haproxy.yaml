@@ -26,7 +26,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
     {{- if $.Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: val{{$i}}.{{ $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: val{{$i}}-{{ $.Values.chain.era }}.{{ $.Values.service.domain }}
     {{- end }}
 spec:
   selector:
@@ -69,7 +69,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
     {{- if $.Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}{{$i}}.{{ $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}{{$i}}-{{ $.Values.chain.era }}.{{ $.Values.service.domain }}
     {{- end }}
 spec:
   selector:
