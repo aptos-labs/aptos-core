@@ -45,13 +45,22 @@ use codespan_reporting::{
     term::termcolor::{ColorChoice, StandardStream},
 };
 use itertools::Itertools;
-use move_cli::{self, base::test::UnitTestResult};
+use move_cli::{
+    self,
+    base::{coverage::CoverageSummaryOptions, test::UnitTestResult},
+};
 use move_command_line_common::env::MOVE_HOME;
+use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     u256::U256,
 };
+use move_coverage::{
+    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
+    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
+};
+use move_disassembler::disassembler::Disassembler;
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use serde::Serialize;
@@ -91,6 +100,7 @@ pub enum MoveTool {
     TransactionalTest(TransactionalTestOpts),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     View(ViewFunction),
+    Coverage(CoveragePackage),
 }
 
 impl MoveTool {
@@ -114,6 +124,7 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             },
             MoveTool::View(tool) => tool.execute_serialized().await,
+            MoveTool::Coverage(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -418,6 +429,9 @@ pub struct TestPackage {
         long = "instructions"
     )]
     pub instruction_execution_bound: u64,
+    /// Collect coverage information for later use with the various `aptos move coverage` subcommands
+    #[clap(long = "coverage")]
+    pub compute_coverage: bool,
 }
 
 #[async_trait]
@@ -428,7 +442,7 @@ impl CliCommand<&'static str> for TestPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         set_bytecode_version(self.move_options.bytecode_version);
-        let config = BuildConfig {
+        let mut config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
@@ -451,12 +465,12 @@ impl CliCommand<&'static str> for TestPackage {
                 ));
             }
         }
-
+        let path = self.move_options.get_package_path()?;
         let result = move_cli::base::test::run_move_unit_tests(
-            self.move_options.get_package_path()?.as_path(),
-            config,
+            path.as_path(),
+            config.clone(),
             UnitTestingConfig {
-                filter: self.filter,
+                filter: self.filter.clone(),
                 report_stacktrace_on_abort: true,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
@@ -467,10 +481,21 @@ impl CliCommand<&'static str> for TestPackage {
                 AbstractValueSizeGasParameters::zeros(),
             ),
             None,
-            false,
+            self.compute_coverage,
             &mut std::io::stdout(),
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+
+        // Print coverage summary if --coverage is set
+        if self.compute_coverage {
+            config.test_mode = false;
+            let summary = CoverageSummaryOptions::Summary {
+                functions: false,
+                output_csv: false,
+            };
+            generate_coverage_info(summary, path.as_path(), config, self.filter).unwrap();
+            println!("Please use `aptos move coverage -h` for more detailed test coverage of this package");
+        }
 
         match result {
             UnitTestResult::Success => Ok("Success"),
@@ -536,6 +561,118 @@ impl CliCommand<&'static str> for ProvePackage {
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
+        }
+    }
+}
+
+/// Generate coverage info
+fn generate_coverage_info(
+    options: CoverageSummaryOptions,
+    path: &Path,
+    config: BuildConfig,
+    filter: Option<String>,
+) -> anyhow::Result<()> {
+    let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"))?;
+    let package = config.compile_package(path, &mut Vec::new())?;
+    match options {
+        CoverageSummaryOptions::Source { module_name } => {
+            let unit = package.get_module_by_name_from_root(&module_name)?;
+            let source_path = &unit.source_path;
+            let (module, source_map) = match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule {
+                    module, source_map, ..
+                }) => (module, source_map),
+                _ => panic!("Should all be modules"),
+            };
+            let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
+            source_coverage
+                .compute_source_coverage(source_path)
+                .output_source_coverage(&mut std::io::stdout())
+                .unwrap();
+        },
+        CoverageSummaryOptions::Summary {
+            functions,
+            output_csv,
+            ..
+        } => {
+            let modules: Vec<_> = package
+                .root_modules()
+                .filter_map(|unit| {
+                    let mut retain = true;
+                    if let Some(filter_str) = &filter {
+                        if !&unit.unit.name().as_str().contains(filter_str.as_str()) {
+                            retain = false;
+                        }
+                    }
+                    match &unit.unit {
+                        CompiledUnit::Module(NamedCompiledModule { module, .. }) if retain => {
+                            Some(module.clone())
+                        },
+                        _ => None,
+                    }
+                })
+                .collect();
+            let coverage_map = coverage_map.to_unified_exec_map();
+            if output_csv {
+                format_csv_summary(
+                    modules.as_slice(),
+                    &coverage_map,
+                    summarize_inst_cov,
+                    &mut std::io::stdout(),
+                )
+            } else {
+                format_human_summary(
+                    modules.as_slice(),
+                    &coverage_map,
+                    summarize_inst_cov,
+                    &mut std::io::stdout(),
+                    functions,
+                )
+            }
+        },
+        CoverageSummaryOptions::Bytecode { module_name } => {
+            let unit = package.get_module_by_name_from_root(&module_name)?;
+            let mut disassembler = Disassembler::from_unit(&unit.unit);
+            disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
+            println!("{}", disassembler.disassemble()?);
+        },
+    }
+    Ok(())
+}
+
+/// Computes coverage for a package
+///
+/// Computes coverage on a previous unit test run for a package.  Coverage input must
+/// first be built with `aptos move test --coverage`
+#[derive(Parser)]
+pub struct CoveragePackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(subcommand)]
+    pub coverage_options: CoverageSummaryOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for CoveragePackage {
+    fn command_name(&self) -> &'static str {
+        "CoveragePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
+
+        let config = BuildConfig {
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: false,
+            install_dir: self.move_options.output_dir.clone(),
+            ..Default::default()
+        };
+        let path = self.move_options.get_package_path()?;
+        let result = generate_coverage_info(self.coverage_options, path.as_path(), config, None);
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(e) => Err(CliError::CoverageError(format!("{:#}", e))),
         }
     }
 }
