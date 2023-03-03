@@ -45,17 +45,18 @@ jobs:
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
-      imageTag: ${{ env.IMAGE_TAG }}
-      forgeImageTag: ${{ env.FORGE_IMAGE_TAG }}
-      forgeRunnerDurationSecs: ${{ env.FORGE_RUNNER_DURATION_SECS }}
-      forgeTestSuite: ${{ env.FORGE_TEST_SUITE }}
+      imageTag: ${{ inputs.IMAGE_TAG }}
+      forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
+      forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
+      forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
 
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    needs: [ determine-forge-run-metadata ] 
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}      
-      IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.image_tag }} 
-      FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forge_image_tag }}
-      FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forge_test_suite }} 
-      FORGE_RUNNER_DURATION_SECS: ${{ needs.determine-forge-run-metadata.outputs.forge_test_duration }}
+      IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.imageTag }} 
+      FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forgeImageTag }}
+      FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }} 
+      FORGE_RUNNER_DURATION_SECS: ${{ needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs }}
