@@ -136,6 +136,7 @@ async fn process_raw_datastream_response(
                         num_of_transactions,
                     })
                 },
+                StatusType::Unspecified => unreachable!("Unspecified status type."),
             }
         },
         datastream::raw_datastream_response::Response::Data(data) => {
