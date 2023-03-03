@@ -7,9 +7,9 @@ use crate::{
     stale_state_value_index::StaleStateValueIndexSchema,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, LedgerPrunerManager, PrunerManager, StateMerklePrunerManager,
+    AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager,
 };
-use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
+use aptos_config::config::{StateKvPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
@@ -378,16 +378,11 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
 
     let mut version = 0;
     let mut current_state_values = HashMap::new();
-    let pruner = LedgerPrunerManager::new(
-        Arc::clone(&db.ledger_db),
-        Arc::clone(store),
-        LedgerPrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
+    let pruner = StateKvPrunerManager::new(Arc::clone(&db.ledger_db), StateKvPrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: 1,
+    });
     for batch in inputs {
         update_store(store, batch.clone().into_iter(), version);
         for (k, v) in batch.iter() {
@@ -423,7 +418,7 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
         assert_eq!(&v_from_db, if pruned { &None } else { v });
         if pruned {
             assert!(state_store
-                .ledger_db
+                .state_kv_db
                 .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
                     stale_since_version: version,
                     version: *old_version,
@@ -432,11 +427,5 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
                 .unwrap()
                 .is_none());
         }
-    }
-
-    if pruned {
-        assert!(state_store.get_usage(Some(version)).is_err())
-    } else {
-        assert!(state_store.get_usage(Some(version)).is_ok())
     }
 }

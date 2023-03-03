@@ -19,7 +19,7 @@ use crate::{
     },
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    StateKvPrunerManager, StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -86,6 +86,7 @@ pub(crate) struct StateDb {
     pub state_kv_db: Arc<DB>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_kv_pruner: StateKvPrunerManager,
 }
 
 pub(crate) struct StateStore {
@@ -278,6 +279,7 @@ impl StateStore {
         state_kv_db: Arc<DB>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+        state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -348,6 +350,7 @@ impl StateStore {
             state_kv_db,
             state_merkle_pruner,
             epoch_snapshot_pruner,
+            state_kv_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(
@@ -383,12 +386,17 @@ impl StateStore {
         );
         let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
         let state_kv_db = Arc::clone(&ledger_db);
+        let state_kv_pruner = StateKvPrunerManager::new(
+            Arc::clone(&state_kv_db),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
+        );
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
             state_kv_db,
             state_merkle_pruner,
             epoch_snapshot_pruner,
+            state_kv_pruner,
         });
         let buffered_state = Self::create_buffered_state_from_latest_snapshot(
             &state_db, 0, /*hack_for_tests=*/ false,
@@ -807,34 +815,6 @@ impl StateStore {
             expected_root_hash,
             false, /* async_commit */
         )?))
-    }
-
-    /// Prune the stale state value schema generated between a range of version in (begin, end]
-    pub fn prune_state_values(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> Result<()> {
-        // TODO(grao): Replace ledger_db by state_kv_db.
-        let mut iter = self
-            .state_db
-            .ledger_db
-            .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
-        iter.seek(&begin)?;
-        for item in iter {
-            let (index, _) = item?;
-            if index.stale_since_version > end {
-                break;
-            }
-            // Prune the stale state value index itself first.
-            db_batch.delete::<StaleStateValueIndexSchema>(&index)?;
-            db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
-        }
-        for version in begin..end {
-            db_batch.delete::<VersionDataSchema>(&version)?;
-        }
-        Ok(())
     }
 
     #[cfg(test)]

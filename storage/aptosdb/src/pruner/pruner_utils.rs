@@ -6,9 +6,10 @@
 use crate::{
     pruner::{
         ledger_store::ledger_store_pruner::LedgerPruner,
+        state_kv_pruner::StateKvPruner,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
-    EventStore, StateStore, TransactionStore,
+    EventStore, TransactionStore,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::{schema::KeyCodec, DB};
@@ -25,14 +26,15 @@ where
 }
 
 /// A utility function to instantiate the ledger pruner
-pub(crate) fn create_ledger_pruner(
-    ledger_db: Arc<DB>,
-    state_store: Arc<StateStore>,
-) -> Arc<LedgerPruner> {
+pub(crate) fn create_ledger_pruner(ledger_db: Arc<DB>) -> Arc<LedgerPruner> {
     Arc::new(LedgerPruner::new(
         Arc::clone(&ledger_db),
         Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
         Arc::new(EventStore::new(Arc::clone(&ledger_db))),
-        state_store,
     ))
+}
+
+/// A utility function to instantiate the state kv pruner.
+pub(crate) fn create_state_kv_pruner(state_kv_db: Arc<DB>) -> Arc<StateKvPruner> {
+    Arc::new(StateKvPruner::new(state_kv_db))
 }
