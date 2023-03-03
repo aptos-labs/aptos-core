@@ -293,6 +293,12 @@ module std::vector {
         p
     }
 
+    fun test_stable_partition() {
+        let v = vector[1, 2, 3, 4, 5];
+        assert!(stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        assert!(&v == &vector[2, 4, 1, 3, 5], 1);
+    }
+
     /// rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
     /// ie. 3 in the example above
     public fun rotate<Element>(
