@@ -5702,6 +5702,7 @@ impl serde::Serialize for transaction_payload::Type {
             Self::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
             Self::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
             Self::ModuleBundlePayload => "TYPE_MODULE_BUNDLE_PAYLOAD",
+            Self::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
             Self::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
         };
         serializer.serialize_str(variant)
@@ -5718,6 +5719,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "TYPE_ENTRY_FUNCTION_PAYLOAD",
             "TYPE_SCRIPT_PAYLOAD",
             "TYPE_MODULE_BUNDLE_PAYLOAD",
+            "TYPE_WRITE_SET_PAYLOAD",
             "TYPE_MULTISIG_PAYLOAD",
         ];
 
@@ -5765,6 +5767,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     "TYPE_ENTRY_FUNCTION_PAYLOAD" => Ok(transaction_payload::Type::EntryFunctionPayload),
                     "TYPE_SCRIPT_PAYLOAD" => Ok(transaction_payload::Type::ScriptPayload),
                     "TYPE_MODULE_BUNDLE_PAYLOAD" => Ok(transaction_payload::Type::ModuleBundlePayload),
+                    "TYPE_WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     "TYPE_MULTISIG_PAYLOAD" => Ok(transaction_payload::Type::MultisigPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
