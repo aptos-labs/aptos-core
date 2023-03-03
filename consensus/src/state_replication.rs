@@ -68,7 +68,12 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>, transaction_shuffler: Arc<dyn TransactionShuffler>,);
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        payload_manager: Arc<PayloadManager>,
+        transaction_shuffler: Arc<dyn TransactionShuffler>,
+    );
 
     // Reconfigure to clear epoch state at end of epoch.
     fn end_epoch(&self);

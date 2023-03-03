@@ -163,13 +163,9 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-<<<<<<< HEAD
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
 
     fn end_epoch(&self) {}
-=======
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
->>>>>>> 20b20fc676 ([BlockSTM] Optimized transaction shuffling)
 }
 
 /// Random Compute Result State Computer
@@ -221,11 +217,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-<<<<<<< HEAD
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>) {}
+    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
 
     fn end_epoch(&self) {}
-=======
-    fn new_epoch(&self, _: &EpochState, _: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>) {}
->>>>>>> 20b20fc676 ([BlockSTM] Optimized transaction shuffling)
 }

@@ -284,11 +284,11 @@ impl StateComputer for ExecutionProxy {
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::error::MempoolError;
+    use crate::{error::MempoolError, transaction_shuffler::create_transaction_shuffler};
     use aptos_consensus_notifications::Error;
     use aptos_types::{
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
-        transaction::SignedTransaction,
+        on_chain_config::TransactionShufflerType, transaction::SignedTransaction,
     };
 
     struct RecordedCommit {
@@ -387,6 +387,7 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
+        create_transaction_shuffler(TransactionShufflerType::NoShuffling),
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

@@ -120,7 +120,13 @@ impl StateComputer for OrderingStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState, _payload_manager: Arc<PayloadManager>, _: Arc<dyn TransactionShuffler>,) {}
+    fn new_epoch(
+        &self,
+        _: &EpochState,
+        _payload_manager: Arc<PayloadManager>,
+        _: Arc<dyn TransactionShuffler>,
+    ) {
+    }
 
     fn end_epoch(&self) {}
 }
