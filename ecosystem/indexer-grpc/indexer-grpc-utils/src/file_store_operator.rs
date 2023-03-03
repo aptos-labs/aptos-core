@@ -67,6 +67,7 @@ impl FileStoreOperator {
 
     /// Bootstraps the file store operator. This is required before any other operations.
     pub async fn verify_storage_bucket_existence(&self) {
+        aptos_logger::info!(bucket_name=self.bucket_name, "file store operator starts.");
         // Verifies the bucket exists.
         Bucket::read(&self.bucket_name)
             .await
