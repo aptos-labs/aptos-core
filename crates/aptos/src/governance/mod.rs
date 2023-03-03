@@ -176,9 +176,16 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
             .into_inner();
         let mut proposals = vec![];
 
-        for event in events {
-            let event = bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data())?;
-            proposals.push(event.into());
+        for event in &events {
+            match bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data()) {
+                Ok(valid_event) => proposals.push(valid_event.into()),
+                Err(err) => {
+                    eprintln!(
+                        "Event: {:?} cannot be parsed as a proposal: {:?}",
+                        event, err
+                    )
+                },
+            }
         }
 
         // TODO: Show more information about proposal?
@@ -953,7 +960,7 @@ struct CreateProposalFullEvent {
     stake_pool: AccountAddress,
     proposal_id: u64,
     execution_hash: Vec<u8>,
-    proposal_metadata: BTreeMap<String, Vec<u8>>,
+    proposal_metadata: Vec<(String, Vec<u8>)>,
 }
 
 /// A proposal and the verified information about it
