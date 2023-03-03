@@ -30,6 +30,7 @@ module aptos_framework::transaction_fee {
     }
 
     /// Length of `amounts` vector.
+    /// TODO (Igor): set to the right number?
     const NUM_BATCH_PROPOSERS: u64 = 300;
 
     /// Stores information about the block proposer and the amount of fees
