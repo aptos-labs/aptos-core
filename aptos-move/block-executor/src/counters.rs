@@ -24,6 +24,28 @@ pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_parallel_execution_seconds",
+        // metric description
+        "The time spent in seconds in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+        .unwrap()
+});
+
+pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_rayon_execution_seconds",
+        // metric description
+        "The time spent in seconds in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+        .unwrap()
+});
+
 pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
