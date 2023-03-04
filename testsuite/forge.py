@@ -1531,7 +1531,7 @@ def list_jobs(
     phase: List[str],
     regex: str,
 ) -> None:
-    """List all available clusters"""
+    """List all running forge jobs"""
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1558,7 +1558,10 @@ def list_jobs(
         else:
             fg = "white"
 
-        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+        click.secho(
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            fg=fg,
+        )
 
 
 @main.command()
