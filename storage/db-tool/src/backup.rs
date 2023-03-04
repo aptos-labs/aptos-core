@@ -136,7 +136,6 @@ pub struct VerifyOpt {
 impl Command {
     pub async fn run(self) -> Result<()> {
         Logger::new().level(Level::Info).init();
-        #[allow(deprecated)]
         let _mp = MetricsPusher::start();
         match self {
             Command::Oneoff(opt) => {
