@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
@@ -14,7 +15,6 @@ use std::{
         Arc, Condvar,
     },
 };
-use crate::counters::GET_NEXT_TASK_SECONDS;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 

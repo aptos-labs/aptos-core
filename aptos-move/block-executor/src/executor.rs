@@ -4,7 +4,10 @@
 
 use crate::{
     counters,
-    counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS},
+    counters::{
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+    },
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, Version, Wave},
@@ -23,7 +26,6 @@ use std::{
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
 };
-use crate::counters::{PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS};
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -198,6 +200,7 @@ where
         committing: bool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);

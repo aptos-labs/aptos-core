@@ -32,7 +32,7 @@ pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in seconds in parallel execution",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
@@ -43,7 +43,7 @@ pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in seconds in parallel execution",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
@@ -61,6 +61,17 @@ pub static TASK_VALIDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_execution_task_validate_seconds",
+        // metric description
+        "The time spent in task validation in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static WORK_WITH_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_work_with_task_seconds",
         // metric description
         "The time spent in task validation in Block STM",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
@@ -87,7 +98,7 @@ pub static GET_NEXT_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in seconds for getting next task from the scheduler",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
