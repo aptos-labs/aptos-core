@@ -2,8 +2,8 @@ require("dotenv").config();
 
 const aptos = require("aptos");
 
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.testnet.aptoslabs.com";
+const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.testnet.aptoslabs.com";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
@@ -66,7 +66,7 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   ); // <:!:section_5
   await client.waitForTransaction(txnHash2, { checkSuccess: true });
 
-  const provider = new aptos.Provider(aptos.Network.DEVNET);
+  const provider = new aptos.Provider(aptos.Network.TESTNET);
   const nfts = await provider.getAccountNFTs(account1.address().hex());
   console.log(`account1 current token ownership: ${nfts.current_token_ownerships[0].amount}. Should be 1`);
 })();

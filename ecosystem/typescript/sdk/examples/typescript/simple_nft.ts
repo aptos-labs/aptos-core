@@ -27,6 +27,9 @@ import { NODE_URL, FAUCET_URL } from "./common";
   const alice = new AptosAccount();
   const bob = new AptosAccount(); // <:!:section_2
 
+  console.log("=== network ===");
+  console.log(NODE_URL);
+
   // Print out account addresses.
   console.log("=== Addresses ===");
   console.log(`Alice: ${alice.address()}`);
@@ -161,7 +164,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
   console.log(`Alice's token balance: ${aliceBalance3["amount"]}`);
   console.log(`Bob's token balance: ${bobBalance3["amount"]}`);
 
-  const provider = new Provider(Network.DEVNET);
+  const provider = new Provider(Network.TESTNET);
   console.log("\n=== Getting Alices's NFTs ===");
   const aliceNfts = await provider.getAccountNFTs(alice.address().hex());
   console.log(`Alice current token ownership: ${aliceNfts.current_token_ownerships[0].amount}. Should be 1`);
