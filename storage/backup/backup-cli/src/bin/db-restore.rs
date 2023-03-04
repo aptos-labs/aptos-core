@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
-    let _mp = MetricsPusher::start();
+    let _mp = MetricsPusher::start("db-restore");
 
     let opt = Opt::from_args();
     let global_opt: GlobalRestoreOptions = opt.global.clone().try_into()?;

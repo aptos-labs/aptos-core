@@ -142,7 +142,7 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
-    let _mp = MetricsPusher::start();
+    let _mp = MetricsPusher::start("db-backup");
 
     let cmd = Command::from_args();
     match cmd {
