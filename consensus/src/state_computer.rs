@@ -9,6 +9,7 @@ use crate::{
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
@@ -45,6 +46,7 @@ pub struct ExecutionProxy {
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
+    transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
 }
 
 impl ExecutionProxy {
@@ -77,6 +79,7 @@ impl ExecutionProxy {
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
+            transaction_shuffler: Mutex::new(None),
         }
     }
 }
@@ -104,13 +107,16 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
+
+        let shuffled_txns = txn_shuffler.shuffle(txns);
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
 
         let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), txns.clone());
+            block.transactions_to_execute(&self.validators.lock(), shuffled_txns.clone());
 
         let compute_result = monitor!(
             "execute_block",
@@ -126,7 +132,7 @@ impl StateComputer for ExecutionProxy {
         // notify mempool about failed transaction
         if let Err(e) = self
             .txn_notifier
-            .notify_failed_txn(txns, &compute_result)
+            .notify_failed_txn(shuffled_txns, &compute_result)
             .await
         {
             error!(
@@ -155,6 +161,8 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
+
         for block in blocks {
             block_ids.push(block.id());
 
@@ -163,8 +171,9 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
+            let shuffled_txns = txn_shuffler.shuffle(signed_txns);
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
+            txns.extend(block.transactions_to_commit(&self.validators.lock(), shuffled_txns));
             reconfig_events.extend(block.reconfig_event());
         }
 
@@ -249,12 +258,20 @@ impl StateComputer for ExecutionProxy {
         })
     }
 
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>) {
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        payload_manager: Arc<PayloadManager>,
+        transaction_shuffler: Arc<dyn TransactionShuffler>,
+    ) {
         *self.validators.lock() = epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
             .collect();
         self.payload_manager.lock().replace(payload_manager);
+        self.transaction_shuffler
+            .lock()
+            .replace(transaction_shuffler);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -267,11 +284,11 @@ impl StateComputer for ExecutionProxy {
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::error::MempoolError;
+    use crate::{error::MempoolError, transaction_shuffler::create_transaction_shuffler};
     use aptos_consensus_notifications::Error;
     use aptos_types::{
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
-        transaction::SignedTransaction,
+        on_chain_config::TransactionShufflerType, transaction::SignedTransaction,
     };
 
     struct RecordedCommit {
@@ -370,6 +387,7 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
+        create_transaction_shuffler(TransactionShufflerType::NoShuffling),
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())
