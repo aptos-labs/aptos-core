@@ -14,6 +14,7 @@ use std::{
         Arc, Condvar,
     },
 };
+use crate::counters::GET_NEXT_TASK_SECONDS;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -291,6 +292,7 @@ impl Scheduler {
 
     /// Return the next task for the thread.
     pub fn next_task(&self, committing: bool) -> SchedulerTask {
+        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
                 // No more tasks.
