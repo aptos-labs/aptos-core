@@ -34,6 +34,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
+-  [Function `test_stable_partition`](#0x1_vector_test_stable_partition)
 -  [Function `rotate`](#0x1_vector_rotate)
 -  [Function `rotate_slice`](#0x1_vector_rotate_slice)
 -  [Function `stable_partition_internal`](#0x1_vector_stable_partition_internal)
@@ -555,6 +556,37 @@ Aborts if <code>i</code> is out of bounds.
     <b>let</b> last_idx = <a href="vector.md#0x1_vector_length">length</a>(v) - 1;
     <a href="vector.md#0x1_vector_swap">swap</a>(v, i, last_idx);
     <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_test_stable_partition"></a>
+
+## Function `test_stable_partition`
+
+
+
+<pre><code><b>fun</b> <a href="vector.md#0x1_vector_test_stable_partition">test_stable_partition</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="vector.md#0x1_vector_test_stable_partition">test_stable_partition</a>() {
+    <b>let</b> v:<a href="vector.md#0x1_vector">vector</a>&lt;u64&gt; = <a href="vector.md#0x1_vector">vector</a>[1, 2, 3, 4, 5];
+
+    <b>let</b> pred = map_ref2(&v, |n| *n % 2 == 0);
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&v);
+    <b>assert</b>!(<a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(&<b>mut</b> v, &pred,0, len) == 2, 0);
+
+    //<b>assert</b>!(stable_partition(&<b>mut</b> v, |n| *n % 2 == 0) == 2, 0);
+    <b>assert</b>!(&v == &<a href="vector.md#0x1_vector">vector</a>[2, 4, 1, 3, 5], 1);
 }
 </code></pre>
 

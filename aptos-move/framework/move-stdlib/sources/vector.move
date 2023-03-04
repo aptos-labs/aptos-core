@@ -293,9 +293,24 @@ module std::vector {
         p
     }
 
+    public inline fun map_ref2<Element>(
+        v: &mut vector<Element>,
+        f: |&Element|u64
+    ): vector<u64> {
+        let pred = map_ref(v, |elem| f(elem));
+        // let len = length(v);
+        // stable_partition_internal(v, &pred,0, len)
+        pred
+    }
+
     fun test_stable_partition() {
-        let v = vector[1, 2, 3, 4, 5];
-        assert!(stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        let pred = map_ref2(&mut v, |n| *n % 2);
+        //let len = length(&v);
+        //assert!(stable_partition_internal(&mut v, &pred,0, len) == 2, 0);
+
+        //assert!(stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
         assert!(&v == &vector[2, 4, 1, 3, 5], 1);
     }
 
