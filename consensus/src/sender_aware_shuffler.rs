@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     counters::{NUM_SENDERS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
     transaction_shuffler::TransactionShuffler,

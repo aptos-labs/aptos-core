@@ -226,7 +226,7 @@ impl StateComputer for ExecutionProxy {
 
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
-        // Might be none if called in the recovery path.
+        // Might be none if called in the recovery path, or between epoch stop and start.
         let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
         if let Some(payload_manager) = maybe_payload_manager {
             payload_manager
@@ -273,11 +273,19 @@ impl StateComputer for ExecutionProxy {
             .lock()
             .replace(transaction_shuffler);
     }
+
+    // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
+    // on the next epoch.
+    fn end_epoch(&self) {
+        *self.validators.lock() = vec![];
+        self.payload_manager.lock().take();
+        self.transaction_shuffler.lock().take();
+    }
 }
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::error::MempoolError;
+    use crate::{error::MempoolError, transaction_shuffler::NoOpShuffler};
     use aptos_consensus_notifications::Error;
     use aptos_types::{
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
@@ -380,6 +388,7 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
+        Arc::new(NoOpShuffler {}),
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())
