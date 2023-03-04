@@ -66,11 +66,23 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq_format(): vector<u8> { x"01" }
 
+    /// A serialization format for `BLS12_381_Fq` elements.
+    /// In this format, an element is represented by a byte array `b[]` of size 48 using little-endian byte order.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_Fq_Format {}
+
     /// Return the ID of a serialization scheme,
     /// where a `BLS12_381_Fq` element is represented by a byte array `b[]` of size 48 using big-endian byte order.
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq_bendian_format(): vector<u8> { x"0101" }
+
+    /// A serialization format for `BLS12_381_Fq` elements.
+    /// In this format, an element is represented by a byte array `b[]` of size 48 using big-endian byte order.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_Fq_Format_BEndian {}
 
     /// The finite field $F_{q^2}$ used in BLS12-381 curves.
     /// It is an extension field of `BLS12_381_Fq`, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
@@ -85,6 +97,22 @@ module aptos_std::algebra {
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq2_format(): vector<u8> { x"02" }
+
+    /// A serialization scheme for `BLS12_381_Fq2` elements.
+    ///In this format, an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96.
+    /// `b[0..48]` is $c_0$ serialized in `BLS12_381_Fq_Format`.
+    /// `b[48..96]` is $c_1$ serialized in `BLS12_381_Fq_Format`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_Fq2_Format {}
+
+    /// A serialization scheme for `BLS12_381_Fq2` elements.
+    /// In this format, an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array `b[]` of size 96.
+    /// `b[0..48]` is $c_0$ serialized in `BLS12_381_Fq_Format_BEndianFq`.
+    /// `b[48..96]` is $c_1$ serialized in `BLS12_381_Fq_Format_BEndianFq`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_Fq2_Format_BEndianFq {}
 
     /// The finite field $F_{q^6}$ used in BLS12-381 curves.
     /// It is an extension field of `BLS12_381_Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
@@ -101,6 +129,16 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_fq6_format(): vector<u8> { x"03" }
 
+    /// A serialization scheme for `BLS12_381_Fq6` elements.
+    ///
+    /// In this format, an element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array `b[]` of size 288.
+    /// `b[0..96]` is $c_0$ serialized in `BLS12_381_Fq2_Format`.
+    /// `b[96..192]` is $c_1$ serialized in `BLS12_381_Fq2_Format`.
+    /// `b[192..288]` is $c_2$ serialized in `BLS12_381_Fq2_Format`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_Fq6_Format {}
+
     /// The finite field $F_{q^12}$ used in BLS12-381 curves.
     /// It is an extension field of `BLS12_381_Fq6`, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
     struct BLS12_381_Fq12 {}
@@ -112,6 +150,15 @@ module aptos_std::algebra {
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_fq12_format(): vector<u8> { x"04" }
+
+    /// A serialization scheme for `BLS12_381_Fq12` elements.
+
+    /// In this format, an element $(c_0+c_1\cdot w)$ is represented by a byte array `b[]` of size 576.
+    /// `b[0..288]` is $c_0$ serialized in `BLS12_381_Fq6_Format`.
+    /// `b[288..576]` is $c_1$ serialized in `BLS12_381_Fq6_Format`.
+    ///
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
+    struct BLS12_381_Fq12_Format {}
 
     /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at inifinity,
     /// under the elliptic curve point addition.
@@ -132,6 +179,30 @@ module aptos_std::algebra {
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g1_parent_uncompressed_format(): vector<u8> { x"05" }
 
+    /// A serialization scheme for `BLS12_381_G1_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 96.
+    /// `b[95] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_q)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `bls12_381_fq_format`, and
+    /// `[b[48], ..., b[95] & 0x3f]` is $y$ serialized in `bls12_381_fq_format`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G1_Parent_Format_Uncompressed {}
+
+    /// A serialization scheme for `BLS12_381_G1_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 96.
+    /// `b[95] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_q)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `BLS12_381_Fq_Format_BEndian`, and
+    /// `[b[48], ..., b[95] & 0x3f]` is $y$ serialized in `BLS12_381_Fq_Format_BEndian`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G1_Parent_Format_Uncompressed_BEndianFq {}
+
     /// Return the ID of a serialization scheme,
     /// where an `BLS12_381_G1_Parent` element is represented by a byte array `b[]` of size 48.
     /// `b[47] & 0x40` is the infinity flag.
@@ -142,6 +213,31 @@ module aptos_std::algebra {
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g1_parent_compressed_format(): vector<u8> { x"0501" }
+
+
+    /// A serialization scheme for `BLS12_381_G1_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 48.
+    /// `b[47] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(Fq)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `bls12_381_fq_format`, and
+    /// the positiveness flag `b_47 & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G1_Parent_Format_Compressed {}
+
+    /// A serialization scheme for `BLS12_381_G1_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 48.
+    /// `b[47] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(Fq)$,
+    /// `[b[0], ..., b[47] & 0x3f]` is $x$ serialized in `BLS12_381_Fq_Format_BEndian`, and
+    /// the positiveness flag `b_47 & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G1_Parent_Format_Compressed_BEndianFq {}
 
     /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is subgroup of `BLS12_381_G1_Parent`.
@@ -155,11 +251,31 @@ module aptos_std::algebra {
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_uncompressed_format(): vector<u8> { x"06" }
 
+    /// A serialization scheme for `BLS12_381_G1` elements.
+    ///
+    /// Essentially `BLS12_381_G1_Parent_Format_Uncompressed` but only applied to `BLS12_381_G1` elements.
+    struct BLS12_381_G1_Format_Uncompressed {}
+
+    /// A serialization scheme for `BLS12_381_G1` elements.
+    ///
+    /// Essentially `BLS12_381_G1_Parent_Format_Uncompressed_BEndianFq` but only applied to `BLS12_381_G1` elements.
+    struct BLS12_381_G1_Format_Uncompressed_BEndianFq {}
+
     /// Return the ID of a serialization scheme,
     /// which is essentially `bls12_381_g1_parent_compressed_format()` but only applicable to `BLS12_381_G1` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g1_compressed_format(): vector<u8> { x"0601" }
+
+    /// A serialization scheme for `BLS12_381_G1` elements.
+    ///
+    /// Essentially `BLS12_381_G1_Parent_Format_Compressed` but only applied to `BLS12_381_G1` elements.
+    struct BLS12_381_G1_Format_Compressed {}
+
+    /// A serialization scheme for `BLS12_381_G1` elements.
+    ///
+    /// Essentially `BLS12_381_G1_Parent_Format_Compressed_BEndianFq` but only applied to `BLS12_381_G1` elements.
+    struct BLS12_381_G1_Format_Compressed_BEndianFq {}
 
     /// A group constructed by the points on a curve $E(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
     /// $E(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
@@ -173,22 +289,46 @@ module aptos_std::algebra {
     /// `b[191] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
-    /// `b[0..96]` is $x$ serialized in `bls12_381_fq2_format`, and
-    /// `[b[96], ..., b[191] & 0x3f]` is $y$ serialized in `bls12_381_fq2_format`.
+    /// `b[0..96]` is $x$ serialized in `BLS12_381_Fq2_Format`, and
+    /// `[b[96], ..., b[191] & 0x3f]` is $y$ serialized in `BLS12_381_Fq2_Format`.
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g2_parent_uncompressed_format(): vector<u8> { x"07" }
+
+    /// A serialization scheme for `BLS12_381_G2_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 192.
+    /// `b[191] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
+    /// `b[0..96]` is $x$ serialized in `BLS12_381_Fq2_Format`, and
+    /// `[b[96], ..., b[191] & 0x3f]` is $y$ serialized in `BLS12_381_Fq2_Format`.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G2_Parent_Format_Uncompressed {}
 
     /// Return the ID of a serialization scheme,
     /// where a `BLS12_381_G2_Parent` element is represented by a byte array `b[]` of size 96.
     /// `b[95] & 0x40` is the infinity flag.
     /// The infinity flag is 1 if and only if the element is the point at infinity.
     /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
-    /// `[b[0], ..., b[95] & 0x3f]` is $x$ serialized in `bls12_381_fq2_format`, and
+    /// `[b[0], ..., b[95] & 0x3f]` is $x$ serialized in `BLS12_381_Fq2_Format`, and
     /// the positiveness flag `b[95] & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
     ///
     /// NOTE: currently information-only, not implemented.
     public fun bls12_381_g2_parent_compressed_format(): vector<u8> { x"0701" }
+
+    /// A serialization scheme for `BLS12_381_G2_Parent` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 96.
+    /// `b[95] & 0x40` is the infinity flag.
+    /// The infinity flag is 1 if and only if the element is the point at infinity.
+    /// The infinity flag is 0 if and only if the element is a point $(x,y)$ on curve $E(F_{q^2})$,
+    /// `[b[0], ..., b[95] & 0x3f]` is $x$ serialized in `BLS12_381_Fq2_Format`, and
+    /// the positiveness flag `b[95] & 0x80` is 1 if and only if $y > -y$ ($y$ and $-y$ treated as unsigned integers).
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G2_Parent_Format_Compressed {}
 
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `BLS12_381_G2_Parent`.
@@ -202,11 +342,25 @@ module aptos_std::algebra {
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_uncompressed_format(): vector<u8> { x"08" }
 
+    /// A serialization scheme for `BLS12_381_G2` elements.
+    ///
+    /// Essentially `BLS12_381_G2_Parent_Format_Uncompressed` but only applicable to `BLS12_381_G2` elements.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G2_Format_Uncompressed {}
+
     /// Return the ID of a serialization scheme,
     /// which is essentially `bls12_381_g2_parent_compressed_format()` but only applicable to `BLS12_381_G2` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_g2_compressed_format(): vector<u8> { x"0801" }
+
+    /// A serialization scheme for `BLS12_381_G2` elements.
+    ///
+    /// Essentially `BLS12_381_G2_Parent_Format_Compressed` but only applicable to `BLS12_381_G2` elements.
+    ///
+    /// NOTE: currently information-only, not implemented.
+    struct BLS12_381_G2_Format_Compressed {}
 
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a multiplicative subgroup of `BLS12_381_Fq12`.
@@ -221,6 +375,13 @@ module aptos_std::algebra {
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
     public fun bls12_381_gt_format(): vector<u8> { x"09" }
 
+    /// A serialization scheme for `BLS12_381_Gt` elements.
+    ///
+    /// Essentially `BLS12_381_Fq12_Format` but only applicable to `BLS12_381_Gt` elements.
+    ///
+    /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.3.0).
+    struct BLS12_381_Gt_Format {}
+
     /// The finite field $F_r$ that can be used as the scalar fields
     /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct BLS12_381_Fr {}
@@ -231,11 +392,25 @@ module aptos_std::algebra {
     /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.3.0, blst-0.3.7).
     public fun bls12_381_fr_lendian_format(): vector<u8> { x"0a" }
 
+    /// A serialization scheme for `BLS12_381_Fr` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 32 using little-endian byte order.
+    ///
+    /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.3.0, blst-0.3.7).
+    struct BLS12_381_Fr_Format_LEndian {}
+
     /// Return the ID of a serialization scheme,
     /// where a `BLS12_381_Fr` element is represented by a byte array `b[]` of size 32 using big-endian byte order.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g., blst-0.3.7).
     public fun bls12_381_fr_bendian_format(): vector<u8> { x"0a01" }
+
+    /// A serialization scheme for `BLS12_381_Fr` elements.
+    ///
+    /// In this format, an element is represented by a byte array `b[]` of size 32 using big-endian byte order.
+    ///
+    /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.3.0, blst-0.3.7).
+    struct BLS12_381_Fr_Format_BEndian {}
 
     // Marker types (and their serialization schemes) end.
 
@@ -507,11 +682,31 @@ module aptos_std::algebra {
         }
     }
 
+    /// Try deserializing a byte array to an element of an algebraic structure `S` using a given format `F`.
+    /// Return none if the deserialization failed.
+    public fun deserialize_v2<S, F>(bytes: &vector<u8>): Option<Element<S>> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_serialization_format_enabled<S, F>();
+        let (succeeded, handle) = deserialize_v2_internal<S,F>(bytes);
+        if (succeeded) {
+            some(Element<S> { handle })
+        } else {
+            none()
+        }
+    }
+
     /// Serialize an element of an algebraic structure `S` to a byte array using a given `scheme`.
     public fun serialize<S>(scheme: vector<u8>, element: &Element<S>): vector<u8> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         abort_unless_type_serialization_scheme_enabled<S>(scheme);
         serialize_internal<S>(scheme, element.handle)
+    }
+
+    /// Serialize an element of an algebraic structure `S` to a byte array using a given format `F`.
+    public fun serialize_v2<S, F>(element: &Element<S>): vector<u8> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_type_serialization_format_enabled<S, F>();
+        serialize_v2_internal<S,F>(element.handle)
     }
 
     /// Get the order of group `G`, a big integer little-endian encoded as a byte array.
@@ -559,6 +754,15 @@ module aptos_std::algebra {
         }
     }
 
+    /// Hash some bytes with domain separation tag `dst` into group `G` using suite `S`.
+    public fun hash_to_group<G, S>(dst: &vector<u8>, bytes: &vector<u8>): Element<G> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        abort_unless_structure_hashsuite_pair_enabled_for_hash<G, S>();
+        Element {
+            handle: hash_to_group_internal<G, S>(dst, bytes)
+        }
+    }
+
     #[test_only]
     /// Generate a random element of an algebraic structure `S`.
     public fun insecure_random_element<S>(): Element<S> {
@@ -574,6 +778,7 @@ module aptos_std::algebra {
     // Native functions begin.
 
     native fun deserialize_internal<G>(scheme_id: vector<u8>, bytes: &vector<u8>): (bool, u64);
+    native fun deserialize_v2_internal<G,F>(bytes: &vector<u8>): (bool, u64);
     native fun downcast_internal<L,S>(handle: u64): (bool, u64);
     native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
@@ -601,10 +806,12 @@ module aptos_std::algebra {
     native fun group_scalar_mul_internal<G>(element_handle: u64, scalar_encoded: &vector<u8>): u64;
     native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun hash_to_internal<S,C>(bytes: &vector<u8>): u64;
+    native fun hash_to_group_internal<G,C>(dst: &vector<u8>, bytes: &vector<u8>): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
     native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
     native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
+    native fun serialize_v2_internal<G,F>(handle: u64): vector<u8>;
     native fun upcast_internal<S,L>(handle: u64): u64;
 
     // Native functions end.
@@ -636,6 +843,17 @@ module aptos_std::algebra {
         if (type == type_of<BLS12_381_G1>() && (scheme == bls12_381_g1_uncompressed_format() || scheme == bls12_381_g1_compressed_format()) && bls12_381_structures_enabled()) return;
         if (type == type_of<BLS12_381_G2>() && (scheme == bls12_381_g2_uncompressed_format() || scheme == bls12_381_g2_compressed_format()) && bls12_381_structures_enabled()) return;
         if (type == type_of<BLS12_381_Gt>() && scheme == bls12_381_gt_format() && bls12_381_structures_enabled()) return;
+        abort(std::error::not_implemented(0))
+    }
+
+    fun abort_unless_type_serialization_format_enabled<S, F>() {
+        let structure_type = type_of<S>();
+        let format_type = type_of<F>();
+        if (structure_type == type_of<BLS12_381_Fr>() && (format_type == type_of<BLS12_381_Fr_Format_LEndian>() || format_type == type_of<BLS12_381_Fr_Format_BEndian>()) && bls12_381_structures_enabled()) return;
+        if (structure_type == type_of<BLS12_381_Fq12>() && format_type == type_of<BLS12_381_Fq12_Format>() && bls12_381_structures_enabled()) return;
+        if (structure_type == type_of<BLS12_381_G1>() && (format_type == type_of<BLS12_381_G1_Format_Uncompressed>() || format_type == type_of<BLS12_381_G1_Format_Compressed>()) && bls12_381_structures_enabled()) return;
+        if (structure_type == type_of<BLS12_381_G2>() && (format_type == type_of<BLS12_381_G2_Format_Uncompressed>() || format_type == type_of<BLS12_381_G2_Format_Compressed>()) && bls12_381_structures_enabled()) return;
+        if (structure_type == type_of<BLS12_381_Gt>() && format_type == type_of<BLS12_381_Gt_Format>() && bls12_381_structures_enabled()) return;
         abort(std::error::not_implemented(0))
     }
 
@@ -697,26 +915,26 @@ module aptos_std::algebra {
 
         // Serialization/deserialization.
         let val_7 = from_u64<BLS12_381_Fr>(7);
-        let val_7_2nd = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN));
-        let val_7_3rd = std::option::extract(&mut deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN));
+        let val_7_2nd = std::option::extract(&mut deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN));
+        let val_7_3rd = std::option::extract(&mut deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_BEndian>(&BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN));
         assert!(eq(&val_7, &val_7_2nd), 1);
         assert!(eq(&val_7, &val_7_3rd), 1);
-        assert!(BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN == serialize(bls12_381_fr_lendian_format(), &val_7), 1);
-        assert!(BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN == serialize(bls12_381_fr_bendian_format(), &val_7), 1);
+        assert!(BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN == serialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&val_7), 1);
+        assert!(BLS12_381_FR_VAL_7_SERIALIZED_BENDIAN == serialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_BEndian>(&val_7), 1);
 
         // Deserialization: byte array of right size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_BEndian>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
 
         // Deserialization: byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_lendian_format(), &x"ffff")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fr>(bls12_381_fr_bendian_format(), &x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_BEndian>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&x"ffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_BEndian>(&x"ffff")), 1);
 
         // Negation.
         let val_minus_7 = field_neg(&val_7);
-        assert!(BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN == serialize(bls12_381_fr_lendian_format(), &val_minus_7), 1);
+        assert!(BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN == serialize_v2<BLS12_381_Fr, BLS12_381_Fr_Format_LEndian>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<BLS12_381_Fr>(9);
@@ -764,14 +982,14 @@ module aptos_std::algebra {
 
         // Serialization/deserialization.
         let val_7 = from_u64<BLS12_381_Fq12>(7);
-        let val_7_another = std::option::extract(&mut deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &BLS12_381_FQ12_VAL_7_SERIALIZED));
+        let val_7_another = std::option::extract(&mut deserialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&BLS12_381_FQ12_VAL_7_SERIALIZED));
         assert!(eq(&val_7, &val_7_another), 1);
-        assert!(BLS12_381_FQ12_VAL_7_SERIALIZED == serialize(bls12_381_fq12_format(), &val_7), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffff")), 1);
+        assert!(BLS12_381_FQ12_VAL_7_SERIALIZED == serialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&val_7), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&x"ffff")), 1);
 
         // Negation.
         let val_minus_7 = field_neg(&val_7);
-        assert!(BLS12_381_FQ12_VAL_7_NEG_SERIALIZED == serialize(bls12_381_fq12_format(), &val_minus_7), 1);
+        assert!(BLS12_381_FQ12_VAL_7_NEG_SERIALIZED == serialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<BLS12_381_Fq12>(9);
@@ -834,44 +1052,44 @@ module aptos_std::algebra {
         assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &generator), 1);
-        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &generator), 1);
-        let generator_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
-        let generator_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
+        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&generator), 1);
+        assert!(BLS12_381_G1_GENERATOR_SERIALIZED_COMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&generator), 1);
+        let generator_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&BLS12_381_G1_GENERATOR_SERIALIZED_COMP));
+        let generator_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
 
         // Deserialization: byte array of correct size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization: byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Fq12>(bls12_381_fq12_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Fq12, BLS12_381_Fq12_Format>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
-        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_at_infinity), 1);
-        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_INF_SERIALIZED_UNCOMP));
-        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_INF_SERIALIZED_COMP));
+        assert!(BLS12_381_G1_INF_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&point_at_infinity), 1);
+        assert!(BLS12_381_G1_INF_SERIALIZED_COMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&BLS12_381_G1_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&BLS12_381_G1_INF_SERIALIZED_COMP));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
 
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization: on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12a76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12a76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12")), 1);
 
         // Deserialization: a valid point in (Fq,Fq) but not on the curve.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization: an invalid point (x not in Fq).
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization: byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
@@ -879,8 +1097,8 @@ module aptos_std::algebra {
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         let point_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_7g_calc), 1);
-        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&point_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>( &point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let scalar_a = x"0003";
@@ -921,8 +1139,8 @@ module aptos_std::algebra {
 
         // Negation.
         let point_minus_7g_calc = group_neg(&point_7g_calc);
-        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g1_compressed_format(), &point_minus_7g_calc), 1);
-        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g1_uncompressed_format(), &point_minus_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&point_minus_7g_calc), 1);
+        assert!(BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
@@ -933,6 +1151,14 @@ module aptos_std::algebra {
 
         // Subtraction.
         assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
+
+//        // Hash-to-group.
+//        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+//        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"2c15230b26dbc6fc9a37051158c95b79656e17a1a920b11394ca91c44247d3e48a7a74985cc5c776cdfe4b1f19884970453912e9d31528c060be9ab5c43e8415"));
+//        assert!(eq(&expected, &actual), 1);
+//        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+//        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"65038ac8f2b1def042a5df0b33b1f4eca6bff7cb0f9c6c1526811864e544ed80cad44d40a656e7aff4002a8de287abc8ae0482b5ae825822bb870d6df9b56ca3"));
+//        assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
@@ -965,36 +1191,36 @@ module aptos_std::algebra {
         assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &generator), 1);
-        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &generator), 1);
-        let generator_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
-        let generator_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&generator), 1);
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&generator), 1);
+        let generator_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
+        let generator_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
-        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_at_infinity), 1);
-        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_INF_SERIALIZED_UNCOMP));
-        let inf_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_INF_SERIALIZED_COMP));
+        assert!(BLS12_381_G2_INF_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&point_at_infinity), 1);
+        assert!(BLS12_381_G2_INF_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&point_at_infinity), 1);
+        let inf_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&BLS12_381_G2_INF_SERIALIZED_UNCOMP));
+        let inf_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&BLS12_381_G2_INF_SERIALIZED_COMP));
         assert!(eq(&point_at_infinity, &inf_from_comp), 1);
         assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
+        let point_7g_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP));
+        let point_7g_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
         // Deserialization: on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
 
         // Deserialization: a valid point in (Fq2,Fq2) but not on the curve.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization: an invalid point (x not in Fq2).
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization: byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
@@ -1002,8 +1228,8 @@ module aptos_std::algebra {
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         let point_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_7g_calc), 1);
-        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&point_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&point_7g_calc), 1);
 
         // Multi-scalar multiplication.
         let scalar_a = x"0003";
@@ -1044,8 +1270,8 @@ module aptos_std::algebra {
 
         // Negation.
         let point_minus_7g_calc = group_neg(&point_7g_calc);
-        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize(bls12_381_g2_compressed_format(), &point_minus_7g_calc), 1);
-        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize(bls12_381_g2_uncompressed_format(), &point_minus_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&point_minus_7g_calc), 1);
+        assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);
@@ -1080,20 +1306,20 @@ module aptos_std::algebra {
         assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        assert!(BLS12_381_GT_GENERATOR_SERIALIZED == serialize(bls12_381_gt_format(), &generator), 1);
-        let generator_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_SERIALIZED));
+        assert!(BLS12_381_GT_GENERATOR_SERIALIZED == serialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&generator), 1);
+        let generator_from_deser = std::option::extract(&mut deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&BLS12_381_GT_GENERATOR_SERIALIZED));
         assert!(eq(&generator, &generator_from_deser), 1);
-        assert!(BLS12_381_FQ12_ONE_SERIALIZED == serialize(bls12_381_gt_format(), &identity), 1);
-        let identity_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_FQ12_ONE_SERIALIZED));
+        assert!(BLS12_381_FQ12_ONE_SERIALIZED == serialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&identity), 1);
+        let identity_from_deser = std::option::extract(&mut deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&BLS12_381_FQ12_ONE_SERIALIZED));
         assert!(eq(&identity, &identity_from_deser), 1);
-        let element_7g_from_deser = std::option::extract(&mut deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED));
-        assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"ffff")), 1);
+        let element_7g_from_deser = std::option::extract(&mut deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED));
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&x"ffff")), 1);
 
         // Deserialization: in Fq12 but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
         // Deserialization: byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<BLS12_381_Gt>(bls12_381_gt_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(std::option::is_none(&deserialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
@@ -1101,11 +1327,11 @@ module aptos_std::algebra {
         assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
         let element_7g_calc = group_scalar_mul(&generator, &x"07");
         assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
-        assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize(bls12_381_gt_format(), &element_7g_calc), 1);
+        assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&element_7g_calc), 1);
 
         // Element negation.
         let element_minus_7g_calc = group_neg(&element_7g_calc);
-        assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize(bls12_381_gt_format(), &element_minus_7g_calc), 1);
+        assert!(BLS12_381_GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize_v2<BLS12_381_Gt, BLS12_381_Gt_Format>(&element_minus_7g_calc), 1);
 
         // Element addition.
         let scalar_9 = from_u64<BLS12_381_Fr>(9);

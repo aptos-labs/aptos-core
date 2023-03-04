@@ -1,11 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::algebra::{
-    Structure, BLS12_381_FQ12_FORMAT, BLS12_381_FR_BENDIAN_FORMAT, BLS12_381_FR_FORMAT,
-    BLS12_381_G1_COMPRESSED_FORMAT, BLS12_381_G1_UNCOMPRESSED_FORMAT,
-    BLS12_381_G2_COMPRESSED_FORMAT, BLS12_381_G2_UNCOMPRESSED_FORMAT, BLS12_381_GT_FORMAT,
-};
+use crate::natives::cryptography::algebra::{Structure, BLS12_381_FQ12_FORMAT, BLS12_381_FR_BENDIAN_FORMAT, BLS12_381_FR_FORMAT, BLS12_381_G1_COMPRESSED_FORMAT, BLS12_381_G1_UNCOMPRESSED_FORMAT, BLS12_381_G2_COMPRESSED_FORMAT, BLS12_381_G2_UNCOMPRESSED_FORMAT, BLS12_381_GT_FORMAT, SerializationFormat};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 
 #[derive(Debug, Clone)]
@@ -124,6 +120,34 @@ impl GasParameters {
                 self.ark_bls12_381_fq12_deser * NumArgs::one()
             },
             (Structure::BLS12381Gt, sch) if sch == BLS12_381_GT_FORMAT.as_slice() => {
+                self.ark_bls12_381_fq12_deser * NumArgs::one()
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn deserialize_v2(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
+        match (structure, format) {
+            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLEndian)
+            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrBEndian) => {
+                self.ark_bls12_381_fr_deser * NumArgs::one()
+            },
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12) => {
+                self.ark_bls12_381_fq12_deser * NumArgs::one()
+            },
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Uncompressed) => {
+                self.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Compressed) => {
+                self.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Unompressed) => {
+                self.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Compressed) => {
+                self.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
+            },
+            (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
                 self.ark_bls12_381_fq12_deser * NumArgs::one()
             },
             _ => unreachable!(),
@@ -356,6 +380,32 @@ impl GasParameters {
                 self.ark_bls12_381_fq12_serialize * NumArgs::one()
             },
             (Structure::BLS12381Fr, _) => self.ark_bls12_381_fr_serialize * NumArgs::one(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn serialize_v2(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
+        match (structure, format) {
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12) => self.ark_bls12_381_fq12_serialize * NumArgs::one(),
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Uncompressed) => {
+                self.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Compressed) => {
+                self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Unompressed) => {
+                self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Compressed) => {
+                self.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
+            },
+            (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
+                self.ark_bls12_381_fq12_serialize * NumArgs::one()
+            },
+            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLEndian)
+            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrBEndian) => {
+                self.ark_bls12_381_fr_serialize * NumArgs::one()
+            },
             _ => unreachable!(),
         }
     }

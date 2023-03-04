@@ -58,6 +58,34 @@ impl Structure {
     }
 }
 
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum SerializationFormat {
+    BLS12381Fq12,
+    BLS12381G1Compressed,
+    BLS12381G1Uncompressed,
+    BLS12381G2Compressed,
+    BLS12381G2Unompressed,
+    BLS12381Gt,
+    BLS12381FrLEndian,
+    BLS12381FrBEndian,
+}
+
+impl SerializationFormat {
+    pub fn from_type_tag(type_tag: &TypeTag) -> Option<SerializationFormat> {
+        match type_tag.to_string().as_str() {
+            "0x1::algebra::BLS12_381_Fq12_Format" => Some(SerializationFormat::BLS12381Fq12),
+            "0x1::algebra::BLS12_381_G1_Format_Compressed" => Some(SerializationFormat::BLS12381G1Compressed),
+            "0x1::algebra::BLS12_381_G1_Format_Uncompressed" => Some(SerializationFormat::BLS12381G1Uncompressed),
+            "0x1::algebra::BLS12_381_G2_Format_Compressed" => Some(SerializationFormat::BLS12381G2Compressed),
+            "0x1::algebra::BLS12_381_G2_Format_Uncompressed" => Some(SerializationFormat::BLS12381G2Unompressed),
+            "0x1::algebra::BLS12_381_Gt_Format" => Some(SerializationFormat::BLS12381Gt),
+            "0x1::algebra::BLS12_381_Fr_Format_LEndian" => Some(SerializationFormat::BLS12381FrLEndian),
+            "0x1::algebra::BLS12_381_Fr_Format_BEndian" => Some(SerializationFormat::BLS12381FrBEndian),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Tid, Default)]
 pub struct AlgebraContext {
     objs: Vec<Rc<dyn Any>>,
@@ -73,6 +101,13 @@ macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
         Structure::from_type_tag(&type_tag)
+    }};
+}
+
+macro_rules! format_from_ty_arg {
+    ($context:expr, $typ:expr) => {{
+        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        SerializationFormat::from_type_tag(&type_tag)
     }};
 }
 
@@ -260,6 +295,157 @@ fn serialize_internal(
                 Structure::BLS12381Gt,
                 handle,
                 scheme.as_slice(),
+                ark_bls12_381::Fq12,
+                serialize_uncompressed
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        _ => unreachable!(),
+    }
+}
+
+macro_rules! ark_serialize_v2_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $structure:expr,
+        $handle:expr,
+        $format:expr,
+        $typ:ty,
+        $ser_func:ident
+    ) => {{
+        let element_ptr = get_obj_pointer!($context, $handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let mut buf = Vec::new();
+        element.$ser_func(&mut buf).unwrap();
+        let cost = $gas_params.serialize_v2($structure, $format);
+        (cost, buf)
+    }};
+}
+
+macro_rules! ark_ec_point_serialize_v2_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $structure:expr,
+        $handle:expr,
+        $format:expr,
+        $typ:ty,
+        $ser_func:ident
+    ) => {{
+        let element_ptr = get_obj_pointer!($context, $handle);
+        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let element_affine = element.into_affine();
+        let mut buf = Vec::new();
+        element_affine.$ser_func(&mut buf).unwrap();
+        let cost = $gas_params.serialize_v2($structure, $format);
+        (cost, buf)
+    }};
+}
+
+fn serialize_v2_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(2, ty_args.len());
+    let handle = pop_arg!(args, u64) as usize;
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
+    match (structure_opt, format_opt) {
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLEndian)) => {
+            let (cost, buf) = ark_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381Fr,
+                handle,
+                SerializationFormat::BLS12381FrLEndian,
+                ark_bls12_381::Fr,
+                serialize_uncompressed
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrBEndian)) => {
+            let (cost, mut buf) = ark_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381Fr,
+                handle,
+                SerializationFormat::BLS12381FrBEndian,
+                ark_bls12_381::Fr,
+                serialize_uncompressed
+            );
+            buf.reverse();
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12)) => {
+            let (cost, buf) = ark_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381Fq12,
+                handle,
+                SerializationFormat::BLS12381Fq12,
+                ark_bls12_381::Fq12,
+                serialize_uncompressed
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Uncompressed)) => {
+            let (cost, buf) = ark_ec_point_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381G1,
+                handle,
+                SerializationFormat::BLS12381G1Uncompressed,
+                ark_bls12_381::G1Projective,
+                serialize_uncompressed
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
+            let (cost, buf) = ark_ec_point_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381G1,
+                handle,
+                SerializationFormat::BLS12381G1Compressed,
+                ark_bls12_381::G1Projective,
+                serialize
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Unompressed)) => {
+            let (cost, buf) = ark_ec_point_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381G2,
+                handle,
+                SerializationFormat::BLS12381G2Unompressed,
+                ark_bls12_381::G2Projective,
+                serialize_uncompressed
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
+            let (cost, buf) = ark_ec_point_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381G2,
+                handle,
+                SerializationFormat::BLS12381G2Compressed,
+                ark_bls12_381::G2Projective,
+                serialize
+            );
+            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+        },
+        (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
+            let (cost, buf) = ark_serialize_v2_internal!(
+                gas_params,
+                context,
+                Structure::BLS12381Gt,
+                handle,
+                SerializationFormat::BLS12381Gt,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
@@ -497,6 +683,227 @@ fn deserialize_internal(
                 },
                 _ => Ok(NativeResult::ok(
                     gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
+                    smallvec![Value::bool(false), Value::u64(0)],
+                )),
+            }
+        },
+        _ => unreachable!(),
+    }
+}
+
+macro_rules! ark_deserialize_v2_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $bytes:expr,
+        $structure:expr,
+        $format:expr,
+        $typ:ty,
+        $deser_func:ident
+    ) => {{
+        match <$typ>::$deser_func($bytes) {
+            Ok(element) => {
+                let handle = store_obj!($context, element);
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize_v2($structure, $format),
+                    smallvec![Value::bool(true), Value::u64(handle as u64)],
+                ))
+            },
+            _ => Ok(NativeResult::ok(
+                $gas_params.deserialize_v2($structure, $format),
+                smallvec![Value::bool(false), Value::u64(0)],
+            )),
+        }
+    }};
+}
+
+macro_rules! ark_ec_point_deserialize_v2_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $bytes:expr,
+        $structure:expr,
+        $format:expr,
+        $typ:ty,
+        $deser_func:ident
+    ) => {{
+        match <$typ>::$deser_func($bytes) {
+            Ok(element) => {
+                let element_proj = element.into_projective();
+                let handle = store_obj!($context, element_proj);
+                Ok(NativeResult::ok(
+                    $gas_params.deserialize_v2($structure, $format),
+                    smallvec![Value::bool(true), Value::u64(handle as u64)],
+                ))
+            },
+            _ => Ok(NativeResult::ok(
+                $gas_params.deserialize_v2($structure, $format),
+                smallvec![Value::bool(false), Value::u64(0)],
+            )),
+        }
+    }};
+}
+
+
+fn deserialize_v2_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(2, ty_args.len());
+    let structure = structure_from_ty_arg!(context, &ty_args[0]);
+    let format = format_from_ty_arg!(context, &ty_args[1]);
+    let vector_ref = pop_arg!(args, VectorRef);
+    let bytes_ref = vector_ref.as_bytes_ref();
+    let bytes = bytes_ref.as_slice();
+    match (structure, format) {
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLEndian)) => {
+            if bytes.len() != 32 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381Fr,
+                SerializationFormat::BLS12381FrLEndian,
+                ark_bls12_381::Fr,
+                deserialize_uncompressed
+            )
+        },
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrBEndian)) => {
+            if bytes.len() != 32 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            let mut lendian: Vec<u8> = bytes.to_vec();
+            lendian.reverse();
+            let bytes = lendian.as_slice();
+            ark_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381Fr,
+                SerializationFormat::BLS12381FrBEndian,
+                ark_bls12_381::Fr,
+                deserialize_uncompressed
+            )
+        },
+        (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12)) => {
+            if bytes.len() != 576 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381Fq12,
+                SerializationFormat::BLS12381Fq12,
+                ark_bls12_381::Fq12,
+                deserialize_uncompressed
+            )
+        },
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Uncompressed)) => {
+            if bytes.len() != 96 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_ec_point_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381G1,
+                SerializationFormat::BLS12381G1Uncompressed,
+                ark_bls12_381::G1Affine,
+                deserialize_uncompressed
+            )
+        },
+        (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
+            if bytes.len() != 48 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_ec_point_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381G1,
+                SerializationFormat::BLS12381G1Compressed,
+                ark_bls12_381::G1Affine,
+                deserialize
+            )
+        },
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Unompressed)) => {
+            if bytes.len() != 192 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_ec_point_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381G2,
+                SerializationFormat::BLS12381G2Unompressed,
+                ark_bls12_381::G2Affine,
+                deserialize_uncompressed
+            )
+        },
+        (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
+            if bytes.len() != 96 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            ark_ec_point_deserialize_v2_internal!(
+                gas_params,
+                context,
+                bytes,
+                Structure::BLS12381G2,
+                SerializationFormat::BLS12381G2Compressed,
+                ark_bls12_381::G2Affine,
+                deserialize
+            )
+        },
+        (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
+            if bytes.len() != 576 {
+                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                    Value::bool(false),
+                    Value::u64(0)
+                ]));
+            }
+            match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
+                Ok(element) => {
+                    if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
+                        let handle = store_obj!(context, element);
+                        Ok(NativeResult::ok(
+                            gas_params.deserialize_v2(Structure::BLS12381Gt, SerializationFormat::BLS12381Gt),
+                            smallvec![Value::bool(true), Value::u64(handle as u64)],
+                        ))
+                    } else {
+                        Ok(NativeResult::ok(
+                            gas_params.deserialize_v2(Structure::BLS12381Gt, SerializationFormat::BLS12381Gt),
+                            smallvec![Value::bool(false), Value::u64(0)],
+                        ))
+                    }
+                },
+                _ => Ok(NativeResult::ok(
+                    gas_params.deserialize_v2(Structure::BLS12381Gt, SerializationFormat::BLS12381Gt),
                     smallvec![Value::bool(false), Value::u64(0)],
                 )),
             }
@@ -1897,6 +2304,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), deserialize_internal),
         ),
         (
+            "deserialize_v2_internal",
+            make_native_from_func(gas_params.clone(), deserialize_v2_internal),
+        ),
+        (
             "downcast_internal",
             make_native_from_func(gas_params.clone(), downcast_internal),
         ),
@@ -2007,6 +2418,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "serialize_internal",
             make_native_from_func(gas_params.clone(), serialize_internal),
+        ),
+        (
+            "serialize_v2_internal",
+            make_native_from_func(gas_params.clone(), serialize_v2_internal),
         ),
         (
             "upcast_internal",
