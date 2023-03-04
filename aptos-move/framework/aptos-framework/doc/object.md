@@ -45,11 +45,18 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `generate_transfer_ref`](#0x1_object_generate_transfer_ref)
 -  [Function `generate_signer`](#0x1_object_generate_signer)
 -  [Function `object_from_constructor_ref`](#0x1_object_object_from_constructor_ref)
+-  [Function `object_from_extend_ref`](#0x1_object_object_from_extend_ref)
+-  [Function `object_from_transfer_ref`](#0x1_object_object_from_transfer_ref)
+-  [Function `address_from_constructor_ref`](#0x1_object_address_from_constructor_ref)
+-  [Function `address_from_extend_ref`](#0x1_object_address_from_extend_ref)
+-  [Function `address_from_transfer_ref`](#0x1_object_address_from_transfer_ref)
+-  [Function `address_from_delete_ref`](#0x1_object_address_from_delete_ref)
 -  [Function `create_guid`](#0x1_object_create_guid)
 -  [Function `new_event_handle`](#0x1_object_new_event_handle)
 -  [Function `object_from_delete_ref`](#0x1_object_object_from_delete_ref)
 -  [Function `delete`](#0x1_object_delete)
 -  [Function `generate_signer_for_extending`](#0x1_object_generate_signer_for_extending)
+-  [Function `ungated_transfer_allowed`](#0x1_object_ungated_transfer_allowed)
 -  [Function `disable_ungated_transfer`](#0x1_object_disable_ungated_transfer)
 -  [Function `enable_ungated_transfer`](#0x1_object_enable_ungated_transfer)
 -  [Function `generate_linear_transfer_ref`](#0x1_object_generate_linear_transfer_ref)
@@ -527,7 +534,7 @@ Produces an ObjectId from the given address. This is not verified.
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>));
     <b>assert</b>!(<a href="object.md#0x1_object_exists_at">exists_at</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>));
-    <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;{ inner: <a href="object.md#0x1_object">object</a> }
+    <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: <a href="object.md#0x1_object">object</a> }
 }
 </code></pre>
 
@@ -886,6 +893,156 @@ Returns the address of within a ConstructorRef
 
 </details>
 
+<a name="0x1_object_object_from_extend_ref"></a>
+
+## Function `object_from_extend_ref`
+
+Returns the address of within a DeleteRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_extend_ref">object_from_extend_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_extend_ref">object_from_extend_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_object_from_transfer_ref"></a>
+
+## Function `object_from_transfer_ref`
+
+Returns the address of within a DeleteRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_transfer_ref">object_from_transfer_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_transfer_ref">object_from_transfer_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_constructor_ref"></a>
+
+## Function `address_from_constructor_ref`
+
+Returns the address of within a ConstructorRef
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_extend_ref"></a>
+
+## Function `address_from_extend_ref`
+
+Returns the address of within a ExtendRef
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_transfer_ref"></a>
+
+## Function `address_from_transfer_ref`
+
+Returns the address of within a TransferRef
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_transfer_ref">address_from_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_transfer_ref">address_from_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_delete_ref"></a>
+
+## Function `address_from_delete_ref`
+
+Returns the address of within a DeleteRef
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_object_create_guid"></a>
 
 ## Function `create_guid`
@@ -1015,6 +1172,31 @@ Create a signer for the ExtendRef
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <a href="create_signer.md#0x1_create_signer">create_signer</a>(ref.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_ungated_transfer_allowed"></a>
+
+## Function `ungated_transfer_allowed`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+    <a href="object.md#0x1_object">object</a>.allow_ungated_transfer
 }
 </code></pre>
 

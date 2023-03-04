@@ -83,7 +83,7 @@ module aptos_framework::object {
 
     #[resource_group(scope = global)]
     /// A shared resource group for storing object resources together in storage.
-    struct ObjectGroup { }
+    struct ObjectGroup {}
 
     /// A pointer to an object -- these can only provide guarantees based upon the underlying data
     /// type, that is the validity of T existing at an address is something that cannot be verified
@@ -134,7 +134,7 @@ module aptos_framework::object {
     public fun address_to_object<T: key>(object: address): Object<T> {
         assert!(exists<ObjectCore>(object), error::not_found(EOBJECT_DOES_NOT_EXIST));
         assert!(exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
-        Object<T>{ inner: object }
+        Object<T> { inner: object }
     }
 
     /// Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
@@ -230,6 +230,36 @@ module aptos_framework::object {
         address_to_object<T>(ref.self)
     }
 
+    /// Returns the address of within a DeleteRef.
+    public fun object_from_extend_ref<T: key>(ref: &ExtendRef): Object<T> {
+        address_to_object<T>(ref.self)
+    }
+
+    /// Returns the address of within a DeleteRef.
+    public fun object_from_transfer_ref<T: key>(ref: &TransferRef): Object<T> {
+        address_to_object<T>(ref.self)
+    }
+
+    /// Returns the address of within a ConstructorRef
+    public fun address_from_constructor_ref(ref: &ConstructorRef): address {
+        ref.self
+    }
+
+    /// Returns the address of within a ExtendRef
+    public fun address_from_extend_ref(ref: &ExtendRef): address {
+        ref.self
+    }
+
+    /// Returns the address of within a TransferRef
+    public fun address_from_transfer_ref(ref: &TransferRef): address {
+        ref.self
+    }
+
+    /// Returns the address of within a DeleteRef
+    public fun address_from_delete_ref(ref: &DeleteRef): address {
+        ref.self
+    }
+
     // Signer required functions
 
     /// Create a guid for the object, typically used for events
@@ -273,6 +303,10 @@ module aptos_framework::object {
     }
 
     // Transfer functionality
+    public fun ungated_transfer_allowed<T>(object: Object<T>): bool acquires ObjectCore {
+        let object = borrow_global_mut<ObjectCore>(object.inner);
+        object.allow_ungated_transfer
+    }
 
     /// Disable direct transfer, transfers can only be triggered via a TransferRef
     public fun disable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
@@ -476,7 +510,7 @@ module aptos_framework::object {
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct Weapon has key { }
+    struct Weapon has key {}
 
     #[test_only]
     public fun create_hero(creator: &signer): (ConstructorRef, Object<Hero>) acquires ObjectCore {
@@ -499,7 +533,7 @@ module aptos_framework::object {
     public fun create_weapon(creator: &signer): (ConstructorRef, Object<Weapon>) {
         let weapon_constructor_ref = create_named_object(creator, b"weapon");
         let weapon_signer = generate_signer(&weapon_constructor_ref);
-        move_to(&weapon_signer, Weapon { });
+        move_to(&weapon_signer, Weapon {});
         let weapon = object_from_constructor_ref<Weapon>(&weapon_constructor_ref);
         (weapon_constructor_ref, weapon)
     }

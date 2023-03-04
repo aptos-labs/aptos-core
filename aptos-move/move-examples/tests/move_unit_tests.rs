@@ -146,6 +146,11 @@ fn test_token_objects() {
 }
 
 #[test]
+fn test_token_v2() {
+    test_common("token_v2");
+}
+
+#[test]
 fn test_two_by_two_transfer() {
     run_tests_for_pkg("scripts/two_by_two_transfer", BTreeMap::new());
 }

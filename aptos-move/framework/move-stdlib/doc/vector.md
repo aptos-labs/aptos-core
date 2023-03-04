@@ -300,7 +300,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
     <b>if</b> (len == 0) <b>return</b> ();
 
     <b>let</b> front_index = 0;
-    <b>let</b> back_index = len -1;
+    <b>let</b> back_index = len - 1;
     <b>while</b> (front_index &lt; back_index) {
         <a href="vector.md#0x1_vector_swap">swap</a>(v, front_index, back_index);
         front_index = front_index + 1;
@@ -452,7 +452,10 @@ Aborts if <code>i</code> is out of bounds.
     <b>if</b> (i &gt;= len) <b>abort</b> <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>;
 
     len = len - 1;
-    <b>while</b> (i &lt; len) <a href="vector.md#0x1_vector_swap">swap</a>(v, i, { i = i + 1; i });
+    <b>while</b> (i &lt; len) <a href="vector.md#0x1_vector_swap">swap</a>(v, i, {
+        i = i + 1;
+        i
+    });
     <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v)
 }
 </code></pre>
@@ -510,8 +513,8 @@ Check if <code>v1</code> is equal to the result of adding <code>e</code> at the 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_push_back">eq_push_back</a>&lt;Element&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element): bool {
     len(v1) == len(v2) + 1 &&
-    v1[len(v1)-1] == e &&
-    v1[0..len(v1)-1] == v2[0..len(v2)]
+        v1[len(v1) - 1] == e &&
+        v1[0..len(v1) - 1] == v2[0..len(v2)]
 }
 </code></pre>
 
@@ -524,8 +527,8 @@ Check if <code>v</code> is equal to the result of concatenating <code>v1</code> 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_append">eq_append</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
     len(v) == len(v1) + len(v2) &&
-    v[0..len(v1)] == v1 &&
-    v[len(v1)..len(v)] == v2
+        v[0..len(v1)] == v1 &&
+        v[len(v1)..len(v)] == v2
 }
 </code></pre>
 
@@ -538,7 +541,7 @@ Check <code>v1</code> is equal to the result of removing the first element of <c
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_pop_front">eq_pop_front</a>&lt;Element&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
     len(v1) + 1 == len(v2) &&
-    v1 == v2[1..len(v2)]
+        v1 == v2[1..len(v2)]
 }
 </code></pre>
 
@@ -551,8 +554,8 @@ Check that <code>v1</code> is equal to the result of removing the element at ind
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_remove_elem_at_index">eq_remove_elem_at_index</a>&lt;Element&gt;(i: u64, v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
     len(v1) + 1 == len(v2) &&
-    v1[0..i] == v2[0..i] &&
-    v1[i..len(v1)] == v2[i + 1..len(v2)]
+        v1[0..i] == v2[0..i] &&
+        v1[i..len(v1)] == v2[i + 1..len(v2)]
 }
 </code></pre>
 

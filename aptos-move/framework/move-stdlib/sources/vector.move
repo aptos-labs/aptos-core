@@ -67,7 +67,7 @@ module std::vector {
         if (len == 0) return ();
 
         let front_index = 0;
-        let back_index = len -1;
+        let back_index = len - 1;
         while (front_index < back_index) {
             swap(v, front_index, back_index);
             front_index = front_index + 1;
@@ -136,7 +136,10 @@ module std::vector {
         if (i >= len) abort EINDEX_OUT_OF_BOUNDS;
 
         len = len - 1;
-        while (i < len) swap(v, i, { i = i + 1; i });
+        while (i < len) swap(v, i, {
+            i = i + 1;
+            i
+        });
         pop_back(v)
     }
     spec remove {
@@ -163,6 +166,7 @@ module std::vector {
             let e = pop_back(&mut v);
             f(e);
         };
+        destroy_empty(v);
     }
 
     /// Apply the function to a reference of each element in the vector.
@@ -188,7 +192,7 @@ module std::vector {
     public inline fun fold<Accumulator, Element>(
         v: vector<Element>,
         init: Accumulator,
-        f: |Accumulator,Element|Accumulator
+        f: |Accumulator, Element|Accumulator
     ): Accumulator {
         let accu = init;
         for_each(v, |elem| accu = f(accu, elem));
@@ -217,7 +221,7 @@ module std::vector {
     }
 
     /// Filter the vector using the boolean function, removing all elements for which `p(e)` is not true.
-    public inline fun filter<Element:drop>(
+    public inline fun filter<Element: drop>(
         v: vector<Element>,
         p: |&Element|bool
     ): vector<Element> {
@@ -273,28 +277,28 @@ module std::vector {
         /// Check if `v1` is equal to the result of adding `e` at the end of `v2`
         fun eq_push_back<Element>(v1: vector<Element>, v2: vector<Element>, e: Element): bool {
             len(v1) == len(v2) + 1 &&
-            v1[len(v1)-1] == e &&
-            v1[0..len(v1)-1] == v2[0..len(v2)]
+                v1[len(v1) - 1] == e &&
+                v1[0..len(v1) - 1] == v2[0..len(v2)]
         }
 
         /// Check if `v` is equal to the result of concatenating `v1` and `v2`
         fun eq_append<Element>(v: vector<Element>, v1: vector<Element>, v2: vector<Element>): bool {
             len(v) == len(v1) + len(v2) &&
-            v[0..len(v1)] == v1 &&
-            v[len(v1)..len(v)] == v2
+                v[0..len(v1)] == v1 &&
+                v[len(v1)..len(v)] == v2
         }
 
         /// Check `v1` is equal to the result of removing the first element of `v2`
         fun eq_pop_front<Element>(v1: vector<Element>, v2: vector<Element>): bool {
             len(v1) + 1 == len(v2) &&
-            v1 == v2[1..len(v2)]
+                v1 == v2[1..len(v2)]
         }
 
         /// Check that `v1` is equal to the result of removing the element at index `i` from `v2`.
         fun eq_remove_elem_at_index<Element>(i: u64, v1: vector<Element>, v2: vector<Element>): bool {
             len(v1) + 1 == len(v2) &&
-            v1[0..i] == v2[0..i] &&
-            v1[i..len(v1)] == v2[i + 1..len(v2)]
+                v1[0..i] == v2[0..i] &&
+                v1[i..len(v1)] == v2[i + 1..len(v2)]
         }
 
         /// Check if `v` contains `e`.
@@ -302,5 +306,4 @@ module std::vector {
             exists x in v: x == e
         }
     }
-
 }
