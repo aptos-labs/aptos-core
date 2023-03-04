@@ -206,6 +206,13 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let duration = Duration::from_secs(10 * 420);
+    let suite_name = if suite_name == "compat" {
+        panic!();
+    } else {
+        "load_vs_perf_benchmark"
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -726,9 +733,11 @@ fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&LoadVsPerfBenchmark {
-            test: &PerformanceBenchmarkWithFN,
+            test: &ThreeRegionSimulationTest {
+                add_execution_delay: None,
+            },
             workloads: Workloads::TPS(&[
-                200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
+                200, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000
             ]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
