@@ -215,7 +215,6 @@ where
 }
 
 fn main() {
-    #[allow(deprecated)]
     let _mp = MetricsPusher::start();
     let opt = Opt::from_args();
 
