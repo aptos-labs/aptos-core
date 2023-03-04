@@ -127,11 +127,14 @@ module aptos_framework::delegation_pool {
     /// Delegator's active balance cannot be less than `MIN_COINS_ON_SHARES_POOL`.
     const EDELEGATOR_ACTIVE_BALANCE_TOO_LOW: u64 = 8;
 
+    /// Delegator's pending_inactive balance cannot be less than `MIN_COINS_ON_SHARES_POOL`.
+    const EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW: u64 = 9;
+
     /// Creating delegation pools is not enabled yet.
-    const EDELEGATION_POOLS_DISABLED: u64 = 9;
+    const EDELEGATION_POOLS_DISABLED: u64 = 10;
 
     /// Cannot request to withdraw zero stake.
-    const EWITHDRAW_ZERO_STAKE: u64 = 10;
+    const EWITHDRAW_ZERO_STAKE: u64 = 11;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -462,6 +465,19 @@ module aptos_framework::delegation_pool {
         assert!(delegation_pool_exists(pool_address), error::invalid_argument(EDELEGATION_POOL_DOES_NOT_EXIST));
     }
 
+    fun assert_min_active_balance(pool: &DelegationPool, delegator_address: address) {
+        let balance = pool_u64::balance(&pool.active_shares, delegator_address);
+        assert!(balance >= MIN_COINS_ON_SHARES_POOL, error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW));
+    }
+
+    fun assert_min_pending_inactive_balance(pool: &DelegationPool, delegator_address: address) {
+        let balance = pool_u64::balance(pending_inactive_shares_pool(pool), delegator_address);
+        assert!(
+            balance >= MIN_COINS_ON_SHARES_POOL,
+            error::invalid_argument(EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW)
+        );
+    }
+
     fun coins_to_redeem_to_ensure_min_stake(
         src_shares_pool: &pool_u64::Pool,
         shareholder: address,
@@ -558,10 +574,7 @@ module aptos_framework::delegation_pool {
 
         // but buy shares for delegator just for the remaining amount after fee
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount - add_stake_fee);
-        assert!(
-            pool_u64::balance(&pool.active_shares, delegator_address) >= MIN_COINS_ON_SHARES_POOL,
-            error::invalid_argument(EDELEGATOR_ACTIVE_BALANCE_TOO_LOW)
-        );
+        assert_min_active_balance(pool, delegator_address);
 
         // grant temporary ownership over `add_stake` fees to a separate shareholder in order to:
         // - not mistake them for rewards to pay the operator from
@@ -605,7 +618,9 @@ module aptos_framework::delegation_pool {
         amount = redeem_active_shares(pool, delegator_address, amount);
 
         stake::unlock(&retrieve_stake_pool_owner(pool), amount);
+
         buy_in_pending_inactive_shares(pool, delegator_address, amount);
+        assert_min_pending_inactive_balance(pool, delegator_address);
 
         event::emit_event(
             &mut pool.unlock_stake_events,
@@ -637,7 +652,9 @@ module aptos_framework::delegation_pool {
         amount = redeem_inactive_shares(pool, delegator_address, amount, observed_lockup_cycle);
 
         stake::reactivate_stake(&retrieve_stake_pool_owner(pool), amount);
+
         pool_u64::buy_in(&mut pool.active_shares, delegator_address, amount);
+        assert_min_active_balance(pool, delegator_address);
 
         event::emit_event(
             &mut pool.reactivate_stake_events,
@@ -1091,7 +1108,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x30009, location = Self)]
+    #[expected_failure(abort_code = 0x3000A, location = Self)]
     public entry fun test_delegation_pools_disabled(
         aptos_framework: &signer,
         validator: &signer,
@@ -1157,7 +1174,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x1000A, location = Self)]
+    #[expected_failure(abort_code = 0x1000B, location = Self)]
     public entry fun test_cannot_withdraw_zero_stake(
         aptos_framework: &signer,
         validator: &signer,
@@ -1358,8 +1375,8 @@ module aptos_framework::delegation_pool {
         // the pending withdrawal has been created as > 0 pending_inactive shares have been bought
         assert_pending_withdrawal(delegator_address, pool_address, true, 0, false, 1);
 
-        reactivate_stake(delegator, pool_address, 2);
-        // redeem 2 coins >= delegator balance -> all shares are redeemed
+        reactivate_stake(delegator, pool_address, 1);
+        // redeem 1 coins >= delegator balance -> all shares are redeemed and pending withdrawal is deleted
         assert_delegation(delegator_address, pool_address, 1009999995, 0, 0);
         // the pending withdrawal has been deleted as delegator has 0 pending_inactive shares now
         assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
