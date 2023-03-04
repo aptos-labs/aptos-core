@@ -79,6 +79,28 @@ pub static WORK_WITH_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static TASK_COMMITTING_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_task_committing_seconds",
+        // metric description
+        "The time spent in task validation in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static TASK_WAKEUP_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_task_wakeup_seconds",
+        // metric description
+        "The time spent in task validation in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name

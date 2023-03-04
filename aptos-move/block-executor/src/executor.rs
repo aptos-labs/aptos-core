@@ -5,8 +5,9 @@
 use crate::{
     counters,
     counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_COMMITTING_SECONDS,
+        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, TASK_WAKEUP_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
@@ -200,14 +201,15 @@ where
         committing: bool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
-        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             // Only one thread try_commit to avoid contention.
+            let committing_timer = TASK_COMMITTING_SECONDS.start_timer();
             if committing {
                 // Keep committing txns until there is no more that can be committed now.
                 loop {
@@ -216,6 +218,7 @@ where
                     }
                 }
             }
+            drop(committing_timer);
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(
                     version_to_validate,
@@ -234,6 +237,7 @@ where
                     base_view,
                 ),
                 SchedulerTask::ExecutionTask(_, Some(condvar)) => {
+                    let _timer = TASK_WAKEUP_SECONDS.start_timer();
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = true;
