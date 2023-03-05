@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_infallible::{Mutex, RwLock};
 use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
@@ -60,9 +61,9 @@ impl AccountGenerator {
 }
 
 pub struct AccountCache {
-    generator: AccountGenerator,
-    pub accounts: VecDeque<LocalAccount>,
-    rng: StdRng,
+    generator: Mutex<AccountGenerator>,
+    pub accounts: VecDeque<RwLock<LocalAccount>>,
+    rng: RwLock<StdRng>,
 }
 
 impl AccountCache {
@@ -70,9 +71,9 @@ impl AccountCache {
 
     pub fn new(generator: AccountGenerator) -> Self {
         Self {
-            generator,
+            generator: Mutex::new(generator),
             accounts: VecDeque::new(),
-            rng: StdRng::from_seed(Self::SEED),
+            rng: RwLock::new(StdRng::from_seed(Self::SEED)),
         }
     }
 
@@ -80,34 +81,37 @@ impl AccountCache {
         self.accounts.len()
     }
 
-    pub fn accounts(&self) -> &VecDeque<LocalAccount> {
+    pub fn accounts(&self) -> &VecDeque<RwLock<LocalAccount>> {
         &self.accounts
     }
 
     pub fn grow(&mut self, n: usize) {
-        let accounts: Vec<_> = (0..n).map(|_| self.generator.generate()).collect();
+        let accounts: Vec<_> = (0..n)
+            .map(|_| RwLock::new(self.generator.lock().generate()))
+            .collect();
         self.accounts.extend(accounts);
     }
 
-    pub fn get_random(&mut self) -> &mut LocalAccount {
-        let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 1);
+    pub fn get_random(&self) -> &RwLock<LocalAccount> {
+        //let x = self.rng.write().next_u64();
+        let indices = rand::seq::index::sample(&mut *self.rng.write(), self.accounts.len(), 1);
         let index = indices.index(0);
-
-        &mut self.accounts[index]
+        &self.accounts[index]
     }
 
     pub fn get_random_transfer_batch(
-        &mut self,
+        &self,
         batch_size: usize,
-    ) -> (&mut LocalAccount, Vec<AccountAddress>) {
-        let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), batch_size + 1);
+    ) -> (&RwLock<LocalAccount>, Vec<AccountAddress>) {
+        let indices =
+            rand::seq::index::sample(&mut *self.rng.write(), self.accounts.len(), batch_size + 1);
         let sender_idx = indices.index(0);
         let receivers = indices
             .iter()
             .skip(1)
-            .map(|i| self.accounts[i].address())
+            .map(|i| self.accounts[i].read().address())
             .collect();
-        let sender = &mut self.accounts[sender_idx];
+        let sender = &self.accounts[sender_idx];
 
         (sender, receivers)
     }

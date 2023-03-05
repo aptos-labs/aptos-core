@@ -7,6 +7,8 @@ use crate::{
     benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
+use aptos_infallible::Mutex;
+use aptos_logger::error;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
@@ -130,10 +132,12 @@ impl TransactionGenerator {
     fn gen_seed_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
         let generator = AccountGenerator::new_for_seed_accounts();
 
-        let mut accounts = Self::gen_account_cache(generator, num_accounts, "seed");
+        let accounts = Self::gen_account_cache(generator, num_accounts, "seed");
 
-        for account in &mut accounts.accounts {
-            *account.sequence_number_mut() = get_sequence_number(account.address(), reader.clone());
+        for account in &accounts.accounts {
+            let mut account_write = account.write();
+            *account_write.sequence_number_mut() =
+                get_sequence_number(account_write.address(), reader.clone());
         }
         accounts
     }
@@ -268,7 +272,7 @@ impl TransactionGenerator {
                     let txn = self.root_account.sign_with_transaction_builder(
                         self.transaction_factory
                             .implicitly_create_user_account_and_transfer(
-                                new_account.public_key(),
+                                new_account.read().public_key(),
                                 seed_account_balance,
                             ),
                     );
@@ -276,7 +280,7 @@ impl TransactionGenerator {
                         Transaction::UserTransaction(txn),
                         ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
                             self.root_account.address(),
-                            new_account.address(),
+                            new_account.read().address(),
                             seed_account_balance,
                         )),
                     )
@@ -317,7 +321,12 @@ impl TransactionGenerator {
         for chunk in &(0..num_new_accounts).chunks(block_size) {
             let transactions: Vec<_> = chunk
                 .map(|_| {
-                    let sender = self.seed_accounts_cache.as_mut().unwrap().get_random();
+                    let mut sender = self
+                        .seed_accounts_cache
+                        .as_mut()
+                        .unwrap()
+                        .get_random()
+                        .write();
                     let new_account = generator.generate();
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory
@@ -358,15 +367,15 @@ impl TransactionGenerator {
     ) {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
-            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
+            let transactions = Mutex::new(vec![]);
+            (0..(block_size / transactions_per_sender))
                 .into_par_iter()
-                .flat_map(|_| {
-                    let (sender, receivers) = self
-                        .accounts_cache
-                        .as_mut()
-                        .unwrap()
-                        .get_random_transfer_batch(transactions_per_sender);
-                    receivers
+                .for_each(|_| {
+                    let account_cache = self.accounts_cache.as_ref().unwrap();
+                    let (sender, receivers) =
+                        account_cache.get_random_transfer_batch(transactions_per_sender);
+                    let mut sender = sender.write();
+                    let txns_for_sender = receivers
                         .into_iter()
                         .map(|receiver| {
                             let amount = 1;
@@ -382,16 +391,18 @@ impl TransactionGenerator {
                                 )),
                             )
                         })
-                        .collect::<Vec<_>>()
-                })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
-                .collect();
-            self.version += transactions.len() as Version;
+                        .collect::<Vec<_>>();
+                    transactions.lock().extend(txns_for_sender)
+                });
+            transactions
+                .lock()
+                .push(Transaction::StateCheckpoint(HashValue::random()).into());
+            error!("Transactions len is {}", transactions.lock().len());
+
+            self.version += transactions.lock().len() as Version;
 
             if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
+                sender.send(transactions.into_inner()).unwrap();
             }
         }
     }
@@ -416,7 +427,7 @@ impl TransactionGenerator {
             .accounts()
             .par_iter()
             .for_each(|account| {
-                let address = account.address();
+                let address = account.read().address();
                 let db_state_view = db.latest_state_checkpoint_view().unwrap();
                 let address_account_view = db_state_view.as_account_with_state_view(&address);
                 assert_eq!(
@@ -425,7 +436,7 @@ impl TransactionGenerator {
                         .unwrap()
                         .unwrap()
                         .sequence_number(),
-                    account.sequence_number()
+                    account.read().sequence_number()
                 );
                 bar.inc(1);
             });
