@@ -24,6 +24,7 @@ module token_objects::collection {
     use std::signer;
     use std::string::{Self, String};
 
+    use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
     friend token_objects::token;
@@ -51,6 +52,14 @@ module token_objects::collection {
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Emitted upon any mutation of the collection.
+        mutation_events: event::EventHandle<MutationEvent>,
+    }
+
+    /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
+    /// directly understand the behavior in a writeset.
+    struct MutationEvent has drop, store {
+        mutated_field_name: String,
     }
 
     /// This config specifies which fields in the TokenData are mutable
@@ -147,6 +156,7 @@ module token_objects::collection {
             mutability_config,
             name,
             uri,
+            mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, collection);
         move_to(&object_signer, supply);
@@ -305,6 +315,10 @@ module token_objects::collection {
         );
 
         collection.description = description;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"description") },
+        );
     }
 
     public fun set_uri<T: key>(
@@ -325,6 +339,10 @@ module token_objects::collection {
         );
 
         collection.uri = uri;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+        );
     }
 
     // Tests
