@@ -2188,6 +2188,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "ureq",
+ "url",
 ]
 
 [[package]]
