@@ -6,10 +6,10 @@
 # metrics port for example, we'll only run metrics checks.
 ---
 node_address:
-  url: "https://fullnode.devnet.aptoslabs.com/"
+  url: "https://fullnode.testnet.aptoslabs.com/"
   api_port: 443
-configuration_id: devnet_fullnode
-configuration_name: "Devnet Fullnode"
+configuration_id: testnet_fullnode
+configuration_name: "Testnet Fullnode"
 checkers:
   - type: "BuildVersion"
   - type: "Latency"
