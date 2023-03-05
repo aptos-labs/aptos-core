@@ -171,5 +171,5 @@ import { NODE_URL, FAUCET_URL } from "./common";
 
   console.log("\n=== Getting Bob's NFTs ===");
   const bobNfts = await provider.getAccountNFTs(bob.address().hex());
-  console.log(`Alice current token ownership: ${bobNfts.current_token_ownerships.length}. Should be 0`);
+  console.log(`Bob current token ownership: ${bobNfts.current_token_ownerships.length}. Should be 0`);
 })();
