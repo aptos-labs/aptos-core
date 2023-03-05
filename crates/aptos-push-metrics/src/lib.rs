@@ -22,6 +22,7 @@ use std::{
 use url::Url;
 
 const DEFAULT_PUSH_FREQUENCY_SECS: u64 = 15;
+const DEFAULT_DASHBOARD_BASE_URL: &str = "https://o11y.aptosdev.com/grafana/d/execution/execution";
 
 /// MetricsPusher provides a function to push a list of Metrics to a configurable
 /// pushgateway endpoint.
@@ -144,8 +145,11 @@ impl MetricsPusher {
             .unwrap()
             .as_millis()
             .to_string();
-        let mut url =
-            Url::parse("https://o11y.aptosdev.com/grafana/d/execution/execution").unwrap();
+        let mut url = Url::parse(
+            &env::var("DASHBOARD_BASE_URL")
+                .unwrap_or_else(|_| DEFAULT_DASHBOARD_BASE_URL.to_string()),
+        )
+        .unwrap();
         url.query_pairs_mut()
             .append_pair("from", &start_time)
             .append_pair("to", &end_time)
@@ -173,11 +177,13 @@ impl MetricsPusher {
     /// start starts a new thread and periodically pushes the metrics to a pushgateway endpoint
     pub fn start(chain_name: &str) -> Self {
         let (tx, rx) = mpsc::channel();
-        let namespace = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            .to_string();
+        let namespace = env::var("PUSH_METRICS_NAMESPACE").unwrap_or_else(|_| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+                .to_string()
+        });
         let push_metrics_labels = Self::push_metrics_extra_labels(chain_name, &namespace);
         let worker_thread =
             Self::start_worker_thread(rx, push_metrics_labels, chain_name, &namespace);
