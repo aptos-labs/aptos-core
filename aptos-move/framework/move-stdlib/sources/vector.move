@@ -353,7 +353,7 @@ module std::vector {
     ): u64 {
         let pred = map_ref(v, |e| p(e));
         let len = length(v);
-        stable_partition_internal(v, &pred,0, len)
+        stable_partition_internal(v, &pred, 0, len)
     }
 
     /// Return true if any element in the vector satisfies the predicate.
