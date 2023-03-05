@@ -7,7 +7,7 @@
 
 use super::transactions::{Transaction, TransactionQuery};
 use crate::{schema::block_metadata_transactions, util::parse_timestamp_secs};
-use aptos_protos::transaction::v1::BlockMetadataTransaction as ProtoBlockMetadataTransaction;
+use aptos_protos::transaction::testing1::v1::BlockMetadataTransaction as ProtoBlockMetadataTransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

@@ -9,14 +9,14 @@ use crate::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::{
+    models::default::{
         move_tables::{CurrentTableItem, TableMetadata},
         transactions::{TransactionDetail, TransactionModel},
         write_set_changes::WriteSetChangeDetail,
     },
     schema,
 };
-use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
+use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;

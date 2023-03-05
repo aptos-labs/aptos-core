@@ -7,7 +7,6 @@ use crate::{
         PROCESSOR_SUCCESSES, UNABLE_TO_GET_CONNECTION,
     },
     database::{execute_with_better_error, PgDbPool, PgPoolConnection},
-    indexer::{errors::TransactionProcessingError, processing_result::ProcessingResult},
     models::processor_status::ProcessorStatus,
     schema::processor_status,
 };
@@ -15,6 +14,8 @@ use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use std::fmt::Debug;
+
+pub type ProcessingResult = Vec<ProcessorStatus>;
 
 /// The `TransactionProcessor` is used by an instance of a `Tailer` to process transactions
 #[async_trait]

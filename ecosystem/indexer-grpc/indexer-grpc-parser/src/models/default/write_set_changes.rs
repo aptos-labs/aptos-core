@@ -6,12 +6,10 @@ use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
     move_tables::{CurrentTableItem, TableItem, TableMetadata},
-    transactions::TransactionQuery,
+    transactions::{Transaction, TransactionQuery},
 };
-use crate::{
-    models::transactions::Transaction, schema::write_set_changes, util::standardize_address,
-};
-use aptos_protos::transaction::v1::{
+use crate::{schema::write_set_changes, util::standardize_address};
+use aptos_protos::transaction::testing1::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as ProtoWriteSetChange,
 };
@@ -193,12 +191,15 @@ impl WriteSetChange {
         match WriteSetChangeTypeEnum::from_i32(t.r#type)
             .expect("WriteSetChange must have a valid type.")
         {
-            WriteSetChangeTypeEnum::DeleteModule => String::from("delete_module"),
-            WriteSetChangeTypeEnum::DeleteResource => String::from("delete_resource"),
-            WriteSetChangeTypeEnum::DeleteTableItem => String::from("delete_table_item"),
-            WriteSetChangeTypeEnum::WriteModule => String::from("write_module"),
-            WriteSetChangeTypeEnum::WriteResource => String::from("write_resource"),
-            WriteSetChangeTypeEnum::WriteTableItem => String::from("write_table_item"),
+            WriteSetChangeTypeEnum::DeleteModule => "delete_module".to_string(),
+            WriteSetChangeTypeEnum::DeleteResource => "delete_resource".to_string(),
+            WriteSetChangeTypeEnum::DeleteTableItem => "delete_table_item".to_string(),
+            WriteSetChangeTypeEnum::WriteModule => "write_module".to_string(),
+            WriteSetChangeTypeEnum::WriteResource => "write_resource".to_string(),
+            WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
+            WriteSetChangeTypeEnum::Unspecified => {
+                panic!("WriteSetChange type must be specified.")
+            },
         }
     }
 }

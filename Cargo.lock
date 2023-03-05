@@ -1535,9 +1535,7 @@ name = "aptos-indexer-grpc-parser"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api",
  "aptos-api-test-context",
- "aptos-api-types",
  "aptos-bitvec",
  "aptos-config",
  "aptos-logger",
@@ -1547,7 +1545,6 @@ dependencies = [
  "aptos-protos",
  "aptos-runtimes",
  "aptos-storage-interface",
- "aptos-types",
  "aptos-vm",
  "async-trait",
  "base64 0.13.0",

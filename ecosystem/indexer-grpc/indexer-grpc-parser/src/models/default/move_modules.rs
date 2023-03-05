@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::move_modules, util::standardize_address};
-use aptos_protos::transaction::v1::{
+use super::transactions::Transaction;
+use crate::{schema::move_modules, util::standardize_address};
+use aptos_protos::transaction::testing1::v1::{
     DeleteModule, MoveModule as ProtoMoveModule, MoveModuleBytecode, WriteModule,
 };
 use field_count::FieldCount;

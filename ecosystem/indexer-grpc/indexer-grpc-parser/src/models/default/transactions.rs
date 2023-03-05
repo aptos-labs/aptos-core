@@ -17,7 +17,7 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
-use aptos_protos::transaction::v1::{
+use aptos_protos::transaction::testing1::v1::{
     transaction::{TransactionType, TxnData},
     Transaction as TransactionProto, TransactionInfo,
 };

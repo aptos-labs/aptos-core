@@ -15,7 +15,7 @@ use crate::{
     schema::user_transactions,
     util::{parse_timestamp, u64_to_bigdecimal},
 };
-use aptos_protos::transaction::v1::{
+use aptos_protos::transaction::testing1::v1::{
     transaction_payload::Payload as ProtoPayloadEnum, UserTransaction as ProtoUserTransaction,
 };
 use bigdecimal::BigDecimal;

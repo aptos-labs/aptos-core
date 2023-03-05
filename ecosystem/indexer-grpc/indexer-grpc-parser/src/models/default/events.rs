@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use super::transactions::TransactionQuery;
-use crate::{models::transactions::Transaction, schema::events};
-use aptos_protos::transaction::v1::Event as ProtoEvent;
+use super::transactions::{Transaction, TransactionQuery};
+use crate::schema::events;
+use aptos_protos::transaction::testing1::v1::Event as ProtoEvent;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

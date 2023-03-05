@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::transactions::Transaction, schema::move_resources, util::standardize_address};
+use super::transactions::Transaction;
+use crate::{schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::{
+use aptos_protos::transaction::testing1::v1::{
     DeleteResource, MoveStructTag as ProtoMoveStructTag, WriteResource,
 };
 use field_count::FieldCount;
+
 use serde::{Deserialize, Serialize};
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,

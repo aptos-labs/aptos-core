@@ -3,9 +3,10 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
+use super::transactions::Transaction;
+use crate::{schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::{
+use aptos_protos::transaction::testing1::v1::{
     account_signature::Signature as AccountSignatureEnum, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as ProtoEd25519Signature,
     MultiAgentSignature as ProtoMultiAgentSignature,
