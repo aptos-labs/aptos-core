@@ -64,7 +64,7 @@ target "builder-base" {
   target = "builder-base"
   context = "."
   contexts = {
-    rust = "docker-image://rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
+    rust = "docker-image://rust:1.66.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
   }
   args = {
     PROFILE            = "${PROFILE}"
@@ -81,7 +81,6 @@ target "aptos-node-builder" {
   dockerfile = "docker/experimental/builder.Dockerfile"
   target = "aptos-node-builder"
   contexts = {
-    rust = "docker-image://rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
     builder-base = "target:builder-base"
   }
   args = {
@@ -99,7 +98,6 @@ target "tools-builder" {
   dockerfile = "docker/experimental/builder.Dockerfile"
   target = "tools-builder"
   contexts = {
-    rust = "docker-image://rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300"
     builder-base =  "target:builder-base"
   }
   args = {
