@@ -91,30 +91,20 @@ module token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
-
-        let collection = Collection {
-            creator: signer::address_of(creator),
-            description,
-            mutability_config,
-            name,
-            uri,
-        };
-        move_to(&object_signer, collection);
-
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
         };
-        move_to(&object_signer, supply);
 
-        if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
-        };
-
-        creator_ref
+        create_collection_internal(
+            creator,
+            description,
+            mutability_config,
+            name,
+            royalty,
+            uri,
+            supply,
+        )
     }
 
     public fun create_aggregable_collection(
@@ -125,9 +115,31 @@ module token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        let supply = AggregableSupply { };
+
+        create_collection_internal(
+            creator,
+            description,
+            mutability_config,
+            name,
+            royalty,
+            uri,
+            supply,
+        )
+    }
+
+    inline fun create_collection_internal<Supply: key>(
+        creator: &signer,
+        description: String,
+        mutability_config: MutabilityConfig,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+        supply: Supply,
+    ): ConstructorRef {
         let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
             creator: signer::address_of(creator),
@@ -137,15 +149,13 @@ module token_objects::collection {
             uri,
         };
         move_to(&object_signer, collection);
-
-        let supply = AggregableSupply { };
         move_to(&object_signer, supply);
 
         if (option::is_some(&royalty)) {
             move_to(&object_signer, option::extract(&mut royalty))
         };
 
-        creator_ref
+        constructor_ref
     }
 
     public fun init_royalty(object_signer: &signer, royalty: Royalty) {
