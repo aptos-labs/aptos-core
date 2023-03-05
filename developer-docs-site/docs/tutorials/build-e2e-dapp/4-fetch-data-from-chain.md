@@ -77,7 +77,8 @@ function App (
 )
 ```
 also import `useEffect` using 
-```jsx import { useState, useEffect } from "react";```
+```jsx import { useState, useEffect } from "react"; ```
+
 5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
 ```jsx
@@ -109,8 +110,9 @@ The `client.getAccountResource()`expects an *account address* that holds the res
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
 
-6. Let’s update our ```jsximport { Layout, Row, Col } from "antd";``` by importing Button
-	i.e. ```jsximport { Layout, Row, Col, Button  } from "antd";```
+6. Let’s update ```jsx import { Layout, Row, Col } from "antd"; ``` to import Button:
+   ```jsx import { Layout, Row, Col, Button  } from "antd"; ```
+
 7. Let’s update our UI based on the `accountHasList` state:
 
 ```jsx
