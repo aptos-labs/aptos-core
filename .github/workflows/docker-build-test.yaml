@@ -181,6 +181,20 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
+  cli-e2e-tests:
+    needs: [rust-images, determine-docker-build-metadata]
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-sdk-integration-test') && (
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null) ||
+      contains(github.event.pull_request.body, '#e2e')
+    uses: ./.github/workflows/cli-e2e-tests.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+
   forge-e2e-test:
     needs:
       [rust-images, rust-images-failpoints, determine-docker-build-metadata]
