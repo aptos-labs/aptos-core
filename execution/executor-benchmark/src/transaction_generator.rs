@@ -20,7 +20,7 @@ use aptos_types::{
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -359,7 +359,7 @@ impl TransactionGenerator {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
-                .into_iter()
+                .into_par_iter()
                 .flat_map(|_| {
                     let (sender, receivers) = self
                         .accounts_cache
