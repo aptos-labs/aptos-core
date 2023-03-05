@@ -6,6 +6,7 @@ use tokio::runtime::Builder;
 
 fn main() {
     aptos_logger::Logger::new().init();
+    aptos_crash_handler::setup_panic_handler();
     let runtime = Builder::new_multi_thread()
         .thread_name("Datastream Indexer")
         .disable_lifo_slot()

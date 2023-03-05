@@ -1535,17 +1535,13 @@ name = "aptos-indexer-grpc-parser"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api-test-context",
  "aptos-bitvec",
- "aptos-config",
+ "aptos-crash-handler",
  "aptos-logger",
- "aptos-mempool",
  "aptos-metrics-core",
  "aptos-moving-average",
  "aptos-protos",
  "aptos-runtimes",
- "aptos-storage-interface",
- "aptos-vm",
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",

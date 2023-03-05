@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod processor_trait;
 pub mod default_processor;
 
 use self::default_processor::NAME as DEFAULT_PROCESSOR_NAME;

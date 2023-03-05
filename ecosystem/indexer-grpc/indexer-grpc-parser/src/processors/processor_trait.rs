@@ -15,23 +15,22 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use std::fmt::Debug;
 
-pub type ProcessingResult = Vec<ProcessorStatus>;
+type StartVersion = u64;
+type EndVersion = u64;
+pub type ProcessingResult = (StartVersion, EndVersion);
 
-/// The `TransactionProcessor` is used by an instance of a `Tailer` to process transactions
+/// Base trait for all processors
 #[async_trait]
-pub trait TransactionProcessor: Send + Sync + Debug {
-    /// name of the processor, for status logging
-    /// This will get stored in the database for each (`TransactionProcessor`, transaction_version) pair
+pub trait ProcessorTrait: Send + Sync + Debug {
     fn name(&self) -> &'static str;
 
-    /// Process all transactions within a block and processes it. This method will be called from `process_transaction_with_status`
-    /// In case a transaction cannot be processed, we will fail the entire block.
+    /// Process all transactions including writing to the database
     async fn process_transactions(
         &self,
         transactions: Vec<ProtoTransaction>,
         start_version: u64,
         end_version: u64,
-    ) -> Result<ProcessingResult, TransactionProcessingError>;
+    ) -> anyhow::Result<ProcessingResult>;
 
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below

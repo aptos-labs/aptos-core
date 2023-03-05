@@ -5,10 +5,6 @@ use crate::{
     database::{
         clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
     },
-    indexer::{
-        errors::TransactionProcessingError, processing_result::ProcessingResult,
-        transaction_processor::TransactionProcessor,
-    },
     models::default::{
         move_tables::{CurrentTableItem, TableMetadata},
         transactions::{TransactionDetail, TransactionModel},
@@ -16,11 +12,15 @@ use crate::{
     },
     schema,
 };
+use anyhow::bail;
+use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{result::Error, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
+
+use super::processor_trait::{ProcessingResult, ProcessorTrait};
 
 pub const NAME: &str = "default_processor";
 pub struct DefaultTransactionProcessor {
@@ -100,7 +100,7 @@ fn insert_transactions(
 }
 
 #[async_trait]
-impl TransactionProcessor for DefaultTransactionProcessor {
+impl ProcessorTrait for DefaultTransactionProcessor {
     fn name(&self) -> &'static str {
         NAME
     }
@@ -110,7 +110,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         transactions: Vec<ProtoTransaction>,
         start_version: u64,
         end_version: u64,
-    ) -> Result<ProcessingResult, TransactionProcessingError> {
+    ) -> anyhow::Result<ProcessingResult> {
         let (txns, txn_details, _events, _write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -165,17 +165,17 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         let mut conn = self.get_conn();
         let tx_result = insert_to_db(&mut conn, self.name(), start_version, end_version, txns);
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(
-                self.name(),
-                start_version,
-                end_version,
-            )),
-            Err(err) => Err(TransactionProcessingError::TransactionCommitError((
-                anyhow::Error::from(err),
-                start_version,
-                end_version,
-                self.name(),
-            ))),
+            Ok(_) => Ok((start_version, end_version)),
+            Err(err) => {
+                error!(
+                    start_version = start_version,
+                    end_version = end_version,
+                    processor_name = self.name(),
+                    "[Parser] Error inserting transactions to db: {:?}",
+                    err
+                );
+                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
+            },
         }
     }
 
