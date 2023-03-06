@@ -29,7 +29,7 @@ pub struct StakePool {
 }
 
 impl StakePool {
-    pub fn get_total_staked_amount(&self) -> u64 {
+    pub fn get_total_staked_amount(&self) -> u64 { //test
         self.active + self.inactive + self.pending_active + self.pending_inactive
     }
 

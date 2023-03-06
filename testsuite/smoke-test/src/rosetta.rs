@@ -951,7 +951,7 @@ async fn test_block() {
     )
     .await
     .expect_err("Set voter shouldn't work with the wrong operator!");
-    let final_txn = set_voter_and_wait(
+    set_voter_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -967,7 +967,7 @@ async fn test_block() {
     .expect("Set voter should work!");
 
     // Unlock stake
-    unlock_stake_and_wait(
+    let final_txn = unlock_stake_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
