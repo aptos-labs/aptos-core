@@ -1,17 +1,10 @@
 /// This defines an object-based Royalty. The royalty can be applied to either a collection or a
 /// token. Applications should read the royalty from the token, as it will read the appropriate
 /// royalty.
-///
-/// TODO:
-/// * Determine what if any mutability framework for royalties. For example, adding a wrapper around
-///   the extension ref may be sufficient to allow removing the existing one and adding a new one.
 module token_objects::royalty {
     use std::option::{Self, Option};
 
-    use aptos_framework::object::{Self, Object};
-
-    friend token_objects::collection;
-    friend token_objects::token;
+    use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The royalty of a token within this collection -- this optional
@@ -23,16 +16,37 @@ module token_objects::royalty {
         payee_address: address,
     }
 
-    public(friend) fun init(object_signer: &signer, royalty: Royalty) {
-        move_to(object_signer, royalty);
+    struct MutatorRef has drop, store {
+        inner: ExtendRef,
+    }
+
+    /// Add a royalty, given a ConstructorRef.
+    public fun init(ref: &ConstructorRef, royalty: Royalty) {
+        let signer = object::generate_signer(ref);
+        move_to(&signer, royalty);
+    }
+
+    /// Set the royalty if it does not exist, replace it otherwise.
+    public fun update(mutator_ref: &MutatorRef, royalty: Royalty) acquires Royalty {
+        let addr = object::address_from_extend_ref(&mutator_ref.inner);
+        if (exists<Royalty>(addr)) {
+            move_from<Royalty>(addr);
+        };
+
+        let signer = object::generate_signer_for_extending(&mutator_ref.inner);
+        move_to(&signer, royalty);
     }
 
     public fun create(numerator: u64, denominator: u64, payee_address: address): Royalty {
         Royalty { numerator, denominator, payee_address }
     }
 
+    public fun generate_mutator_ref(ref: ExtendRef): MutatorRef {
+        MutatorRef { inner: ref }
+    }
+
     // Accessors
-    public fun royalty<T: key>(maybe_royalty: Object<T>): Option<Royalty> acquires Royalty {
+    public fun get<T: key>(maybe_royalty: Object<T>): Option<Royalty> acquires Royalty {
         let obj_addr = object::object_address(&maybe_royalty);
         if (exists<Royalty>(obj_addr)) {
             option::some(*borrow_global<Royalty>(obj_addr))
@@ -51,5 +65,38 @@ module token_objects::royalty {
 
     public fun payee_address(royalty: &Royalty): address {
         royalty.payee_address
+    }
+
+    #[test(creator = @0x123)]
+    fun test_none(creator: &signer) acquires Royalty {
+        let constructor_ref = object::create_named_object(creator, b"");
+        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        assert!(option::none() == get(object), 0);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_init_and_update(creator: &signer) acquires Royalty {
+        let constructor_ref = object::create_named_object(creator, b"");
+        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        let init_royalty = create(1, 2, @0x123);
+        init(&constructor_ref, init_royalty);
+        assert!(option::some(init_royalty) == get(object), 0);
+
+        let mutator_ref = generate_mutator_ref(object::generate_extend_ref(&constructor_ref));
+        let update_royalty = create(1, 5, @0x123);
+        update(&mutator_ref, update_royalty);
+        assert!(option::some(update_royalty) == get(object), 1);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_update_only(creator: &signer) acquires Royalty {
+        let constructor_ref = object::create_named_object(creator, b"");
+        let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
+        assert!(option::none() == get(object), 0);
+
+        let mutator_ref = generate_mutator_ref(object::generate_extend_ref(&constructor_ref));
+        let update_royalty = create(1, 5, @0x123);
+        update(&mutator_ref, update_royalty);
+        assert!(option::some(update_royalty) == get(object), 1);
     }
 }

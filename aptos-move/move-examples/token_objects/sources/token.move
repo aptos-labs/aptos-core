@@ -95,7 +95,7 @@ module token_objects::token {
         move_to(&object_signer, token);
 
         if (option::is_some(&royalty)) {
-            royalty::init(&object_signer, option::extract(&mut royalty))
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
         constructor_ref
     }
@@ -219,7 +219,7 @@ module token_objects::token {
 
     public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
         verify(&token);
-        let royalty = royalty::royalty(token);
+        let royalty = royalty::get(token);
         if (option::is_some(&royalty)) {
             royalty
         } else {
@@ -227,7 +227,7 @@ module token_objects::token {
             let collection_name = collection(token);
             let collection_address = collection::create_collection_address(&creator, &collection_name);
             let collection = object::address_to_object<collection::Collection>(collection_address);
-            royalty::royalty(collection)
+            royalty::get(collection)
         }
     }
 
