@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
+use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient, counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED};
 use anyhow::Result;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, Round},
@@ -102,6 +102,8 @@ impl PayloadClient for QuorumStoreClient {
     ) -> Result<Payload, QuorumStoreError> {
         let return_non_full = recent_fill_fraction < self.wait_for_full_blocks_above_recent_fill_threshold && pending_uncommitted_blocks < self.wait_for_full_blocks_above_num_pending_uncommitted_blocks;
         let return_empty = pending_ordering && return_non_full;
+
+        WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(if return_non_full { 0 } else { 1 });
 
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
