@@ -24,6 +24,7 @@ resource "helm_release" "chaos-mesh" {
     jsonencode({
       chaos-mesh = {
         chaosDaemon = {
+          podSecurityPolicy = true
         }
       }
     })

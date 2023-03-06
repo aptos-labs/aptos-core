@@ -94,20 +94,14 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
     }
   }
 
-  # Recommended config https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/aws/README.md
   statement {
     sid = "DescribeAutoscaling"
     actions = [
-      "autoscaling:DescribeAutoScalingGroups",
       "autoscaling:DescribeAutoScalingInstances",
-      "autoscaling:DescribeLaunchConfigurations",
-      "autoscaling:DescribeScalingActivities",
-      "autoscaling:DescribeTags",
-      "ec2:DescribeInstanceTypes",
+      "autoscaling:DescribeAutoScalingGroups",
       "ec2:DescribeLaunchTemplateVersions",
-      "ec2:DescribeImages",
-      "ec2:GetInstanceTypesFromInstanceRequirements",
-      "eks:DescribeNodegroup"
+      "autoscaling:DescribeTags",
+      "autoscaling:DescribeLaunchConfigurations"
     ]
     resources = ["*"]
   }
@@ -156,6 +150,7 @@ resource "helm_release" "chaos-mesh" {
       }
       chaos-mesh = {
         chaosDaemon = {
+          podSecurityPolicy = true
           # tolerate pod assignment on nodes in the validator nodegroup
           tolerations = [{
             key    = "aptos.org/nodepool"

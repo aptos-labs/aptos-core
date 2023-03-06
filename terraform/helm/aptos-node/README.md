@@ -127,6 +127,10 @@ ServiceAccounts:
 * `<RELEASE_NAME>-validator` - The validator service account
 * `<RELEASE_NAME>-fullnode` - The fullnode service account
 
+[optional] PodSecurityPolicy:
+* `<RELEASE_NAME>` - The default PodSecurityPolicy for validators and fullnodes
+* `<RELEASE_NAME>-haproxy` - The PodSecurityPolicy for HAProxy
+
 ## Common Operations
 
 ### Check Pod Status
