@@ -1525,11 +1525,11 @@ impl InternalOperation {
                         },
                         Ok(OperationType::UnlockStake) => {
                             if let (
-                                Some(OperationMetadata { 
-                                    operator, 
-                                    amount, 
-                                    .. 
-                                }), 
+                                Some(OperationMetadata {
+                                    operator,
+                                    amount,
+                                    ..
+                                }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
                             {
@@ -1542,7 +1542,7 @@ impl InternalOperation {
                                 };
                                 return Ok(Self::UnlockStake(UnlockStake {
                                     owner: account.account_address()?,
-                                    operator: operator,
+                                    operator,
                                     amount: amount.map(u64::from).unwrap_or_default(),
                                 }));
                             }

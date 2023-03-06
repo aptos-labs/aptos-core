@@ -353,11 +353,11 @@ impl RosettaClient {
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
         operator: Option<AccountAddress>,
+        amount: Option<u64>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         max_gas: Option<u64>,
         gas_unit_price: Option<u64>,
-        amount: Option<u64>,
     ) -> anyhow::Result<TransactionIdentifier> {
         let sender = self
             .get_account_address(network_identifier.clone(), private_key)
@@ -365,7 +365,6 @@ impl RosettaClient {
         let mut keys = HashMap::new();
         keys.insert(sender, private_key);
 
-        // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![Operation::unlock_stake(
             0,
             None,
