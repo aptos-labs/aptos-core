@@ -153,7 +153,7 @@ module token_objects::collection {
         };
 
         if (option::is_some(&royalty)) {
-            royalty::init(&object_signer, option::extract(&mut royalty))
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
 
         constructor_ref
