@@ -6,7 +6,9 @@ slug: "unity-sdk"
 
 # Aptos Unity SDK
 
-The Aptos Unity SDK is a .NET implementation of the [Aptos SDK](./index.md), compatible with .NET Standard 2.0 and .NET 4.x for Unity. The goal of this SDK is to provide a set of tools for developers to build multi-platform applications (mobile, desktop, web, VR) using the Unity game engine and the Aptos blockchain infrastructure.
+The [Aptos Unity SDK](https://github.com/aptos-labs/Aptos-Unity-SDK) is a .NET implementation of the [Aptos SDK](./index.md), compatible with .NET Standard 2.0 and .NET 4.x for Unity. The goal of this SDK is to provide a set of tools for developers to build multi-platform applications (mobile, desktop, web, VR) using the Unity game engine and the Aptos blockchain infrastructure.
+
+See the post [Aptos Labs brings Web3 to Gaming with its new SDK for Unity developers](https://medium.com/aptoslabs/aptos-labs-brings-web3-to-gaming-with-its-new-sdk-for-unity-developers-e6544bdf9ba9) for all of the features offered to game developers by the Aptos Unity SDK.
 
 ## Core features
 
@@ -61,7 +63,7 @@ You may install the Unity SDK either through our `unitypackage` or the [Unity Pa
 ### Install by `unitypackage`
 
 1. Start Unity.
-2. Download the latest `Aptos.Unity.unitypackage` file from the [Unity Asset Store](https://assetstore.unity.com/).
+2. Download the latest `Aptos.Unity.unitypackage` file from the [Unity Asset Store](https://assetstore.unity.com/packages/decentralization/aptos-sdk-244713).
 3. Click **Assets** → **Import Packages** → **Custom Package** and select the downloaded file.
 
 ### Install by Unity Package Manager
@@ -69,4 +71,4 @@ You may install the Unity SDK either through our `unitypackage` or the [Unity Pa
 1. Open [Unity Package Manager](https://docs.unity3d.com/Manual/upm-ui.html) window.
 2. Click the add **+** button in the top status bar.
 3. Select *Add package from git URL* from the dropdown menu.
-4. Enter the `https://github.com/xxxxxxxxxx.git` and click **Add**.
+4. Enter the URL `https://github.com/xxxxxxxxxx.git` and click **Add**.
