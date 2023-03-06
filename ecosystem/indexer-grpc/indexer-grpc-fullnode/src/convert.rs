@@ -376,7 +376,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                     state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
                     r#type: Some(convert_move_struct_tag(&write_resource.data.typ)),
                     type_str: write_resource.data.typ.to_string(),
-                    data: serde_json::to_string(&write_resource.data).unwrap_or_else(|_| {
+                    data: serde_json::to_string(&write_resource.data.data).unwrap_or_else(|_| {
                         panic!(
                             "Could not convert move_resource data to json '{:?}'",
                             write_resource.data
