@@ -14,6 +14,10 @@ This documentation will help you develop applications for the Aptos blockchain, 
 
 > Please note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## Find the latest releases
+
+See the newest Aptos releases in the [Latest Releases](./releases/index.md) list and its subpages.
+
 ## Set up your environment and start with the tutorials
 
 <div class="docs-card-container">
