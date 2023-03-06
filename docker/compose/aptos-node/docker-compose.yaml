@@ -23,8 +23,8 @@ services:
       - 9101
       # Haproxy internal stats
       - 9102
-      # Disable access to rest API port 80 for validator by default
-      # - 8180
+      # Enable access to rest API for validator for loadtesting during PreviewNet
+      - 8180
     ports:
       # Expose these to the outside
       - "6180:6180"
@@ -32,8 +32,8 @@ services:
       # Preface these with 127 to only expose them locally
       - "127.0.0.1:9101:9101"
       - "127.0.0.1:9102:9102"
-      # Disable access to rest API port 80 for validator by default
-      # - 8180:8180
+      # Enable access to rest API for validator for loadtesting during PreviewNet
+      - 8180:8180
 
 
   validator:
@@ -66,8 +66,8 @@ services:
       - 6181
       # Validator Metrics
       - 9101
-      # Disable access to rest API port 80 for validator by default
-      # - 8080
+      # Enable access to rest API port for validator
+      - 8080
 
 networks:
   shared:
