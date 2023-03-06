@@ -80,7 +80,19 @@ For an Aptos indexer fullnode, install these packages:
         emit_every: 500
     ```
 
-1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node.
+1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node:
+    ```bash
+    docker run -p 8080:8080 \
+      -p 9101:9101 -p 6180:6180 \
+      -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
+      --workdir /opt/aptos/etc \
+      --name=aptos-fullnode aptoslabs/validator:nightly_indexer aptos-node \
+      -f /opt/aptos/etc/fullnode.yaml
+    ```
+    or:
+    ```bash
+    cargo run -p aptos-node --features "indexer" --release -- -f ./fullnode.yaml
+    ```
 
 ## Restart the indexer
 
