@@ -20,7 +20,8 @@ module token_objects::token {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection::{Self, Royalty};
+    use token_objects::collection;
+    use token_objects::royalty::{Self, Royalty};
 
     // The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -97,7 +98,7 @@ module token_objects::token {
         move_to(&object_signer, token);
 
         if (option::is_some(&royalty)) {
-            collection::init_royalty(&object_signer, option::extract(&mut royalty))
+            royalty::init(&object_signer, option::extract(&mut royalty))
         };
         constructor_ref
     }
@@ -139,7 +140,7 @@ module token_objects::token {
         );
 
         let royalty = if (enable_royalty) {
-            option::some(collection::create_royalty(
+            option::some(royalty::create(
                 royalty_numerator,
                 royalty_denominator,
                 royalty_payee_address,
@@ -217,6 +218,20 @@ module token_objects::token {
     public fun uri<T: key>(token: Object<T>): String acquires Token {
         let token_address = verify(&token);
         borrow_global<Token>(token_address).uri
+    }
+
+    public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
+        verify(&token);
+        let royalty = royalty::royalty(token);
+        if (option::is_some(&royalty)) {
+            royalty
+        } else {
+            let creator = creator(token);
+            let collection_name = collection(token);
+            let collection_address = collection::create_collection_address(&creator, &collection_name);
+            let collection = object::address_to_object<collection::Collection>(collection_address);
+            royalty::royalty(collection)
+        }
     }
 
     // Mutators
@@ -305,7 +320,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
-    entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
+    entry fun test_create_and_transfer(creator: &signer, trader: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -318,7 +333,78 @@ module token_objects::token {
         assert!(object::owner(token) == creator_address, 1);
         object::transfer(creator, token, signer::address_of(trader));
         assert!(object::owner(token) == signer::address_of(trader), 1);
+
+        let expected_royalty = royalty::create(25, 10000, creator_address);
+        assert!(option::some(expected_royalty) == royalty(token), 2);
     }
+
+    #[test(creator = @0x123)]
+    entry fun test_collection_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        collection::create_collection(
+            creator,
+            string::utf8(b"collection description"),
+            collection_name,
+            string::utf8(b"collection uri"),
+            false,
+            false,
+            5,
+            true,
+            10,
+            1000,
+            signer::address_of(creator),
+        );
+
+        create_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            create_mutability_config(false, false, false),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+
+        let creator_address = signer::address_of(creator);
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+        let expected_royalty = royalty::create(10, 1000, creator_address);
+        assert!(option::some(expected_royalty) == royalty(token), 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_no_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        collection::create_untracked_collection(
+            creator,
+            string::utf8(b"collection description"),
+            collection::create_mutability_config(false, false),
+            collection_name,
+            option::none(),
+            string::utf8(b"collection uri"),
+        );
+
+        create_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            create_mutability_config(false, false, false),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+
+        let creator_address = signer::address_of(creator);
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+        assert!(option::none() == royalty(token), 0);
+    }
+
+
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
