@@ -3,8 +3,8 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::{Transaction, TransactionQuery};
-use crate::schema::events;
-use aptos_protos::transaction::testing1::v1::Event as ProtoEvent;
+use crate::{schema::events, util::standardize_address};
+use aptos_protos::transaction::testing1::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -42,13 +42,13 @@ pub struct EventQuery {
 
 impl Event {
     pub fn from_event(
-        event: &ProtoEvent,
+        event: &EventPB,
         transaction_version: i64,
         transaction_block_height: i64,
         event_index: i64,
     ) -> Self {
         Event {
-            account_address: event.key.as_ref().unwrap().account_address.clone(),
+            account_address: standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
             creation_number: event.key.as_ref().unwrap().creation_number as i64,
             sequence_number: event.sequence_number as i64,
             transaction_version,
@@ -60,7 +60,7 @@ impl Event {
     }
 
     pub fn from_events(
-        events: &[ProtoEvent],
+        events: &[EventPB],
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> Vec<Self> {

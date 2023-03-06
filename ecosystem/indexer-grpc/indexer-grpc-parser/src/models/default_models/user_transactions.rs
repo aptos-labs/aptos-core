@@ -13,11 +13,9 @@ use super::{
 };
 use crate::{
     schema::user_transactions,
-    util::{parse_timestamp, u64_to_bigdecimal},
+    util::{get_entry_function_from_user_request, parse_timestamp, u64_to_bigdecimal, standardize_address},
 };
-use aptos_protos::transaction::testing1::v1::{
-    transaction_payload::Payload as ProtoPayloadEnum, UserTransaction as ProtoUserTransaction,
-};
+use aptos_protos::transaction::testing1::v1::UserTransaction as UserTransactionPB;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -64,7 +62,7 @@ pub struct UserTransactionQuery {
 
 impl UserTransaction {
     pub fn from_transaction(
-        txn: &ProtoUserTransaction,
+        txn: &UserTransactionPB,
         timestamp_in_secs: i64,
         block_height: i64,
         epoch: i64,
@@ -86,7 +84,7 @@ impl UserTransaction {
                     .as_ref()
                     .map(Signature::get_signature_type)
                     .unwrap_or_default(),
-                sender: user_request.sender.clone(),
+                sender: standardize_address(&user_request.sender),
                 sequence_number: user_request.sequence_number as i64,
                 max_gas_amount: u64_to_bigdecimal(user_request.max_gas_amount),
                 expiration_timestamp_secs: parse_timestamp(
@@ -101,15 +99,8 @@ impl UserTransaction {
                 ),
                 gas_unit_price: u64_to_bigdecimal(user_request.gas_unit_price),
                 timestamp: parse_timestamp(timestamp_in_secs.try_into().unwrap(), version),
-                entry_function_id_str: match &user_request.payload.as_ref().unwrap().payload {
-                    Some(ProtoPayloadEnum::EntryFunctionPayload(payload)) => payload
-                        .function
-                        .as_ref()
-                        .expect("function not exists.")
-                        .name
-                        .clone(),
-                    _ => String::default(),
-                },
+                entry_function_id_str: get_entry_function_from_user_request(user_request)
+                    .unwrap_or_default(),
                 epoch,
             },
             user_request

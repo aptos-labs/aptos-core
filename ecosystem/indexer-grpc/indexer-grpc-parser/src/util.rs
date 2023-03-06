@@ -1,13 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// use crate::models::property_map::PropertyMap;
-use bigdecimal::{BigDecimal, ToPrimitive};
+use std::str::FromStr;
+
+use crate::models::property_map::PropertyMap;
+use aptos_protos::transaction::testing1::v1::UserTransactionRequest;
+use aptos_protos::transaction::testing1::v1::{
+    transaction_payload::Payload as PayloadPB, UserTransaction as UserTransactionPB,
+};
+use bigdecimal::{BigDecimal, Signed, Zero};
+use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use sha2::Digest;
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
+// Max length of entry function id string to ensure that db doesn't explode
+const MAX_ENTRY_FUNCTION_LENGTH: usize = 100;
 
 /// Standardizes all addresses and table handles to be length 66 (0x-64 length hash)
 pub fn standardize_address(handle: &str) -> String {
@@ -18,13 +27,39 @@ pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }
 
+pub fn truncate_str(val: &str, max_chars: usize) -> String {
+    let mut trunc = val.to_string();
+    trunc.truncate(max_chars);
+    trunc
+}
+
 pub fn u64_to_bigdecimal(val: u64) -> BigDecimal {
     BigDecimal::from(val)
 }
 
-#[allow(dead_code)]
-pub fn bigdecimal_to_u64(val: &BigDecimal) -> u64 {
-    val.to_u64().expect("Unable to convert big decimal to u64")
+pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
+    if val.is_negative() {
+        return BigDecimal::zero();
+    }
+    val
+}
+
+pub fn get_entry_function_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    let entry_function_id_str: String = match &user_request.payload.as_ref().unwrap().payload {
+        Some(PayloadPB::EntryFunctionPayload(payload)) => payload
+            .function
+            .as_ref()
+            .expect("function not exists.")
+            .name
+            .clone(),
+        _ => return None,
+    };
+    Some(truncate_str(
+        &entry_function_id_str,
+        MAX_ENTRY_FUNCTION_LENGTH,
+    ))
 }
 
 pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
@@ -72,6 +107,30 @@ fn string_null_byte_replacement(value: &mut str) -> String {
     value.replace('\u{0000}', "").replace("\\u0000", "")
 }
 
+/// convert the bcs encoded inner value of property_map to its original value in string format
+pub fn deserialize_property_map_from_bcs_hexstring<'de, D>(
+    deserializer: D,
+) -> core::result::Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = serde_json::Value::deserialize(deserializer)?;
+    // iterate the json string to convert key-value pair
+    // assume the format of {“map”: {“data”: [{“key”: “Yuri”, “value”: {“type”: “String”, “value”: “0x42656e”}}, {“key”: “Tarded”, “value”: {“type”: “String”, “value”: “0x446f766572"}}]}}
+    // if successfully parsing we return the decoded property_map string otherwise return the original string
+    Ok(convert_bcs_propertymap(s.clone()).unwrap_or(s))
+}
+
+pub fn deserialize_string_from_hexstring<'de, D>(
+    deserializer: D,
+) -> core::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = <String>::deserialize(deserializer)?;
+    Ok(convert_hex(s.clone()).unwrap_or(s))
+}
+
 /// Convert the bcs serialized vector<u8> to its original string format
 pub fn convert_bcs_hex(typ: String, value: String) -> Option<String> {
     let decoded = hex::decode(value.strip_prefix("0x").unwrap_or(&*value)).ok()?;
@@ -88,10 +147,55 @@ pub fn convert_bcs_hex(typ: String, value: String) -> Option<String> {
     .ok()
 }
 
+/// Convert the json serialized PropertyMap's inner BCS fields to their original value in string format
+pub fn convert_bcs_propertymap(s: Value) -> Option<Value> {
+    match PropertyMap::from_bcs_encode_str(s) {
+        Some(e) => match serde_json::to_value(&e) {
+            Ok(val) => Some(val),
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+
+/// Convert the vector<u8> that is directly generated from b"xxx"
+pub fn convert_hex(val: String) -> Option<String> {
+    let decoded = hex::decode(val.strip_prefix("0x").unwrap_or(&*val)).ok()?;
+    String::from_utf8(decoded).ok()
+}
+
+/// Deserialize from string to type T
+pub fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    use serde::de::Error;
+
+    let s = <String>::deserialize(deserializer)?;
+    s.parse::<T>().map_err(D::Error::custom)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::Datelike;
+    use serde::Serialize;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct TypeInfoMock {
+        #[serde(deserialize_with = "deserialize_string_from_hexstring")]
+        pub module_name: String,
+        #[serde(deserialize_with = "deserialize_string_from_hexstring")]
+        pub struct_name: String,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct TokenDataMock {
+        #[serde(deserialize_with = "deserialize_property_map_from_bcs_hexstring")]
+        pub default_properties: serde_json::Value,
+    }
 
     #[test]
     fn test_parse_timestamp() {
@@ -104,5 +208,72 @@ mod tests {
 
         let ts3 = parse_timestamp_secs(1659386386, 2);
         assert_eq!(ts3.timestamp(), 1659386386);
+    }
+
+    #[test]
+    fn test_deserialize_string_from_bcs() {
+        let test_struct = TypeInfoMock {
+            module_name: String::from("0x6170746f735f636f696e"),
+            struct_name: String::from("0x4170746f73436f696e"),
+        };
+        let val = serde_json::to_string(&test_struct).unwrap();
+        let d: TypeInfoMock = serde_json::from_str(val.as_str()).unwrap();
+        assert_eq!(d.module_name.as_str(), "aptos_coin");
+        assert_eq!(d.struct_name.as_str(), "AptosCoin");
+    }
+
+    #[test]
+    fn test_deserialize_property_map() {
+        let test_property_json = r#"
+        {
+            "map":{
+               "data":[
+                  {
+                     "key":"type",
+                     "value":{
+                        "type":"0x1::string::String",
+                        "value":"0x06646f6d61696e"
+                     }
+                  },
+                  {
+                     "key":"creation_time_sec",
+                     "value":{
+                        "type":"u64",
+                        "value":"0x140f4f6300000000"
+                     }
+                  },
+                  {
+                     "key":"expiration_time_sec",
+                     "value":{
+                        "type":"u64",
+                        "value":"0x9442306500000000"
+                     }
+                  }
+               ]
+            }
+        }"#;
+        let test_property_json: serde_json::Value =
+            serde_json::from_str(test_property_json).unwrap();
+        let test_struct = TokenDataMock {
+            default_properties: test_property_json,
+        };
+        let val = serde_json::to_string(&test_struct).unwrap();
+        let d: TokenDataMock = serde_json::from_str(val.as_str()).unwrap();
+        assert_eq!(d.default_properties["type"], "domain");
+        assert_eq!(d.default_properties["creation_time_sec"], "1666125588");
+        assert_eq!(d.default_properties["expiration_time_sec"], "1697661588");
+    }
+
+    #[test]
+    fn test_empty_property_map() {
+        let test_property_json = r#"{"map": {"data": []}}"#;
+        let test_property_json: serde_json::Value =
+            serde_json::from_str(test_property_json).unwrap();
+        let test_struct = TokenDataMock {
+            default_properties: test_property_json,
+        };
+        let val = serde_json::to_string(&test_struct).unwrap();
+        let d: TokenDataMock = serde_json::from_str(val.as_str()).unwrap();
+        assert_eq!(d.default_properties, Value::Object(serde_json::Map::new()));
     }
 }

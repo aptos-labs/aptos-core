@@ -8,9 +8,9 @@ use crate::{schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::testing1::v1::{
     account_signature::Signature as AccountSignatureEnum, signature::Signature as SignatureEnum,
-    AccountSignature as ProtoAccountSignature, Ed25519Signature as ProtoEd25519Signature,
+    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     MultiAgentSignature as ProtoMultiAgentSignature,
-    MultiEd25519Signature as ProtoMultiEd25519Signature, Signature as ProtoTransactionSignature,
+    MultiEd25519Signature as ProtoMultiEd25519Signature, Signature as TransactionSignaturePB,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ pub struct Signature {
 impl Signature {
     /// Returns a flattened list of signatures. If signature is a Ed25519Signature, then return a vector of 1 signature
     pub fn from_user_transaction(
-        s: &ProtoTransactionSignature,
+        s: &TransactionSignaturePB,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,
@@ -76,7 +76,7 @@ impl Signature {
         }
     }
 
-    pub fn get_signature_type(t: &ProtoTransactionSignature) -> String {
+    pub fn get_signature_type(t: &TransactionSignaturePB) -> String {
         match t.signature.as_ref().unwrap() {
             SignatureEnum::Ed25519(_) => String::from("ed25519_signature"),
             SignatureEnum::MultiEd25519(_) => String::from("multi_ed25519_signature"),
@@ -85,7 +85,7 @@ impl Signature {
     }
 
     fn parse_single_signature(
-        s: &ProtoEd25519Signature,
+        s: &Ed25519SignaturePB,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,

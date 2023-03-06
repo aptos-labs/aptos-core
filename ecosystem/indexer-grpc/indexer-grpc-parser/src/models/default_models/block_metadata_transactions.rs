@@ -7,7 +7,7 @@
 
 use super::transactions::{Transaction, TransactionQuery};
 use crate::{schema::block_metadata_transactions, util::parse_timestamp_secs};
-use aptos_protos::transaction::testing1::v1::BlockMetadataTransaction as ProtoBlockMetadataTransaction;
+use aptos_protos::transaction::testing1::v1::BlockMetadataTransaction as BlockMetadataTransactionPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -51,7 +51,7 @@ pub struct BlockMetadataTransactionQuery {
 
 impl BlockMetadataTransaction {
     pub fn from_transaction(
-        txn: &ProtoBlockMetadataTransaction,
+        txn: &BlockMetadataTransactionPB,
         version: i64,
         block_height: i64,
         epoch: i64,

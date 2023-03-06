@@ -5,7 +5,7 @@
 use super::transactions::Transaction;
 use crate::{schema::move_modules, util::standardize_address};
 use aptos_protos::transaction::testing1::v1::{
-    DeleteModule, MoveModule as ProtoMoveModule, MoveModuleBytecode, WriteModule,
+    DeleteModule, MoveModule as MoveModulePB, MoveModuleBytecode, WriteModule,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,7 @@ impl MoveModule {
     }
 
     pub fn convert_move_module(
-        move_module: &ProtoMoveModule,
+        move_module: &MoveModulePB,
         bytecode: Vec<u8>,
     ) -> MoveModuleByteCodeParsed {
         MoveModuleByteCodeParsed {

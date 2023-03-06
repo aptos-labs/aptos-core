@@ -6,7 +6,7 @@ use super::transactions::Transaction;
 use crate::{schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::testing1::v1::{
-    DeleteResource, MoveStructTag as ProtoMoveStructTag, WriteResource,
+    DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
 };
 use field_count::FieldCount;
 
@@ -31,9 +31,10 @@ pub struct MoveResource {
 }
 
 pub struct MoveStructTag {
-    module: String,
-    name: String,
-    generic_type_params: Option<serde_json::Value>,
+    pub address: String,
+    pub module: String,
+    pub name: String,
+    pub generic_type_params: Option<serde_json::Value>,
 }
 
 impl MoveResource {
@@ -89,8 +90,9 @@ impl MoveResource {
         }
     }
 
-    pub fn convert_move_struct_tag(struct_tag: &ProtoMoveStructTag) -> MoveStructTag {
+    pub fn convert_move_struct_tag(struct_tag: &MoveStructTagPB) -> MoveStructTag {
         MoveStructTag {
+            address: standardize_address(struct_tag.address.as_str()),
             module: struct_tag.module.to_string(),
             name: struct_tag.name.to_string(),
             generic_type_params: struct_tag

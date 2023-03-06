@@ -15,11 +15,11 @@ use super::{
 use crate::{
     database::PgPoolConnection,
     schema::{block_metadata_transactions, transactions, user_transactions},
-    util::u64_to_bigdecimal,
+    util::{standardize_address, u64_to_bigdecimal},
 };
 use aptos_protos::transaction::testing1::v1::{
     transaction::{TransactionType, TxnData},
-    Transaction as TransactionProto, TransactionInfo,
+    Transaction as TransactionPB, TransactionInfo,
 };
 use bigdecimal::BigDecimal;
 use diesel::{
@@ -87,19 +87,22 @@ impl Transaction {
             payload,
             version,
             block_height,
-            hash: format!("0x{}", hex::encode(info.hash.as_slice())),
-            state_change_hash: format!("0x{}", hex::encode(info.state_change_hash.as_slice())),
-            event_root_hash: format!("0x{}", hex::encode(info.event_root_hash.as_slice())),
+            hash: standardize_address(hex::encode(info.hash.as_slice()).as_str()),
+            state_change_hash: standardize_address(
+                hex::encode(info.state_change_hash.as_slice()).as_str(),
+            ),
+            event_root_hash: standardize_address(
+                hex::encode(info.event_root_hash.as_slice()).as_str(),
+            ),
             state_checkpoint_hash: info
                 .state_checkpoint_hash
                 .as_ref()
-                .map(|hash| format!("0x{}", hex::encode(hash))),
+                .map(|hash| standardize_address(hex::encode(hash).as_str())),
             gas_used: u64_to_bigdecimal(info.gas_used),
             success: info.success,
             vm_status: info.vm_status.clone(),
-            accumulator_root_hash: format!(
-                "0x{}",
-                hex::encode(info.accumulator_root_hash.as_slice())
+            accumulator_root_hash: standardize_address(
+                hex::encode(info.accumulator_root_hash.as_slice()).as_str(),
             ),
             num_events,
             num_write_set_changes: info.changes.len() as i64,
@@ -108,7 +111,7 @@ impl Transaction {
     }
 
     pub fn from_transaction(
-        transaction: &TransactionProto,
+        transaction: &TransactionPB,
     ) -> (
         Self,
         Option<TransactionDetail>,
@@ -252,7 +255,7 @@ impl Transaction {
     }
 
     pub fn from_transactions(
-        transactions: &[TransactionProto],
+        transactions: &[TransactionPB],
     ) -> (
         Vec<Self>,
         Vec<TransactionDetail>,
