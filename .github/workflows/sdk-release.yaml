@@ -16,7 +16,7 @@
 
 name: "API + TS SDK CI"
 on:
-  # This is called from within the build-images.yaml workflow since we depend
+  # This is called from within the docker-build-test.yaml workflow since we depend
   # on the images having been built before this workflow runs.
   workflow_call:
     inputs:

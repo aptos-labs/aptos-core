@@ -17,7 +17,8 @@ To efficiently write smart contracts in Aptos, we recommend you first:
 
 Start here to learn how the Move language works on the Aptos blockchain. 
 
-- ### [Move on Aptos](move-on-aptos.md)
+- ### [Aptos Move Book](book/SUMMARY.md)
+- ### [Move on Aptos](./move-on-aptos.md)
 - ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)

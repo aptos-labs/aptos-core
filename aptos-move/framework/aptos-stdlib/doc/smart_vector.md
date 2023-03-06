@@ -24,6 +24,8 @@
 -  [Function `contains`](#0x1_smart_vector_contains)
 -  [Function `length`](#0x1_smart_vector_length)
 -  [Function `is_empty`](#0x1_smart_vector_is_empty)
+-  [Specification](#@Specification_1)
+    -  [Function `swap`](#@Specification_1_swap)
 
 
 <pre><code><b>use</b> <a href="big_vector.md#0x1_big_vector">0x1::big_vector</a>;
@@ -745,6 +747,25 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_swap"></a>
+
+### Function `swap`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_swap">swap</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, i: u64, j: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

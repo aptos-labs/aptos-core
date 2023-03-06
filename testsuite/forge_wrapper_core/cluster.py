@@ -28,6 +28,7 @@ class GcpError(Exception):
 
 class GetPodsItemMetadata(TypedDict):
     name: str
+    labels: dict
 
 
 class GetPodsItemStatus(TypedDict):
@@ -106,11 +107,55 @@ class ForgeCluster:
         )
         pods_result: GetPodsResult = json.loads(pod_result)
         pods = pods_result["items"]
-        return [
-            ForgeJob.from_pod(self, pod)
-            for pod in pods
-            if pod["metadata"]["name"].startswith("forge-")
-        ]
+        forge_jobs = []
+
+        # For each forge test runner pod, get the forge namespace and get the pods in that namespace
+        # to infer the number of validators and fullnodes for each job
+        for pod in pods:
+            if (  # use the forge_namespace label to filter out forge pods
+                not pod["metadata"]["name"].startswith("forge-")
+                or "forge-namespace" not in pod["metadata"]["labels"]
+            ):
+                continue
+            forge_namespace = pod["metadata"]["labels"]["forge-namespace"]
+            forge_namespace_pods_result_str = (
+                (
+                    await shell.gen_run(
+                        [
+                            "kubectl",
+                            "get",
+                            "pods",
+                            "-n",
+                            forge_namespace,
+                            "--kubeconfig",
+                            self.kubeconf,
+                            "-o",
+                            "json",
+                        ]
+                    )
+                )
+                .unwrap()
+                .decode()
+            )
+            forge_namespace_pods_result: GetPodsResult = json.loads(
+                forge_namespace_pods_result_str
+            )
+            forge_namespace_pods = forge_namespace_pods_result["items"]
+            validator_pods = [
+                forge_pod
+                for forge_pod in forge_namespace_pods
+                if "validator" in forge_pod["metadata"]["name"]
+            ]
+            fullnode_pods = [
+                forge_pod
+                for forge_pod in forge_namespace_pods
+                if "fullnode" in forge_pod["metadata"]["name"]
+            ]
+            job = ForgeJob.from_pod(self, pod)
+            job.num_validators = len(validator_pods)
+            job.num_fullnodes = len(fullnode_pods)
+            forge_jobs.append(job)
+        return forge_jobs
 
     def assert_auth(self, shell: Shell) -> None:
         if self.cloud == Cloud.AWS:
@@ -157,6 +202,8 @@ class ForgeJob:
     name: str
     phase: str
     cluster: ForgeCluster
+    num_validators: int = 0
+    num_fullnodes: int = 0
 
     @classmethod
     def from_pod(cls, cluster: ForgeCluster, pod: GetPodsItem) -> ForgeJob:

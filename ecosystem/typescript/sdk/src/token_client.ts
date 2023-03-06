@@ -8,9 +8,9 @@ import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
-import { TransactionBuilder, TransactionBuilderABI, TxnBuilderTypes } from "./transaction_builder";
+import { TransactionBuilder, TransactionBuilderRemoteABI, TxnBuilderTypes } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./bcs/consts";
-import { TOKEN_ABIS, TOKEN_TRANSFER_OPT_IN } from "./abis";
+import { TOKEN_TRANSFER_OPT_IN } from "./abis";
 import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
 import { getPropertyValueRaw, PropertyMap } from "./utils/property_map_serde";
 import {
@@ -28,8 +28,6 @@ import { Token, TokenData } from "./token_types";
 export class TokenClient {
   aptosClient: AptosClient;
 
-  transactionBuilder: TransactionBuilderABI;
-
   /**
    * Creates new TokenClient instance
    *
@@ -37,7 +35,6 @@ export class TokenClient {
    */
   constructor(aptosClient: AptosClient) {
     this.aptosClient = aptosClient;
-    this.transactionBuilder = new TransactionBuilderABI(TOKEN_ABIS.map((abi) => new HexString(abi).toUint8Array()));
   }
 
   /**
@@ -60,13 +57,17 @@ export class TokenClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // <:!:createCollection
-    const payload = this.transactionBuilder.buildTransactionPayload(
+
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::create_collection_script",
       [],
       [name, description, uri, maxAmount, [false, false, false]],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -105,7 +106,9 @@ export class TokenClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // <:!:createToken
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+
+    const rawTxn = await builder.build(
       "0x3::token::create_token_script",
       [],
       [
@@ -125,7 +128,9 @@ export class TokenClient {
       ],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -166,7 +171,8 @@ export class TokenClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     // <:!:createToken
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::create_token_script",
       [],
       [
@@ -186,7 +192,9 @@ export class TokenClient {
       ],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -211,13 +219,16 @@ export class TokenClient {
     property_version: number = 0,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token_transfers::offer_script",
       [],
       [receiver, creator, collectionName, name, property_version, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -240,13 +251,16 @@ export class TokenClient {
     property_version: number = 0,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token_transfers::claim_script",
       [],
       [sender, creator, collectionName, name, property_version],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -269,13 +283,16 @@ export class TokenClient {
     property_version: number = 0,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token_transfers::cancel_offer_script",
       [],
       [receiver, creator, collectionName, name, property_version],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -301,13 +318,13 @@ export class TokenClient {
     propertyVersion: AnyNumber = 0,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: sender.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::direct_transfer_script",
       [],
       [creator, collectionName, name, propertyVersion, amount],
     );
 
-    const rawTxn = await this.aptosClient.generateRawTransaction(sender.address(), payload, extraArgs);
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
       TxnBuilderTypes.AccountAddress.fromHex(receiver.address()),
     ]);
@@ -351,9 +368,11 @@ export class TokenClient {
    * @returns The hash of the transaction submitted to the API
    */
   async optInTokenTransfer(sender: AptosAccount, optIn: boolean, extraArgs?: OptionalTransactionArgs): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload("0x3::token::opt_in_direct_transfer", [], [optIn]);
-
-    return this.aptosClient.generateSignSubmitTransaction(sender, payload, extraArgs);
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: sender.address(), ...extraArgs });
+    const rawTxn = await builder.build("0x3::token::opt_in_direct_transfer", [], [optIn]);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -416,13 +435,16 @@ export class TokenClient {
     amount: AnyNumber,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: creator.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::burn_by_creator",
       [],
       [ownerAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(creator, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(creator, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -445,13 +467,16 @@ export class TokenClient {
     amount: AnyNumber,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: owner.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::burn",
       [],
       [creatorAddress, collection, name, PropertyVersion, amount],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(owner, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**
@@ -480,13 +505,16 @@ export class TokenClient {
     types: Array<string>,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const payload = this.transactionBuilder.buildTransactionPayload(
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: account.address(), ...extraArgs });
+    const rawTxn = await builder.build(
       "0x3::token::mutate_token_properties",
       [],
       [tokenOwner, creator, collection_name, tokenName, propertyVersion, amount, keys, values, types],
     );
 
-    return this.aptosClient.generateSignSubmitTransaction(account, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**

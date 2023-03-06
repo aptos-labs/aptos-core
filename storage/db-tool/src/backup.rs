@@ -136,8 +136,7 @@ pub struct VerifyOpt {
 impl Command {
     pub async fn run(self) -> Result<()> {
         Logger::new().level(Level::Info).init();
-        #[allow(deprecated)]
-        let _mp = MetricsPusher::start();
+        let _mp = MetricsPusher::start(vec![]);
         match self {
             Command::Oneoff(opt) => {
                 let client = Arc::new(BackupServiceClient::new_with_opt(opt.client));

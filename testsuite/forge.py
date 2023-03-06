@@ -960,7 +960,7 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 64
+    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -1531,7 +1531,7 @@ def list_jobs(
     phase: List[str],
     regex: str,
 ) -> None:
-    """List all available clusters"""
+    """List all running forge jobs"""
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1558,7 +1558,10 @@ def list_jobs(
         else:
             fg = "white"
 
-        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+        click.secho(
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            fg=fg,
+        )
 
 
 @main.command()

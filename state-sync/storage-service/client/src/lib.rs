@@ -28,8 +28,8 @@ pub enum Error {
     StorageServiceError(#[from] StorageServiceError),
 }
 
-/// The interface for sending Storage Service requests and querying network peer
-/// information.
+/// The interface for sending Storage Service requests and
+/// querying network peer information.
 #[derive(Clone, Debug)]
 pub struct StorageServiceClient<NetworkClient> {
     network_client: NetworkClient,

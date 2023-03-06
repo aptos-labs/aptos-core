@@ -36,8 +36,7 @@ async fn main() -> Result<()> {
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
 
-    #[allow(deprecated)]
-    let _mp = MetricsPusher::start();
+    let _mp = MetricsPusher::start(vec![]);
 
     let opt = Opt::from_args();
     VerifyCoordinator::new(

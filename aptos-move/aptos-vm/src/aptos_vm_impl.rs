@@ -85,17 +85,31 @@ impl AptosVMImpl {
             0 => None,
             _ => StorageGasSchedule::fetch_config(&storage),
         };
-        if gas_feature_version >= 2 {
-            if let (Some(gas_params), Some(storage_gas_schedule)) =
-                (&mut gas_params, &storage_gas_schedule)
-            {
-                gas_params.natives.table.common.load_base =
-                    storage_gas_schedule.per_item_read.into();
-                gas_params.natives.table.common.load_per_byte =
-                    storage_gas_schedule.per_byte_read.into();
-                gas_params.natives.table.common.load_failure = 0.into();
+
+        if let (Some(gas_params), Some(storage_gas_schedule)) =
+            (&mut gas_params, &storage_gas_schedule)
+        {
+            match gas_feature_version {
+                2..=6 => {
+                    gas_params.natives.table.common.load_base_legacy =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_base_new = 0.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                7.. => {
+                    gas_params.natives.table.common.load_base_legacy = 0.into();
+                    gas_params.natives.table.common.load_base_new =
+                        storage_gas_schedule.per_item_read.into();
+                    gas_params.natives.table.common.load_per_byte =
+                        storage_gas_schedule.per_byte_read.into();
+                    gas_params.natives.table.common.load_failure = 0.into();
+                },
+                _ => (),
             }
         }
+
         let storage_gas_params = StorageGasParameters::new(
             gas_feature_version,
             gas_params.as_ref(),

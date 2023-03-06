@@ -23,6 +23,10 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 * The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
 * As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
+:::important
+Ensure the [fullnode](../nodes/aptos-deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
+:::
+
 The storage service on a node employs two forms of pruning that erase data from nodes: 
 
 * state

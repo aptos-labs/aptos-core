@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_counter, register_gauge, register_gauge_vec,
-    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, Counter, Gauge, GaugeVec, Histogram, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, op_counters::DurationHistogram, register_counter, register_gauge,
+    register_gauge_vec, register_histogram, register_histogram_vec, register_int_counter,
+    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Counter, Gauge, GaugeVec,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -88,6 +88,23 @@ pub static TOTAL_VOTING_POWER: Lazy<Gauge> = Lazy::new(|| {
     register_gauge!(
         "aptos_total_voting_power",
         "Total voting power of validators in validator set"
+    )
+    .unwrap()
+});
+
+/// Number of distinct senders in a block
+pub static NUM_SENDERS_IN_BLOCK: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!("num_senders_in_block", "Total number of senders in a block").unwrap()
+});
+
+/// Transaction shuffling call latency
+pub static TXN_SHUFFLE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_transaction_shuffle_seconds",
+        // metric description
+        "The time spent in seconds in initializing the VM in the block executor",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });

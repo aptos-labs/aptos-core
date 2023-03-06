@@ -17,18 +17,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         binutils \
         lld
 
-# install cargo chef to cache dependencies
-RUN --mount=type=cache,target=/root/.cargo <<EOT
-    cargo install cargo-chef@0.1.51
-    cargo install cargo-cache --no-default-features --features ci-autoclean
-EOT
-
-### Build Rust dependencies ###
-FROM rust-base as planner
-
-COPY --link . .
-RUN cargo chef prepare --recipe-path recipe.json
-
 ### Build Rust code ###
 FROM rust-base as builder-base
 
@@ -51,15 +39,6 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
-
-# Use cargo chef
-COPY  --link --from=planner /aptos/recipe.json recipe.json
-
-# Build dependencies - this is the caching Docker layer!
-RUN <<EOT
-    cargo chef cook --profile ${PROFILE} --workspace --recipe-path recipe.json
-    cargo cache
-EOT
 
 COPY --link . /aptos/
 

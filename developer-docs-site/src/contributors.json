@@ -126,6 +126,11 @@
       "username": "0xbe1"
     },
     {
+      "name": "Jiege",
+      "email": "stevekeol.x@gmail.com",
+      "username": null
+    },
+    {
       "name": "Kevin",
       "email": "105028215+movekevin@users.noreply.github.com",
       "username": "movekevin"
@@ -633,6 +638,11 @@
       "name": "Kevin",
       "email": "105028215+movekevin@users.noreply.github.com",
       "username": "movekevin"
+    },
+    {
+      "name": "nk_ysg",
+      "email": "nk_ysg@163.com",
+      "username": null
     }
   ],
   "/guides/data-pruning": [
@@ -1256,14 +1266,14 @@
   ],
   "/guides/state-sync": [
     {
-      "name": "Josh Lind",
-      "email": "josh.lind@hotmail.com",
-      "username": "joshlind"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Josh Lind",
+      "email": "josh.lind@hotmail.com",
+      "username": "joshlind"
     },
     {
       "name": "Raj Karamchedu",
@@ -1854,6 +1864,11 @@
       "username": "clay-aptos"
     },
     {
+      "name": "David Conroy",
+      "email": "dconroy@gmail.com",
+      "username": null
+    },
+    {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
       "username": "rajkaramchedu"
@@ -2388,7 +2403,7 @@
       "username": "areshand"
     },
     {
-      "name": "Maayan Savir",
+      "name": "Maayan",
       "email": "maayan@aptoslabs.com",
       "username": null
     },

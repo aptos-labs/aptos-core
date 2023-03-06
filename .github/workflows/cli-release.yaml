@@ -17,7 +17,7 @@ on:
       release_title:
         type: string
         required: false
-        description: 'Name of the release, e.g. "Aptos CLI devnet release 2022-06-09":'
+        description: 'Name of the release, e.g. "Aptos CLI Release v0.2.3":'
 
 jobs:
   build-ubuntu20-binary:

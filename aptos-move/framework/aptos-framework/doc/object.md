@@ -1457,8 +1457,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 

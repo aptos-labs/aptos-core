@@ -10,6 +10,7 @@ use crate::{
     },
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -119,5 +120,13 @@ impl StateComputer for OrderingStateComputer {
         Ok(())
     }
 
-    fn new_epoch(&self, _: &EpochState, _payload_manager: Arc<PayloadManager>) {}
+    fn new_epoch(
+        &self,
+        _: &EpochState,
+        _payload_manager: Arc<PayloadManager>,
+        _: Arc<dyn TransactionShuffler>,
+    ) {
+    }
+
+    fn end_epoch(&self) {}
 }

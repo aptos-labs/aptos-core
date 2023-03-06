@@ -4,6 +4,7 @@
 use crate::{gather_metrics, json_encoder::JsonEncoder, NUM_METRICS};
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
+use aptos_logger::debug;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -19,9 +20,16 @@ use std::{
     thread,
 };
 
-// The message displayed when the endpoint is disabled.
+// TODO: we need to write tests for this service!
+
+// Useful string constants
+const CONTENT_TYPE_JSON: &str = "application/json";
+const CONTENT_TYPE_TEXT: &str = "text/plain";
 const DISABLED_ENDPOINT_MESSAGE: &str =
     "This endpoint is disabled! Enable it in the InspectionServiceConfig.";
+const HEADER_CONTENT_TYPE: &str = "Content-Type";
+const INVALID_ENDPOINT_MESSAGE: &str = "The requested endpoint is invalid!";
+const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 
 pub fn encode_metrics(encoder: impl Encoder) -> Vec<u8> {
     let metric_families = gather_metrics();
@@ -85,57 +93,105 @@ async fn serve_requests(
     req: Request<Body>,
     node_config: NodeConfig,
 ) -> Result<Response<Body>, hyper::Error> {
-    let mut resp = Response::new(Body::empty());
-    match (req.method(), req.uri().path()) {
-        // Expose the node configuration
-        (&Method::GET, "/configuration") => {
+    // Process the request and get the response components
+    let (status_code, body, content_type) = match req.uri().path() {
+        "/configuration" => {
+            // Exposes the node configuration
             if node_config.inspection_service.expose_configuration {
                 // We format the configuration using debug formatting. This is important to
                 // prevent secret/private keys from being serialized and leaked (i.e.,
                 // all secret keys are marked with SilentDisplay and SilentDebug).
                 let encoded_configuration = format!("{:?}", node_config);
-                *resp.body_mut() = Body::from(encoded_configuration);
+                (
+                    StatusCode::OK,
+                    Body::from(encoded_configuration),
+                    CONTENT_TYPE_TEXT,
+                )
             } else {
-                *resp.body_mut() = Body::from(DISABLED_ENDPOINT_MESSAGE);
+                (
+                    StatusCode::FORBIDDEN,
+                    Body::from(DISABLED_ENDPOINT_MESSAGE),
+                    CONTENT_TYPE_TEXT,
+                )
             }
         },
-        // Exposes JSON encoded metrics
-        (&Method::GET, "/json_metrics") => {
+        "/json_metrics" => {
+            // Exposes JSON encoded metrics
             let encoder = JsonEncoder;
             let buffer = encode_metrics(encoder);
-            *resp.body_mut() = Body::from(buffer);
+            (StatusCode::OK, Body::from(buffer), CONTENT_TYPE_JSON)
         },
-        // Exposes text encoded metrics
-        (&Method::GET, "/metrics") => {
+        "/metrics" => {
+            // Exposes text encoded metrics
             let encoder = TextEncoder::new();
             let buffer = encode_metrics(encoder);
-            *resp.body_mut() = Body::from(buffer);
+            (StatusCode::OK, Body::from(buffer), CONTENT_TYPE_TEXT)
         },
-        // Exposes forge encoded metrics (this is currently only used by forge).
-        (&Method::GET, "/forge_metrics") => {
+        "/forge_metrics" => {
+            // Exposes forge encoded metrics
             let metrics = get_all_metrics();
             let encoded_metrics = serde_json::to_string(&metrics).unwrap();
-            *resp.body_mut() = Body::from(encoded_metrics);
+            (
+                StatusCode::OK,
+                Body::from(encoded_metrics),
+                CONTENT_TYPE_JSON,
+            )
         },
-        // Expose the system and build information
-        (&Method::GET, "/system_information") => {
+        "/system_information" => {
+            // Exposes the system and build information
             if node_config.inspection_service.expose_system_information {
                 let mut system_information =
                     aptos_telemetry::system_information::get_system_information();
                 let build_info = build_information!();
                 system_information.extend(build_info);
                 let encoded_information = serde_json::to_string(&system_information).unwrap();
-                *resp.body_mut() = Body::from(encoded_information);
+                (
+                    StatusCode::OK,
+                    Body::from(encoded_information),
+                    CONTENT_TYPE_JSON,
+                )
             } else {
-                *resp.body_mut() = Body::from(DISABLED_ENDPOINT_MESSAGE);
+                (
+                    StatusCode::FORBIDDEN,
+                    Body::from(DISABLED_ENDPOINT_MESSAGE),
+                    CONTENT_TYPE_TEXT,
+                )
             }
         },
+        _ => (
+            StatusCode::NOT_FOUND,
+            Body::from(INVALID_ENDPOINT_MESSAGE),
+            CONTENT_TYPE_TEXT,
+        ),
+    };
+
+    // Create a response builder
+    let response_builder = Response::builder()
+        .header(HEADER_CONTENT_TYPE, content_type)
+        .status(status_code);
+
+    // Build the response based on the request methods
+    let response = match *req.method() {
+        Method::HEAD => response_builder.body(Body::empty()), // Return only the headers
+        Method::GET => response_builder.body(body),           // Include the response body
         _ => {
-            *resp.status_mut() = StatusCode::NOT_FOUND;
+            // Invalid method found
+            Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .body(Body::empty())
         },
     };
 
-    Ok(resp)
+    // Return the processed response
+    Ok(response.unwrap_or_else(|error| {
+        // Log the internal error
+        debug!("Error encountered when generating response: {:?}", error);
+
+        // Return a failure response
+        let mut response = Response::new(Body::from(UNEXPECTED_ERROR_MESSAGE));
+        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        response
+    }))
 }
 
 pub fn start_inspection_service(node_config: NodeConfig) {

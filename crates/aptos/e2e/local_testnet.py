@@ -6,17 +6,16 @@
 import logging
 import subprocess
 import time
-
 from urllib.request import urlopen
 
-from common import FAUCET_PORT, NODE_PORT, Network
+from common import FAUCET_PORT, NODE_PORT, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
 
 # Run a local testnet in a docker container. We choose to detach here and we'll
 # stop running it later using the container name.
-def run_node(network: Network, image_repo: str):
-    image_name = build_image_name(network, image_repo)
+def run_node(network: Network, image_repo_with_project: str):
+    image_name = build_image_name(image_repo_with_project, network)
     container_name = f"aptos-tools-{network}"
     LOG.info(f"Trying to run aptos CLI local testnet from image: {image_name}")
 
@@ -32,7 +31,8 @@ def run_node(network: Network, image_repo: str):
         [
             "docker",
             "run",
-            "--rm",
+            "--pull",
+            "always",
             "--detach",
             "--name",
             container_name,
@@ -81,7 +81,3 @@ def wait_for_startup(container_name: str, timeout: int):
             count += 1
             time.sleep(1)
     LOG.info(f"Node and faucet APIs for {container_name} came up")
-
-
-def build_image_name(network: Network, image_repo: str):
-    return f"{image_repo}aptoslabs/tools:{network}"

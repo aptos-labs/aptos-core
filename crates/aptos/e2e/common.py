@@ -1,9 +1,9 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from dataclasses import dataclass
 from enum import Enum
-
 
 NODE_PORT = 8080
 FAUCET_PORT = 8081
@@ -31,3 +31,14 @@ ACCOUNT_ONE = AccountInfo(
     public_key="0x25caf00522e4d4664ec0a27166a69e8a32b5078959d0fc398da70d40d2893e8f",
     account_address="0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82",
 )
+
+
+def build_image_name(image_repo_with_project: str, tag: str):
+    return f"{image_repo_with_project}/tools:{tag}"
+
+
+def recursive_chmod(path, perms):
+    for dirpath, _, filenames in os.walk(path):
+        os.chmod(dirpath, perms)
+        for filename in filenames:
+            os.chmod(os.path.join(dirpath, filename), perms)

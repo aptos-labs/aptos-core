@@ -679,7 +679,7 @@ async fn test_validator_failure_bootstrap_execution() {
 
 /// A helper method that tests that all validators can sync after a failure and
 /// continue to stay up-to-date.
-async fn test_all_validator_failures(mut swarm: LocalSwarm) {
+pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let validator_0 = validator_peer_ids[0];

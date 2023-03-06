@@ -768,16 +768,12 @@ module aptos_framework::multisig_account {
             table::contains(&multisig_account_resource.transactions, sequence_number),
             error::not_found(ETRANSACTION_NOT_FOUND),
         );
-        // Delete the transaction to keep storage efficient. Off-chain components can reconstruct the transaction and
-        // from events.
-        let transaction = table::remove(&mut multisig_account_resource.transactions, sequence_number);
-        let (_, num_rejections) = num_approvals_and_rejections(&multisig_account_resource.owners, &transaction);
+        let (_, num_rejections) = remove_executed_transaction(multisig_account_resource);
         assert!(
             num_rejections >= multisig_account_resource.num_signatures_required,
             error::invalid_state(ENOT_ENOUGH_REJECTIONS),
         );
 
-        multisig_account_resource.last_executed_sequence_number = sequence_number;
         emit_event(
             &mut multisig_account_resource.execute_rejected_transaction_events,
             ExecuteRejectedTransactionEvent {
@@ -830,7 +826,7 @@ module aptos_framework::multisig_account {
         transaction_payload: vector<u8>,
     ) acquires MultisigAccount {
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        let num_approvals = remove_executed_transaction(multisig_account_resource);
+        let (num_approvals, _) = remove_executed_transaction(multisig_account_resource);
         emit_event(
             &mut multisig_account_resource.execute_transaction_events,
             TransactionExecutionSucceededEvent {
@@ -851,7 +847,7 @@ module aptos_framework::multisig_account {
         execution_error: ExecutionError,
     ) acquires MultisigAccount {
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        let num_approvals = remove_executed_transaction(multisig_account_resource);
+        let (num_approvals, _) = remove_executed_transaction(multisig_account_resource);
         emit_event(
             &mut multisig_account_resource.transaction_execution_failed_events,
             TransactionExecutionFailedEvent {
@@ -867,12 +863,11 @@ module aptos_framework::multisig_account {
     ////////////////////////// Private functions ///////////////////////////////
 
     // Remove the next transaction in the queue as it's been executed and return the number of approvals it had.
-    fun remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): u64 {
+    fun remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
         let transaction = table::remove(&mut multisig_account_resource.transactions, sequence_number);
         multisig_account_resource.last_executed_sequence_number = sequence_number;
-        let (num_approvals, _) = num_approvals_and_rejections(&multisig_account_resource.owners, &transaction);
-        num_approvals
+        num_approvals_and_rejections(&multisig_account_resource.owners, &transaction)
     }
 
     fun add_transaction(creator: address, multisig_account: &mut MultisigAccount, transaction: MultisigTransaction) {
