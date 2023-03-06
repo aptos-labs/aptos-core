@@ -233,6 +233,7 @@ Xeon
 YAML
 YAMLs
 accessors
+accountHasList
 ait
 allowlist
 analytics
@@ -268,6 +269,7 @@ cli
 codebase
 config
 configs
+const
 copyable
 cryptographic
 cryptographically
@@ -295,6 +297,7 @@ entrancy
 enum
 failover
 faq
+fetchList
 filesystem
 findable
 fn
@@ -359,7 +362,6 @@ npmjs
 octa
 octas
 offchain
-on-chain
 onchain
 onwards
 orderbook
@@ -401,6 +403,7 @@ sdk
 sdks
 serde
 serializable
+setAccountHasList
 sft
 sharded
 sharding
@@ -446,6 +449,8 @@ upvote
 uri
 url
 useBaseUrl
+useEffect
+useState
 useWallet
 usecase
 utc

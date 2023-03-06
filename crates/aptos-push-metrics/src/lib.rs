@@ -22,6 +22,7 @@ use std::{
 use url::Url;
 
 const DEFAULT_PUSH_FREQUENCY_SECS: u64 = 15;
+const DEFAULT_DASHBOARD_BASE_URL: &str = "https://o11y.aptosdev.com/grafana/d/execution/execution";
 
 /// MetricsPusher provides a function to push a list of Metrics to a configurable
 /// pushgateway endpoint.
@@ -90,8 +91,6 @@ impl MetricsPusher {
     fn start_worker_thread(
         quit_receiver: mpsc::Receiver<()>,
         push_metrics_extra_labels: Vec<String>,
-        chain_name: &str,
-        namespace: &str,
     ) -> Option<JoinHandle<()>> {
         // eg value for PUSH_METRICS_ENDPOINT: "http://pushgateway.server.com:9091/metrics/job/safety_rules"
         let push_metrics_endpoint = match env::var("PUSH_METRICS_ENDPOINT") {
@@ -117,10 +116,6 @@ impl MetricsPusher {
             push_metrics_endpoint, push_metrics_frequency_secs
         );
 
-        info!(
-            "Execution dashboard link: {} ",
-            Self::get_dashboard_link(chain_name, namespace)
-        );
         Some(thread::spawn(move || {
             Self::worker(
                 quit_receiver,
@@ -144,8 +139,11 @@ impl MetricsPusher {
             .unwrap()
             .as_millis()
             .to_string();
-        let mut url =
-            Url::parse("https://o11y.aptosdev.com/grafana/d/execution/execution").unwrap();
+        let mut url = Url::parse(
+            &env::var("DASHBOARD_BASE_URL")
+                .unwrap_or_else(|_| DEFAULT_DASHBOARD_BASE_URL.to_string()),
+        )
+        .unwrap();
         url.query_pairs_mut()
             .append_pair("from", &start_time)
             .append_pair("to", &end_time)
@@ -171,21 +169,32 @@ impl MetricsPusher {
     }
 
     /// start starts a new thread and periodically pushes the metrics to a pushgateway endpoint
-    pub fn start(chain_name: &str) -> Self {
+    pub fn start(push_metrics_labels: Vec<String>) -> Self {
         let (tx, rx) = mpsc::channel();
-        let namespace = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            .to_string();
-        let push_metrics_labels = Self::push_metrics_extra_labels(chain_name, &namespace);
-        let worker_thread =
-            Self::start_worker_thread(rx, push_metrics_labels, chain_name, &namespace);
+        let worker_thread = Self::start_worker_thread(rx, push_metrics_labels);
 
         Self {
             worker_thread,
             quit_sender: tx,
         }
+    }
+
+    pub fn start_for_local_run(chain_name: &str) -> Self {
+        let namespace = env::var("PUSH_METRICS_NAMESPACE").unwrap_or_else(|_| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+                .to_string()
+        });
+        let push_metrics_labels = Self::push_metrics_extra_labels(chain_name, &namespace);
+        let pusher = Self::start(push_metrics_labels);
+
+        info!(
+            "Execution dashboard link: {} ",
+            Self::get_dashboard_link(chain_name, &namespace)
+        );
+        pusher
     }
 
     pub fn join(&mut self) {

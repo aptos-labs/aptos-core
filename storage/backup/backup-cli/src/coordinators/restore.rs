@@ -101,9 +101,6 @@ impl RestoreCoordinator {
         if self.replay_all {
             bail!("--replay--all not supported in this version.");
         }
-        if self.ledger_history_start_version.is_some() {
-            bail!("--ledger-history-start-version not supported in this version.");
-        }
 
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
@@ -145,10 +142,8 @@ impl RestoreCoordinator {
         let version = state_snapshot_backup.version;
         self.global_opt.target_version = version;
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
-        let transaction_backup = metadata_view
-            .select_transaction_backups(version, version)?
-            .pop()
-            .unwrap();
+        let transaction_backups = metadata_view
+            .select_transaction_backups(self.ledger_history_start_version(), version)?;
         COORDINATOR_TARGET_VERSION.set(version as i64);
         info!(version = version, "Restore target decided.");
 
@@ -182,7 +177,10 @@ impl RestoreCoordinator {
         .run()
         .await?;
 
-        let txn_manifests = vec![transaction_backup.manifest];
+        let txn_manifests = transaction_backups
+            .iter()
+            .map(|e| e.manifest.clone())
+            .collect();
         TransactionRestoreBatchController::new(
             self.global_opt,
             self.storage,
@@ -201,6 +199,11 @@ impl RestoreCoordinator {
 impl RestoreCoordinator {
     fn target_version(&self) -> Version {
         self.global_opt.target_version
+    }
+
+    fn ledger_history_start_version(&self) -> Version {
+        self.ledger_history_start_version
+            .unwrap_or_else(|| self.target_version())
     }
 
     #[allow(dead_code)]

@@ -233,7 +233,7 @@ fn main() {
             .unwrap()
             .as_millis() as i64,
     );
-    let _mp = MetricsPusher::start("executor-benchmark");
+    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
