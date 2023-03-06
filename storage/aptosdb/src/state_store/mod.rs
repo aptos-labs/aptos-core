@@ -851,7 +851,6 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
-        // TODO(grao): Support state kv db here.
         let batch = SchemaBatch::new();
         node_batch
             .par_iter()
@@ -861,7 +860,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.ledger_db.write_schemas(batch)
+        self.state_kv_db.write_schemas(batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -871,7 +870,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
-            .ledger_db
+            .state_kv_db
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }
