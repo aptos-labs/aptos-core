@@ -13,11 +13,4 @@ The source materials for both code and docs live in GitHub. See [Contribute](../
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
-| [Multisig Python SDK tooling and tutorial](https://github.com/aptos-labs/aptos-core/pull/6788) | This tutorial introduces assorted [K-of-N multi-signer authentication](../../concepts/accounts.md#multi-signer-authentication) operations | [alnoki](https://github.com/alnoki) | 2023-03-06 |
-| [Remix IDE plugin for Move](https://github.com/aptos-labs/aptos-core/pull/6458) | This tutorial describes a plugin that can develop you develop Aptos Move modules with the Remix IDE. | [0xhsy](https://github.com/0xhsy) | 2023-03-02 |
 | [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process. | [alnoki](https://github.com/alnoki) | 2022-10-06 |
-
-TODO: Update Multisig and Remix IDE with live documents once in place. Not Multisig is landing in two parts:
-https://github.com/aptos-labs/aptos-core/pull/6788/
-https://github.com/aptos-labs/aptos-core/pull/6356
-Also announce in See what's new as sub-bullets of each page announcement.
