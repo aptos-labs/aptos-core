@@ -320,7 +320,8 @@ impl Scheduler {
                 };
             }
 
-            if idx_to_validate < idx_to_execute {
+            if idx_to_execute >= self.num_txns || idx_to_validate < idx_to_execute.saturating_sub(128) {
+           // if idx_to_validate < idx_to_execute {
                 if let Some((version_to_validate, wave)) = self.try_validate_next_version() {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
