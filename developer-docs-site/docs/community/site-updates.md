@@ -19,7 +19,7 @@ Here are the basic steps for editing in your web browser:
 2. Modify and add source Markdown files in the [developer-docs-site](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site) directory.
 3. See your changes in Netlify (by swapping `prnumber` in):
  [https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/](https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/)
-4. Have at least two reviewers in the Aptos Labs examine and test the change.
+4. Have at least two verified reviewers examine and test the change.
 5. Merge in the change and see it go live.
 
 For more complex documentation updates, we recommend [forking the repository](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md#developer-workflow) and using a local editor to make changes. To edit at the command line and preview your changes on your localhost, see our [Developer Documentation](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/README.md) README.
@@ -56,12 +56,12 @@ To update [Aptos.dev](http://Aptos.dev) directly:
 3. For local edits, use the [local doc build instructions](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/README.md) to see your updates at: [http://localhost:3000](http://localhost:3000)
 4. After creating the pull request, use the *Deploy Preview* in Netlify to see your updates made in web browser or via local editor by replacing the *prnumber* with your own in:
 [https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/](https://deploy-preview-prnumber--aptos-developer-docs.netlify.app/)
-5. Have at least two verified reviewers from Aptos Labs review and test your changes.
+5. Have at least two verified reviewers review and test your changes.
 6. Make direct commits during review.
 7. Request review from the Docs team (currently, clay-aptos in GitHub).
 8. Use the *Assignee* field in the PR to identify the review the change is blocking upon.
 9. Receive and address *all feedback*.
-10. Get approval from at least two verified reviewers from Aptos Labs.
+10. Get approval from at least two verified reviewers.
 11. Merge in the change.
 12. Announce the update in [See What’s New.](https://aptos.dev/whats-new-in-docs)
 13. Monitor builds at: [https://app.netlify.com/sites/aptos-developer-docs/overview](https://app.netlify.com/sites/aptos-developer-docs/overview)
