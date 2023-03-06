@@ -67,16 +67,12 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     }
     aptos_db.ledger_db.write_schemas(batch).unwrap();
 
-    let pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_store),
-        LedgerPrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
+    let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        enable: true,
+        prune_window: 0,
+        batch_size: 1,
+        user_pruning_window_offset: 0,
+    });
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
         pruner

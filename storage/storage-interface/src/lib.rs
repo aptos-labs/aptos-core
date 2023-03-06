@@ -501,7 +501,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns if the state store pruner is enabled.
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
         unimplemented!()
     }
 
