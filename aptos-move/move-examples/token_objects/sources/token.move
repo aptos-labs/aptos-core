@@ -23,11 +23,11 @@ module token_objects::token {
     use token_objects::collection::{Self, Royalty};
 
     // The token does not exist
-    const ETOKEN_DOES_NOT_EXIST: u64 = 0;
+    const ETOKEN_DOES_NOT_EXIST: u64 = 1;
     /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 1;
+    const ENOT_CREATOR: u64 = 2;
     /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 2;
+    const EFIELD_NOT_MUTABLE: u64 = 3;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
@@ -321,7 +321,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x20000, location = token_objects::collection)]
+    #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
     entry fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
