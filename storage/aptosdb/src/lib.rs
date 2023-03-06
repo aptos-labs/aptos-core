@@ -59,7 +59,9 @@ use crate::{
     pruner::{
         db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
-        pruner_utils, state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+        pruner_utils, state_kv_pruner::StateKvPruner,
+        state_kv_pruner_manager::StateKvPrunerManager,
+        state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
     },
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
@@ -280,28 +282,32 @@ impl AptosDB {
         } else {
             Arc::clone(&arc_ledger_rocksdb)
         };
-        let state_pruner = StatePrunerManager::new(
+        let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StatePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.epoch_snapshot_pruner_config.into(),
+        );
+        let state_kv_pruner = StateKvPrunerManager::new(
+            Arc::clone(&arc_state_kv_rocksdb),
+            pruner_config.state_kv_pruner_config,
         );
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             Arc::clone(&arc_state_kv_rocksdb),
-            state_pruner,
+            state_merkle_pruner,
             epoch_snapshot_pruner,
+            state_kv_pruner,
             buffered_state_target_items,
             max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
-        // TODO(grao): Handle state kv db pruning.
+
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&arc_ledger_rocksdb),
-            Arc::clone(&state_store),
             pruner_config.ledger_pruner_config,
         );
 
@@ -979,7 +985,7 @@ impl AptosDB {
         let min_readable_version = self
             .state_store
             .state_db
-            .state_pruner
+            .state_merkle_pruner
             .get_min_readable_version();
         if version >= min_readable_version {
             return Ok(());
@@ -1001,6 +1007,18 @@ impl AptosDB {
                 min_readable_epoch_snapshot_version,
             )
         }
+    }
+
+    fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
+        let min_readable_version = self.state_store.state_kv_pruner.get_min_readable_version();
+        ensure!(
+            version >= min_readable_version,
+            "{} at version {} is pruned, min available version is {}.",
+            data_type,
+            version,
+            min_readable_version
+        );
+        Ok(())
     }
 }
 
@@ -1024,7 +1042,7 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
         gauged_api("get_prefixed_state_value_iterator", || {
-            self.error_if_ledger_pruned("State", version)?;
+            self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(Box::new(
                 self.state_store
@@ -1426,7 +1444,7 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
-            self.error_if_ledger_pruned("State", version)?;
+            self.error_if_state_kv_pruned("StateValue", version)?;
 
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
@@ -1655,9 +1673,13 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
-        gauged_api("is_state_pruner_enabled", || {
-            Ok(self.state_store.state_db.state_pruner.is_pruner_enabled())
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_state_merkle_pruner_enabled", || {
+            Ok(self
+                .state_store
+                .state_db
+                .state_merkle_pruner
+                .is_pruner_enabled())
         })
     }
 
@@ -1870,9 +1892,13 @@ impl DbWriter for AptosDB {
                 let last_version = first_version + num_txns - 1;
                 COMMITTED_TXNS.inc_by(num_txns);
                 LATEST_TXN_VERSION.set(last_version as i64);
-                // Activate the ledger pruner. Note the state merkle pruner is activated when
-                // state snapshots are persisted in their async thread.
+                // Activate the ledger pruner and state kv pruner.
+                // Note the state merkle pruner is activated when state snapshots are persisted
+                // in their async thread.
                 self.ledger_pruner
+                    .maybe_set_pruner_target_db_version(last_version);
+                self.state_store
+                    .state_kv_pruner
                     .maybe_set_pruner_target_db_version(last_version);
             }
 
@@ -1988,11 +2014,7 @@ impl DbWriter for AptosDB {
             )?;
 
             // Delete the genesis transaction
-            LedgerPruner::prune_genesis(
-                self.ledger_db.clone(),
-                self.state_store.clone(),
-                &mut batch,
-            )?;
+            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut batch)?;
 
             self.ledger_pruner
                 .pruner()
@@ -2005,7 +2027,7 @@ impl DbWriter for AptosDB {
             )?;
 
             self.state_store
-                .state_pruner
+                .state_merkle_pruner
                 .pruner()
                 .save_min_readable_version(version, &state_merkle_batch)?;
             self.state_store
@@ -2013,17 +2035,29 @@ impl DbWriter for AptosDB {
                 .pruner()
                 .save_min_readable_version(version, &state_merkle_batch)?;
 
+            let mut state_kv_batch = SchemaBatch::new();
+            StateKvPruner::prune_genesis(
+                self.state_store.state_kv_db.clone(),
+                &mut state_kv_batch,
+            )?;
+            self.state_store
+                .state_kv_pruner
+                .pruner()
+                .save_min_readable_version(version, &state_kv_batch)?;
+
             // Apply the change set writes to the database (atomically) and update in-memory state
             self.ledger_db.clone().write_schemas(batch)?;
             self.state_merkle_db
                 .clone()
                 .write_schemas(state_merkle_batch)?;
+            self.state_kv_db.clone().write_schemas(state_kv_batch)?;
+
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
 
             self.ledger_pruner.pruner().record_progress(version);
             self.state_store
-                .state_pruner
+                .state_merkle_pruner
                 .pruner()
                 .record_progress(version);
             self.state_store

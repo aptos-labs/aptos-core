@@ -7,7 +7,7 @@ use crate::{
         db_pruner::DBPruner, ledger_pruner_worker::LedgerPrunerWorker,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
     },
-    pruner_utils, StateStore,
+    pruner_utils,
 };
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
@@ -99,12 +99,8 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(
-        ledger_rocksdb: Arc<DB>,
-        state_store: Arc<StateStore>,
-        ledger_pruner_config: LedgerPrunerConfig,
-    ) -> Self {
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb, state_store);
+    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
+        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb);
 
         if ledger_pruner_config.enable {
             PRUNER_WINDOW
