@@ -27,7 +27,6 @@ See [Prepare your Aptos Dev Environment](https://aptos.dev/guides/getting-starte
 
 ### Resources
 
-* [Aptos Labs](https://aptoslabs.com/)
 * [Aptos Developer Network](https://aptos.dev)
 * [Getting Started](https://aptos.dev/guides/getting-started)
 * Join us on the [Aptos Discord](https://discord.gg/aptoslabs).
