@@ -9,7 +9,6 @@
 /// Move functions here because many have loops, requiring loop invariants to prove, and
 /// the return on investment didn't seem worth it for these simple functions.
 module std::vector {
-
     /// The index into the vector is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 0x20000;
 
@@ -92,14 +91,23 @@ module std::vector {
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {
         reverse(&mut other);
-        while (!is_empty(&other)) push_back(lhs, pop_back(&mut other));
-        destroy_empty(other);
+        reverse_append(lhs, other);
     }
     spec append {
         pragma intrinsic = true;
     }
     spec is_empty {
         pragma intrinsic = true;
+    }
+
+    /// Pushes all of the elements of the `other` vector into the `lhs` vector.
+    public fun reverse_append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {
+        let len = length(&other);
+        while (len > 0) {
+            push_back(lhs, pop_back(&mut other));
+            len = len - 1;
+        };
+        destroy_empty(other);
     }
 
     /// Trim a vector to a smaller size, returning the evicted elements in reverse order
@@ -293,27 +301,6 @@ module std::vector {
         p
     }
 
-    public inline fun map_ref2<Element>(
-        v: &mut vector<Element>,
-        f: |&Element|u64
-    ): vector<u64> {
-        let pred = map_ref(v, |elem| f(elem));
-        // let len = length(v);
-        // stable_partition_internal(v, &pred,0, len)
-        pred
-    }
-
-    fun test_stable_partition() {
-        let v:vector<u64> = vector[1, 2, 3, 4, 5];
-
-        let pred = map_ref2(&mut v, |n| *n % 2);
-        //let len = length(&v);
-        //assert!(stable_partition_internal(&mut v, &pred,0, len) == 2, 0);
-
-        //assert!(stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
-        assert!(&v == &vector[2, 4, 1, 3, 5], 1);
-    }
-
     /// rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
     /// ie. 3 in the example above
     public fun rotate<Element>(
@@ -338,37 +325,28 @@ module std::vector {
         left + (right - rot)
     }
 
-    /// For in-place stable partition we need recursion so we cannot use inline functions
-    /// and thus we cannot use lambdas. Luckily it so happens that we can precompute the predicate
-    /// in a secondary array. Note how the algorithm belows only start shuffling items after the
-    /// predicate is checked.
-    public fun stable_partition_internal<Element>(
-        v: &mut vector<Element>,
-        pred: &vector<bool>,
-        left: u64,
-        right: u64
-    ): u64 {
-        if (left == right) {
-            left
-        } else if (left + 1 == right) {
-            if (*borrow(pred, left)) right else left
-        } else {
-            let mid = left + ((right - left) >> 1);
-            let p1 = stable_partition_internal(v, pred, left, mid);
-            let p2 = stable_partition_internal(v, pred, mid, right);
-            rotate_slice(v, p1, mid, p2)
-        }
-    }
-
     /// Partition the array based on a predicate p, this routine is stable and thus
     /// preserves the relative order of the elements in the two partitions.
     public inline fun stable_partition<Element>(
         v: &mut vector<Element>,
         p: |&Element|bool
     ): u64 {
-        let pred = map_ref(v, |e| p(e));
         let len = length(v);
-        stable_partition_internal(v, &pred, 0, len)
+        let t = empty();
+        let f = empty();
+        while (len > 0) {
+            let e = pop_back(v);
+            if (p(&e)) {
+                push_back(&mut t, e);
+            } else {
+                push_back(&mut f, e);
+            };
+            len = len - 1;
+        };
+        let pos = length(&t);
+        reverse_append(v, t);
+        reverse_append(v, f);
+        pos
     }
 
     /// Return true if any element in the vector satisfies the predicate.
