@@ -149,6 +149,9 @@ module aptos_token::token {
     /// Withdraw proof expires
     const EWITHDRAW_PROOF_EXPIRES: u64 = 39;
 
+    /// The property is reserved by token standard
+    const EPROPERTY_RESERVED_BY_STANDARD: u64 = 40;
+
     //
     // Core data structures for holding tokens
     //
@@ -756,6 +759,7 @@ module aptos_token::token {
         let i: u64 = 0;
         let old_values: vector<Option<PropertyValue>> = vector::empty();
         let new_values: vector<PropertyValue> = vector::empty();
+        assert_non_standard_reserved_property(&keys);
         while (i < vector::length(&keys)){
             let key = vector::borrow(&keys, i);
             let old_pv = if (property_map::contains_key(&token_data.default_properties, key)) {
@@ -1614,7 +1618,7 @@ module aptos_token::token {
         assert!(table::contains(tokens, token_id), error::not_found(ENO_TOKEN_IN_TOKEN_STORE));
 
         let value = &mut table::borrow_mut(tokens, token_id).token_properties;
-
+        assert_non_standard_reserved_property(&keys);
         property_map::update_property_map(value, keys, values, types);
     }
 
@@ -1653,6 +1657,20 @@ module aptos_token::token {
         assert!(exists<Collections>(creator_addr), error::not_found(ECOLLECTIONS_NOT_PUBLISHED));
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
         assert!(table::contains(all_token_data, token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
+    }
+
+    fun assert_non_standard_reserved_property(keys: &vector<String>) {
+        let len = vector::length(keys);
+        let i = 0;
+        while ( i < len) {
+            let key = vector::borrow(keys, i);
+            let length = string::length(key);
+            if (length >= 6) {
+                let prefix = string::sub_string(&*key, 0, 6);
+                assert!(prefix != string::utf8(b"TOKEN_"), error::permission_denied(EPROPERTY_RESERVED_BY_STANDARD));
+            };
+            i = i + 1;
+        };
     }
 
     // ****************** TEST-ONLY FUNCTIONS **************
@@ -2198,7 +2216,6 @@ module aptos_token::token {
         let collections = borrow_global<Collections>(signer::address_of(creator));
         assert!(!table::contains(&collections.collection_data, token_id.token_data_id.name), 1);
         assert!(!table::contains(&collections.token_data, token_id.token_data_id), 1);
-
     }
 
     #[test(creator = @0xcafe)]
@@ -2632,6 +2649,44 @@ module aptos_token::token {
         );
 
         get_tokendata_mutability_config(token_id.token_data_id);
+    }
+
+    #[test(creator = @0xcafe, owner = @0x456)]
+    #[expected_failure(abort_code = 327720, location = Self)]
+    fun test_fail_to_add_burn_flag(
+        creator: &signer,
+        owner: &signer,
+    ) acquires TokenStore, Collections {
+        use std::bcs;
+        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of(owner));
+        let token_id = create_collection_and_token(
+            creator,
+            2,
+            4,
+            4,
+            vector<String>[string::utf8(BURNABLE_BY_OWNER)],
+            vector<vector<u8>>[bcs::to_bytes<bool>(&true)],
+            vector<String>[string::utf8(b"bool")],
+            vector<bool>[false, false, false],
+            vector<bool>[true, true, true, true, true],
+        );
+        let new_keys = vector<String>[
+            string::utf8(BURNABLE_BY_CREATOR),
+        ];
+        let new_vals = vector<vector<u8>>[
+            bcs::to_bytes<bool>(&true),
+        ];
+        let new_types = vector<String>[
+            string::utf8(b"bool"),
+        ];
+        mutate_tokendata_property(
+            creator,
+            token_id.token_data_id,
+            new_keys,
+            new_vals,
+            new_types,
+        );
     }
 
     //

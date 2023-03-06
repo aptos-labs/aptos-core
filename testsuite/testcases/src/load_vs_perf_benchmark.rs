@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::NetworkLoadTest;
@@ -254,7 +254,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 "actual dur"
             );
             for result in &results {
-                let rate = result.stats.rate(result.actual_duration);
+                let rate = result.stats.rate();
                 println!(
                     "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
                     result.name,

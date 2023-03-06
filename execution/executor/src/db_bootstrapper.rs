@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -197,7 +198,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value(&StateKey::AccessPath(AccessPath::new(
+        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             TimestampResource::resource_path(),
         )))?
@@ -208,7 +209,7 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
 
 fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value(&StateKey::AccessPath(AccessPath::new(
+        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )))?

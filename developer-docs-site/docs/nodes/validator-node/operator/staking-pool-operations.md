@@ -17,18 +17,18 @@ The current required minimum for staking is 1M APT tokens.
 
 ## Initializing the stake pool
 
-Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](/nodes/validator-node/owner/index#initialize-staking-pool) in the owner documentation section.
+Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
 
 ## Joining validator set
 
 :::danger Errors? 
-**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](/docs/issues-and-workarounds.md).
+**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](../../../issues-and-workarounds.md).
 :::
 
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
 :::
 
 ### 1. Initialize Aptos CLI
@@ -100,7 +100,7 @@ aptos node join-validator-set \
 The validator set is updated at every epoch change. You will see your validator node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
 :::tip When is next epoch?
-Run the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information). You can also follow these steps: [How to find out when the next epoch starts](/issues-and-workarounds#how-to-find-out-when-the-next-epoch-starts).
+Run the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information). You can also follow these steps: [How to find out when the next epoch starts](../../../issues-and-workarounds.md#how-to-find-out-when-the-next-epoch-starts).
 :::
 
 ### 6. Check the validator set
@@ -120,7 +120,7 @@ aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active
 ## Checking your stake pool information
 
 :::tip How validation works
-Before you proceed, see [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain) for a brief overview.
+Before you proceed, see [Validation on the Aptos blockchain](../../../concepts/staking.md#validation-on-the-aptos-blockchain) for a brief overview.
 :::
 
 To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
@@ -128,7 +128,7 @@ To check the details of your stake pool, run the below CLI command with the `get
 The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
 
 :::tip
-For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](/nodes/aptos-deployments).
+For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../aptos-deployments.md).
 :::
 
 ```bash
@@ -277,7 +277,7 @@ Example output:
 #### Description of fields
 
 **current_epoch_successful_proposals**
-- Successful leader-validator proposals during the current epoch. Also see [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain) for the distinction between leader-validator and the voter-validator.
+- Successful leader-validator proposals during the current epoch. Also see [Validation on the Aptos blockchain](../../../concepts/staking.md#validation-on-the-aptos-blockchain) for the distinction between leader-validator and the voter-validator.
 
 **previous_epoch_rewards**
 - An ordered list of rewards earned (APT amounts) for the previous 10 epochs, starting with the 10 epoch in the past. In the above example, a reward of 12312716242 APT was earned 10 epochs past and a reward of 12313600288 APT was earned in the most recent epoch. If a reward is 0 for any epoch, then:

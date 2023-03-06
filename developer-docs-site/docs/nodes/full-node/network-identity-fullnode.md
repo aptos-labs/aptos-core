@@ -22,7 +22,7 @@ This guide will show you how to:
 
 ## Before you proceed
 
-Before you proceed, make sure that you already know how to start your local fullnode. See [Run a Fullnode](/nodes/full-node/index.md) for detailed documentation.
+Before you proceed, make sure that you already know how to start your local fullnode. See [Run a Fullnode](./index.md) for detailed documentation.
 
 :::caution Docker support only on Linux
 
@@ -68,7 +68,7 @@ Follow the below detailed steps:
 
   **Using Aptos-core source code**
   
-  Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
+  Run the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
 
   :::tip
 

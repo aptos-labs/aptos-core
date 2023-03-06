@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::{MoveResolverExt, SessionExt};
@@ -80,7 +80,7 @@ pub(crate) fn validate_module_and_extract_new_entries<S: MoveResolverExt>(
     BTreeMap<String, StructTag>,
 )> {
     let (new_groups, mut new_members) =
-        if let Some(metadata) = aptos_framework::get_module_metadata(module) {
+        if let Some(metadata) = aptos_framework::get_metadata_from_compiled_module(module) {
             extract_resource_group_metadata(&metadata)?
         } else {
             (BTreeMap::new(), BTreeMap::new())
@@ -123,7 +123,7 @@ pub(crate) fn extract_resource_group_metadata_from_module<S: MoveResolverExt>(
         .load_module(module_id)
         .map(|module| {
             CompiledModule::deserialize(&module)
-                .map(|module| aptos_framework::get_module_metadata(&module))
+                .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
         });
 
     if let Ok(Ok(Some(metadata))) = metadata {

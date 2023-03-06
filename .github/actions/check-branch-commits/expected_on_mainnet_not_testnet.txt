@@ -1,0 +1,6 @@
+# This file contains a list of commit hashes that are expected to
+# be on the mainnet branch, but not on the testnet branch. Each commit
+# hash should be on a new line, with a comment explaining why it is
+# not on the testnet branch.
+
+# This list is currently empty.

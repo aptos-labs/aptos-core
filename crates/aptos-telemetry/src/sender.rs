@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{self, increment_log_ingest_failures_by, increment_log_ingest_successes_by};
@@ -321,7 +321,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(format!("{}/api/v1/auth", self.base_url))
+            .post(self.build_path("auth")?)
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;

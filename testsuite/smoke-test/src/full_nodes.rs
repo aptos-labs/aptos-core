@@ -1,9 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
+    test_utils::{
+        assert_balance, create_and_fund_account, transfer_coins, MAX_CATCH_UP_WAIT_SECS,
+        MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+    },
 };
 use aptos_config::{
     config::{DiscoveryMethod, NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
@@ -17,8 +21,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_WAIT_SECS: u64 = 60;
-
 #[tokio::test]
 async fn test_full_node_basic_flow() {
     let mut swarm = local_swarm_with_fullnodes(1, 1).await;
@@ -30,7 +32,7 @@ async fn test_full_node_basic_flow() {
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
             .unwrap();
     }
@@ -45,7 +47,7 @@ async fn test_full_node_basic_flow() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -122,11 +124,11 @@ async fn test_vfn_failover() {
 
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
             .await
             .unwrap();
         fullnode
-            .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+            .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))
             .await
             .unwrap();
     }
@@ -136,7 +138,7 @@ async fn test_vfn_failover() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -223,7 +225,7 @@ async fn test_private_full_node() {
     let user = swarm.add_full_node(&version, user_config).unwrap();
 
     swarm
-        .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -249,7 +251,7 @@ async fn test_private_full_node() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 

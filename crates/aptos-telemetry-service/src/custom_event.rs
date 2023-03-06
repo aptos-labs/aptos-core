@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -29,6 +29,8 @@ pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
             NodeType::ValidatorFullNode,
             NodeType::PublicFullNode,
             NodeType::Unknown,
+            NodeType::UnknownValidator,
+            NodeType::UnknownFullNode,
         ]))
         .and(warp::body::json())
         .and_then(handle_custom_event)

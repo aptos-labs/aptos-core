@@ -1,7 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::NetworkLoadTest;
 use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 
 pub struct PerformanceBenchmarkWithFN;
@@ -12,11 +12,7 @@ impl Test for PerformanceBenchmarkWithFN {
     }
 }
 
-impl NetworkLoadTest for PerformanceBenchmarkWithFN {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-}
+impl NetworkLoadTest for PerformanceBenchmarkWithFN {}
 
 impl NetworkTest for PerformanceBenchmarkWithFN {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {

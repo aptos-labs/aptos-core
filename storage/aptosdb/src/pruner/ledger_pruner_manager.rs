@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -16,7 +16,6 @@ use aptos_types::transaction::Version;
 use std::{sync::Arc, thread::JoinHandle};
 
 /// The `PrunerManager` for `LedgerPruner`.
-#[derive(Debug)]
 pub(crate) struct LedgerPrunerManager {
     pruner_enabled: bool,
     /// DB version window, which dictates how many version of other stores like transaction, ledger

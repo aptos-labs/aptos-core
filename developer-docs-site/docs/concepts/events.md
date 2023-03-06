@@ -18,7 +18,7 @@ Assuming that an account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f779496
 }]
 ```
 
-Each registered event has a unique `key`. The key `0x0000000000000000c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd` maps to the event `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/sent_events` registered on account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd`. This key can then be used to directly make event queries, e.g., `https://fullnode.devnet.aptoslabs.com/v1/events/0000000000000000c40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd`.
+Each registered event has a unique `key`. The key `0x0000000000000000caa60eb4a01756955ab9b2d1caca52ed` maps to the event `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/sent_events` registered on account `0xc40f1c9b9fdc204cf77f68c9bb7029b0abbe8ad9e5561f7794964076a4fbdcfd`. This key can then be used to directly make event queries, e.g., `https://fullnode.devnet.aptoslabs.com/v1/events/0x0000000000000000caa60eb4a01756955ab9b2d1caca52ed`.
 
 These represent event streams, or a list of events with each entry containing a sequentially increasing `sequence_number` beginning at `0`, a `type`, and `data`. Each event must be defined by some `type`. There may be multiple events defined by the same or similar `type`s especially when using generics. Events have associated `data`. The general principle is to include all data necessary to understand the changes to the underlying resources before and after the execution of the transaction that changed the data and emitted the event.
 

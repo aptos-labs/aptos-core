@@ -89,7 +89,7 @@ for (let i = 0; currentGap < gapLimit; i += 1) {
 
 ## dapp API
 
-More important than account creation, is how wallets connect to dapps. Additionally, following these APIs will allow for the wallet developer to integrate with the [Aptos Wallet adapter standard](../concepts/wallet-adapter-concept.md).  The APIs are as follows:
+More important than account creation, is how wallets connect to dapps. Additionally, following these APIs will allow for the wallet developer to integrate with the [Aptos Wallet Adapter Standard](../concepts/wallet-adapter-concept.md).  The APIs are as follows:
 
 - `connect()`, `disconnect()`
 - `account()`

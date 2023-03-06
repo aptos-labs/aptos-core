@@ -36,6 +36,7 @@ arc-swap = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
+claims = { workspace = true }
 clap = { workspace = true, optional = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
@@ -50,6 +51,7 @@ proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 static_assertions = { workspace = true }
+status-line = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -208,6 +208,62 @@ export class EntryFunction {
   }
 }
 
+export class MultiSigTransactionPayload {
+  /**
+   * Contains the payload to run a multisig account transaction.
+   * @param transaction_payload The payload of the multisig transaction. This can only be EntryFunction for now but
+   * Script might be supported in the future.
+   */
+  constructor(public readonly transaction_payload: EntryFunction) {}
+
+  serialize(serializer: Serializer): void {
+    // We can support multiple types of inner transaction payload in the future.
+    // For now it's only EntryFunction but if we support more types, we need to serialize with the right enum values
+    // here
+    serializer.serializeU32AsUleb128(0);
+    this.transaction_payload.serialize(serializer);
+  }
+
+  static deserialize(deserializer: Deserializer): MultiSigTransactionPayload {
+    return new MultiSigTransactionPayload(EntryFunction.deserialize(deserializer));
+  }
+}
+
+export class MultiSig {
+  /**
+   * Contains the payload to run a multisig account transaction.
+   * @param multisig_address The multisig account address the transaction will be executed as.
+   * @param transaction_payload The payload of the multisig transaction. This is optional when executing a multisig
+   *  transaction whose payload is already stored on chain.
+   */
+  constructor(
+    public readonly multisig_address: AccountAddress,
+    public readonly transaction_payload?: MultiSigTransactionPayload,
+  ) {}
+
+  serialize(serializer: Serializer): void {
+    this.multisig_address.serialize(serializer);
+    // Options are encoded with an extra u8 field before the value - 0x0 is none and 0x1 is present.
+    // We use serializeBool below to create this prefix value.
+    if (this.transaction_payload === undefined) {
+      serializer.serializeBool(false);
+    } else {
+      serializer.serializeBool(true);
+      this.transaction_payload.serialize(serializer);
+    }
+  }
+
+  static deserialize(deserializer: Deserializer): MultiSig {
+    const multisig_address = AccountAddress.deserialize(deserializer);
+    const payloadPresent = deserializer.deserializeBool();
+    let transaction_payload;
+    if (payloadPresent) {
+      transaction_payload = MultiSigTransactionPayload.deserialize(deserializer);
+    }
+    return new MultiSig(multisig_address, transaction_payload);
+  }
+}
+
 export class Module {
   /**
    * Contains the bytecode of a Move module that can be published to the Aptos chain.
@@ -353,6 +409,8 @@ export abstract class TransactionPayload {
       // TODO: change to 1 once ModuleBundle has been removed from rust
       case 2:
         return TransactionPayloadEntryFunction.load(deserializer);
+      case 3:
+        return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
@@ -388,6 +446,22 @@ export class TransactionPayloadEntryFunction extends TransactionPayload {
   static load(deserializer: Deserializer): TransactionPayloadEntryFunction {
     const value = EntryFunction.deserialize(deserializer);
     return new TransactionPayloadEntryFunction(value);
+  }
+}
+
+export class TransactionPayloadMultisig extends TransactionPayload {
+  constructor(public readonly value: MultiSig) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(3);
+    this.value.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): TransactionPayloadMultisig {
+    const value = MultiSig.deserialize(deserializer);
+    return new TransactionPayloadMultisig(value);
   }
 }
 

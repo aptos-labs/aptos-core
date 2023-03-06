@@ -1,5 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 //! Names of modules, functions, and types used by Aptos System.
 
 use aptos_types::account_config;
@@ -22,3 +24,16 @@ pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("multi_agent_
 pub const MODULE_PROLOGUE_NAME: &IdentStr = ident_str!("module_prologue");
 pub const USER_EPILOGUE_NAME: &IdentStr = ident_str!("epilogue");
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
+
+pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("multisig_account").to_owned(),
+    )
+});
+pub const VALIDATE_MULTISIG_TRANSACTION: &IdentStr = ident_str!("validate_multisig_transaction");
+pub const GET_NEXT_TRANSACTION_PAYLOAD: &IdentStr = ident_str!("get_next_transaction_payload");
+pub const SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
+    ident_str!("successful_transaction_execution_cleanup");
+pub const FAILED_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
+    ident_str!("failed_transaction_execution_cleanup");

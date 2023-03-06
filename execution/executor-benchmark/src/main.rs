@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{
@@ -8,14 +9,24 @@ use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{
     benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
 };
+use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
-use std::path::PathBuf;
+use once_cell::sync::Lazy;
+use std::{
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use structopt::StructOpt;
 
 #[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+/// This is needed for filters on the Grafana dashboard working as its used to populate the filter
+/// variables.
+pub static START_TIME: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("node_process_start_time", "Start time").unwrap());
 
 #[derive(Debug, StructOpt)]
 struct PrunerOpt {
@@ -75,11 +86,17 @@ struct Opt {
     #[structopt(long, default_value = "10000")]
     block_size: usize,
 
+    #[structopt(long, default_value = "5")]
+    transactions_per_sender: usize,
+
     #[structopt(long)]
     concurrency_level: Option<usize>,
 
     #[structopt(flatten)]
     pruner_opt: PrunerOpt,
+
+    #[structopt(long)]
+    use_state_kv_db: bool,
 
     #[structopt(subcommand)]
     cmd: Command,
@@ -168,6 +185,7 @@ where
                 data_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
+                opt.use_state_kv_db,
             );
         },
         Command::RunExecutor {
@@ -178,10 +196,12 @@ where
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
+                opt.transactions_per_sender,
                 data_dir,
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
+                opt.use_state_kv_db,
             );
         },
         Command::AddAccounts {
@@ -198,17 +218,22 @@ where
                 checkpoint_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
+                opt.use_state_kv_db,
             );
         },
     }
 }
 
 fn main() {
-    #[allow(deprecated)]
-    let _mp = MetricsPusher::start();
     let opt = Opt::from_args();
-
     aptos_logger::Logger::new().init();
+    START_TIME.set(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64,
+    );
+    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))

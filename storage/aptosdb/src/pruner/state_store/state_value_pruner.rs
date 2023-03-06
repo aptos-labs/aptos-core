@@ -1,10 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{pruner::db_sub_pruner::DBSubPruner, StateStore};
 use aptos_schemadb::SchemaBatch;
 use std::sync::Arc;
 
-#[derive(Debug)]
 pub struct StateValuePruner {
     state_store: Arc<StateStore>,
 }

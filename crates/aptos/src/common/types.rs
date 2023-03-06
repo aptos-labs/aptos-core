@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -20,7 +20,11 @@ use aptos_crypto::{
 };
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::{aptos_api_types::HashValue, error::RestError, Client, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{HashValue, ViewRequest},
+    error::RestError,
+    Client, Transaction,
+};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
@@ -951,10 +955,6 @@ impl MovePackageDir {
             .collect()
     }
 
-    pub fn bytecode_version_or_detault(&self) -> u32 {
-        self.bytecode_version.unwrap_or(5)
-    }
-
     pub fn add_named_address(&mut self, key: String, value: String) {
         self.named_addresses
             .insert(key, AccountAddressWrapper::from_str(&value).unwrap());
@@ -1318,6 +1318,11 @@ impl TransactionOptions {
     pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
         let client = self.rest_client()?;
         get_sequence_number(&client, sender_address).await
+    }
+
+    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
+        let client = self.rest_client()?;
+        Ok(client.view(&payload, None).await?.into_inner())
     }
 
     /// Submit a transaction

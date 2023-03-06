@@ -1,5 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 pub(crate) mod db_pruner;
 pub(crate) mod db_sub_pruner;
 pub(crate) mod event_store;

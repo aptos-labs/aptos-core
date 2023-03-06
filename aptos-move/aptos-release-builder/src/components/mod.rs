@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
 use crate::components::feature_flags::Features;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
@@ -42,6 +42,9 @@ pub struct ReleaseConfig {
     pub consensus_config: Option<OnChainConsensusConfig>,
     #[serde(default)]
     pub is_multi_step: bool,
+    /// Execute the framework releases after setting all other flags.
+    #[serde(default)]
+    pub framework_release_at_end: bool,
 }
 
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
@@ -80,13 +83,23 @@ impl ReleaseConfig {
         let mut result: Vec<(String, String)> = vec![];
         let mut release_generation_functions: Vec<
             &dyn Fn(&Self, &Option<Client>, &mut Vec<(String, String)>) -> Result<()>,
-        > = vec![
-            &Self::generate_framework_release,
-            &Self::generate_gas_schedule,
-            &Self::generate_version_file,
-            &Self::generate_feature_flag_file,
-            &Self::generate_consensus_file,
-        ];
+        > = if self.framework_release_at_end {
+            vec![
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+                &Self::generate_framework_release,
+            ]
+        } else {
+            vec![
+                &Self::generate_framework_release,
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+            ]
+        };
         let client = self
             .remote_endpoint
             .as_ref()
@@ -113,7 +126,7 @@ impl ReleaseConfig {
             script_path.push(&proposal_name);
             script_path.set_extension("move");
 
-            std::fs::write(script_path.as_path(), script.as_bytes())
+            std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
                 .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
         }
 
@@ -201,6 +214,8 @@ impl ReleaseConfig {
                         .await
                 })?;
                 // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
+                // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
+                // we would like to enable/disable, regardless of their current on chain state.
                 needs_update = feature_flags.has_modified(features.inner());
             }
             if needs_update {
@@ -275,6 +290,45 @@ impl ReleaseConfig {
     pub fn parse(serialized: &str) -> Result<Self> {
         serde_yaml::from_str(serialized).map_err(|e| anyhow!("Failed to parse the config: {:?}", e))
     }
+
+    // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
+    pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
+        let client = Client::new(endpoint);
+        if let Some(features) = &self.feature_flags {
+            let on_chain_features = block_on(async {
+                client
+                    .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
+                        CORE_CODE_ADDRESS,
+                        "0x1::features::Features",
+                    )
+                    .await
+            })?;
+            if features.has_modified(on_chain_features.inner()) {
+                bail!(
+                    "Feature mismatch: Got {:?}, expected {:?}",
+                    on_chain_features.inner(),
+                    features
+                );
+            }
+        }
+        let client_opt = Some(client);
+        if let Some(config) = &self.consensus_config {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Consensus config mismatch: Expected {:?}", config);
+            }
+        }
+        if let Some(config) = &self.gas_schedule {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Gas schedule config mismatch: Expected {:?}", config);
+            }
+        }
+        if let Some(config) = &self.version {
+            if !fetch_and_equals(&client_opt, config)? {
+                bail!("Version mismatch: Expected {:?}", config);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for ReleaseConfig {
@@ -282,14 +336,22 @@ impl Default for ReleaseConfig {
         ReleaseConfig {
             testnet: true,
             framework_release: Some(FrameworkReleaseConfig {
-                bytecode_version: 6,
+                bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                git_hash: None,
             }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
             version: None,
-            feature_flags: None,
+            feature_flags: Some(Features {
+                enabled: aptos_vm_genesis::default_features()
+                    .into_iter()
+                    .map(crate::components::feature_flags::FeatureFlag::from)
+                    .collect(),
+                disabled: vec![],
+            }),
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,
+            framework_release_at_end: false,
         }
     }
 }
@@ -318,4 +380,28 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
         .unwrap();
         hash.to_vec()
     }
+}
+
+fn append_script_hash(raw_script: String) -> String {
+    let temp_script_path = TempPath::new();
+    temp_script_path.create_as_file().unwrap();
+
+    let mut move_script_path = temp_script_path.path().to_path_buf();
+    move_script_path.set_extension("move");
+    std::fs::write(move_script_path.as_path(), raw_script.as_bytes())
+        .map_err(|err| {
+            anyhow!(
+                "Failed to get execution hash: failed to write to file: {:?}",
+                err
+            )
+        })
+        .unwrap();
+
+    let (_, hash) = GenerateExecutionHash {
+        script_path: Option::from(move_script_path),
+    }
+    .generate_hash()
+    .unwrap();
+
+    format!("// Script hash: {} \n{}", hash, raw_script)
 }

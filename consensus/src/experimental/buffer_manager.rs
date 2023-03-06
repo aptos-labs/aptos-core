@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -160,7 +161,7 @@ impl BufferManager {
         duration: Duration,
     ) {
         counters::BUFFER_MANAGER_RETRY_COUNT.inc();
-        spawn_named!(&"retry request", async move {
+        spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
                 .send(request)

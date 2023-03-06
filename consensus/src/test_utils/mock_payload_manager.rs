@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -8,7 +8,7 @@ use anyhow::Result;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter, Round},
-    request_response::PayloadRequest,
+    request_response::GetPayloadCommand,
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
@@ -17,13 +17,14 @@ use aptos_types::{
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 
+#[allow(dead_code)]
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool
     _quorum_store_client: Option<QuorumStoreClient>,
 }
 
 impl MockPayloadManager {
-    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<PayloadRequest>>) -> Self {
+    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<GetPayloadCommand>>) -> Self {
         let quorum_store_client =
             consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
         Self {

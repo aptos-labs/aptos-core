@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
@@ -181,7 +182,7 @@ impl Benches {
             None
         } else {
             let bytes: Vec<u8> = rng.sample_iter::<u8, _>(Standard).take(100).collect();
-            Some(StateValue::new(bytes))
+            Some(StateValue::new_legacy(bytes))
         }
     }
 

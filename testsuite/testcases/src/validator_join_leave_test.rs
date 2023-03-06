@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
@@ -25,7 +25,7 @@ impl Test for ValidatorJoinLeaveTest {
 
 impl NetworkLoadTest for ValidatorJoinLeaveTest {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllValidators)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {

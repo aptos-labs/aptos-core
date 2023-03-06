@@ -2810,7 +2810,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op='commit_block',  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
+          "expr": "quantile(0.67, rate(consensus_duration_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", op='commit_block', kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) / quantile(0.67, rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
@@ -3260,13 +3260,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "s"
         },
         "overrides": []
@@ -3317,13 +3311,7 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "s"
         },
         "overrides": []
@@ -5294,8 +5282,8 @@
         "multiFormat": "",
         "name": "interval",
         "options": [
-          { "selected": false, "text": "auto", "value": "$__auto_interval_interval" },
-          { "selected": true, "text": "1m", "value": "1m" },
+          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": false, "text": "1m", "value": "1m" },
           { "selected": false, "text": "5m", "value": "5m" },
           { "selected": false, "text": "10m", "value": "10m" },
           { "selected": false, "text": "30m", "value": "30m" },
@@ -5325,6 +5313,6 @@
   "timezone": "browser",
   "title": "Consensus",
   "uid": "consensus",
-  "version": 106,
+  "version": 107,
   "weekStart": ""
 }

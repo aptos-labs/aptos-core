@@ -1,16 +1,18 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::types::SerializedTransaction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    PrivateKey, Uniform,
+    hash::DefaultHasher,
+    HashValue, PrivateKey, Uniform,
 };
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
 };
+use bcs::to_bytes;
 
 // Creates a single test transaction
 fn create_transaction() -> Transaction {
@@ -36,7 +38,7 @@ fn create_transaction() -> Transaction {
     Transaction::UserTransaction(signed_transaction)
 }
 
-fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
+pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
     (0..size)
         .map(|_| match create_transaction() {
             Transaction::UserTransaction(inner) => inner,
@@ -50,4 +52,11 @@ pub(crate) fn create_vec_serialized_transactions(size: u64) -> Vec<SerializedTra
         .iter()
         .map(SerializedTransaction::from_signed_txn)
         .collect()
+}
+
+pub fn compute_digest_from_signed_transaction(data: Vec<SignedTransaction>) -> HashValue {
+    let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
+    let serialized_data: Vec<u8> = data.iter().flat_map(|txn| to_bytes(txn).unwrap()).collect();
+    hasher.update(&serialized_data);
+    hasher.finish()
 }

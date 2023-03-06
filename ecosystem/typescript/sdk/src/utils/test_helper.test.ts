@@ -1,8 +1,9 @@
-import { FaucetClient } from "../faucet_client";
+import { FaucetClient } from "../providers/faucet_client";
 import { OpenAPIConfig } from "../generated";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
+export const API_TOKEN = process.env.API_TOKEN!;
 
 /**
  * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the
@@ -24,4 +25,4 @@ test("noop", () => {
   // 2. Prevent jest from exploding when it finds a file with no tests in it
 });
 
-export const longTestTimeout = 60 * 1000;
+export const longTestTimeout = 70 * 1000;

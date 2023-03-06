@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -99,6 +100,16 @@ impl Block {
 
     pub fn payload(&self) -> Option<&Payload> {
         self.block_data.payload()
+    }
+
+    pub fn payload_size(&self) -> usize {
+        match self.block_data.payload() {
+            None => 0,
+            Some(payload) => match payload {
+                Payload::InQuorumStore(pos) => pos.proofs.len(),
+                Payload::DirectMempool(txns) => txns.len(),
+            },
+        }
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {

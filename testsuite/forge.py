@@ -37,6 +37,18 @@ from forge_wrapper_core.shell import LocalShell, Shell
 from forge_wrapper_core.time import SystemTime, Time
 from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob
 
+# map of build variant (e.g. cargo profile and feature flags)
+BUILD_VARIANT_TAG_PREFIX_MAP = {
+    "performance": "performance",
+    "failpoints": "failpoints",
+    "indexer": "indexer",
+    "release": "",  # the default release profile has no tag prefix
+}
+
+VALIDATOR_IMAGE_NAME = "aptos/validator"
+VALIDATOR_TESTING_IMAGE_NAME = "aptos/validator-testing"
+FORGE_IMAGE_NAME = "aptos/forge"
+
 
 @dataclass
 class RunResult:
@@ -430,7 +442,12 @@ def get_humio_logs_link(
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the node logs in humio for a given test run in a given namespace"""
-    query = f'$forgeLogs(validator_instance=*) | "k8s.namespace" = "{forge_namespace}"'
+    query = (
+        f"$forgeLogs(validator_instance=*) |\n"
+        f'    "k8s.namespace" = "{forge_namespace}" // filters on namespace which contains validator logs\n'
+        f"   OR  // remove either side of the OR operator to only display validator or forge-runner logs\n"
+        f'    "k8s.labels.forge-namespace" = "{forge_namespace}" // filters on specific forge-runner pod in default namespace\n'
+    )
     columns = [
         {
             "type": "field",
@@ -690,7 +707,7 @@ class K8sForgeRunner(ForgeRunner):
             forge_image_repo = (
                 f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
             )
-            validator_node_selector = "" # no selector
+            validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
         else:
@@ -820,25 +837,38 @@ def get_current_cluster_name(shell: Shell) -> str:
     return matches[0]
 
 
-def assert_provided_image_tags_has_profile_or_features(
+def add_build_variant_prefix(image_tag: str, variant: str) -> str:
+    """Add the necessary image tag prefix to specify the correct image tag for the build variant"""
+    variant_prefix = BUILD_VARIANT_TAG_PREFIX_MAP[variant]
+    if not image_tag.startswith(variant_prefix):
+        return f"{variant_prefix}_{image_tag}"
+    return image_tag
+
+
+def ensure_provided_image_tags_has_profile_or_features(
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     enable_failpoints: bool,
     enable_performance_profile: bool,
-):
+) -> Tuple[str, str]:
+    """
+    Ensure that the build variant specified is reflected in the image tag. If not, then return the image tag
+    with the prefix that is expected
+    """
+    ret = []
     for tag in [image_tag, upgrade_image_tag]:
+        curr_tag = None
         if not tag:
-            continue
-        if (
-            enable_failpoints
-        ):  # testing image requires the tag to be prefixed with failpoints_
-            assert tag.startswith(
-                "failpoints"
-            ), f"Missing failpoints_ feature prefix in {tag}"
-        if enable_performance_profile:
-            assert tag.startswith(
-                "performance"
-            ), f"Missing performance_ profile prefix in {tag}"
+            pass
+        elif enable_failpoints:
+            curr_tag = add_build_variant_prefix(tag, "failpoints")
+        elif enable_performance_profile:
+            curr_tag = add_build_variant_prefix(tag, "performance")
+        else:
+            curr_tag = tag
+        ret.append(curr_tag)
+
+    return tuple(ret)
 
 
 def find_recent_images_by_profile_or_features(
@@ -847,8 +877,7 @@ def find_recent_images_by_profile_or_features(
     num_images: int,
     enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
-) -> Generator[str, None, None]:
-    image_name = "aptos/validator"
+) -> Sequence[str]:
     image_tag_prefix = ""
     if enable_failpoints and enable_performance_profile:
         raise Exception(
@@ -864,8 +893,8 @@ def find_recent_images_by_profile_or_features(
         shell,
         git,
         num_images,
-        image_name=image_name,
-        image_tag_prefix=image_tag_prefix,
+        image_name=VALIDATOR_TESTING_IMAGE_NAME,
+        image_tag_prefixes=[image_tag_prefix],
     )
 
 
@@ -874,26 +903,42 @@ def find_recent_images(
     git: Git,
     num_images: int,
     image_name: str,
-    image_tag_prefix: str = "",
+    image_tag_prefixes: Sequence[str] = [""],
     commit_threshold: int = 100,
-) -> Generator[str, None, None]:
+) -> Sequence[str]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
-    For images built with different features or profiles than the default release profile, the image searching logic
-    will be more complicated. We use a combination of image_tag prefixes and different image names to distinguish
+    Also optionally filter by images with the provided prefixes, such as those denoting specific build variants
+    (e.g. cargo profiles and feature flags enabled)
     """
 
-    i = 0
+    # implicitly add the empty prefix, which will get the default release build without a prefix
+    if len(image_tag_prefixes) == 0:
+        image_tag_prefixes.append("")
+
+    # the number of images we need to find is actually the number of unique images
+    # multiplied by the number of image tag prefixes (e.g. variants) we expect to find
+    num_variants = len(image_tag_prefixes)
+    num_images_with_variants = num_images * num_variants
+
+    ret = []  # the list of images we will return
     for revision in git.last(commit_threshold):
-        image_tag = f"{image_tag_prefix}{revision}"
-        exists = image_exists(shell, image_name, image_tag)
-        if exists:
-            i += 1
-            yield image_tag
-        if i >= num_images:
+        temp_ret = []  # count variants for this revision
+        for prefix in image_tag_prefixes:
+            image_tag = f"{prefix}{revision}"
+            exists = image_exists(shell, image_name, image_tag)
+            if exists:
+                temp_ret.append(image_tag)
+            if len(temp_ret) >= num_variants:
+                ret.extend(temp_ret)
+        if len(ret) >= num_images_with_variants:  # we have enough images
             break
-    if i < num_images:
-        raise Exception(f"Could not find {num_images} recent images")
+    if len(ret) < num_images_with_variants:
+        raise Exception(
+            f"Could not find {num_images} recent images with prefixes {image_tag_prefixes}"
+        )
+
+    return ret
 
 
 def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
@@ -915,7 +960,7 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 64
+    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -1267,15 +1312,15 @@ def test(
 
     # cloud
     if cloud.upper() == "AWS":
-        cloud = Cloud.AWS
+        cloud_enum = Cloud.AWS
     elif cloud.upper() == "GCP":
-        cloud = Cloud.GCP
+        cloud_enum = Cloud.GCP
     else:
         raise Exception(f"Unknown cloud: {cloud}")
 
-    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud.value}")
+    print(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
     temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud)
+    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
@@ -1284,7 +1329,7 @@ def test(
 
     # In the below, assume that the image is pushed to all registries
     # across all clouds and supported regions
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_failpoints=enable_failpoints,
@@ -1310,20 +1355,19 @@ def test(
     else:
         # All other tests use just one image tag
         # Only try finding exactly 1 image
-        default_latest_image = next(
-            find_recent_images_by_profile_or_features(
-                shell,
-                git,
-                1,
-                enable_failpoints=enable_failpoints,
-                enable_performance_profile=enable_performance_profile,
-            )
-        )
+        default_latest_image = find_recent_images_by_profile_or_features(
+            shell,
+            git,
+            1,
+            enable_failpoints=enable_failpoints,
+            enable_performance_profile=enable_performance_profile,
+        )[0]
+
         image_tag = image_tag or default_latest_image
         forge_image_tag = forge_image_tag or default_latest_image
         upgrade_image_tag = upgrade_image_tag or default_latest_image
 
-    assert_provided_image_tags_has_profile_or_features(
+    image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
         image_tag,
         upgrade_image_tag,
         enable_failpoints=enable_failpoints,
@@ -1338,6 +1382,17 @@ def test(
     print("\tforge: ", forge_image_tag)
     print("\tswarm: ", image_tag)
     print("\tswarm upgrade (if applicable): ", upgrade_image_tag)
+
+    # finally, whether we've derived the image tags or used the user-inputted ones, check if they exist
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, image_tag
+    ), f"swarm (validator) image does not exist: {image_tag}"
+    assert image_exists(
+        shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag
+    ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
+    assert image_exists(
+        shell, FORGE_IMAGE_NAME, forge_image_tag
+    ), f"forge (test runner) image does not exist: {forge_image_tag}"
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
@@ -1362,7 +1417,7 @@ def test(
         processes=processes,
         time=time,
         # cluster auth
-        cloud=cloud,
+        cloud=cloud_enum,
         aws_account_num=aws_account_num,
         aws_region=aws_region,
         gcp_zone=gcp_zone,
@@ -1476,7 +1531,7 @@ def list_jobs(
     phase: List[str],
     regex: str,
 ) -> None:
-    """List all available clusters"""
+    """List all running forge jobs"""
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1503,7 +1558,10 @@ def list_jobs(
         else:
             fg = "white"
 
-        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+        click.secho(
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            fg=fg,
+        )
 
 
 @main.command()

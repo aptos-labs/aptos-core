@@ -5,18 +5,24 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
-                            ): Creation(a11ceb0b06000000030100020702020804200000014df5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100),
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
-                            ): Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10300000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                            StateKey {
+                                inner: AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
+                                ),
+                                hash: OnceCell(Uninit),
+                            }: Creation(a11ceb0b06000000030100020702020804200000014df5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100),
+                            StateKey {
+                                inner: AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+                                ),
+                                hash: OnceCell(Uninit),
+                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10300000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
                         },
                     },
                 ),
             ),
             events: [],
-            gas_used: 650,
+            gas_used: 7,
             status: Keep(
                 Success,
             ),
@@ -30,15 +36,18 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            AccessPath(
-                                AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
-                            ): Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10400000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
+                            StateKey {
+                                inner: AccessPath(
+                                    AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
+                                ),
+                                hash: OnceCell(Uninit),
+                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10400000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000),
                         },
                     },
                 ),
             ),
             events: [],
-            gas_used: 150,
+            gas_used: 2,
             status: Keep(
                 MiscellaneousError(
                     Some(

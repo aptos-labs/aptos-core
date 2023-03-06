@@ -90,6 +90,7 @@ module aptos_framework::block {
         );
     }
 
+    #[view]
     /// Return epoch interval in seconds.
     public fun get_epoch_interval_secs(): u64 acquires BlockResource {
         borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
@@ -155,6 +156,7 @@ module aptos_framework::block {
         };
     }
 
+    #[view]
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockResource {
         borrow_global<BlockResource>(@aptos_framework).height

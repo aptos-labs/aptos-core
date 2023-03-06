@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};

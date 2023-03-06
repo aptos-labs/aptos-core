@@ -108,7 +108,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
   <div class="col">
   <div class="card h-100" >
     <div class="card-body d-flex flex-column"  >
-    <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
+    <a href="https://aptos.dev/nodes/aptos-api-spec/#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
     <p class="card-text">Reference for the REST API to interact with the Aptos blockchain.</p>
 </div>
 </div>

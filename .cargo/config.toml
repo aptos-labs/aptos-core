@@ -9,6 +9,7 @@ xclippy = [
   "-Aclippy::upper_case_acronyms",
   "-Aclippy::enum-variant-names",
   "-Aclippy::result-large-err",
+  "-Aclippy::mutable-key-type",
 ]
 
 [build]

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -153,3 +154,12 @@ pub trait VMExecutor: Send + Sync {
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
+
+/*
+/// Get the AccessPath to a resource stored under `address` with type name `tag`
+/// DNS
+fn create_access_path(address: AccountAddress, tag: StructTag) -> anyhow::Result<AccessPath> {
+    let resource_tag = ResourceKey::new(address, tag);
+    AccessPath::resource_access_path(resource_tag)
+}
+ */

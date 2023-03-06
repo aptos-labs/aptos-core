@@ -1,12 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
 use aptos_crypto::HashValue;
-use aptos_types::{
-    account_address::AccountAddress, account_config::AccountSequenceInfo,
-    transaction::SignedTransaction,
-};
+use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
@@ -33,13 +31,13 @@ impl MempoolTransaction {
         expiration_time: Duration,
         ranking_score: u64,
         timeline_state: TimelineState,
-        seqno_type: AccountSequenceInfo,
+        seqno: u64,
         insertion_time: SystemTime,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
                 transaction_sequence_number: txn.sequence_number(),
-                account_sequence_number_type: seqno_type,
+                account_sequence_number: seqno,
             },
             txn,
             expiration_time,
@@ -81,7 +79,7 @@ pub enum TimelineState {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SequenceInfo {
     pub transaction_sequence_number: u64,
-    pub account_sequence_number_type: AccountSequenceInfo,
+    pub account_sequence_number: u64,
 }
 
 #[cfg(test)]
@@ -90,7 +88,6 @@ mod test {
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         account_address::AccountAddress,
-        account_config::AccountSequenceInfo,
         chain_id::ChainId,
         transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
     };
@@ -112,7 +109,7 @@ mod test {
             Duration::from_secs(1),
             1,
             TimelineState::NotReady,
-            AccountSequenceInfo::Sequential(0),
+            0,
             SystemTime::now(),
         )
     }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
@@ -53,7 +54,12 @@ pub trait PersistentLivenessStorage: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootInfo(pub Block, pub QuorumCert, pub QuorumCert, pub QuorumCert);
+pub struct RootInfo(
+    pub Box<Block>,
+    pub QuorumCert,
+    pub QuorumCert,
+    pub QuorumCert,
+);
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -131,7 +137,7 @@ impl LedgerRecoveryData {
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
 
         Ok(RootInfo(
-            root_block,
+            Box::new(root_block),
             root_quorum_cert,
             root_ordered_cert,
             root_commit_cert,

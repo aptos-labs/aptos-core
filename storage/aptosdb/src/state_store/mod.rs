@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines state store APIs that are related account state Merkle tree.
@@ -12,7 +13,10 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
-    utils::iterators::PrefixedStateValueIterator,
+    utils::{
+        iterators::PrefixedStateValueIterator,
+        truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
+    },
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
     StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
@@ -42,6 +46,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use claims::{assert_ge, assert_le};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -65,6 +70,8 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
 
+const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
+
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(32)
@@ -73,15 +80,14 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Debug)]
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    pub state_kv_db: Arc<DB>,
     pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
-#[derive(Debug)]
 pub(crate) struct StateStore {
     pub(crate) state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
@@ -180,7 +186,7 @@ impl StateDb {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
+        let mut iter = self.state_kv_db.iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()
@@ -269,12 +275,69 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
+        state_kv_db: Arc<DB>,
         state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
+        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
+            .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
+            .expect("Failed to read overall commit progress.")
+        {
+            info!(
+                overall_commit_progress = overall_commit_progress,
+                "Start syncing databases..."
+            );
+            let ledger_commit_progress = ledger_db
+                .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
+                .expect("Failed to read ledger commit progress.")
+                .expect("Ledger commit progress cannot be None.")
+                .expect_version();
+            assert_ge!(ledger_commit_progress, overall_commit_progress);
+
+            let state_kv_commit_progress = state_kv_db
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
+                .expect("Failed to read state K/V commit progress.")
+                .expect("State K/V commit progress cannot be None.")
+                .expect_version();
+            assert_ge!(state_kv_commit_progress, overall_commit_progress);
+
+            if ledger_commit_progress != overall_commit_progress {
+                info!(
+                    ledger_commit_progress = ledger_commit_progress,
+                    "Start truncation...",
+                );
+                let difference = ledger_commit_progress - overall_commit_progress;
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                truncate_ledger_db(
+                    Arc::clone(&ledger_db),
+                    ledger_commit_progress,
+                    overall_commit_progress,
+                    difference as usize,
+                )
+                .expect("Failed to truncate ledger db.");
+            }
+
+            if state_kv_commit_progress != overall_commit_progress {
+                info!(
+                    state_kv_commit_progress = state_kv_commit_progress,
+                    "Start truncation..."
+                );
+                let difference = state_kv_commit_progress - overall_commit_progress;
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                truncate_state_kv_db(
+                    Arc::clone(&state_kv_db),
+                    state_kv_commit_progress,
+                    overall_commit_progress,
+                    difference as usize,
+                )
+                .expect("Failed to truncate state K/V db.");
+            }
+        } else {
+            info!("No overall commit progress was found!");
+        }
         let state_merkle_db = Arc::new(StateMerkleDb::new(
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
@@ -282,6 +345,7 @@ impl StateStore {
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
+            state_kv_db,
             state_pruner,
             epoch_snapshot_pruner,
         });
@@ -290,6 +354,7 @@ impl StateStore {
                 &state_db,
                 buffered_state_target_items,
                 hack_for_tests,
+                /*check_max_versions_after_snapshot=*/ true,
             )
             .expect("buffered state creation failed."),
         );
@@ -300,10 +365,43 @@ impl StateStore {
         }
     }
 
+    #[cfg(feature = "db-debugger")]
+    pub fn catch_up_state_merkle_db(
+        ledger_db: Arc<DB>,
+        state_merkle_db: DB,
+    ) -> Result<Option<Version>> {
+        use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+
+        let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
+        let state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
+        );
+        let epoch_snapshot_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
+        );
+        let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
+        let state_kv_db = Arc::clone(&ledger_db);
+        let state_db = Arc::new(StateDb {
+            ledger_db,
+            state_merkle_db,
+            state_kv_db,
+            state_pruner,
+            epoch_snapshot_pruner,
+        });
+        let buffered_state = Self::create_buffered_state_from_latest_snapshot(
+            &state_db, 0, /*hack_for_tests=*/ false,
+            /*check_max_versions_after_snapshot=*/ false,
+        )?;
+        Ok(buffered_state.current_state().base_version)
+    }
+
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        check_max_versions_after_snapshot: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
         let num_transactions = ledger_store
@@ -353,12 +451,14 @@ impl StateStore {
 
         // Replaying the committed write sets after the latest snapshot.
         if snapshot_next_version < num_transactions {
-            ensure!(
-                num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
-                "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
-                snapshot_next_version,
-                num_transactions,
-            );
+            if check_max_versions_after_snapshot {
+                ensure!(
+                    num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_SNAPSHOT,
+                    "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
+                    snapshot_next_version,
+                    num_transactions,
+                );
+            }
             let latest_snapshot_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
                 state_db.clone(),
@@ -409,6 +509,7 @@ impl StateStore {
             &self.state_db,
             self.buffered_state_target_items,
             false,
+            true,
         )
         .expect("buffered state creation failed.");
     }
@@ -427,7 +528,7 @@ impl StateStore {
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
         PrefixedStateValueIterator::new(
-            &self.ledger_db,
+            &self.state_kv_db,
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
@@ -449,16 +550,23 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         expected_usage: StateStorageUsage,
-        batch: &SchemaBatch,
+        ledger_batch: &SchemaBatch,
+        state_kv_batch: &SchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
             .start_timer();
 
-        self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, batch)?;
+        self.put_stats_and_indices(
+            &value_state_sets,
+            first_version,
+            expected_usage,
+            ledger_batch,
+            state_kv_batch,
+        )?;
 
         let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["add_kv_batch"])
+            .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
         value_state_sets
@@ -466,8 +574,9 @@ impl StateStore {
             .enumerate()
             .flat_map_iter(|(i, kvs)| {
                 let version = first_version + i as Version;
-                kvs.iter()
-                    .map(move |(k, v)| batch.put::<StateValueSchema>(&(k.clone(), version), v))
+                kvs.iter().map(move |(k, v)| {
+                    state_kv_batch.put::<StateValueSchema>(&(k.clone(), version), v)
+                })
             })
             .collect()
     }
@@ -494,6 +603,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         batch: &SchemaBatch,
+        state_kv_batch: &SchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -545,7 +655,7 @@ impl StateStore {
                     usage.add_item(key.size() + value.size());
                 } else {
                     // stale index of the tombstone at current version.
-                    batch.put::<StaleStateValueIndexSchema>(
+                    state_kv_batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version,
@@ -566,7 +676,7 @@ impl StateStore {
                 if let Some((old_version, old_value)) = old_version_and_value_opt {
                     usage.remove_item(key.size() + old_value.size());
                     // stale index of the old value at its version.
-                    batch.put::<StaleStateValueIndexSchema>(
+                    state_kv_batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version: old_version,
@@ -706,6 +816,7 @@ impl StateStore {
         end: Version,
         db_batch: &SchemaBatch,
     ) -> Result<()> {
+        // TODO(grao): Replace ledger_db by state_kv_db.
         let mut iter = self
             .state_db
             .ledger_db
@@ -760,8 +871,12 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
+        // TODO(grao): Support state kv db here.
         let batch = SchemaBatch::new();
-        add_kv_batch(&batch, node_batch)?;
+        node_batch
+            .par_iter()
+            .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
+            .collect::<Result<Vec<_>>>()?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
@@ -780,12 +895,4 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }
-}
-
-fn add_kv_batch(batch: &SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
-    kv_batch
-        .par_iter()
-        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
-        .collect::<Result<Vec<_>>>()?;
-    Ok(())
 }

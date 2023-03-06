@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::QuorumStoreError, monitor, state_replication::PayloadClient};
 use anyhow::Result;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, Round},
-    request_response::{ConsensusResponse, PayloadRequest},
+    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
 use fail::fail_point;
@@ -21,7 +21,7 @@ const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
 /// Client that pulls blocks from Quorum Store
 #[derive(Clone)]
 pub struct QuorumStoreClient {
-    consensus_to_quorum_store_sender: mpsc::Sender<PayloadRequest>,
+    consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
     poll_count: u64,
     /// Timeout for consensus to pull transactions from quorum store and get a response (in milliseconds)
     pull_timeout_ms: u64,
@@ -29,7 +29,7 @@ pub struct QuorumStoreClient {
 
 impl QuorumStoreClient {
     pub fn new(
-        consensus_to_quorum_store_sender: mpsc::Sender<PayloadRequest>,
+        consensus_to_quorum_store_sender: mpsc::Sender<GetPayloadCommand>,
         poll_count: u64,
         pull_timeout_ms: u64,
     ) -> Self {
@@ -52,7 +52,7 @@ impl QuorumStoreClient {
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = PayloadRequest::GetBlockRequest(
+        let req = GetPayloadCommand::GetPayloadRequest(
             round,
             max_items,
             max_bytes,
@@ -73,7 +73,7 @@ impl QuorumStoreClient {
                 Err(anyhow::anyhow!("[consensus] did not receive GetBlockResponse on time").into())
             },
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
-                ConsensusResponse::GetBlockResponse(payload) => Ok(payload),
+                GetPayloadResponse::GetPayloadResponse(payload) => Ok(payload),
             },
         }
     }

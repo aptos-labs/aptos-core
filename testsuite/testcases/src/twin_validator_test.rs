@@ -1,7 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::NetworkLoadTest;
+use anyhow::Context;
 use aptos_forge::{NetworkContext, NetworkTest, NodeExt, Test};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use std::time::{Duration, Instant};
@@ -15,11 +16,7 @@ impl Test for TwinValidatorTest {
     }
 }
 
-impl NetworkLoadTest for TwinValidatorTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-}
+impl NetworkLoadTest for TwinValidatorTest {}
 
 impl NetworkTest for TwinValidatorTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
@@ -41,36 +38,37 @@ impl NetworkTest for TwinValidatorTest {
                     .unwrap()
                     .clear_storage()
                     .await
-                    .unwrap_or_else(|_| {
-                        panic!("Error while clearing storage and stopping {twin_id}")
-                    });
+                    .context(format!(
+                        "Error while clearing storage and stopping {twin_id}"
+                    ))?;
                 let main_identity = ctx
                     .swarm()
                     .validator_mut(main_id)
                     .unwrap()
                     .get_identity()
                     .await
-                    .unwrap_or_else(|_| panic!("Error while getting identity for {main_id}"));
+                    .context(format!("Error while getting identity for {main_id}"))?;
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .set_identity(main_identity)
                     .await
-                    .unwrap_or_else(|_| panic!("Error while setting identity for {twin_id}"));
+                    .context(format!("Error while setting identity for {twin_id}"))?;
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .start()
                     .await
-                    .unwrap_or_else(|_| panic!("Error while starting {twin_id}"));
+                    .context(format!("Error while starting {twin_id}"))?;
                 ctx.swarm()
                     .validator_mut(twin_id)
                     .unwrap()
                     .wait_until_healthy(Instant::now() + Duration::from_secs(300))
                     .await
-                    .unwrap_or_else(|_| panic!("Error while waiting for {twin_id}"));
+                    .context(format!("Error while waiting for {twin_id}"))?;
             }
-        });
+            Ok::<(), anyhow::Error>(())
+        })?;
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
