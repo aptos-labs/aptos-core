@@ -276,8 +276,8 @@ impl BatchGenerator {
                             );
                             debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }
-                        counters::QS_BACKPRESSURE.set(1);
-                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
+                        counters::QS_BACKPRESSURE.observe(1);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_max_pull_count);
                     } else {
                         // additive increase, every second
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
@@ -288,8 +288,8 @@ impl BatchGenerator {
                             );
                             debug!("QS: dynamic_max_pull_count: {}", dynamic_max_pull_count);
                         }
-                        counters::QS_BACKPRESSURE.set(0);
-                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.set(dynamic_max_pull_count as i64);
+                        counters::QS_BACKPRESSURE.observe(0);
+                        counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_max_pull_count);
                     }
                     if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_max_pull_count).await {
                         proofs_in_progress.push(Box::pin(proof_rx));
