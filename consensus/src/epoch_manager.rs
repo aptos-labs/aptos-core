@@ -29,7 +29,10 @@ use crate::{
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
+    network::{
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, NetworkReceivers,
+        NetworkSender,
+    },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -127,6 +130,8 @@ pub struct EpochManager {
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
     quorum_store_db: Arc<QuorumStoreDB>,
+    batch_retrieval_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
 }
 
 impl EpochManager {
@@ -169,6 +174,7 @@ impl EpochManager {
             quorum_store_msg_tx: None,
             quorum_store_coordinator_tx: None,
             quorum_store_db,
+            batch_retrieval_tx: None,
         }
     }
 
@@ -539,6 +545,7 @@ impl EpochManager {
 
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
+        self.batch_retrieval_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -690,8 +697,10 @@ impl EpochManager {
             onchain_consensus_config.back_pressure_limit(),
             payload_manager.clone(),
         ));
+        let (tx, rx) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        self.batch_retrieval_tx = Some(tx);
 
-        self.quorum_store_coordinator_tx = quorum_store_builder.start();
+        self.quorum_store_coordinator_tx = quorum_store_builder.start(rx);
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
@@ -910,8 +919,6 @@ impl EpochManager {
     ) -> anyhow::Result<()> {
         match event {
             UnverifiedEvent::FragmentMsg(_)
-            | UnverifiedEvent::BatchRequestMsg(_)
-            | UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedDigestMsg(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
                 if self.quorum_store_enabled {
@@ -939,9 +946,7 @@ impl EpochManager {
             );
         }
         match event {
-            quorum_store_event @ (VerifiedEvent::BatchRequestMsg(_)
-            | VerifiedEvent::UnverifiedBatchMsg(_)
-            | VerifiedEvent::SignedDigestMsg(_)
+            quorum_store_event @ (VerifiedEvent::SignedDigestMsg(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::FragmentMsg(_)) => {
                 if let Some(sender) = &mut self.quorum_store_msg_tx {
@@ -988,6 +993,18 @@ impl EpochManager {
         }
     }
 
+    fn process_batch_retrieval(
+        &self,
+        peer_id: Author,
+        request: IncomingBatchRetrievalRequest,
+    ) -> anyhow::Result<()> {
+        if let Some(tx) = &self.batch_retrieval_tx {
+            tx.push(peer_id, request)
+        } else {
+            Err(anyhow::anyhow!("Quorum store not started"))
+        }
+    }
+
     fn process_local_timeout(&mut self, round: u64) {
         self.forward_to_round_manager(self.author, VerifiedEvent::LocalTimeout(round));
     }
@@ -1021,8 +1038,13 @@ impl EpochManager {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 },
-                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
+                (peer, request) = network_receivers.block_retrieval_rx.select_next_some() => {
                     if let Err(e) = self.process_block_retrieval(peer, request) {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                    }
+                },
+                (peer, request) = network_receivers.batch_retrieval_rx.select_next_some() => {
+                    if let Err(e) = self.process_batch_retrieval(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 },

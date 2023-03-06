@@ -749,7 +749,7 @@ mod tests {
         );
 
         // verify request block rpc
-        let mut block_retrieval = receiver_1.block_retrieval;
+        let mut block_retrieval = receiver_1.block_retrieval_rx;
         let on_request_block = async move {
             while let Some((_, request)) = block_retrieval.next().await {
                 // make sure the network task is not blocked during RPC
@@ -824,13 +824,13 @@ mod tests {
             .unwrap();
 
         let f_check = async move {
-            assert!(network_receivers.block_retrieval.next().await.is_some());
+            assert!(network_receivers.block_retrieval_rx.next().await.is_some());
 
             drop(peer_mgr_notifs_tx);
             drop(connection_notifs_tx);
             drop(self_sender);
 
-            assert!(network_receivers.block_retrieval.next().await.is_none());
+            assert!(network_receivers.block_retrieval_rx.next().await.is_none());
             assert!(network_receivers.consensus_messages.next().await.is_none());
         };
         let f_network_task = network_task.start();

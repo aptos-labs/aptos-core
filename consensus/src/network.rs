@@ -53,6 +53,13 @@ pub struct IncomingBlockRetrievalRequest {
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
+#[derive(Debug)]
+pub struct IncomingBatchRetrievalRequest {
+    pub req: BatchRequest,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
@@ -65,13 +72,22 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub block_retrieval:
+    pub block_retrieval_rx:
         aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    pub batch_retrieval_rx:
+        aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingBatchRetrievalRequest)>,
 }
 
 #[async_trait::async_trait]
-pub trait QuorumStoreSender {
+pub trait QuorumStoreSender: Send + Clone {
     async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
+
+    async fn request_batch(
+        &self,
+        request: BatchRequest,
+        recipient: Author,
+        timeout: Duration,
+    ) -> anyhow::Result<Batch>;
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
@@ -311,6 +327,23 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
+    async fn request_batch(
+        &self,
+        request: BatchRequest,
+        recipient: Author,
+        timeout: Duration,
+    ) -> anyhow::Result<Batch> {
+        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
+        let response = self
+            .consensus_network_client
+            .send_rpc(recipient, msg, timeout)
+            .await?;
+        match response {
+            ConsensusMsg::BatchMsg(batch) => Ok(*batch),
+            _ => Err(anyhow!("Invalid batch response")),
+        }
+    }
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         fail_point!("consensus::send::batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(batch));
@@ -347,6 +380,8 @@ pub struct NetworkTask {
     >,
     block_retrieval_tx:
         aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBlockRetrievalRequest)>,
+    batch_retrieval_tx:
+        aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingBatchRetrievalRequest)>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -364,11 +399,13 @@ impl NetworkTask {
             50,
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
-        let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
+        let (block_retrieval_tx, block_retrieval_rx) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),
         );
+        let (batch_retrieval_tx, batch_retrieval_rx) =
+            aptos_channel::new(QueueStyle::LIFO, 1, None);
 
         // Verify the network events have been constructed correctly
         let network_and_events = network_service_events.into_network_and_events();
@@ -388,12 +425,14 @@ impl NetworkTask {
                 consensus_messages_tx,
                 quorum_store_messages_tx,
                 block_retrieval_tx,
+                batch_retrieval_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
                 quorum_store_messages,
-                block_retrieval,
+                block_retrieval_rx,
+                batch_retrieval_rx,
             },
         )
     }
@@ -422,10 +461,11 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     match msg {
+                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchMsg(_) => {
+                            warn!("unexpected msg");
+                        },
                         quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
                         | ConsensusMsg::FragmentMsg(_)
-                        | ConsensusMsg::BatchRequestMsg(_)
-                        | ConsensusMsg::BatchMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
                             Self::push_msg(
                                 peer_id,
@@ -474,6 +514,16 @@ impl NetworkTask {
                         {
                             warn!(error = ?e, "aptos channel closed");
                         }
+                    },
+                    ConsensusMsg::BatchRequestMsg(request) => {
+                        let req_with_callback = IncomingBatchRetrievalRequest {
+                            req: *request,
+                            protocol,
+                            response_sender: callback,
+                        };
+                        let _ = self
+                            .batch_retrieval_tx
+                            .push(peer_id, (peer_id, req_with_callback));
                     },
                     _ => {
                         warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);

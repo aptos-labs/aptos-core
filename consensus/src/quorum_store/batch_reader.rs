@@ -105,7 +105,7 @@ pub struct BatchReader<T> {
     expiry_grace_rounds: Round,
     memory_quota: usize,
     db_quota: usize,
-    batch_requester: Arc<tokio::sync::Mutex<BatchRequester<T>>>,
+    batch_requester: BatchRequester<T>,
     validator_signer: ValidatorSigner,
     validator_verifier: ValidatorVerifier,
 }
@@ -139,7 +139,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader<T> {
             expiry_grace_rounds,
             memory_quota,
             db_quota,
-            batch_requester: Arc::new(tokio::sync::Mutex::new(batch_requester)),
+            batch_requester,
             validator_signer,
             validator_verifier,
         };
@@ -433,22 +433,13 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader<T> {
             // Quorum store metrics
             counters::MISSED_BATCHES_COUNT.inc();
             // TODO: handle timeout
-            self.batch_requester
-                .lock()
-                .await
-                .add_request(
-                    *proof.digest(),
-                    proof.shuffled_signers(&self.validator_verifier),
-                    tx,
-                )
-                .await;
+            self.batch_requester.request_batch(
+                *proof.digest(),
+                proof.shuffled_signers(&self.validator_verifier),
+                tx,
+            );
         }
         rx
-    }
-
-    pub async fn receive_batch(&self, digest: HashValue, payload: Vec<SignedTransaction>) {
-        let requester = self.batch_requester.clone();
-        tokio::spawn(async move { requester.lock().await.serve_request(digest, payload) });
     }
 }
 

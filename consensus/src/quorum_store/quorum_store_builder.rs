@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network::NetworkSender,
+    network::{IncomingBatchRetrievalRequest, NetworkSender},
+    network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
@@ -15,6 +16,7 @@ use crate::{
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
         quorum_store_db::QuorumStoreDB,
+        types::Batch,
     },
     round_manager::VerifiedEvent,
 };
@@ -31,6 +33,7 @@ use aptos_types::{
     account_address::AccountAddress, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
+use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
 
@@ -52,13 +55,16 @@ impl QuorumStoreBuilder {
         }
     }
 
-    pub fn start(self) -> Option<Sender<CoordinatorCommand>> {
+    pub fn start(
+        self,
+        rx: aptos_channel::Receiver<AccountAddress, IncomingBatchRetrievalRequest>,
+    ) -> Option<Sender<CoordinatorCommand>> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
                 None
             },
-            QuorumStoreBuilder::QuorumStore(inner) => Some(inner.start()),
+            QuorumStoreBuilder::QuorumStore(inner) => Some(inner.start(rx)),
         }
     }
 }
@@ -260,7 +266,10 @@ impl InnerBuilder {
         batch_reader
     }
 
-    fn spawn_quorum_store(mut self) -> Sender<CoordinatorCommand> {
+    fn spawn_quorum_store(
+        mut self,
+        mut rx: aptos_channel::Receiver<AccountAddress, IncomingBatchRetrievalRequest>,
+    ) -> Sender<CoordinatorCommand> {
         let quorum_store_storage = self.quorum_store_storage.clone();
 
         // TODO: parameter? bring back back-off?
@@ -355,16 +364,26 @@ impl InnerBuilder {
 
         let network_msg_rx = self.quorum_store_msg_rx.take().unwrap();
         let net = NetworkListener::new(
-            self.epoch,
-            self.author,
             network_msg_rx,
-            self.batch_reader.clone().unwrap(),
             self.proof_coordinator_cmd_tx.clone(),
             self.remote_batch_coordinator_cmd_tx.clone(),
             self.proof_manager_cmd_tx.clone(),
-            self.network_sender.clone(),
         );
         spawn_named!("network_listener", net.start());
+
+        let batch_reader = self.batch_reader.clone().unwrap();
+        let author = self.author;
+        let epoch = self.epoch;
+        spawn_named!("batch_serve", async move {
+            while let Some(rpc_request) = rx.next().await {
+                if let Ok(value) = batch_reader.get_batch_from_local(&rpc_request.req.digest()) {
+                    let batch = Batch::new(author, epoch, rpc_request.req.digest(), value);
+                    let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+                    let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
+                    let _ = rpc_request.response_sender.send(Ok(bytes.into()));
+                }
+            }
+        });
 
         self.coordinator_tx
     }
@@ -387,7 +406,10 @@ impl InnerBuilder {
         )
     }
 
-    fn start(self) -> Sender<CoordinatorCommand> {
-        self.spawn_quorum_store()
+    fn start(
+        self,
+        rx: aptos_channel::Receiver<AccountAddress, IncomingBatchRetrievalRequest>,
+    ) -> Sender<CoordinatorCommand> {
+        self.spawn_quorum_store(rx)
     }
 }
