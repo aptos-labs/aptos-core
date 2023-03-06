@@ -89,6 +89,7 @@ module token_objects::collection {
     struct FixedSupply has key {
         current_supply: u64,
         max_supply: u64,
+        total_minted: u64,
     }
 
     public fun create_fixed_collection(
@@ -103,6 +104,7 @@ module token_objects::collection {
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
+            total_minted: 0,
         };
 
         create_collection_internal(
@@ -188,15 +190,19 @@ module token_objects::collection {
         Royalty { numerator, denominator, payee_address }
     }
 
-    public(friend) fun increment_supply(creator: &address, name: &String) acquires FixedSupply {
+    public(friend) fun increment_supply(creator: &address, name: &String): Option<u64> acquires FixedSupply {
         let collection_addr = create_collection_address(creator, name);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(EEXCEEDS_MAX_SUPPLY),
             );
+            option::some(supply.total_minted)
+        } else {
+            option::none()
         }
     }
 
