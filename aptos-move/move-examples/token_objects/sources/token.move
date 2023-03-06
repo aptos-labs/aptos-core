@@ -33,6 +33,8 @@ module token_objects::token {
     struct Token has key {
         /// An optional categorization of similar token, there are no constraints on collections.
         collection: String,
+        /// Unique identifier within the collection, optional, 0 means unassigned
+        collection_id: u64,
         /// The original creator of this token.
         creator: address,
         /// A brief description of the token.
@@ -68,12 +70,13 @@ module token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let seed = create_token_seed(&collection, &name);
-        let creator_ref = object::create_named_object(creator, seed);
-        let object_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = object::create_named_object(creator, seed);
+        let object_signer = object::generate_signer(&constructor_ref);
 
-        collection::increment_supply(&creator_address, &collection);
+        let id = collection::increment_supply(&creator_address, &collection);
         let token = Token {
             collection,
+            collection_id: option::get_with_default(&mut id, 0),
             creator: creator_address,
             description,
             mutability_config,
@@ -86,7 +89,7 @@ module token_objects::token {
         if (option::is_some(&royalty)) {
             collection::init_royalty(&object_signer, option::extract(&mut royalty))
         };
-        creator_ref
+        constructor_ref
     }
 
     public fun create_mutability_config(description: bool, name: bool, uri: bool): MutabilityConfig {
