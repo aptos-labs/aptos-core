@@ -1,5 +1,5 @@
 # -- Default image tag to use for all fullnode images
-imageTag: devnet
+imageTag: preview_0a0cb31d76063d8ac4a8502c2afc2e8acd6941f4
 
 # -- If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout)
 manageImages: true
@@ -25,6 +25,9 @@ aptos_chains:
   mainnet:
     waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
     genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob
+  previewnet:
+    waypoint_txt_url: https://raw.githubusercontent.com/aptos-labs/aptos-previewnet/main/waypoint.txt
+    genesis_blob_url: https://raw.githubusercontent.com/aptos-labs/aptos-previewnet/main/genesis.blob
 
 fullnode:
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
