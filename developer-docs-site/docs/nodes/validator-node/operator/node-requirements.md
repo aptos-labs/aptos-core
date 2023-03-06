@@ -38,6 +38,8 @@ For running an Aptos **validator node and validator fullnode** we recommend the 
 - **GCP**
     - n2-standard-16 (if use local SSD)
     - n2-standard-32 + pd-ssd with 40K IOPS.
+- **CherryServers**
+    - Intel Gold 5315Y (8c/16t - 3.2GHz, 32GB RAM, 2TB NVMe)
 
 ### Motivations for hardware requirements
 
