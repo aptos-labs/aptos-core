@@ -17,16 +17,17 @@ module token_objects::token {
     use std::signer;
     use std::vector;
 
+    use aptos_framework::event;
+    use aptos_framework::object::{Self, ConstructorRef, Object};
+
+    use token_objects::collection::{Self, Royalty};
+
     // The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 0;
     /// The provided signer is not the creator
     const ENOT_CREATOR: u64 = 1;
     /// Attempted to mutate an immutable field
     const EFIELD_NOT_MUTABLE: u64 = 2;
-
-    use aptos_framework::object::{Self, ConstructorRef, Object};
-
-    use token_objects::collection::{Self, Royalty};
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
@@ -50,9 +51,17 @@ module token_objects::token {
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Emitted upon any mutation of the token.
+        mutation_events: event::EventHandle<MutationEvent>,
     }
 
-    /// This config specifies which fields in the TokenData are mutable
+    /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
+    /// directly understand the behavior in a writeset.
+    struct MutationEvent has drop, store {
+        mutated_field_name: String,
+    }
+
+    /// This config specifies which fields in the TokenData are mutable.
     struct MutabilityConfig has copy, drop, store {
         description: bool,
         name: bool,
@@ -83,6 +92,7 @@ module token_objects::token {
             name,
             creation_name: option::none(),
             uri,
+            mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, token);
 
@@ -227,6 +237,10 @@ module token_objects::token {
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         token.description = description;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"description") },
+        );
     }
 
     public fun set_name<T: key>(
@@ -249,6 +263,10 @@ module token_objects::token {
             option::fill(&mut token.creation_name, token.name)
         };
         token.name = name;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"name") },
+        );
     }
 
     public fun set_uri<T: key>(
@@ -267,6 +285,10 @@ module token_objects::token {
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         token.uri = uri;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+        );
     }
 
     // Entry functions
