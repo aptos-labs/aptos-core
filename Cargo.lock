@@ -2189,17 +2189,21 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-time-service",
  "aptos-types",
  "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "enum_dispatch",
  "futures",
+ "maplit",
  "once_cell",
  "rand 0.7.3",
  "serde 1.0.149",
  "thiserror",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

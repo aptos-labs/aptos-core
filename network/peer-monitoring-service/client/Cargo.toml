@@ -34,4 +34,8 @@ tokio = { workspace = true }
 [dev-dependencies]
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-peer-monitoring-service-server = { workspace = true }
+bcs = { workspace = true }
+maplit = { workspace = true }
 rand = { workspace = true }
+tokio-stream = { workspace = true }
