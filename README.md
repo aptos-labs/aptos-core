@@ -23,6 +23,8 @@ cargo build
 cargo test
 ```
 
+See [Prepare your Aptos Dev Environment](https://aptos.dev/guides/getting-started) for more details.
+
 ### Resources
 
 * [Aptos Labs](https://aptoslabs.com/)
