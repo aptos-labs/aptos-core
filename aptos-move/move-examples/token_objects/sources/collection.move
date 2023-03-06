@@ -13,11 +13,11 @@
 /// * Events on mint or burn -- that's left to the collection creator.
 ///
 /// TODO:
-/// * Add Royalty reading and consider mutation
 /// * Consider supporting changing the name of the collection.
 /// * Consider supporting changing the aspects of supply
 /// * Add aggregator support when added to framework
-/// * Update ObjectId to be an acceptable param to move
+/// * Provide a Ref/Capability for mutability, relying on the creator is something for the top-level.
+/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
