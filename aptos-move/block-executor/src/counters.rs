@@ -40,7 +40,7 @@ pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         // metric name
         "aptos_rayon_execution_seconds",
         // metric description
-        "The time spent in seconds in parallel execution",
+        "The time spent in seconds in rayon thread pool in parallel execution",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
@@ -73,7 +73,7 @@ pub static WORK_WITH_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         // metric name
         "aptos_execution_work_with_task_seconds",
         // metric description
-        "The time spent in task validation in Block STM",
+        "The time spent in work task with scope call in Block STM",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
