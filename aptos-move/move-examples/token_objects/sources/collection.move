@@ -27,6 +27,8 @@ module token_objects::collection {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
+    use token_objects::royalty::{Self, Royalty};
+
     friend token_objects::token;
 
     /// The collections supply is at its maximum amount
@@ -66,16 +68,6 @@ module token_objects::collection {
     struct MutabilityConfig has copy, drop, store {
         description: bool,
         uri: bool,
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// The royalty of a token within this collection -- this optional
-    struct Royalty has drop, key {
-        numerator: u64,
-        denominator: u64,
-        /// The recipient of royalty payments. See the `shared_account` for how to handle multiple
-        /// creators.
-        payee_address: address,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -161,14 +153,10 @@ module token_objects::collection {
         };
 
         if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
+            royalty::init(&object_signer, option::extract(&mut royalty))
         };
 
         constructor_ref
-    }
-
-    public fun init_royalty(object_signer: &signer, royalty: Royalty) {
-        move_to(object_signer, royalty);
     }
 
     public fun create_collection_address(creator: &address, name: &String): address {
@@ -181,10 +169,6 @@ module token_objects::collection {
 
     public fun create_mutability_config(description: bool, uri: bool): MutabilityConfig {
         MutabilityConfig { description, uri }
-    }
-
-    public fun create_royalty(numerator: u64, denominator: u64, payee_address: address): Royalty {
-        Royalty { numerator, denominator, payee_address }
     }
 
     public(friend) fun increment_supply(
@@ -235,7 +219,7 @@ module token_objects::collection {
     ) {
         let mutability_config = create_mutability_config(mutable_description, mutable_uri);
         let royalty = if (enable_royalty) {
-            option::some(create_royalty(
+            option::some(royalty::create(
                 royalty_numerator,
                 royalty_denominator,
                 royalty_payee_address,
