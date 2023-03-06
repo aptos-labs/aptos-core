@@ -59,7 +59,7 @@ impl MoveResource {
             address: standardize_address(&write_resource.address.to_string()),
             module: parsed_data.module.clone(),
             generic_type_params: parsed_data.generic_type_params,
-            data: Some(serde_json::to_value(&write_resource.data).unwrap()),
+            data: Some(serde_json::from_str(write_resource.data.as_str()).unwrap()),
             is_deleted: false,
         }
     }

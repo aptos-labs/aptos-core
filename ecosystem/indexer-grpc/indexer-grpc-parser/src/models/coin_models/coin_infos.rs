@@ -54,7 +54,6 @@ impl CoinInfo {
     ) -> anyhow::Result<Option<Self>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinInfoResource(inner)) => {
-                let inner = &inner.data;
                 let coin_info_type = &CoinInfoType::from_move_type(
                     &write_resource.type_str,
                     &write_resource.r#type.as_ref().unwrap().address.as_str(),

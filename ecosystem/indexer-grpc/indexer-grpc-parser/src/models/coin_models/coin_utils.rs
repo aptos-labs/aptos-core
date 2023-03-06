@@ -20,21 +20,15 @@ const COIN_TYPE_HASH_LENGTH: usize = 5000;
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
  */
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoinInfoResource {
-    pub data: CoinInfoResourceData,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CoinInfoResourceData {
     name: String,
     symbol: String,
     pub decimals: i32,
     pub supply: OptionalAggregatorWrapperResource,
 }
 
-impl CoinInfoResourceData {
+impl CoinInfoResource {
     pub fn get_name_trunc(&self) -> String {
         truncate_str(&self.name, 32)
     }
