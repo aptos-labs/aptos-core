@@ -15,6 +15,7 @@ use aptos_protos::transaction::testing1::v1::{
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
+const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
@@ -22,13 +23,18 @@ const COIN_TYPE_HASH_LENGTH: usize = 5000;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoinInfoResource {
+    pub data: CoinInfoResourceData,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CoinInfoResourceData {
     name: String,
     symbol: String,
     pub decimals: i32,
     pub supply: OptionalAggregatorWrapperResource,
 }
 
-impl CoinInfoResource {
+impl CoinInfoResourceData {
     pub fn get_name_trunc(&self) -> String {
         truncate_str(&self.name, 32)
     }
@@ -129,6 +135,15 @@ pub struct EventGuidResource {
     pub creation_num: i64,
 }
 
+impl EventGuidResource {
+    pub fn get_standardized(&self) -> Self {
+        Self {
+            addr: standardize_address(&self.addr),
+            creation_num: self.creation_num,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WithdrawCoinEvent {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -171,7 +186,11 @@ pub enum CoinResource {
 
 impl CoinResource {
     pub fn is_resource_supported(data_type: &str) -> bool {
-        matches!(data_type, "0x1::coin::CoinInfo" | "0x1::coin::CoinStore")
+        [
+            format!("{}::coin::CoinInfo", COIN_ADDR),
+            format!("{}::coin::CoinStore", COIN_ADDR),
+        ]
+        .contains(&data_type.to_string())
     }
 
     pub fn from_resource(
@@ -180,10 +199,14 @@ impl CoinResource {
         txn_version: i64,
     ) -> Result<CoinResource> {
         match data_type {
-            "0x1::coin::CoinInfo" => serde_json::from_value(data.clone())
-                .map(|inner| Some(CoinResource::CoinInfoResource(inner))),
-            "0x1::coin::CoinStore" => serde_json::from_value(data.clone())
-                .map(|inner| Some(CoinResource::CoinStoreResource(inner))),
+            x if x == format!("{}::coin::CoinInfo", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(CoinResource::CoinInfoResource(inner)))
+            },
+            x if x == format!("{}::coin::CoinStore", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(CoinResource::CoinStoreResource(inner)))
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -235,10 +258,14 @@ pub enum CoinEvent {
 impl CoinEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<CoinEvent>> {
         match data_type {
-            "0x1::coin::WithdrawEvent" => serde_json::from_str(data.clone())
-                .map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner))),
-            "0x1::coin::DepositEvent" => serde_json::from_str(data.clone())
-                .map(|inner| Some(CoinEvent::DepositCoinEvent(inner))),
+            x if x == format!("{}::coin::WithdrawEvent", COIN_ADDR) => {
+                serde_json::from_str(data.clone())
+                    .map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner)))
+            },
+            x if x == format!("{}::coin::DepositEvent", COIN_ADDR) => {
+                serde_json::from_str(data.clone())
+                    .map(|inner| Some(CoinEvent::DepositCoinEvent(inner)))
+            },
             _ => Ok(None),
         }
         .context(format!(

@@ -17,7 +17,7 @@ use aptos_protos::transaction::testing1::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, owner_address, coin_type))]
@@ -56,7 +56,7 @@ impl CoinBalance {
                     &write_resource.type_str,
                     write_resource.r#type.as_ref().unwrap().address.as_str(),
                 );
-                let owner_address = standardize_address(&write_resource.address.to_string());
+                let owner_address = standardize_address(write_resource.address.as_str());
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     owner_address: owner_address.clone(),
@@ -75,14 +75,15 @@ impl CoinBalance {
                 };
                 let event_to_coin_mapping: EventToCoinType = HashMap::from([
                     (
-                        (inner.withdraw_events.guid.id.clone()),
+                        inner.withdraw_events.guid.id.get_standardized(),
                         coin_balance.coin_type.clone(),
                     ),
                     (
-                        (inner.deposit_events.guid.id.clone()),
+                        inner.deposit_events.guid.id.get_standardized(),
                         coin_balance.coin_type.clone(),
                     ),
                 ]);
+                aptos_logger::info!(i = ?event_to_coin_mapping, "wtf is happening");
 
                 Ok(Some((
                     coin_balance,

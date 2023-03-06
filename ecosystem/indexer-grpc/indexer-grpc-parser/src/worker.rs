@@ -132,8 +132,9 @@ impl Worker {
             starting_version = starting_version,
             "[Parser] Making request to GRPC endpoint",
         );
+        // TODO: CHECK CHAIN ID.
+        // TODO: Loads from the recent successful starting version.
         let request = tonic::Request::new(RawDatastreamRequest {
-            // TODO: Loads from the recent successful starting version.
             starting_version,
             transactions_count: None,
         });
