@@ -5,11 +5,8 @@
 /// * Extensible framework for tokens
 ///
 /// TODO:
-/// * Provide functions for mutability -- the capability model seems to heavy for mutations, so
-///   probably keep the existing model
-/// * Consider adding an optional source name if name is mutated, since the objects address depends
-///   on the name...
-/// * Update ObjectId to be an acceptable param to move
+/// * Provide a Ref/Capability for mutability, relying on the creator is something for the top-level.
+/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module token_objects::token {
     use std::error;
     use std::option::{Self, Option};

@@ -1,6 +1,10 @@
 /// This defines an object-based Royalty. The royalty can be applied to either a collection or a
 /// token. Applications should read the royalty from the token, as it will read the appropriate
 /// royalty.
+///
+/// TODO:
+/// * Determine what if any mutability framework for royalties. For example, adding a wrapper around
+///   the extension ref may be sufficient to allow removing the existing one and adding a new one.
 module token_objects::royalty {
     use std::option::{Self, Option};
 
