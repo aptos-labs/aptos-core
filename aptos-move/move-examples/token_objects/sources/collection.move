@@ -79,12 +79,6 @@ module token_objects::collection {
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Aggregable supply tracker, this is can be used for maximum parallel minting but only for
-    /// for uncapped mints. Currently disabled until this library is in the framework.
-    struct AggregableSupply has key {
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
     struct FixedSupply has key {
         current_supply: u64,
@@ -114,11 +108,11 @@ module token_objects::collection {
             name,
             royalty,
             uri,
-            supply,
+            option::some(supply),
         )
     }
 
-    public fun create_aggregable_collection(
+    public fun create_untracked_collection(
         creator: &signer,
         description: String,
         mutability_config: MutabilityConfig,
@@ -126,16 +120,14 @@ module token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let supply = AggregableSupply { };
-
-        create_collection_internal(
+        create_collection_internal<FixedSupply>(
             creator,
             description,
             mutability_config,
             name,
             royalty,
             uri,
-            supply,
+            option::none(),
         )
     }
 
@@ -146,7 +138,7 @@ module token_objects::collection {
         name: String,
         royalty: Option<Royalty>,
         uri: String,
-        supply: Supply,
+        supply: Option<Supply>,
     ): ConstructorRef {
         let collection_seed = create_collection_seed(&name);
         let constructor_ref = object::create_named_object(creator, collection_seed);
@@ -161,7 +153,12 @@ module token_objects::collection {
             mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, collection);
-        move_to(&object_signer, supply);
+
+        if (option::is_some(&supply)) {
+            move_to(&object_signer, option::destroy_some(supply))
+        } else {
+            option::destroy_none(supply)
+        };
 
         if (option::is_some(&royalty)) {
             move_to(&object_signer, option::extract(&mut royalty))
@@ -240,7 +237,7 @@ module token_objects::collection {
         };
 
         if (max_supply == 0) {
-            create_aggregable_collection(
+            create_untracked_collection(
                 creator,
                 description,
                 mutability_config,
