@@ -30,13 +30,13 @@ module token_objects::collection {
     friend token_objects::token;
 
     /// The collections supply is at its maximum amount
-    const EEXCEEDS_MAX_SUPPLY: u64 = 0;
+    const EEXCEEDS_MAX_SUPPLY: u64 = 1;
     /// The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
     /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 2;
+    const ENOT_CREATOR: u64 = 3;
     /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 3;
+    const EFIELD_NOT_MUTABLE: u64 = 4;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields for a collection.
@@ -373,7 +373,7 @@ module token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     entry fun test_immutable_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
@@ -384,7 +384,7 @@ module token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     entry fun test_immutable_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
