@@ -108,7 +108,7 @@ const config = {
               {
                 label: "Latest Releases",
                 type: "doc",
-                docId: "releases",
+                docId: "releases/index",
               },
               {
                 label: "Read the Aptos White Paper",

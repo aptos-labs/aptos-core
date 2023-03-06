@@ -28,18 +28,11 @@ const sidebars = {
       label: "Latest Releases",
       collapsible: true,
       collapsed: false,
-      link: { type: "doc", id: "releases" },
+      link: { type: "doc", id: "releases/index" },
       items: [
-        {
-          type: "link",
-          label: "aptos-node-v1.2.5",
-          href: "https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.5",
-        },
-        {
-          type: "link",
-          label: "aptos-cli-v1.0.6",
-          href: "https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.6",
-        },
+        "releases/mainnet-release",
+        "releases/testnet-release",
+        "releases/devnet-release",
       ],
     },
     {
