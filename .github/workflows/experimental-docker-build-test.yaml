@@ -103,6 +103,9 @@ jobs:
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
+#!!!    
+    if: ${{ false }}  # disable, see https://github.com/aptos-labs/aptos-core/issues/6941
+#!!!
     uses: ./.github/workflows/experimental-docker-rust-build.yaml
     secrets: inherit
     with:
