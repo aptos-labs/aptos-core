@@ -1,11 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 mod mock_vm_test;
 
+use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
+use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_state_view::StateView;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -53,6 +57,15 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
 
 pub struct MockVM;
 
+impl TransactionBlockExecutor<Transaction> for MockVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
+    }
+}
+
 impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
@@ -98,7 +111,8 @@ impl VMExecutor for MockVM {
             if matches!(txn, Transaction::GenesisTransaction(_)) {
                 read_state_value_from_storage(
                     state_view,
-                    &access_path_for_config(ValidatorSet::CONFIG_ID),
+                    &access_path_for_config(ValidatorSet::CONFIG_ID)
+                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES))?,
                 );
                 read_state_value_from_storage(
                     state_view,
@@ -221,7 +235,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_state_value(&StateKey::AccessPath(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -231,7 +245,7 @@ fn read_state_value_from_storage(
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view
-        .get_state_value(&StateKey::AccessPath(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 
@@ -251,13 +265,14 @@ fn seqnum_ap(account: AccountAddress) -> AccessPath {
 
 fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
-    let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
+    let validator_set_ap =
+        access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test");
     write_set.insert((
-        StateKey::AccessPath(validator_set_ap),
+        StateKey::access_path(validator_set_ap),
         WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
     write_set.insert((
-        StateKey::AccessPath(AccessPath::new(
+        StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
@@ -271,11 +286,11 @@ fn gen_genesis_writeset() -> WriteSet {
 fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.insert((
-        StateKey::AccessPath(balance_ap(sender)),
+        StateKey::access_path(balance_ap(sender)),
         WriteOp::Modification(balance.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(seqnum_ap(sender)),
+        StateKey::access_path(seqnum_ap(sender)),
         WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
@@ -290,15 +305,15 @@ fn gen_payment_writeset(
 ) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.insert((
-        StateKey::AccessPath(balance_ap(sender)),
+        StateKey::access_path(balance_ap(sender)),
         WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(seqnum_ap(sender)),
+        StateKey::access_path(seqnum_ap(sender)),
         WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
     ));
     write_set.insert((
-        StateKey::AccessPath(balance_ap(recipient)),
+        StateKey::access_path(balance_ap(recipient)),
         WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
     ));
     write_set
@@ -388,6 +403,11 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
         },
+        TransactionPayload::Multisig(_) => {
+            unimplemented!("MockVM does not support multisig transaction payload.")
+        },
+
+        // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
         },

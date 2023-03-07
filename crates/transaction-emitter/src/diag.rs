@@ -1,15 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 use futures::future::join_all;
-use itertools::zip;
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use rand_core::OsRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::{
     cmp::min,
+    iter::zip,
     time::{Duration, Instant},
 };
 
@@ -19,7 +18,7 @@ pub async fn diag(cluster: &Cluster) -> Result<()> {
     let emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
-        StdRng::from_seed(OsRng.gen()),
+        StdRng::from_entropy(),
     );
     let coin_source_account_address = coin_source_account.address();
     let instances: Vec<_> = cluster.all_instances().collect();

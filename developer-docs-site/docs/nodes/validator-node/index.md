@@ -1,5 +1,5 @@
 ---
-title: "Install Validators"
+title: "Run a Validator"
 slug: "validators"
 ---
 
@@ -7,7 +7,7 @@ import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
 
-# Install Aptos Validators
+# Run a Validator
 
 To participate in the consensus process in the Aptos mainnet, you must deploy and run a validator node and a validator fullnode. Optionally you can also run a public fullnode. This document presents a high-level conceptual overview of the important steps involved in deploying the nodes for validation. 
 

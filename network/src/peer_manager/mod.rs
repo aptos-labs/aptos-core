@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! The PeerManager module is responsible for establishing connections between Peers and for
@@ -22,7 +23,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkContext;
+use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
@@ -55,12 +56,12 @@ mod types;
 
 pub use self::error::PeerManagerError;
 use crate::{
-    application::storage::PeerMetadataStorage,
+    application::{error::Error, storage::PeersAndMetadata},
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::SerializedRequest,
 };
-use aptos_config::config::{PeerRole, PeerSet};
-use aptos_infallible::RwLock;
+use aptos_config::config::PeerRole;
+use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
 
@@ -89,10 +90,8 @@ where
             aptos_channel::Sender<ProtocolId, PeerRequest>,
         ),
     >,
-    /// Shared metadata storage about peers
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
-    /// Known trusted peers from discovery
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    /// Shared metadata storage about trusted peers and metadata
+    peers_and_metadata: Arc<PeersAndMetadata>,
     /// Channel to receive requests from other actors.
     requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
@@ -143,8 +142,7 @@ where
         transport: TTransport,
         network_context: NetworkContext,
         listen_addr: NetworkAddress,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-        trusted_peers: Arc<RwLock<PeerSet>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
@@ -186,8 +184,7 @@ where
             listen_addr,
             transport_handler: Some(transport_handler),
             active_peers: HashMap::new(),
-            peer_metadata_storage,
-            trusted_peers,
+            peers_and_metadata,
             requests_rx,
             connection_reqs_rx,
             transport_reqs_tx,
@@ -289,80 +286,8 @@ where
         );
         self.sample_connected_peers();
         match event {
-            TransportNotification::NewConnection(mut conn) => {
-                match conn.metadata.origin {
-                    ConnectionOrigin::Outbound => {
-                        // TODO: This is right now a hack around having to feed trusted peers deeper in the outbound path.  Inbound ones are assigned at Noise handshake time.
-                        conn.metadata.role = self
-                            .trusted_peers
-                            .read()
-                            .get(&conn.metadata.remote_peer_id)
-                            .map_or(PeerRole::Unknown, |auth_context| auth_context.role);
-
-                        if conn.metadata.role == PeerRole::Unknown {
-                            warn!(
-                                NetworkSchema::new(&self.network_context)
-                                    .connection_metadata_with_address(&conn.metadata),
-                                "{} Outbound connection made with unknown peer role: {}",
-                                self.network_context,
-                                conn.metadata
-                            )
-                        }
-                    },
-                    ConnectionOrigin::Inbound => {
-                        // Everything below here is meant for unknown peers only, role comes from
-                        // Noise handshake and if it's not `Unknown` it is trusted
-                        if conn.metadata.role == PeerRole::Unknown {
-                            // TODO: Keep track of somewhere else to not take this hit in case of DDoS
-                            // Count unknown inbound connections
-                            let unknown_inbound_conns = self
-                                .active_peers
-                                .iter()
-                                .filter(|(peer_id, (metadata, _))| {
-                                    metadata.origin == ConnectionOrigin::Inbound
-                                        && self
-                                            .trusted_peers
-                                            .read()
-                                            .get(peer_id)
-                                            .map_or(true, |peer| peer.role == PeerRole::Unknown)
-                                })
-                                .count();
-
-                            // Reject excessive inbound connections made by unknown peers
-                            // We control outbound connections with Connectivity manager before we even send them
-                            // and we must allow connections that already exist to pass through tie breaking.
-                            if !self
-                                .active_peers
-                                .contains_key(&conn.metadata.remote_peer_id)
-                                && unknown_inbound_conns + 1 > self.inbound_connection_limit
-                            {
-                                info!(
-                                    NetworkSchema::new(&self.network_context)
-                                        .connection_metadata_with_address(&conn.metadata),
-                                    "{} Connection rejected due to connection limit: {}",
-                                    self.network_context,
-                                    conn.metadata
-                                );
-                                counters::connections_rejected(
-                                    &self.network_context,
-                                    conn.metadata.origin,
-                                )
-                                .inc();
-                                self.disconnect(conn);
-                                return;
-                            }
-                        }
-                    },
-                }
-
-                // Add new peer, updating counters and all
-                info!(
-                    NetworkSchema::new(&self.network_context)
-                        .connection_metadata_with_address(&conn.metadata),
-                    "{} New connection established: {}", self.network_context, conn.metadata
-                );
-                self.add_peer(conn);
-                self.update_connected_peers_metrics();
+            TransportNotification::NewConnection(conn) => {
+                self.handle_new_connection_event(conn);
             },
             TransportNotification::Disconnected(lost_conn_metadata, reason) => {
                 // See: https://github.com/aptos-labs/aptos-core/issues/3128#issuecomment-605351504 for
@@ -380,13 +305,11 @@ where
                 // If the active connection with the peer is lost, remove it from `active_peers`.
                 if let Entry::Occupied(entry) = self.active_peers.entry(peer_id) {
                     let (conn_metadata, _) = entry.get();
-                    if conn_metadata.connection_id == lost_conn_metadata.connection_id {
+                    let connection_id = conn_metadata.connection_id;
+                    if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
-                        self.peer_metadata_storage.remove_connection(
-                            self.network_context.network_id(),
-                            &lost_conn_metadata,
-                        )
+                        self.remove_peer_from_metadata(peer_id, connection_id);
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -433,6 +356,119 @@ where
         }
     }
 
+    /// Handles a new connection event
+    fn handle_new_connection_event(&mut self, mut conn: Connection<TSocket>) {
+        // Get the trusted peers
+        let trusted_peers = match self
+            .peers_and_metadata
+            .get_trusted_peers(&self.network_context.network_id())
+        {
+            Ok(trusted_peers) => trusted_peers,
+            Err(error) => {
+                error!(
+                    NetworkSchema::new(&self.network_context)
+                        .connection_metadata_with_address(&conn.metadata),
+                    "Failed to get trusted peers for network context: {:?}, error: {:?}",
+                    self.network_context,
+                    error
+                );
+                return;
+            },
+        };
+
+        // Handle the new connection based on the connection origin
+        match conn.metadata.origin {
+            ConnectionOrigin::Outbound => {
+                // TODO: This is a hack around having to feed trusted peers deeper
+                // into the outbound path. Inbound ones are assigned at Noise handshake time.
+                let peer_role = match trusted_peers.read().get(&conn.metadata.remote_peer_id) {
+                    Some(trusted_peer) => trusted_peer.role,
+                    None => {
+                        // Return an unknown peer role
+                        warn!(
+                            NetworkSchema::new(&self.network_context)
+                                .connection_metadata_with_address(&conn.metadata),
+                            "{} Outbound connection made with unknown peer role: {}",
+                            self.network_context,
+                            conn.metadata
+                        );
+                        PeerRole::Unknown
+                    },
+                };
+                conn.metadata.role = peer_role;
+            },
+            ConnectionOrigin::Inbound => {
+                // Everything below here is meant for unknown peers only, role comes from
+                // Noise handshake and if it's not `Unknown` it is trusted
+                if conn.metadata.role == PeerRole::Unknown {
+                    // TODO: Keep track of somewhere else to not take this hit in case of DDoS
+                    // Count unknown inbound connections
+                    let unknown_inbound_conns = self
+                        .active_peers
+                        .iter()
+                        .filter(|(peer_id, (metadata, _))| {
+                            metadata.origin == ConnectionOrigin::Inbound
+                                && trusted_peers
+                                    .read()
+                                    .get(peer_id)
+                                    .map_or(true, |peer| peer.role == PeerRole::Unknown)
+                        })
+                        .count();
+
+                    // Reject excessive inbound connections made by unknown peers
+                    // We control outbound connections with Connectivity manager before we even send them
+                    // and we must allow connections that already exist to pass through tie breaking.
+                    if !self
+                        .active_peers
+                        .contains_key(&conn.metadata.remote_peer_id)
+                        && unknown_inbound_conns + 1 > self.inbound_connection_limit
+                    {
+                        info!(
+                            NetworkSchema::new(&self.network_context)
+                                .connection_metadata_with_address(&conn.metadata),
+                            "{} Connection rejected due to connection limit: {}",
+                            self.network_context,
+                            conn.metadata
+                        );
+                        counters::connections_rejected(&self.network_context, conn.metadata.origin)
+                            .inc();
+                        self.disconnect(conn);
+                        return;
+                    }
+                }
+            },
+        }
+
+        // Add the new peer and update the metric counters
+        info!(
+            NetworkSchema::new(&self.network_context)
+                .connection_metadata_with_address(&conn.metadata),
+            "{} New connection established: {}", self.network_context, conn.metadata
+        );
+        if let Err(error) = self.add_peer(conn) {
+            warn!(
+                NetworkSchema::new(&self.network_context),
+                "Failed to add peer. Error: {:?}", error
+            )
+        }
+        self.update_connected_peers_metrics();
+    }
+
+    fn remove_peer_from_metadata(&mut self, peer_id: AccountAddress, connection_id: ConnectionId) {
+        let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
+        if let Err(error) = self
+            .peers_and_metadata
+            .remove_peer_metadata(peer_network_id, connection_id)
+        {
+            warn!(
+                NetworkSchema::new(&self.network_context),
+                "Failed to remove peer from peers and metadata. Peer: {:?}, error: {:?}",
+                peer_network_id,
+                error
+            );
+        }
+    }
+
     async fn handle_outbound_connection_request(&mut self, request: ConnectionRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),
@@ -476,8 +512,7 @@ where
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
                     let connection_id = conn_metadata.connection_id;
-                    self.peer_metadata_storage
-                        .remove_connection(self.network_context.network_id(), &conn_metadata);
+                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
 
                     // This triggers a disconnect.
                     drop(sender);
@@ -604,7 +639,7 @@ where
         self.executor.spawn(drop_fut);
     }
 
-    fn add_peer(&mut self, connection: Connection<TSocket>) {
+    fn add_peer(&mut self, connection: Connection<TSocket>) -> Result<(), Error> {
         let conn_meta = connection.metadata.clone();
         let peer_id = conn_meta.remote_peer_id;
 
@@ -617,7 +652,7 @@ where
                 "Received self-dial, disconnecting it"
             );
             self.disconnect(connection);
-            return;
+            return Ok(());
         }
 
         let mut send_new_peer_notification = true;
@@ -650,7 +685,7 @@ where
                 );
                 // Drop the new connection and keep the one already stored in active_peers
                 self.disconnect(connection);
-                return;
+                return Ok(());
             }
         }
 
@@ -700,13 +735,17 @@ where
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
-        self.peer_metadata_storage
-            .insert_connection(self.network_context.network_id(), conn_meta.clone());
+        self.peers_and_metadata.insert_connection_metadata(
+            PeerNetworkId::new(self.network_context.network_id(), peer_id),
+            conn_meta.clone(),
+        )?;
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
             let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
             self.send_conn_notification(peer_id, notif);
         }
+
+        Ok(())
     }
 
     /// Sends a `ConnectionNotification` to all event handlers, warns on failures

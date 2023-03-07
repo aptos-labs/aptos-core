@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
+    test_utils::{assert_balance, create_and_fund_account, transfer_coins, MAX_HEALTHY_WAIT_SECS},
 };
 use aptos_consensus::CONSENSUS_DB_NAME;
 use aptos_forge::{HealthCheckError, NodeExt, Swarm};
@@ -56,7 +56,7 @@ async fn test_consensusdb_recovery() {
     }
 
     node.restart().await.unwrap();
-    node.wait_until_healthy(Instant::now() + Duration::from_secs(10))
+    node.wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 

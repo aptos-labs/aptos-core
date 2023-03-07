@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
@@ -93,7 +93,7 @@ impl CoinActivity {
                 &inner.info.changes,
                 &inner.events,
                 None,
-                chrono::NaiveDateTime::from_timestamp(0, 0),
+                chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap(),
             ),
             APITransaction::UserTransaction(inner) => (
                 &inner.info,

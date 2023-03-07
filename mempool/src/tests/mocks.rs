@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -18,7 +19,7 @@ use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeerMetadataStorage,
+        storage::PeersAndMetadata,
     },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
@@ -28,8 +29,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
-    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
+    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
+    transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -129,13 +130,13 @@ impl MockSharedMempool {
                 on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
             })
             .unwrap();
-        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
+        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
         let network_senders = hashmap! {NetworkId::Validator => network_sender};
         let network_client = NetworkClient::new(
             vec![MempoolDirectSend],
             vec![],
             network_senders,
-            peer_metadata_storage,
+            peers_and_metadata,
         );
         let network_and_events = hashmap! {NetworkId::Validator => network_events};
         let network_service_events = NetworkServiceEvents::new(network_and_events);
@@ -166,7 +167,7 @@ impl MockSharedMempool {
                     .add_txn(
                         txn.clone(),
                         txn.gas_unit_price(),
-                        AccountSequenceInfo::Sequential(0),
+                        0,
                         TimelineState::NotReady,
                     )
                     .code

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::{ensure, format_err, Error, Result};
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
@@ -30,19 +31,9 @@ const TESTING: &str = "testing";
 const PREMAINNET: &str = "premainnet";
 
 impl NamedChain {
-    fn str_to_chain_id(s: &str) -> Result<ChainId> {
-        // TODO implement custom macro that derives FromStr impl for enum (similar to aptos-core/common/num-variants)
-        let reserved_chain = match s.to_lowercase().as_str() {
-            MAINNET => NamedChain::MAINNET,
-            TESTNET => NamedChain::TESTNET,
-            DEVNET => NamedChain::DEVNET,
-            TESTING => NamedChain::TESTING,
-            PREMAINNET => NamedChain::PREMAINNET,
-            _ => {
-                return Err(format_err!("Not a reserved chain: {:?}", s));
-            },
-        };
-        Ok(ChainId::new(reserved_chain.id()))
+    fn str_to_chain_id(string: &str) -> Result<ChainId> {
+        let named_chain = NamedChain::from_str(string)?;
+        Ok(ChainId::new(named_chain.id()))
     }
 
     pub fn id(&self) -> u8 {
@@ -50,14 +41,33 @@ impl NamedChain {
     }
 
     pub fn from_chain_id(chain_id: &ChainId) -> Result<NamedChain, String> {
-        match chain_id.id() {
+        let chain_id = chain_id.id();
+        match chain_id {
             1 => Ok(NamedChain::MAINNET),
             2 => Ok(NamedChain::TESTNET),
             3 => Ok(NamedChain::DEVNET),
             4 => Ok(NamedChain::TESTING),
             5 => Ok(NamedChain::PREMAINNET),
-            _ => Err(String::from("Not a named chain")),
+            _ => Err(format!("Not a named chain. Given ID: {:?}", chain_id)),
         }
+    }
+}
+
+impl FromStr for NamedChain {
+    type Err = Error;
+
+    fn from_str(string: &str) -> Result<Self> {
+        let named_chain = match string.to_lowercase().as_str() {
+            MAINNET => NamedChain::MAINNET,
+            TESTNET => NamedChain::TESTNET,
+            DEVNET => NamedChain::DEVNET,
+            TESTING => NamedChain::TESTING,
+            PREMAINNET => NamedChain::PREMAINNET,
+            _ => {
+                return Err(format_err!("Not a reserved chain name: {:?}", string));
+            },
+        };
+        Ok(named_chain)
     }
 }
 

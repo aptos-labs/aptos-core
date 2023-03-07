@@ -2,6 +2,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::account::{Self, new_event_handle};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event};
     use std::error;
     use std::signer;
@@ -69,7 +70,7 @@ module aptos_framework::aptos_account {
         // Resource accounts can be created without registering them to receive APT.
         // This conveniently does the registration if necessary.
         if (!coin::is_account_registered<AptosCoin>(to)) {
-            coin::register<AptosCoin>(&account::create_signer(to));
+            coin::register<AptosCoin>(&create_signer(to));
         };
         coin::transfer<AptosCoin>(source, to, amount)
     }
@@ -109,7 +110,7 @@ module aptos_framework::aptos_account {
                 can_receive_direct_coin_transfers(to),
                 error::permission_denied(EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS),
             );
-            coin::register<CoinType>(&account::create_signer(to));
+            coin::register<CoinType>(&create_signer(to));
         };
         coin::deposit<CoinType>(to, coins)
     }
@@ -149,6 +150,7 @@ module aptos_framework::aptos_account {
         };
     }
 
+    #[view]
     /// Return true if `account` can receive direct transfers of coins that they have not explicitly registered to
     /// receive.
     ///

@@ -1,7 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::{
+    smoke_test_environment::new_local_swarm_with_aptos, test_utils::MAX_HEALTHY_WAIT_SECS,
+};
 use anyhow::bail;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
@@ -29,7 +32,7 @@ async fn test_indexer() {
 
     let fullnode = swarm.full_node_mut(fullnode_peer_id).unwrap();
     fullnode
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
         .unwrap();
 
@@ -46,7 +49,7 @@ async fn test_indexer() {
         .unwrap();
     // TODO(Gas): double check if this is correct
     chain_info
-        .mint(account1.address(), 10_000_000)
+        .mint(account1.address(), 10_000_000_000)
         .await
         .unwrap();
     chain_info

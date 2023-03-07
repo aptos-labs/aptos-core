@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -53,6 +53,12 @@ impl Error {
             Self::TimeoutWaitingForResponse(_) => "timeout_waiting_for_response",
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
         }
+    }
+}
+
+impl From<aptos_storage_service_client::Error> for Error {
+    fn from(error: aptos_storage_service_client::Error) -> Self {
+        Self::UnexpectedErrorEncountered(error.to_string())
     }
 }
 

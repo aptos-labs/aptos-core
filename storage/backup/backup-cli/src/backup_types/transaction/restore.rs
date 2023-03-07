@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -23,7 +24,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor::chunk_executor::ChunkExecutor;
-use aptos_executor_types::TransactionReplayer;
+use aptos_executor_types::{TransactionReplayer, VerifyExecutionMode};
 use aptos_logger::prelude::*;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
@@ -45,7 +46,6 @@ use futures::{
 use itertools::{izip, Itertools};
 use std::{
     cmp::{max, min},
-    collections::BTreeSet,
     pin::Pin,
     sync::Arc,
     time::Instant,
@@ -160,7 +160,7 @@ impl TransactionRestoreController {
         global_opt: GlobalRestoreOptions,
         storage: Arc<dyn BackupStorage>,
         epoch_history: Option<Arc<EpochHistory>>,
-        txns_to_skip: Vec<Version>,
+        verify_execution_mode: VerifyExecutionMode,
     ) -> Self {
         let inner = TransactionRestoreBatchController::new(
             global_opt,
@@ -168,7 +168,7 @@ impl TransactionRestoreController {
             vec![opt.manifest_handle],
             opt.replay_from_version,
             epoch_history,
-            txns_to_skip.into_iter().collect(),
+            verify_execution_mode,
         );
 
         Self { inner }
@@ -188,7 +188,7 @@ pub struct TransactionRestoreBatchController {
     manifest_handles: Vec<FileHandle>,
     replay_from_version: Option<Version>,
     epoch_history: Option<Arc<EpochHistory>>,
-    txns_to_skip: Arc<BTreeSet<Version>>,
+    verify_execution_mode: VerifyExecutionMode,
 }
 
 impl TransactionRestoreBatchController {
@@ -198,7 +198,7 @@ impl TransactionRestoreBatchController {
         manifest_handles: Vec<FileHandle>,
         replay_from_version: Option<Version>,
         epoch_history: Option<Arc<EpochHistory>>,
-        txns_to_skip: Vec<Version>,
+        verify_execution_mode: VerifyExecutionMode,
     ) -> Self {
         Self {
             global_opt,
@@ -206,7 +206,7 @@ impl TransactionRestoreBatchController {
             manifest_handles,
             replay_from_version,
             epoch_history,
-            txns_to_skip: Arc::new(txns_to_skip.into_iter().collect()),
+            verify_execution_mode,
         }
     }
 
@@ -458,14 +458,20 @@ impl TransactionRestoreBatchController {
                 let (txns, txn_infos, write_sets, events): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
                     chunk.into_iter().multiunzip();
                 let chunk_replayer = chunk_replayer.clone();
-                let txns_to_skip = self.txns_to_skip.clone();
+                let verify_execution_mode = self.verify_execution_mode.clone();
 
                 async move {
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["replay_txn_chunk"])
                         .start_timer();
                     tokio::task::spawn_blocking(move || {
-                        chunk_replayer.replay(txns, txn_infos, write_sets, events, txns_to_skip)
+                        chunk_replayer.replay(
+                            txns,
+                            txn_infos,
+                            write_sets,
+                            events,
+                            &verify_execution_mode,
+                        )
                     })
                     .err_into::<anyhow::Error>()
                     .await

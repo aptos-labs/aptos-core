@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -16,7 +17,7 @@ use futures::stream::poll_fn;
 use once_cell::sync::Lazy;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
@@ -47,8 +48,14 @@ pub struct MetadataCacheOpt {
 }
 
 impl MetadataCacheOpt {
-    // in cache we save things other than the cached files.
+    // in case we save things other than the cached files.
     const SUB_DIR: &'static str = "cache";
+
+    pub fn new(dir: Option<impl AsRef<Path>>) -> Self {
+        Self {
+            dir: dir.map(|dir| dir.as_ref().to_path_buf()),
+        }
+    }
 
     fn cache_dir(&self) -> PathBuf {
         self.dir
@@ -123,7 +130,7 @@ pub async fn sync_and_load(
     for h in stale_local_hashes {
         let file = cache_dir.join(h);
         remove_file(&file).await.err_notes(&file)?;
-        info!("Deleted stale metadata files in cache.");
+        info!(file_name = h, "Deleted stale metadata file in cache.");
     }
 
     let num_new_files = new_remote_hashes.len();

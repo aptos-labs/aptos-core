@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,10 +7,9 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
         DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
-        TransactionGenParams, ValueType, STORAGE_AGGREGATOR_VALUE,
+        TransactionGenParams, ValueType,
     },
 };
-use aptos_aggregator::delta_change_set::serialize;
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -57,7 +57,7 @@ fn run_transactions<K, V>(
             EmptyDataView<KeyType<K>, ValueType<V>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|(res, _)| res);
+        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -166,9 +166,10 @@ fn deltas_writes_mixed() {
     .expect("creating a new value should succeed")
     .current();
 
+    // Do not allow deletions as resolver can't apply delta to a deleted aggregator.
     let transactions: Vec<_> = transaction_gen
         .into_iter()
-        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, true))
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
     let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
@@ -182,7 +183,7 @@ fn deltas_writes_mixed() {
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|(res, _)| res);
+        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
         baseline.assert_output(&output);
@@ -217,25 +218,15 @@ fn deltas_resolver() {
         .collect();
 
     for _ in 0..20 {
-        let output = BlockExecutor::<
+        let (output, resolved) = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view);
-
-        let (output, delta_resolver) = output.unwrap();
-        let resolved = delta_resolver.resolve(
-            (15..50)
-                .map(|i| {
-                    (
-                        KeyType(universe[i], false),
-                        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE))),
-                    )
-                })
-                .collect(),
-            num_txns,
-        );
+        .execute_transactions_parallel((), &transactions, &data_view)
+        .unwrap()
+        .into_iter()
+        .unzip();
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
         baseline.assert_output(&Ok(output));
@@ -405,8 +396,7 @@ fn publishing_fixed_params() {
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|(res, _)| res);
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

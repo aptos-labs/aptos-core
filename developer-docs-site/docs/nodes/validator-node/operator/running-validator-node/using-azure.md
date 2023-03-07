@@ -21,7 +21,7 @@ Make sure you complete these prerequisite steps before you proceed:
 
 - **Azure account**: https://azure.microsoft.com/
 - **Aptos CLI**: https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
-- **Terraform 1.2.4**: https://www.terraform.io/downloads.html
+- **Terraform 1.3.6**: https://www.terraform.io/downloads.html
 - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
 - **Azure CLI**: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 
@@ -69,7 +69,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
   ```
   terraform {
-    required_version = "~> 1.2.0"
+    required_version = "~> 1.3.6"
     backend "azurerm" {
       resource_group_name  = <resource group name>
       storage_account_name = <storage account name>
@@ -88,7 +88,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
   }
   ```
 
-    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+    For the full customization options, see the variables file [`variables.tf`](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file.
   ```bash
@@ -155,7 +155,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+12. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 

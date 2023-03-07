@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -14,6 +14,7 @@ pub mod op;
 pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
+pub mod update;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
@@ -45,6 +46,7 @@ pub enum Tool {
     Node(node::NodeTool),
     #[clap(subcommand)]
     Stake(stake::StakeTool),
+    Update(update::UpdateTool),
 }
 
 impl Tool {
@@ -62,6 +64,7 @@ impl Tool {
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
+            Update(tool) => tool.execute_serialized().await,
         }
     }
 }

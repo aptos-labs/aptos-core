@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_merkle_db::Node;
@@ -9,7 +9,6 @@ use lru::LruCache;
 
 const NUM_SHARDS: usize = 256;
 
-#[derive(Debug)]
 pub(crate) struct LruNodeCache {
     shards: [Mutex<LruCache<NibblePath, (Version, Node)>>; NUM_SHARDS],
 }

@@ -1,17 +1,20 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     emitter::{
         stats::{DynamicStatsTracking, StatsAccumulator},
-        wait_for_accounts_sequence,
+        update_seq_num_and_get_num_expired, wait_for_accounts_sequence,
     },
     transaction_generator::TransactionGenerator,
     EmitModeParams,
 };
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
+};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
@@ -20,8 +23,9 @@ use core::{
 };
 use futures::future::join_all;
 use itertools::Itertools;
-use rand::{seq::IteratorRandom, Rng};
+use rand::seq::IteratorRandom;
 use std::{
+    collections::HashMap,
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
@@ -34,7 +38,7 @@ pub struct SubmissionWorker {
     params: EmitModeParams,
     stats: Arc<DynamicStatsTracking>,
     txn_generator: Box<dyn TransactionGenerator>,
-    worker_index: usize,
+    start_sleep_duration: Duration,
     skip_latency_stats: bool,
     rng: ::rand::rngs::StdRng,
 }
@@ -47,7 +51,7 @@ impl SubmissionWorker {
         params: EmitModeParams,
         stats: Arc<DynamicStatsTracking>,
         txn_generator: Box<dyn TransactionGenerator>,
-        worker_index: usize,
+        start_sleep_duration: Duration,
         skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
@@ -58,7 +62,7 @@ impl SubmissionWorker {
             params,
             stats,
             txn_generator,
-            worker_index,
+            start_sleep_duration,
             skip_latency_stats,
             rng,
         }
@@ -66,13 +70,9 @@ impl SubmissionWorker {
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self) -> Vec<LocalAccount> {
-        // Introduce a random jitter between, so that:
-        //  - we don't hammer the rest APIs all at once.
-        //  - allow for even spread for fixed TPS setup
-        let start_sleep_duration = self.start_sleep_time();
-        let start_time = Instant::now() + start_sleep_duration;
+        let start_time = Instant::now() + self.start_sleep_duration;
 
-        self.sleep_check_done(start_sleep_duration).await;
+        self.sleep_check_done(self.start_sleep_duration).await;
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
         let mut wait_until = start_time;
@@ -99,13 +99,28 @@ impl SubmissionWorker {
 
             let requests = self.gen_requests();
 
+            let mut account_to_start_and_end_seq_num = HashMap::new();
+            for req in requests.iter() {
+                let cur = req.sequence_number();
+                let _ = *account_to_start_and_end_seq_num
+                    .entry(req.sender())
+                    .and_modify(|(start, end)| {
+                        if *start > cur {
+                            *start = cur;
+                        }
+                        if *end < cur + 1 {
+                            *end = cur + 1;
+                        }
+                    })
+                    .or_insert((cur, cur + 1));
+            }
+
             let txn_expiration_time = requests
                 .iter()
                 .map(|txn| txn.expiration_timestamp_secs())
                 .max()
                 .unwrap_or(0);
 
-            let num_requests = requests.len();
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
             join_all(
@@ -132,10 +147,10 @@ impl SubmissionWorker {
                 .await
             }
 
-            self.update_stats(
+            self.wait_and_update_stats(
                 *loop_start_time,
-                txn_offset_time.load(Ordering::Relaxed),
-                num_requests,
+                txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
+                account_to_start_and_end_seq_num,
                 // skip latency if asked to check seq_num only once
                 // even if we check more often due to stop (to not affect sampling)
                 self.skip_latency_stats,
@@ -175,18 +190,6 @@ impl SubmissionWorker {
         }
     }
 
-    fn start_sleep_time(&mut self) -> Duration {
-        let random_jitter_millis = if self.params.start_jitter_millis > 0 {
-            self.rng.gen_range(0, self.params.start_jitter_millis)
-        } else {
-            0
-        };
-        Duration::from_millis(
-            (self.params.start_offset_multiplier_millis * self.worker_index as f64) as u64
-                + random_jitter_millis,
-        )
-    }
-
     /// This function assumes that num_requests == num_accounts, which is
     /// precisely how gen_requests works. If this changes, this code will
     /// need to be fixed.
@@ -194,31 +197,31 @@ impl SubmissionWorker {
     /// Note, the latency values are not accurate if --check-stats-at-end
     /// is used. There is no easy way around this accurately. As such, we
     /// don't update latency at all if that flag is set.
-    async fn update_stats(
+    async fn wait_and_update_stats(
         &mut self,
         start_time: Instant,
-        txn_offset_time: u64,
-        num_requests: usize,
+        avg_txn_offset_time: u64,
+        account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
         skip_latency_stats: bool,
         txn_expiration_ts_secs: u64,
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
-        assert_eq!(
-            num_requests,
-            self.params.transactions_per_account * self.accounts.len()
-        );
-        let (num_expired, sum_of_completion_timestamps_millis) = wait_for_accounts_sequence(
-            start_time,
-            &self.client,
-            &mut self.accounts,
-            self.params.transactions_per_account,
-            txn_expiration_ts_secs,
-            check_account_sleep_duration,
-        )
-        .await;
+        let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
+            wait_for_accounts_sequence(
+                start_time,
+                &self.client,
+                &account_to_start_and_end_seq_num,
+                txn_expiration_ts_secs,
+                check_account_sleep_duration,
+            )
+            .await;
 
-        let num_committed = num_requests - num_expired;
+        let (num_committed, num_expired) = update_seq_num_and_get_num_expired(
+            &mut self.accounts,
+            account_to_start_and_end_seq_num,
+            latest_fetched_counts,
+        );
 
         if num_expired > 0 {
             loop_stats
@@ -240,7 +243,7 @@ impl SubmissionWorker {
 
         if num_committed > 0 {
             let sum_latency = sum_of_completion_timestamps_millis
-                - (txn_offset_time as u128 * num_committed as u128) / num_requests as u128;
+                - (avg_txn_offset_time as u128 * num_committed as u128);
             let avg_latency = (sum_latency / num_committed as u128) as u64;
             loop_stats
                 .committed
@@ -300,7 +303,7 @@ pub async fn submit_transactions(
                 .failed_submission
                 .fetch_add(txns.len() as u64, Ordering::Relaxed);
             sample!(
-                SampleRate::Duration(Duration::from_secs(120)),
+                SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
                     "[{:?}] Failed to submit batch request: {:?}",
                     client.path_prefix_string(),
@@ -341,9 +344,13 @@ pub async fn submit_transactions(
                         } else {
                             None
                         };
+                    let balance = client
+                        .get_account_balance(sender)
+                        .await
+                        .map_or(-1, |v| v.into_inner().get() as i64);
 
                     warn!(
-                        "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, last transaction for account: {:?}",
+                        "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
                         client.path_prefix_string(),
                         failures.len(),
                         failure,
@@ -351,6 +358,7 @@ pub async fn submit_transactions(
                         txns[0].sequence_number(),
                         failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
                         by_error,
+                        balance,
                         last_transactions,
                     );
                 }

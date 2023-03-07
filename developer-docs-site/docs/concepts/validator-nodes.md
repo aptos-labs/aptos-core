@@ -9,7 +9,7 @@ An Aptos node is an entity of the Aptos ecosystem that tracks the state of the A
 * [Fullnodes](./fullnodes.md)
 
 Each Aptos node comprises several logical components:
-* [REST service](../reference/glossary#rest-service)
+* [REST service](../reference/glossary.md#rest-service)
 * [Mempool](#mempool)
 * [Consensus (disabled in fullnodes)](#consensus)
 * [Execution](#execution)
@@ -17,13 +17,13 @@ Each Aptos node comprises several logical components:
 * [Storage](#storage)
 * [State synchronizer](#state-synchronizer)
 
-The [Aptos-core](../reference/glossary#aptos-core) software can be configured to run as a validator node or as a fullnode.
+The [Aptos-core](../reference/glossary.md#aptos-core) software can be configured to run as a validator node or as a fullnode.
 
 # Overview
 
-When a transaction is submitted to the Aptos blockchain, validator nodes run a distributed [consensus protocol](../reference/glossary#consensus-protocol), execute the transaction, and store the transaction and the execution results on the blockchain. Validator nodes decide which transactions will be added to the blockchain and in which order.
+When a transaction is submitted to the Aptos blockchain, validator nodes run a distributed [consensus protocol](../reference/glossary.md#consensus-protocol), execute the transaction, and store the transaction and the execution results on the blockchain. Validator nodes decide which transactions will be added to the blockchain and in which order.
 
-The Aptos blockchain uses a Byzantine Fault Tolerance (BFT) consensus protocol for validator nodes to agree on the ledger of finalized transactions and their execution results. Validator nodes process these transactions and include them in their local copy of the blockchain database. This means that up-to-date validator nodes always maintain a copy of the current [state](/reference/glossary#state) of the blockchain, locally.
+The Aptos blockchain uses a Byzantine Fault Tolerance (BFT) consensus protocol for validator nodes to agree on the ledger of finalized transactions and their execution results. Validator nodes process these transactions and include them in their local copy of the blockchain database. This means that up-to-date validator nodes always maintain a copy of the current [state](../reference/glossary.md#state) of the blockchain, locally.
 
 Validator nodes communicate directly with other validator nodes over a private network. [Fullnodes](./fullnodes.md) are an external validation and/or dissemination resource for the finalized transaction history. They receive transactions from peers and may re-execute them locally (the same way a validator executes transactions). Fullnodes store the results of re-executed transactions to local storage. In doing so, they can challenge any foul-play by validators and provide evidence if there is any attempt to re-write or modify the blockchain history. This helps to mitigate against validator corruption and/or collusion.
 

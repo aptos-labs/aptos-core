@@ -7,7 +7,7 @@ ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 ENTRYPOINT ["/tini", "--"]
 
-FROM rust:1.64.0-bullseye@sha256:5cf09a76cb9baf4990d121221bbad64927cc5690ee54f246487e302ddc2ba300 AS rust-base
+FROM rust:1.66.1-bullseye@sha256:f72949bcf1daf8954c0e0ed8b7e10ac4c641608f6aa5f0ef7c172c49f35bd9b5 AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 RUN apt-get update && apt-get install binutils lld
@@ -68,9 +68,8 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 
 RUN mkdir -p /opt/aptos/etc
 COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/
 COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
 
 # Admission control
 EXPOSE 8000
@@ -148,9 +147,7 @@ RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --dir
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
 COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
-COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup-verify
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/aptos-db-tool
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
@@ -232,6 +229,9 @@ ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
+### Get Aptos Framework Release for forge framework upgrade testing
+COPY --link --from=builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
+
 ENV RUST_LOG_FORMAT=json
 
 # add build info
@@ -274,6 +274,39 @@ ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
 
+### Indexer GRPC Image ###
+
+FROM debian-base AS indexer-grpc
+
+RUN apt-get update && apt-get install -y \
+    libssl1.1 \
+    ca-certificates \
+    net-tools \
+    tcpdump \
+    iproute2 \
+    netcat \
+    libpq-dev \
+    curl \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
+
+# The health check port
+EXPOSE 8080
+# The gRPC port
+EXPOSE 50501
+
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 ### EXPERIMENTAL ###
 
@@ -343,9 +376,8 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 
 RUN mkdir -p /opt/aptos/etc
 COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
+COPY --link --from=builder /aptos/dist/aptos-db-tool /usr/local/bin/
 COPY --link --from=builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/
-COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
 
 # Admission control
 EXPOSE 8000

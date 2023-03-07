@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
+    quorum_store,
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
@@ -53,6 +55,9 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::COMMITTED_BLOCKS_COUNT.inc();
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
+
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
 
         for status in txn_status.iter() {
             match status {
@@ -203,7 +208,7 @@ impl BlockStore {
         );
 
         let executed_root_block = ExecutedBlock::new(
-            root_block,
+            *root_block,
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
         );
@@ -563,6 +568,10 @@ impl BlockReader for BlockStore {
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
+    }
+
+    fn back_pressure(&self) -> bool {
+        self.back_pressure()
     }
 }
 

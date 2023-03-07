@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -32,16 +33,22 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
-    let batch = SchemaBatch::new();
+    let ledger_batch = SchemaBatch::new();
+    let state_kv_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
-            &batch,
+            &ledger_batch,
+            &state_kv_batch,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(batch).unwrap();
+    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .state_kv_db
+        .write_schemas(state_kv_batch)
+        .unwrap();
     root
 }
 
@@ -85,7 +92,7 @@ fn test_empty_store() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key = StateKey::Raw(String::from("test_key").into_bytes());
+    let key = StateKey::raw(String::from("test_key").into_bytes());
     assert!(store
         .get_state_value_with_proof_by_version(&key, 0)
         .is_err());
@@ -96,9 +103,9 @@ fn test_state_store_reader_writer() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key1 = StateKey::Raw(String::from("test_key1").into_bytes());
-    let key2 = StateKey::Raw(String::from("test_key2").into_bytes());
-    let key3 = StateKey::Raw(String::from("test_key3").into_bytes());
+    let key1 = StateKey::raw(String::from("test_key1").into_bytes());
+    let key2 = StateKey::raw(String::from("test_key2").into_bytes());
+    let key3 = StateKey::raw(String::from("test_key3").into_bytes());
 
     let value1 = StateValue::from(String::from("test_val1").into_bytes());
     let value1_update = StateValue::from(String::from("test_val1_update").into_bytes());
@@ -164,8 +171,8 @@ fn test_get_values_by_key_prefix() {
     let store = &db.state_store;
     let address = AccountAddress::new([12u8; AccountAddress::LENGTH]);
 
-    let key1 = StateKey::AccessPath(AccessPath::new(address, b"state_key1".to_vec()));
-    let key2 = StateKey::AccessPath(AccessPath::new(address, b"state_key2".to_vec()));
+    let key1 = StateKey::access_path(AccessPath::new(address, b"state_key1".to_vec()));
+    let key2 = StateKey::access_path(AccessPath::new(address, b"state_key2".to_vec()));
 
     let value1_v0 = StateValue::from(String::from("value1_v0").into_bytes());
     let value2_v0 = StateValue::from(String::from("value2_v0").into_bytes());
@@ -187,7 +194,7 @@ fn test_get_values_by_key_prefix() {
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
-    let key4 = StateKey::AccessPath(AccessPath::new(address, b"state_key4".to_vec()));
+    let key4 = StateKey::access_path(AccessPath::new(address, b"state_key4".to_vec()));
 
     let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
     let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
@@ -217,7 +224,7 @@ fn test_get_values_by_key_prefix() {
 
     // Add values for one more account and verify the state
     let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-    let key5 = StateKey::AccessPath(AccessPath::new(address1, b"state_key5".to_vec()));
+    let key5 = StateKey::access_path(AccessPath::new(address1, b"state_key5".to_vec()));
     let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
 
     let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
@@ -247,7 +254,7 @@ pub fn test_get_state_snapshot_before() {
 
     // put in genesis
     let kv = vec![(
-        StateKey::Raw(b"key".to_vec()),
+        StateKey::raw(b"key".to_vec()),
         StateValue::from(b"value".to_vec()),
     )];
     let hash = put_value_set(store, kv.clone(), 0, None);
@@ -424,7 +431,7 @@ proptest! {
         let mut restore =
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
 
-        let dummy_state_key = StateKey::Raw(vec![]);
+        let dummy_state_key = StateKey::raw(vec![]);
         let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
         store2.state_merkle_db.db.write_schemas(batch).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
@@ -483,7 +490,7 @@ proptest! {
                 next_version,
             );
 
-            // Check db-restore calculates usage correctly as well.
+            // Check db restore calculates usage correctly as well.
             let tmp_dir = TempPath::new();
             let db2 = AptosDB::new_for_test(&tmp_dir);
             let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();

@@ -1,7 +1,7 @@
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
-  tag: "0.24.X-distroless-libc"
+  tag: "0.25.X-distroless-libc"
 
 
 # -- Choose any (you can choose multiple) logging sinks supported by vector as found here https://vector.dev/docs/reference/configuration/sinks/

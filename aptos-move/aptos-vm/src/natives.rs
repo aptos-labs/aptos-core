@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::account_config::CORE_CODE_ADDRESS;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
+use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::TimedFeatures};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -24,7 +25,8 @@ static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 pub fn aptos_natives(
     gas_params: NativeGasParameters,
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
-    feature_version: u64,
+    gas_feature_version: u64,
+    timed_features: TimedFeatures,
 ) -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
@@ -32,7 +34,8 @@ pub fn aptos_natives(
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
-            move |val| abs_val_size_gas_params.abstract_value_size(val, feature_version),
+            timed_features,
+            move |val| abs_val_size_gas_params.abstract_value_size(val, gas_feature_version),
         ))
         .chain(move_table_extension::table_natives(
             CORE_CODE_ADDRESS,
@@ -57,7 +60,8 @@ pub fn assert_no_test_natives(err_msg: &str) {
         aptos_natives(
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
-            LATEST_GAS_FEATURE_VERSION
+            LATEST_GAS_FEATURE_VERSION,
+            TimedFeatures::enable_all()
         )
         .into_iter()
         .all(|(_, module_name, func_name, _)| {

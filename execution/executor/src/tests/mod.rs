@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,9 +12,12 @@ use crate::{
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
 };
+use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
-use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
+use aptos_executor_types::{
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
@@ -35,7 +39,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use proptest::prelude::*;
-use std::{collections::BTreeSet, iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
 
@@ -61,7 +65,7 @@ fn execute_and_commit_block(
 struct TestExecutor {
     _path: aptos_temppath::TempPath,
     db: DbReaderWriter,
-    executor: BlockExecutor<MockVM>,
+    executor: BlockExecutor<MockVM, Transaction>,
 }
 
 impl TestExecutor {
@@ -83,7 +87,7 @@ impl TestExecutor {
 }
 
 impl std::ops::Deref for TestExecutor {
-    type Target = BlockExecutor<MockVM>;
+    type Target = BlockExecutor<MockVM, Transaction>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
@@ -446,9 +450,9 @@ fn apply_transaction_by_writeset(
 fn test_deleted_key_from_state_store() {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let dummy_state_key1 = StateKey::Raw(String::from("test_key1").into_bytes());
+    let dummy_state_key1 = StateKey::raw(String::from("test_key1").into_bytes());
     let dummy_value1 = 10u64.to_le_bytes().to_vec();
-    let dummy_state_key2 = StateKey::Raw(String::from("test_key2").into_bytes());
+    let dummy_state_key2 = StateKey::raw(String::from("test_key2").into_bytes());
     let dummy_value2 = 20u64.to_le_bytes().to_vec();
     // Create test transaction, event and transaction output
     let transaction1 = create_test_transaction(0);
@@ -647,7 +651,7 @@ proptest! {
                 Just(num_user_txns),
                 0..num_user_txns - 1 // avoid state checkpoint right after reconfig
             )
-        })) {
+        }).no_shrink()) {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
             let num_txns = block.txns.len() as LeafCount;
@@ -689,11 +693,13 @@ proptest! {
             let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
+            let write_sets = db.get_write_set_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
+            let event_vecs = db.get_events_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
 
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos, vec![], vec![], Arc::new(BTreeSet::new())).unwrap();
+            replayer.executor.replay(block.txns, txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
@@ -726,7 +732,7 @@ proptest! {
 
         // Now we construct a new executor and run one more block.
         {
-            let executor = BlockExecutor::<MockVM>::new(db);
+            let executor = BlockExecutor::<MockVM, Transaction>::new(db);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(

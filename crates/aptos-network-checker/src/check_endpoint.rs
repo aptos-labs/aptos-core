@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::args::CheckEndpointArgs;
 use anyhow::{bail, Context, Result};
 use aptos_config::{
-    config::{RoleType, HANDSHAKE_VERSION},
+    config::{Error, RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
@@ -102,7 +102,12 @@ async fn check_endpoint_with_handshake(
         remote_pubkey,
     )
     .await
-    .with_context(|| format!("Failed to connect to {}", address))?;
+    .map_err(|error| {
+        Error::Unexpected(format!(
+            "Failed to connect to {}. Error: {}",
+            address, error
+        ))
+    })?;
     let msg = format!("Successfully connected to {}", conn.metadata.addr);
 
     // Disconnect.
@@ -116,12 +121,19 @@ async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> 
     let mut socket = resolve_and_connect(address.clone(), TCPBufferCfg::new())
         .await
         .map(TcpSocket::new)
-        .with_context(|| format!("Failed to connect to {}", address))?;
+        .map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to connect to {}. Error: {}",
+                address, error
+            ))
+        })?;
 
     socket
         .write_all(INVALID_NOISE_HEADER)
         .await
-        .with_context(|| format!("Failed to write to {}", address))?;
+        .map_err(|error| {
+            Error::Unexpected(format!("Failed to write to {}. Error: {}", address, error))
+        })?;
 
     let buf = &mut [0; 1];
     match socket.read(buf).await {
@@ -166,7 +178,7 @@ fn build_upgrade_context(
             network_context,
             private_key,
             // If we had an incoming message, auth mode would matter.
-            HandshakeAuthMode::server_only(),
+            HandshakeAuthMode::server_only(&[network_id]),
         ),
         HANDSHAKE_VERSION,
         supported_protocols,

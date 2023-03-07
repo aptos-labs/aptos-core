@@ -4,7 +4,7 @@
 /.github/ @aptos-labs/prod-eng
 
 # Owners for the `/api` directory and all its subdirectories.
-/api/ @banool @gregnazario
+/api/ @banool @gregnazario @0xmaayan
 
 # Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`.
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
@@ -21,14 +21,15 @@
 /aptos-move/framework/aptos-token @areshand
 /aptos-move/framework/src/natives/cryptography/ @alinush
 /aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
-/aptos-move/block-executor/ @gelash @zekun000 @sasha8
+/aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
+/aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
 /aptos-move/vm-genesis/ @davidiw @movekevin
 
 # Owner for aptos node (just to prevent things from becoming out of hand, again :D)
 /aptos-node/ @joshlind
 
 # Owner for logger config
-/config/src/config/logger_config.rs @markuze
+/config/src/config/logger_config.rs @joshlind @gregnazario
 
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
@@ -49,7 +50,7 @@
 /crates/aptos-genesis @gregnazario
 
 # Owners for the aptos-logger crate
-/crates/aptos-logger @markuze
+/crates/aptos-logger @gregnazario @joshlind
 
 /crates/aptos-open-api @banool @gregnazario
 /crates/aptos-rest-client @banool @gregnazario
@@ -57,6 +58,9 @@
 # Owners for the `/aptos-rosetta` directory and related crates.
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
+
+# Owners for the aptos-speculative-state-helper crate
+/crates/aptos-speculative-state-helper @gelash
 
 # Owners for the `telemetry` related crates.
 /crates/aptos-telemetry @ibalajiarun @geekflyer
@@ -66,17 +70,20 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @clay-aptos
+/developer-docs-site/ @davidiw @clay-aptos @gregnazario @christian-aptos
+
+# Auto-reviewers for all Markdown changes including READMEs
+*.md @clay-aptos @christian-aptos
 
 # Owner for docs tutorials for the token_standard and related tutorials.
-/developer-docs-site/docs/tutorials @areshand
+/developer-docs-site/docs/tutorials @areshand @gregnazario
 
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
 
 # Owners for the `SDKs`.
-/ecosystem/python/sdk @davidiw @gregnazario @banool
-/ecosystem/typescript/sdk @jjleng @gregnazario @banool
+/ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan
+/ecosystem/typescript/sdk @jjleng @gregnazario @banool @0xmaayan
 
 # Owners for execution and storage.
 /execution/ @msmouse @lightmark
@@ -85,7 +92,7 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @markuze @joshlind
+/network/ @gregnazario @joshlind
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind

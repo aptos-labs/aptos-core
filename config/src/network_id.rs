@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::config::{PeerRole, RoleType};
 use aptos_short_hex_str::AsShortHexStr;
@@ -155,6 +156,10 @@ impl fmt::Display for NetworkId {
 const VFN_NETWORK: &str = "vfn";
 
 impl NetworkId {
+    pub fn is_public_network(&self) -> bool {
+        self == &NetworkId::Public
+    }
+
     pub fn is_vfn_network(&self) -> bool {
         self == &NetworkId::Vfn
     }

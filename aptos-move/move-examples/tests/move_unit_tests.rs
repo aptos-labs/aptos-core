@@ -1,8 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::account_address::{create_resource_address, AccountAddress};
+use aptos_types::{
+    account_address::{create_resource_address, AccountAddress},
+    on_chain_config::TimedFeatures,
+};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
@@ -51,6 +54,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        TimedFeatures::enable_all(),
     )
 }
 
@@ -137,6 +141,11 @@ fn test_shared_account() {
 }
 
 #[test]
+fn test_token_objects() {
+    test_common("token_objects");
+}
+
+#[test]
 fn test_two_by_two_transfer() {
     run_tests_for_pkg("scripts/two_by_two_transfer", BTreeMap::new());
 }
@@ -152,4 +161,13 @@ fn test_post_mint_reveal_nft() {
         (String::from("source_addr"), addr),
     ]);
     run_tests_for_pkg("post_mint_reveal_nft", named_address);
+}
+
+#[test]
+fn test_nft_dao_test() {
+    let named_address = BTreeMap::from([(
+        String::from("dao_platform"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("dao/nft_dao", named_address);
 }

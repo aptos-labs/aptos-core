@@ -1,14 +1,20 @@
 ---
-title: "Aptos Wallet Adapter"
+title: "Integrate with Aptos Wallets"
 id: "wallet-adapter-concept"
 ---
 
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Implement Aptos Wallet Adapter
+# Integrate with Aptos wallets
 
-Building a dapp requires you provide a wallet for the user to interact with the Aptos chain. And for the best user experience, we suggest you offer multiple wallets so users can chose the one they want.
+Decentralized applications often run through a browser extension or mobile application to read onchain data and submit
+transactions.  The Aptos Wallet Adapter allows for a single interface for apps and wallets to integrate together.
+
+## Implementing the Aptos Wallet Adapter
+
+For the best user experience, we suggest that dapps offer multiple wallets, to allow users to choose their preferred
+wallet.
 
 Implementing wallet integration can be difficult for dapps in:
 
@@ -26,7 +32,7 @@ In addition, creating and implementing a wallet is also not an easy task,
 When we started building a wallet adapter, we wanted to provide an adapter that can be easy enough for wallets to integrate with and for dapps to use and implement.
 
 For that, we provide an [Aptos Wallet Adapter](https://github.com/aptos-labs/aptos-wallet-adapter) monorepo for wallet and dapps creators to ease development and ensure a smooth process in building projects on the Aptos network.
-The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
+The Aptos Wallet Adapter acts as a service between dapps and wallets and exposes APIs for dapps to interact with the wallets by following our [Wallet Standard](../guides/wallet-standard.md). This in turns allows dapps to support many wallets with minimal integration efforts, and for wallets to follow a known standard and gain visibility.
 
 ## Adapter structure
 

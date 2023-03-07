@@ -1,27 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::TransactionExecutor;
 use crate::{
-    emitter::{account_minter::create_and_fund_account_request, RETRY_POLICY},
+    emitter::account_minter::create_and_fund_account_request,
     transaction_generator::{TransactionGenerator, TransactionGeneratorCreator},
 };
-use aptos_infallible::Mutex;
-use aptos_logger::{info, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
     types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, thread_rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
+use std::collections::HashMap;
 
 const INITIAL_NFT_BALANCE: u64 = 50_000;
 
 pub struct NFTMintAndTransfer {
     txn_factory: TransactionFactory,
     creator_address: AccountAddress,
-    faucet_account: LocalAccount,
+    distribution_account: LocalAccount,
     collection_name: Vec<u8>,
     token_name: Vec<u8>,
     account_funded: HashMap<AccountAddress, bool>,
@@ -30,27 +29,14 @@ pub struct NFTMintAndTransfer {
 impl NFTMintAndTransfer {
     pub async fn new(
         txn_factory: TransactionFactory,
-        creator_account: Arc<Mutex<LocalAccount>>,
+        creator_address: AccountAddress,
+        distribution_account: LocalAccount,
         collection_name: Vec<u8>,
         token_name: Vec<u8>,
-        rest_client: &RestClient,
     ) -> Self {
-        let creator_address = creator_account.lock().address();
-        let faucet_account = LocalAccount::generate(&mut thread_rng());
-        let fund_faucet_account_txn = create_nft_transfer_request(
-            &mut creator_account.lock(),
-            &faucet_account,
-            creator_address,
-            &collection_name,
-            &token_name,
-            &txn_factory,
-            1_000_000_000,
-        );
-        submit_retry_and_wait(rest_client, &fund_faucet_account_txn).await;
-
         Self {
             txn_factory,
-            faucet_account,
+            distribution_account,
             creator_address,
             collection_name,
             token_name,
@@ -77,7 +63,7 @@ impl TransactionGenerator for NFTMintAndTransfer {
                     if account_funded {
                         create_nft_transfer_request(
                             account,
-                            &self.faucet_account,
+                            &self.distribution_account,
                             self.creator_address,
                             &self.collection_name,
                             &self.token_name,
@@ -90,7 +76,7 @@ impl TransactionGenerator for NFTMintAndTransfer {
                         )
                     } else {
                         create_nft_transfer_request(
-                            &mut self.faucet_account,
+                            &mut self.distribution_account,
                             account,
                             self.creator_address,
                             &self.collection_name,
@@ -112,55 +98,14 @@ impl TransactionGenerator for NFTMintAndTransfer {
     }
 }
 
-async fn submit_retry_and_wait(rest_client: &RestClient, txn: &SignedTransaction) {
-    let submit_result = RETRY_POLICY
-        .retry(move || rest_client.submit_bcs(txn))
-        .await;
-    if let Err(e) = submit_result {
-        warn!("Failed submitting transaction {:?} with {:?}", txn, e);
-    }
-    // if submission timeouts, it might still get committed:
-    RETRY_POLICY
-        .retry(move || {
-            rest_client.wait_for_transaction_by_hash_bcs(
-                txn.clone().committed_hash(),
-                txn.expiration_timestamp_secs(),
-                Some(Duration::from_secs(120)),
-                None,
-            )
-        })
-        .await
-        .unwrap();
-}
-
 pub async fn initialize_nft_collection(
-    rest_client: &RestClient,
+    txn_executor: &dyn TransactionExecutor,
     root_account: &mut LocalAccount,
     creator_account: &mut LocalAccount,
     txn_factory: &TransactionFactory,
     collection_name: &[u8],
     token_name: &[u8],
 ) {
-    // resync root account sequence number
-    match rest_client.get_account(root_account.address()).await {
-        Ok(result) => {
-            let account = result.into_inner();
-            if root_account.sequence_number() < account.sequence_number {
-                warn!(
-                    "Root account sequence number got out of sync: remotely {}, locally {}",
-                    account.sequence_number,
-                    root_account.sequence_number_mut()
-                );
-                *root_account.sequence_number_mut() = account.sequence_number;
-            }
-        },
-        Err(e) => warn!(
-            "[{}] Couldn't check account sequence number due to {:?}",
-            rest_client.path_prefix_string(),
-            e
-        ),
-    }
-
     // Create and mint the owner account first
     let create_account_txn = create_and_fund_account_request(
         root_account,
@@ -169,23 +114,28 @@ pub async fn initialize_nft_collection(
         txn_factory,
     );
 
-    submit_retry_and_wait(rest_client, &create_account_txn).await;
-
-    info!("create_account_txn complete");
+    txn_executor
+        .execute_transactions(&[create_account_txn])
+        .await
+        .unwrap();
 
     let collection_txn =
         create_nft_collection_request(creator_account, collection_name, txn_factory);
 
-    submit_retry_and_wait(rest_client, &collection_txn).await;
-
-    info!("collection_txn complete");
+    txn_executor
+        .execute_transactions(&[collection_txn])
+        .await
+        .unwrap();
 
     let token_txn =
         create_nft_token_request(creator_account, collection_name, token_name, txn_factory);
 
-    submit_retry_and_wait(rest_client, &token_txn).await;
+    txn_executor
+        .execute_transactions(&[token_txn])
+        .await
+        .unwrap();
 
-    info!("token_txn complete");
+    info!("initialize_nft_collection complete");
 }
 
 pub fn create_nft_collection_request(
@@ -252,51 +202,79 @@ pub fn create_nft_transfer_request(
 
 pub struct NFTMintAndTransferGeneratorCreator {
     txn_factory: TransactionFactory,
-    creator_account: Arc<Mutex<LocalAccount>>,
+    creator_address: AccountAddress,
+    distribution_accounts: Vec<LocalAccount>,
     collection_name: Vec<u8>,
     token_name: Vec<u8>,
-    rest_client: RestClient,
 }
 
 impl NFTMintAndTransferGeneratorCreator {
     pub async fn new(
-        mut rng: StdRng,
         txn_factory: TransactionFactory,
+        init_txn_factory: TransactionFactory,
         root_account: &mut LocalAccount,
-        rest_client: RestClient,
+        txn_executor: &dyn TransactionExecutor,
+        num_workers: usize,
     ) -> Self {
+        let mut rng = StdRng::from_entropy();
         let mut creator_account = LocalAccount::generate(&mut rng);
+        let creator_address = creator_account.address();
         let collection_name = "collection name".to_owned().into_bytes();
         let token_name = "token name".to_owned().into_bytes();
         initialize_nft_collection(
-            &rest_client,
+            txn_executor,
             root_account,
             &mut creator_account,
-            &txn_factory,
+            &init_txn_factory,
             &collection_name,
             &token_name,
         )
         .await;
+
+        let mut distribution_accounts = Vec::new();
+        let mut txns = Vec::new();
+
+        for _ in 0..num_workers {
+            let distribution_account = LocalAccount::generate(&mut thread_rng());
+            txns.push(create_nft_transfer_request(
+                &mut creator_account,
+                &distribution_account,
+                creator_address,
+                &collection_name,
+                &token_name,
+                &init_txn_factory,
+                1_000_000_000,
+            ));
+            distribution_accounts.push(distribution_account);
+        }
+
+        info!("Creating {} NFTs", txns.len());
+        // per account limit is 100
+        for chunk in txns.chunks(100) {
+            txn_executor.execute_transactions(chunk).await.unwrap();
+        }
+        info!("Done creating {} NFTs", txns.len());
+
         Self {
             txn_factory,
-            creator_account: Arc::new(Mutex::new(creator_account)),
+            creator_address,
+            distribution_accounts,
             collection_name,
             token_name,
-            rest_client,
         }
     }
 }
 
 #[async_trait]
 impl TransactionGeneratorCreator for NFTMintAndTransferGeneratorCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(
             NFTMintAndTransfer::new(
                 self.txn_factory.clone(),
-                self.creator_account.clone(),
+                self.creator_address,
+                self.distribution_accounts.pop().unwrap(),
                 self.collection_name.clone(),
                 self.token_name.clone(),
-                &self.rest_client,
             )
             .await,
         )

@@ -168,7 +168,6 @@ spec:
             drop:
             - ALL
             add:
-            - SYS_RESOURCE
             - SETUID
       {{- with .nodeSelector }}
       nodeSelector:

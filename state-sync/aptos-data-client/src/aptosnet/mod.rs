@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -20,10 +20,7 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_network::{
-    application::interface::NetworkClient,
-    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
-};
+use aptos_network::{application::interface::NetworkClient, protocols::rpc::error::RpcError};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
@@ -112,7 +109,7 @@ impl AptosNetDataClient {
             peer_states: Arc::new(RwLock::new(PeerStates::new(
                 base_config,
                 storage_service_config,
-                storage_service_client.get_peer_metadata_storage(),
+                storage_service_client.get_peers_and_metadata(),
             ))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
@@ -251,25 +248,13 @@ impl AptosNetDataClient {
 
     /// Returns all peers connected to us
     fn get_all_connected_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
-        let network_peer_metadata = self.storage_service_client.get_peer_metadata_storage();
-        let connected_peers = network_peer_metadata
-            .networks()
-            .flat_map(|network_id| {
-                network_peer_metadata
-                    .read_filtered(network_id, |(_, peer_metadata)| {
-                        peer_metadata.is_connected()
-                            && peer_metadata.supports_protocol(ProtocolId::StorageServiceRpc)
-                    })
-                    .into_keys()
-            })
-            .collect::<Vec<_>>();
-
-        // Ensure connected peers is not empty
+        let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
             return Err(Error::DataIsUnavailable(
                 "No connected AptosNet peers!".to_owned(),
             ));
         }
+
         Ok(connected_peers)
     }
 

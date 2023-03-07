@@ -1,18 +1,21 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{state_store::state_storage_usage::StateStorageUsage, vm_status::StatusCode};
+use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
+use aptos_types::{
+    on_chain_config::TimedFeatures, state_store::state_storage_usage::StateStorageUsage,
+    vm_status::StatusCode,
+};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
     values::{Struct, Value},
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /// Ability to reveal the state storage utilization info.
 pub trait StateStorageUsageResolver {
@@ -48,12 +51,14 @@ pub struct GetUsageGasParameters {
 /// guarantees a fresh state view then.
 fn native_get_usage(
     gas_params: &GetUsageGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert!(_ty_args.is_empty());
     assert!(_args.is_empty());
+
+    context.charge(gas_params.base_cost)?;
 
     let ctx = context.extensions().get::<NativeStateStorageContext>();
     let usage = ctx.resolver.get_state_storage_usage().map_err(|err| {
@@ -61,16 +66,10 @@ fn native_get_usage(
             .with_message(format!("Failed to get state storage usage: {}", err))
     })?;
 
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![
-        Value::struct_(Struct::pack(vec![
-            Value::u64(usage.items() as u64),
-            Value::u64(usage.bytes() as u64),
-        ]))
-    ]))
-}
-
-pub fn make_native_get_usage(gas_params: GetUsageGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_get_usage(&gas_params, context, ty_args, args))
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::u64(usage.items() as u64),
+        Value::u64(usage.bytes() as u64),
+    ]))])
 }
 
 /***************************************************************************************************
@@ -82,10 +81,13 @@ pub struct GasParameters {
     pub get_usage: GetUsageGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "get_state_storage_usage_only_at_epoch_beginning",
-        make_native_get_usage(gas_params.get_usage),
+        make_safe_native(gas_params.get_usage, timed_features, native_get_usage),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

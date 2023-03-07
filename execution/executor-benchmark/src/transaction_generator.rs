@@ -1,7 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_generator::{AccountCache, AccountGenerator};
+use crate::{
+    account_generator::{AccountCache, AccountGenerator},
+    benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
+};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -84,7 +88,7 @@ pub struct TransactionGenerator {
 
     /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
     /// sure if execution is slow to consume the transactions, we do not run out of memory.
-    block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
+    block_sender: Option<mpsc::SyncSender<Vec<BenchmarkTransaction>>>,
 
     /// Transaction Factory
     transaction_factory: TransactionFactory,
@@ -94,18 +98,6 @@ pub struct TransactionGenerator {
 }
 
 impl TransactionGenerator {
-    pub fn new(genesis_key: Ed25519PrivateKey) -> Self {
-        Self {
-            seed_accounts_cache: None,
-            root_account: LocalAccount::new(aptos_test_root_address(), genesis_key, 0),
-            accounts_cache: None,
-            num_existing_accounts: 0,
-            version: 0,
-            block_sender: None,
-            transaction_factory: Self::create_transaction_factory(),
-        }
-    }
-
     fn gen_account_cache(
         generator: AccountGenerator,
         num_accounts: usize,
@@ -149,7 +141,7 @@ impl TransactionGenerator {
     pub fn new_with_existing_db<P: AsRef<Path>>(
         db: DbReaderWriter,
         genesis_key: Ed25519PrivateKey,
-        block_sender: mpsc::SyncSender<Vec<Transaction>>,
+        block_sender: mpsc::SyncSender<Vec<BenchmarkTransaction>>,
         db_dir: P,
         version: Version,
     ) -> Self {
@@ -218,13 +210,13 @@ impl TransactionGenerator {
         block_size: usize,
     ) {
         assert!(self.block_sender.is_some());
-        // Ensure that seed accounts have enough balance to transfer money to at least 1000 account with
+        // Ensure that seed accounts have enough balance to transfer money to at least 10000 account with
         // balance init_account_balance.
         self.create_seed_accounts(
             reader,
             num_new_accounts,
             block_size,
-            init_account_balance * 1_000_000_000,
+            init_account_balance * 10_000,
         );
         self.create_and_fund_accounts(
             num_existing_accounts,
@@ -234,9 +226,14 @@ impl TransactionGenerator {
         );
     }
 
-    pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
+    pub fn run_transfer(
+        &mut self,
+        block_size: usize,
+        num_transfer_blocks: usize,
+        transactions_per_sender: usize,
+    ) {
         assert!(self.block_sender.is_some());
-        self.gen_transfer_transactions(block_size, num_transfer_blocks);
+        self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
     }
 
     pub fn create_seed_accounts(
@@ -245,18 +242,17 @@ impl TransactionGenerator {
         num_new_accounts: usize,
         block_size: usize,
         seed_account_balance: u64,
-    ) -> Vec<Vec<Transaction>> {
-        let mut txn_block = Vec::new();
-
+    ) {
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
         // and re-mint seed accounts here.
         let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache = Self::gen_seed_account_cache(reader, num_seed_accounts);
 
         println!(
-            "[{}] Generating {} seed account creation txns.",
+            "[{}] Generating {} seed account creation txns, with {} coins.",
             now_fmt!(),
             num_seed_accounts,
+            seed_account_balance,
         );
         let bar = get_progress_bar(num_seed_accounts);
 
@@ -264,37 +260,40 @@ impl TransactionGenerator {
             .accounts
             .iter()
             .collect::<Vec<_>>()
-            .chunks(block_size / 2)
+            .chunks(block_size)
         {
             let transactions: Vec<_> = chunk
                 .iter()
-                .flat_map(|account| {
-                    let create = self.root_account.sign_with_transaction_builder(
+                .map(|new_account| {
+                    let txn = self.root_account.sign_with_transaction_builder(
                         self.transaction_factory
-                            .create_user_account(account.public_key()),
+                            .implicitly_create_user_account_and_transfer(
+                                new_account.public_key(),
+                                seed_account_balance,
+                            ),
                     );
-                    let mint = self.root_account.sign_with_transaction_builder(
-                        self.transaction_factory
-                            .mint(account.address(), seed_account_balance),
-                    );
-                    vec![create, mint]
+                    BenchmarkTransaction::new(
+                        Transaction::UserTransaction(txn),
+                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
+                            self.root_account.address(),
+                            new_account.address(),
+                            seed_account_balance,
+                        )),
+                    )
                 })
-                .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .chain(once(
+                    Transaction::StateCheckpoint(HashValue::random()).into(),
+                ))
                 .collect();
             self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
-            } else {
-                txn_block.push(transactions);
             }
         }
         bar.finish();
         println!("[{}] done.", now_fmt!());
         self.seed_accounts_cache = Some(seed_accounts_cache);
-
-        txn_block
     }
 
     /// Generates transactions that creates a set of accounts and fund them from the seed accounts.
@@ -304,9 +303,7 @@ impl TransactionGenerator {
         num_new_accounts: usize,
         init_account_balance: u64,
         block_size: usize,
-    ) -> Vec<Vec<Transaction>> {
-        let mut txn_block = vec![];
-
+    ) {
         println!(
             "[{}] Generating {} account creation txns.",
             now_fmt!(),
@@ -320,33 +317,36 @@ impl TransactionGenerator {
         for chunk in &(0..num_new_accounts).chunks(block_size) {
             let transactions: Vec<_> = chunk
                 .map(|_| {
-                    self.seed_accounts_cache
-                        .as_mut()
-                        .unwrap()
-                        .get_random()
-                        .sign_with_transaction_builder(
-                            self.transaction_factory
-                                .implicitly_create_user_account_and_transfer(
-                                    generator.generate().public_key(),
-                                    init_account_balance,
-                                ),
-                        )
+                    let sender = self.seed_accounts_cache.as_mut().unwrap().get_random();
+                    let new_account = generator.generate();
+                    let txn = sender.sign_with_transaction_builder(
+                        self.transaction_factory
+                            .implicitly_create_user_account_and_transfer(
+                                new_account.public_key(),
+                                init_account_balance,
+                            ),
+                    );
+                    BenchmarkTransaction::new(
+                        Transaction::UserTransaction(txn),
+                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
+                            sender.address(),
+                            new_account.address(),
+                            init_account_balance,
+                        )),
+                    )
                 })
-                .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .chain(once(
+                    Transaction::StateCheckpoint(HashValue::random()).into(),
+                ))
                 .collect();
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
-            } else {
-                txn_block.push(transactions);
             }
             bar.inc(block_size as u64);
         }
         bar.finish();
         println!("[{}] done.", now_fmt!());
-
-        txn_block
     }
 
     /// Generates transactions for random pairs of accounts.
@@ -354,31 +354,46 @@ impl TransactionGenerator {
         &mut self,
         block_size: usize,
         num_blocks: usize,
-    ) -> Vec<Vec<Transaction>> {
-        let mut txn_block = vec![];
-
+        transactions_per_sender: usize,
+    ) {
         for _ in 0..num_blocks {
-            let transactions: Vec<_> = (0..block_size)
+            // TODO: handle when block_size isn't divisible by transactions_per_sender
+            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
                 .into_iter()
-                .map(|_| {
-                    let (sender, receiver) =
-                        self.accounts_cache.as_mut().unwrap().get_random_transfer();
-                    sender.sign_with_transaction_builder(
-                        self.transaction_factory.transfer(receiver, 1),
-                    )
+                .flat_map(|_| {
+                    let (sender, receivers) = self
+                        .accounts_cache
+                        .as_mut()
+                        .unwrap()
+                        .get_random_transfer_batch(transactions_per_sender);
+                    receivers
+                        .into_iter()
+                        .map(|receiver| {
+                            let amount = 1;
+                            let txn = sender.sign_with_transaction_builder(
+                                self.transaction_factory.transfer(receiver, amount),
+                            );
+                            BenchmarkTransaction::new(
+                                Transaction::UserTransaction(txn),
+                                ExtraInfo::TransferInfo(TransferInfo::new(
+                                    sender.address(),
+                                    receiver,
+                                    amount,
+                                )),
+                            )
+                        })
+                        .collect::<Vec<_>>()
                 })
-                .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .chain(once(
+                    Transaction::StateCheckpoint(HashValue::random()).into(),
+                ))
                 .collect();
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
-            } else {
-                txn_block.push(transactions);
             }
         }
-        txn_block
     }
 
     /// Verifies the sequence numbers in storage match what we have locally.

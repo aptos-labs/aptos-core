@@ -24,6 +24,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
+dashmap = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }

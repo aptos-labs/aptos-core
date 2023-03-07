@@ -39,10 +39,9 @@ spec:
         imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
         resources:
           {{- toYaml .Values.backup.resources | nindent 10 }}
-        command: ["/usr/local/bin/db-backup"]
+        command: ["/usr/local/bin/aptos-db-tool"]
         args:
-        - "coordinator"
-        - "run"
+        - "continuously"
         - "--metadata-cache-dir"
         - "/tmp/aptos-backup-metadata"
         - "--backup-service-address"
@@ -52,8 +51,7 @@ spec:
         - "{{ int .config.state_snapshot_interval_epochs }}"
         - "--transaction-batch-size"
         - "{{ int .config.transaction_batch_size }}"
-        - "command-adapter"
-        - "--config"
+        - "--command-adapter-config"
         - "/opt/aptos/etc/{{ .config.location }}.yaml"
         env:
         - name: RUST_LOG

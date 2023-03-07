@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
@@ -6,7 +7,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{state_store::state_value::StateValue, write_set::TransactionWrite};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -51,6 +52,10 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
             Some(bytes)
         }
     }
+
+    fn as_state_value(&self) -> Option<StateValue> {
+        unimplemented!()
+    }
 }
 
 enum Data<V> {
@@ -87,6 +92,7 @@ where
             None => ExpectedOutput::NotInMap,
             Some(mut iter) => {
                 let mut acc: Option<DeltaOp> = None;
+                let mut failure = false;
                 while let Some((_, data)) = iter.next_back() {
                     match data {
                         Data::Write(v) => match acc {
@@ -99,30 +105,47 @@ where
                                     return ExpectedOutput::Deleted;
                                 }
 
+                                assert!(!failure); // acc should be none.
+
                                 match d.apply_to(maybe_value.unwrap()) {
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),
                                 }
                             },
                             None => match v {
-                                Value(Some(w)) => return ExpectedOutput::Value(w.clone()),
+                                Value(Some(w)) => {
+                                    return if failure {
+                                        ExpectedOutput::Failure
+                                    } else {
+                                        ExpectedOutput::Value(w.clone())
+                                    };
+                                },
                                 Value(None) => return ExpectedOutput::Deleted,
                             },
                         },
                         Data::Delta(d) => match acc.as_mut() {
                             Some(a) => {
                                 if a.merge_onto(*d).is_err() {
-                                    return ExpectedOutput::Failure;
+                                    failure = true;
                                 }
                             },
                             None => acc = Some(*d),
                         },
                     }
+
+                    if failure {
+                        // for overriding the delta failure if entry is deleted.
+                        acc = None;
+                    }
                 }
 
-                match acc {
-                    Some(d) => ExpectedOutput::Unresolved(d),
-                    None => ExpectedOutput::NotInMap,
+                if failure {
+                    ExpectedOutput::Failure
+                } else {
+                    match acc {
+                        Some(d) => ExpectedOutput::Unresolved(d),
+                        None => ExpectedOutput::NotInMap,
+                    }
                 }
             },
         }

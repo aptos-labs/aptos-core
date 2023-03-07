@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects of the Rosetta spec
@@ -29,7 +29,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::StateKey,
+    state_store::state_key::{StateKey, StateKeyInner},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };
@@ -831,8 +831,8 @@ async fn parse_operations_from_write_set(
     operation_index: u64,
     changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
-    let (struct_tag, address) = match state_key {
-        StateKey::AccessPath(path) => {
+    let (struct_tag, address) = match state_key.inner() {
+        StateKeyInner::AccessPath(path) => {
             if let Some(struct_tag) = path.get_struct_tag() {
                 (struct_tag, path.address)
             } else {
@@ -845,10 +845,9 @@ async fn parse_operations_from_write_set(
         },
     };
 
-    let data = match write_op {
-        WriteOp::Creation(inner) => inner,
-        WriteOp::Modification(inner) => inner,
-        WriteOp::Deletion => return Ok(vec![]),
+    let data = match write_op.bytes() {
+        Some(bytes) => bytes,
+        None => return Ok(vec![]),
     };
 
     // Determine operation
@@ -1158,14 +1157,10 @@ async fn parse_staking_contract_resource_changes(
         let stake_pools: BTreeMap<AccountAddress, StakePool> = changes
             .iter()
             .filter_map(|(state_key, write_op)| {
-                let data = match write_op {
-                    WriteOp::Creation(data) => Some(data),
-                    WriteOp::Modification(data) => Some(data),
-                    WriteOp::Deletion => None,
-                };
+                let data = write_op.bytes();
 
                 let mut ret = None;
-                if let (StateKey::AccessPath(path), Some(data)) = (state_key, data) {
+                if let (StateKeyInner::AccessPath(path), Some(data)) = (state_key.inner(), data) {
                     if let Some(struct_tag) = path.get_struct_tag() {
                         if let (AccountAddress::ONE, STAKE_MODULE, STAKE_POOL_RESOURCE) = (
                             struct_tag.address,

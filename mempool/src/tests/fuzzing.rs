@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
@@ -44,7 +45,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         vec![MempoolDirectSend],
         vec![],
         HashMap::new(),
-        PeerMetadataStorage::new(&[NetworkId::Validator]),
+        PeersAndMetadata::new(&[NetworkId::Validator]),
     );
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
         Arc::new(Mutex::new(CoreMempool::new(&config))),

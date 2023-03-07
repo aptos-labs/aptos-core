@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -28,7 +29,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
     collections::{BTreeSet, HashMap},
-    sync::Arc,
+    fmt::Debug,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 mod error;
@@ -55,7 +60,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
@@ -73,7 +78,7 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait: Send + Sync {
+pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
@@ -83,7 +88,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error>;
 
@@ -119,14 +124,86 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn finish(&self);
 }
 
+#[derive(Clone)]
+pub enum VerifyExecutionMode {
+    NoVerify,
+    Verify {
+        txns_to_skip: Arc<BTreeSet<Version>>,
+        lazy_quit: bool,
+        seen_error: Arc<AtomicBool>,
+    },
+}
+
+impl VerifyExecutionMode {
+    pub fn verify_all() -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(BTreeSet::new()),
+            lazy_quit: false,
+            seen_error: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn verify_except(txns_to_skip: Vec<Version>) -> Self {
+        Self::Verify {
+            txns_to_skip: Arc::new(txns_to_skip.into_iter().collect()),
+            lazy_quit: false,
+            seen_error: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn txns_to_skip(&self) -> Arc<BTreeSet<Version>> {
+        match self {
+            VerifyExecutionMode::NoVerify => Arc::new(BTreeSet::new()),
+            VerifyExecutionMode::Verify { txns_to_skip, .. } => txns_to_skip.clone(),
+        }
+    }
+
+    pub fn set_lazy_quit(mut self, is_lazy_quit: bool) -> Self {
+        if let Self::Verify {
+            ref mut lazy_quit, ..
+        } = self
+        {
+            *lazy_quit = is_lazy_quit
+        }
+        self
+    }
+
+    pub fn is_lazy_quit(&self) -> bool {
+        match self {
+            VerifyExecutionMode::NoVerify => false,
+            VerifyExecutionMode::Verify { lazy_quit, .. } => *lazy_quit,
+        }
+    }
+
+    pub fn mark_seen_error(&self) {
+        match self {
+            VerifyExecutionMode::NoVerify => unreachable!("Should not call in no-verify mode."),
+            VerifyExecutionMode::Verify { seen_error, .. } => {
+                seen_error.store(true, Ordering::Relaxed)
+            },
+        }
+    }
+
+    pub fn should_verify(&self) -> bool {
+        !matches!(self, Self::NoVerify)
+    }
+
+    pub fn seen_error(&self) -> bool {
+        match self {
+            VerifyExecutionMode::NoVerify => false,
+            VerifyExecutionMode::Verify { seen_error, .. } => seen_error.load(Ordering::Relaxed),
+        }
+    }
+}
+
 pub trait TransactionReplayer: Send {
     fn replay(
         &self,
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
-        writesets: Vec<WriteSet>,
-        events: Vec<Vec<ContractEvent>>,
-        txns_to_skip: Arc<BTreeSet<Version>>,
+        write_sets: Vec<WriteSet>,
+        event_vecs: Vec<Vec<ContractEvent>>,
+        verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;

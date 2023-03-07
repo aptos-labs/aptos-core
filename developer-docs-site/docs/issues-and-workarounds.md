@@ -1,9 +1,9 @@
 ---
-title: "Issues and Workarounds"
+title: "Troubleshooting Issues and Workarounds"
 slug: "issues-and-workarounds"
 ---
 
-# Issues and Workarounds
+# Troubleshooting Issues and Workarounds
 
 This page provides workarounds and answers for issues and questions that frequently come up. 
 
@@ -70,13 +70,13 @@ which produces an output like below (example output for mainnet):
 
 **Find it in your stake pool information output**
 
-You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](/nodes/validator-node/operator/staking-pool-operations/#checking-your-stake-pool-information).
+You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](nodes/validator-node/operator/staking-pool-operations.md#checking-your-stake-pool-information).
 
 Finally, you can use Aptos Explorer and an online epoch converter to find out when the next epoch starts. See below:
 
 **You can use the Aptos Explorer and epoch converter**
 
-1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+1. Go to the [account `0x1` page on the Aptos Explorer](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
 2. Switch to **RESOURCES** tab.
 3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
   ```json
@@ -121,7 +121,7 @@ Follow these steps on the Aptos Explorer:
 
 ### How to find stake pool address
 
-To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
+To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
 
 ```bash
 aptos node get-stake-pool \
@@ -133,7 +133,7 @@ aptos node get-stake-pool \
 
 Follow these steps on the Aptos Explorer:
 
-1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
+1. Go to the account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
 1.  Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
 2. Switch to **RESOURCES** tab.
 3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `StakePool`. The address with the `StakePool` resource is the correct stake pool address.
@@ -183,7 +183,7 @@ If your node cannot state sync, and the logs are showing "NoAvailablePeers", it'
 
 #### Workaround
 
-You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
+You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](nodes/full-node/fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers).
 
 ### Starting a node throws a YAML-parsing error
 
@@ -210,7 +210,7 @@ The devnet validator fullnodes will accept only a maximum of connections. If Apt
 You can workaround this by:
 
 1. Checking your network configuration.
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](nodes/full-node/fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 
@@ -228,21 +228,6 @@ full_node_networks:
             - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
             role: "Upstream"
 ```
-
-### Node liveness issues
-
-#### Workaround
-
-If your validator node is facing persistent issues, for example, it is unable to propose or fails to synchronize, open an [aptos-ait2](https://github.com/aptos-labs/aptos-ait2/issues) GitHub issue and provide the following:
-- Your node setup, i.e., if you're running it from source, Docker or Terraform. Include the source code version, i.e., the image tag or branch).
-- A description of the issues you are facing and how long they have been occurring.
-- **Important**: The logs for your node (going as far back as possible). Without the detailed logs, the Aptos team will likely be unable to debug the issue.
-- We may also ask you to enable the debug logs for the node. You can do this by updating your node configuration file (e.g., `validator.yaml`) by adding:
-```yaml
- logger:
-   level: DEBUG
-```
-- Make sure to also include any other information you think might be useful and whether or not restarting your validator helps.
 
 
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api

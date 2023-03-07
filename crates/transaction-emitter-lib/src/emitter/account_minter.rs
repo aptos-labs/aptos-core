@@ -1,16 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{wait_for_single_account_sequence, RETRY_POLICY, SEND_AMOUNT},
-    query_sequence_number, EmitJobRequest, EmitModeParams,
+    emitter::MAX_RETRIES,
+    transaction_generator::{TransactionExecutor, SEND_AMOUNT},
+    EmitJobRequest, EmitModeParams,
 };
 use anyhow::{anyhow, format_err, Context, Result};
 use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_infallible::Mutex;
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::{aptos_api_types::AptosError, Client as RestClient};
+use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -26,14 +25,8 @@ use core::{
     result::Result::{Err, Ok},
 };
 use futures::StreamExt;
-use rand::{rngs::StdRng, seq::SliceRandom};
-use rand_core::SeedableRng;
-use std::{
-    collections::HashMap,
-    path::Path,
-    sync::atomic::{AtomicUsize, Ordering},
-    time::Duration,
-};
+use rand::{rngs::StdRng, SeedableRng};
+use std::{path::Path, sync::atomic::AtomicUsize, time::Instant};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -67,58 +60,65 @@ impl<'t> AccountMinter<'t> {
     /// will create 10 seed accounts, each seed account create 10 new accounts
     pub async fn create_accounts(
         &mut self,
+        txn_executor: &dyn TransactionExecutor,
         req: &EmitJobRequest,
         mode_params: &EmitModeParams,
         total_requested_accounts: usize,
     ) -> Result<Vec<LocalAccount>> {
         let mut accounts = vec![];
-        let expected_num_seed_accounts =
-            (total_requested_accounts / 50).clamp(1, CREATION_PARALLELISM);
+        let expected_num_seed_accounts = (total_requested_accounts / 50)
+            .clamp(1, (total_requested_accounts as f32).sqrt() as usize + 1);
         let num_accounts = total_requested_accounts - accounts.len(); // Only minting extra accounts
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
-            .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn)
+            .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
             .unwrap()
-            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
+            .checked_add(req.max_gas_per_txn * req.gas_price)
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
         let coins_per_seed_account = (expected_children_per_seed_account as u64)
-            .checked_mul(coins_per_account + req.expected_gas_per_txn)
+            .checked_mul(
+                coins_per_account
+                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+            )
             .unwrap()
-            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
             .unwrap();
+        println!("{:?}", req);
+        println!(">>> coins_per_seed_account {}", coins_per_seed_account);
+        println!(
+            ">>> expected_num_seed_accounts {}",
+            expected_num_seed_accounts
+        );
         let coins_for_source = coins_per_seed_account
             .checked_mul(expected_num_seed_accounts as u64)
             .unwrap()
-            .checked_add(aptos_global_constants::MAX_GAS_AMOUNT * req.gas_price)
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
             .unwrap();
         info!(
             "Account creation plan created for {} accounts with {} balance each.",
             num_accounts, coins_per_account
         );
         info!(
-            "    through {} seed accounts with {} each",
-            expected_num_seed_accounts, coins_per_seed_account
+            "    through {} seed accounts with {} each, each to fund {} accounts",
+            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
         );
         info!(
-            "    because of expecting {} txns and {} gas fee for each ",
-            req.expected_max_txns, req.expected_gas_per_txn
+            "    because of expecting {} txns and {} gas at {} gas price for each ",
+            req.expected_max_txns, req.expected_gas_per_txn, req.gas_price,
         );
 
         if req.mint_to_root {
-            self.mint_to_root(&req.rest_clients, coins_for_source)
-                .await?;
+            self.mint_to_root(txn_executor, coins_for_source).await?;
         } else {
-            let balance = &self
-                .pick_mint_client(&req.rest_clients)
+            let balance = txn_executor
                 .get_account_balance(self.source_account.address())
-                .await?
-                .into_inner();
+                .await?;
             info!(
                 "Source account {} current balance is {}, needed {} coins",
                 self.source_account.address(),
-                balance.get(),
+                balance,
                 coins_for_source
             );
 
@@ -130,33 +130,37 @@ impl<'t> AccountMinter<'t> {
                     panic!("Aborting");
                 }
             } else {
-                let max_allowed = 2 * req
-                    .expected_max_txns
-                    .checked_mul(req.expected_gas_per_txn)
+                let max_allowed = (2 * req.expected_max_txns as u128)
+                    .checked_mul((req.expected_gas_per_txn * req.gas_price).into())
                     .unwrap();
-                assert!(coins_for_source <= max_allowed,
+                assert!(coins_for_source as u128 <= max_allowed,
                     "Estimated total coins needed for load test ({}) are larger than expected_max_txns * expected_gas_per_txn, multiplied by 2 to account for rounding up ({})",
                     coins_for_source,
                     max_allowed,
                 );
             }
 
-            if balance.get() < coins_for_source {
+            if balance < coins_for_source {
                 return Err(anyhow!(
                     "Source ({}) doesn't have enough coins, balance {} < needed {}",
                     self.source_account.address(),
-                    balance.get(),
+                    balance,
                     coins_for_source
                 ));
             }
         }
 
-        let failed_requests = AtomicUsize::new(0);
+        let start = Instant::now();
+
+        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
+            .take(MAX_RETRIES * 2)
+            .collect::<Vec<_>>();
+
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
         let seed_accounts = self
             .create_and_fund_seed_accounts(
-                &req.rest_clients,
+                txn_executor,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 mode_params.max_submit_batch_size,
@@ -167,32 +171,35 @@ impl<'t> AccountMinter<'t> {
         let num_new_child_accounts =
             (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
         info!(
-            "Completed creating {} seed accounts, each with {} coins, had to retry {} transactions",
+            "Completed creating {} seed accounts in {}s, each with {} coins, had to retry {:?} transactions",
             seed_accounts.len(),
+            start.elapsed().as_secs(),
             coins_per_seed_account,
-            failed_requests.into_inner(),
+            failed_requests_to_trimmed_vec(failed_requests),
         );
         info!(
-            "Minting additional {} accounts with {} coins each",
+            "Creating additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
-        let failed_requests = AtomicUsize::new(0);
+        let start = Instant::now();
+        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
+            .take(MAX_RETRIES * 2)
+            .collect::<Vec<_>>();
+
         // For each seed account, create a future and transfer coins from that seed account to new accounts
         let account_futures = seed_accounts
             .into_iter()
             .enumerate()
             .map(|(i, seed_account)| {
                 // Spawn new threads
-                let index = i % req.rest_clients.len();
-                let cur_client = req.rest_clients[index].clone();
                 create_and_fund_new_accounts(
                     seed_account,
                     num_new_child_accounts,
                     coins_per_account,
                     mode_params.max_submit_batch_size,
-                    cur_client,
+                    txn_executor,
                     &txn_factory,
                     req.reuse_accounts,
                     if req.reuse_accounts {
@@ -204,34 +211,40 @@ impl<'t> AccountMinter<'t> {
                 )
             });
 
-        // Each future creates 10 accounts, limit concurrency to 100.
+        // Each future creates 10 accounts, limit concurrency to 1000.
         let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);
         // wait for all futures to complete
-        let mut minted_accounts = stream
+        let mut created_accounts = stream
             .collect::<Vec<_>>()
             .await
             .into_iter()
             .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("Failed to mint accounts: {:?}", e))?
+            .map_err(|e| format_err!("Failed to create accounts: {:?}", e))?
             .into_iter()
             .flatten()
             .collect();
 
-        accounts.append(&mut minted_accounts);
+        accounts.append(&mut created_accounts);
         assert!(
             accounts.len() >= num_accounts,
-            "Something wrong in mint_account, wanted to mint {}, only have {}",
+            "Something wrong in create_accounts, wanted to create {}, only have {}",
             total_requested_accounts,
             accounts.len()
         );
         info!(
-            "Successfully completed creating accounts, had to retry {} transactions",
-            failed_requests.into_inner()
+            "Successfully completed creating {} accounts in {}s, had to retry {:?} transactions",
+            actual_num_seed_accounts * num_new_child_accounts,
+            start.elapsed().as_secs(),
+            failed_requests_to_trimmed_vec(failed_requests),
         );
         Ok(accounts)
     }
 
-    pub async fn mint_to_root(&mut self, rest_clients: &[RestClient], amount: u64) -> Result<()> {
+    pub async fn mint_to_root(
+        &mut self,
+        txn_executor: &dyn TransactionExecutor,
+        amount: u64,
+    ) -> Result<()> {
         info!("Minting new coins to root");
 
         let txn = self
@@ -239,36 +252,28 @@ impl<'t> AccountMinter<'t> {
             .sign_with_transaction_builder(self.txn_factory.payload(
                 aptos_stdlib::aptos_coin_mint(self.source_account.address(), amount),
             ));
-        execute_and_wait_transactions(
-            &self.pick_mint_client(rest_clients).clone(),
-            self.source_account,
-            vec![txn],
-            &AtomicUsize::new(0),
-        )
-        .await?;
-
+        txn_executor.execute_transactions(&[txn]).await?;
         Ok(())
     }
 
     pub async fn create_and_fund_seed_accounts(
         &mut self,
-        rest_clients: &[RestClient],
+        txn_executor: &dyn TransactionExecutor,
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
-        failed_requests: &AtomicUsize,
+        failed_requests: &[AtomicUsize],
     ) -> Result<Vec<LocalAccount>> {
-        info!("Creating and minting seeds accounts");
+        info!("Creating and funding seeds accounts");
         let mut i = 0;
         let mut seed_accounts = vec![];
         while i < seed_account_num {
-            let client = self.pick_mint_client(rest_clients).clone();
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
             let source_account = &mut self.source_account;
             let txn_factory = &self.txn_factory;
-            let create_requests = batch
+            let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
@@ -279,13 +284,10 @@ impl<'t> AccountMinter<'t> {
                     )
                 })
                 .collect();
-            execute_and_wait_transactions(
-                &client,
-                source_account,
-                create_requests,
-                failed_requests,
-            )
-            .await?;
+            txn_executor
+                .execute_transactions_with_counter(&create_requests, failed_requests)
+                .await?;
+
             i += batch_size;
             seed_accounts.append(&mut batch);
         }
@@ -295,7 +297,7 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn load_vasp_account(
         &self,
-        client: &RestClient,
+        txn_executor: &dyn TransactionExecutor,
         index: usize,
     ) -> Result<LocalAccount> {
         let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
@@ -304,26 +306,33 @@ impl<'t> AccountMinter<'t> {
             .unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
-        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
-            format_err!(
-                "query_sequence_number on {:?} for dd account {} failed: {:?}",
-                client.path_prefix_string(),
-                index,
-                e
-            )
-        })?;
+        let sequence_number = txn_executor
+            .query_sequence_number(address)
+            .await
+            .map_err(|e| {
+                format_err!(
+                    "query_sequence_number for account {} failed: {:?}",
+                    index,
+                    e
+                )
+            })?;
         Ok(LocalAccount::new(address, account_key, sequence_number))
-    }
-
-    fn pick_mint_client<'a>(&mut self, clients: &'a [RestClient]) -> &'a RestClient {
-        clients
-            .choose(self.rng())
-            .expect("json-rpc clients can not be empty")
     }
 
     pub fn rng(&mut self) -> &mut StdRng {
         &mut self.rng
     }
+}
+
+fn failed_requests_to_trimmed_vec(failed_requests: Vec<AtomicUsize>) -> Vec<usize> {
+    let mut result = failed_requests
+        .into_iter()
+        .map(|c| c.into_inner())
+        .collect::<Vec<_>>();
+    while result.len() > 1 && *result.last().unwrap() == 0 {
+        result.pop();
+    }
+    result
 }
 
 fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
@@ -350,11 +359,11 @@ async fn create_and_fund_new_accounts<R>(
     num_new_accounts: usize,
     coins_per_new_account: u64,
     max_num_accounts_per_batch: usize,
-    client: RestClient,
+    txn_executor: &dyn TransactionExecutor,
     txn_factory: &TransactionFactory,
     reuse_account: bool,
     mut rng: R,
-    failed_requests: &AtomicUsize,
+    failed_requests: &[AtomicUsize],
 ) -> Result<Vec<LocalAccount>>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
@@ -362,17 +371,14 @@ where
     let mut i = 0;
     let mut accounts = vec![];
 
-    // Wait for source account to exist, this can happen because the corresponding REST endpoint might
-    // not be up to date with the latest ledger state and requires some time for syncing.
-    wait_for_single_account_sequence(&client, &source_account, Duration::from_secs(60)).await?;
     while i < num_new_accounts {
         let batch_size = min(max_num_accounts_per_batch, num_new_accounts - i);
         let mut batch = if reuse_account {
             info!("Loading {} accounts if they exist", batch_size);
-            gen_reusable_accounts(&client, batch_size, &mut rng).await?
+            gen_reusable_accounts(txn_executor, batch_size, &mut rng).await?
         } else {
             let batch = gen_random_accounts(batch_size, &mut rng);
-            let creation_requests = batch
+            let creation_requests: Vec<_> = batch
                 .as_slice()
                 .iter()
                 .map(|account| {
@@ -384,14 +390,12 @@ where
                     )
                 })
                 .collect();
-            execute_and_wait_transactions(
-                &client,
-                &mut source_account,
-                creation_requests,
-                failed_requests,
-            )
-            .await
-            .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
+
+            txn_executor
+                .execute_transactions_with_counter(&creation_requests, failed_requests)
+                .await
+                .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
+
             batch
         };
 
@@ -402,7 +406,7 @@ where
 }
 
 async fn gen_reusable_accounts<R>(
-    client: &RestClient,
+    txn_executor: &dyn TransactionExecutor,
     num_accounts: usize,
     rng: &mut R,
 ) -> Result<Vec<LocalAccount>>
@@ -412,19 +416,22 @@ where
     let mut vasp_accounts = vec![];
     let mut i = 0;
     while i < num_accounts {
-        vasp_accounts.push(gen_reusable_account(client, rng).await?);
+        vasp_accounts.push(gen_reusable_account(txn_executor, rng).await?);
         i += 1;
     }
     Ok(vasp_accounts)
 }
 
-async fn gen_reusable_account<R>(client: &RestClient, rng: &mut R) -> Result<LocalAccount>
+async fn gen_reusable_account<R>(
+    txn_executor: &dyn TransactionExecutor,
+    rng: &mut R,
+) -> Result<LocalAccount>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
 {
     let account_key = AccountKey::generate(rng);
     let address = account_key.authentication_key().derived_address();
-    let sequence_number = query_sequence_number(client, address).await.unwrap_or(0);
+    let sequence_number = txn_executor.query_sequence_number(address).await?;
     Ok(LocalAccount::new(address, account_key, sequence_number))
 }
 
@@ -450,183 +457,4 @@ pub fn create_and_fund_account_request(
     ))
 }
 
-struct SubmittingTxnState {
-    pub txns: Vec<SignedTransaction>,
-    pub failures: Vec<Option<AptosError>>,
-}
-
-pub async fn execute_and_wait_transactions(
-    client: &RestClient,
-    account: &mut LocalAccount,
-    txns: Vec<SignedTransaction>,
-    failure_counter: &AtomicUsize,
-) -> Result<()> {
-    let start_seq_num = account.sequence_number();
-    debug!(
-        "[{:?}] Submitting transactions {} - {} for {}",
-        client.path_prefix_string(),
-        start_seq_num - txns.len() as u64,
-        start_seq_num,
-        account.address()
-    );
-
-    async fn submit_batch(
-        client: &RestClient,
-        state_mutex: &Mutex<SubmittingTxnState>,
-        local_failure_counter: &AtomicUsize,
-    ) -> Result<()> {
-        let (indices, txns) = {
-            let state = state_mutex.lock();
-            let mut indices = Vec::new();
-            let mut txns = Vec::new();
-            for (i, txn) in state.txns.iter().enumerate() {
-                if state.failures.get(i).map(|r| r.is_some()).unwrap_or(true) {
-                    indices.push(i);
-                    txns.push(txn.clone());
-                }
-            }
-            (indices, txns)
-        };
-
-        let response = client.submit_batch_bcs(&txns).await;
-        let results = match response {
-            Err(e) => {
-                warn!(
-                    "[{:?}] Submitting transactions connection refused: {:?}, num txns: {}, first txn: {:?}",
-                    client.path_prefix_string(), e, txns.len(), txns.first()
-                );
-                return Err(format_err!("{:?}", e));
-            },
-            Ok(result) => result.into_inner(),
-        };
-        let mut failures = results
-            .transaction_failures
-            .into_iter()
-            .map(|f| (f.transaction_index, f.error))
-            .collect::<HashMap<_, _>>();
-        if !failures.is_empty() {
-            local_failure_counter.fetch_add(failures.len(), Ordering::Relaxed);
-            sample!(
-                SampleRate::Duration(Duration::from_secs(120)),
-                warn!(
-                    "[{:?}] Submitting transactions failed for: {:?}",
-                    client.path_prefix_string(),
-                    failures,
-                )
-            );
-        }
-        let mut state = state_mutex.lock();
-        for (request_idx, input_idx) in indices.iter().enumerate() {
-            let value = failures.remove(&request_idx);
-            if state.failures.len() == *input_idx {
-                // We need to fill it up on the first call:
-                state.failures.push(value);
-            } else {
-                state.failures[*input_idx] = value;
-            }
-        }
-
-        if state.failures.iter().any(|r| r.is_some()) {
-            Err(format_err!(""))
-        } else {
-            Ok(())
-        }
-    }
-
-    let state = Mutex::new(SubmittingTxnState {
-        txns,
-        failures: vec![],
-    });
-    let state_ref = &state;
-    let local_failure_counter = AtomicUsize::new(0);
-    let local_failure_counter_ref = &local_failure_counter;
-    let result = RETRY_POLICY
-        .retry(move || submit_batch(client, state_ref, local_failure_counter_ref))
-        .await
-        .map_err(|e| {
-            format_err!(
-                "Failed to submit transactions: {:?}, {:?}",
-                state
-                    .lock()
-                    .failures
-                    .iter()
-                    .enumerate()
-                    .filter(|(_idx, r)| r.is_some())
-                    .collect::<Vec<_>>(),
-                e
-            )
-        });
-
-    let local_failures = local_failure_counter.into_inner();
-    if local_failures > 0 {
-        sample!(
-            SampleRate::Duration(Duration::from_secs(120)),
-            warn!(
-                "[{:?}] {} failures occured during submission.",
-                client.path_prefix_string(),
-                local_failures
-            )
-        );
-        failure_counter.fetch_add(local_failures, Ordering::Relaxed);
-    }
-    // Log error, but not return, because timeout or other errors can commit the transaction in the background,
-    // and the wait for transaction below will fail if transaction is not there.
-    if let Err(e) = result {
-        sample!(
-            SampleRate::Duration(Duration::from_secs(120)),
-            warn!(
-                "[{:?}] Appears that we couldn't submit all transactions, rechecking. Details: {:?}",
-                client.path_prefix_string(),
-                e
-            )
-        );
-    }
-
-    let state = state.into_inner();
-
-    for txn in state.txns.iter() {
-        client
-            .wait_for_transaction_by_hash_bcs(
-                txn.clone().committed_hash(),
-                txn.expiration_timestamp_secs(),
-                Some(Duration::from_secs(120)),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                warn!(
-                    "Failed to wait for transactions: {:?}, txn: {:?}. [{:?}] We were submitting transactions for account {}: from {} - {}, now at {}",
-                    e,
-                    txn,
-                    client.path_prefix_string(),
-                    account.address(),
-                    start_seq_num - state.txns.len() as u64,
-                    start_seq_num,
-                    account.sequence_number()
-                );
-
-                // We shouldn't be able to reach this point.
-                // This failure is unrecoverable, we end the test at this point.
-                // It it sporadically happens in forge, and we need to debug why.
-                // By default, we end the test and stop the nodes, before the next
-                // counters poll happens after this.
-                // Wait for 30s here, to make sure Grafana counters for expired transactions, etc,
-                // get pulled from all the nodes, so we can investigate.
-                std::thread::sleep(Duration::from_secs(30));
-                format_err!(
-                    "Failed to wait for transactions: {:?}",
-                    e,
-                )
-            })?;
-    }
-
-    debug!(
-        "[{:?}] Account {} is at sequence number {} now",
-        client.path_prefix_string(),
-        account.address(),
-        account.sequence_number()
-    );
-    Ok(())
-}
-
-const CREATION_PARALLELISM: usize = 100;
+const CREATION_PARALLELISM: usize = 500;

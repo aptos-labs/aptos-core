@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::pruner::{db_pruner::DBPruner, ledger_store::ledger_store_pruner::LedgerPruner};
 use aptos_config::config::LedgerPrunerConfig;
@@ -18,7 +18,6 @@ use std::{
 
 /// Maintains the ledger pruner and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
-#[derive(Debug)]
 pub struct LedgerPrunerWorker {
     /// The worker will sleep for this period of time after pruning each batch.
     pruning_time_interval_in_ms: u64,

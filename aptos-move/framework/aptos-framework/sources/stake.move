@@ -287,6 +287,7 @@ module aptos_framework::stake {
         }
     }
 
+    #[view]
     /// Return the lockup expiration of the stake pool at `pool_address`.
     /// This will throw an error if there's no stake pool at `pool_address`.
     public fun get_lockup_secs(pool_address: address): u64 acquires StakePool {
@@ -294,6 +295,7 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).locked_until_secs
     }
 
+    #[view]
     /// Return the remaining lockup of the stake pool at `pool_address`.
     /// This will throw an error if there's no stake pool at `pool_address`.
     public fun get_remaining_lockup_secs(pool_address: address): u64 acquires StakePool {
@@ -306,6 +308,7 @@ module aptos_framework::stake {
         }
     }
 
+    #[view]
     /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
     /// The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
     public fun get_stake(pool_address: address): (u64, u64, u64, u64) acquires StakePool {
@@ -319,6 +322,7 @@ module aptos_framework::stake {
         )
     }
 
+    #[view]
     /// Returns the validator's state.
     public fun get_validator_state(pool_address: address): u64 acquires ValidatorSet {
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
@@ -333,6 +337,7 @@ module aptos_framework::stake {
         }
     }
 
+    #[view]
     /// Return the voting power of the validator in the current epoch.
     /// This is the same as the validator's total active and pending_inactive stake.
     public fun get_current_epoch_voting_power(pool_address: address): u64 acquires StakePool, ValidatorSet {
@@ -348,12 +353,14 @@ module aptos_framework::stake {
         }
     }
 
+    #[view]
     /// Return the delegated voter of the validator at `pool_address`.
     public fun get_delegated_voter(pool_address: address): address acquires StakePool {
         assert_stake_pool_exists(pool_address);
         borrow_global<StakePool>(pool_address).delegated_voter
     }
 
+    #[view]
     /// Return the operator of the validator at `pool_address`.
     public fun get_operator(pool_address: address): address acquires StakePool {
         assert_stake_pool_exists(pool_address);
@@ -365,12 +372,14 @@ module aptos_framework::stake {
         owner_cap.pool_address
     }
 
+    #[view]
     /// Return the validator index for `pool_address`.
     public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
         assert_stake_pool_exists(pool_address);
         borrow_global<ValidatorConfig>(pool_address).validator_index
     }
 
+    #[view]
     /// Return the number of successful and failed proposals for the proposal at the given validator index.
     public fun get_current_epoch_proposal_counts(validator_index: u64): (u64, u64) acquires ValidatorPerformance {
         let validator_performances = &borrow_global<ValidatorPerformance>(@aptos_framework).validators;
@@ -378,6 +387,7 @@ module aptos_framework::stake {
         (validator_performance.successful_proposals, validator_performance.failed_proposals)
     }
 
+    #[view]
     /// Return the validator's config.
     public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
         assert_stake_pool_exists(pool_address);
@@ -385,6 +395,7 @@ module aptos_framework::stake {
         (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
     }
 
+    #[view]
     public fun stake_pool_exists(addr: address): bool {
         exists<StakePool>(addr)
     }
@@ -1141,16 +1152,6 @@ module aptos_framework::stake {
         staking_config: &StakingConfig,
     ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorFees {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-
-        // First, distribute transaction fees.
-        if (features::collect_and_distribute_gas_fees()) {
-            let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
-            if (table::contains(fees_table, pool_address)) {
-                let coin = table::remove(fees_table, pool_address);
-                coin::merge(&mut stake_pool.active, coin);
-            };
-        };
-
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
         let num_successful_proposals = cur_validator_perf.successful_proposals;
@@ -1182,6 +1183,15 @@ module aptos_framework::stake {
         let rewards_amount = rewards_active + rewards_pending_inactive;
         // Pending active stake can now be active.
         coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
+
+        // Additionally, distribute transaction fees.
+        if (features::collect_and_distribute_gas_fees()) {
+            let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
+            if (table::contains(fees_table, pool_address)) {
+                let coin = table::remove(fees_table, pool_address);
+                coin::merge(&mut stake_pool.active, coin);
+            };
+        };
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
@@ -2682,8 +2692,8 @@ module aptos_framework::stake {
         assert_no_fees_for_validator(validator_1_address);
         assert_no_fees_for_validator(validator_2_address);
         assert_no_fees_for_validator(validator_3_address);
-        assert_validator_state(validator_1_address, 404, 0, 0, 0, 2);
-        assert_validator_state(validator_2_address, 606, 0, 0, 0, 1);
+        assert_validator_state(validator_1_address, 401, 0, 0, 0, 2);
+        assert_validator_state(validator_2_address, 601, 0, 0, 0, 1);
         assert_validator_state(validator_3_address, 101, 0, 0, 0, 0);
     }
 }

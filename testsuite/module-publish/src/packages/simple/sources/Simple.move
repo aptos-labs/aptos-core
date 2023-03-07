@@ -1,7 +1,7 @@
 // This is a generic module used by the transaction generator to produce
 // multiple module to publish and use.
-// The idea is that by running the binary `module-publish`
-// `cargo run` in `testsuite/mudule-publishing`
+// The idea is that by running `cargo run --package module-publish`
+// in `testsuite/module-publish`
 // a rust file (`generic_module.rs`) gets generated in
 // `crates/transaction-emitter-lib/src/transaction_generator/publishing` which
 // contains a `CompiledModule` for the module below.
@@ -94,6 +94,20 @@ module 0xABCD::Simple {
     //
     // Resource
     //
+
+    struct ByteResource has key {
+        data: vector<u8>,
+    }
+
+    public entry fun bytes_make_or_change(owner: &signer, data: vector<u8>) acquires ByteResource {
+        if (exists<ByteResource>(signer::address_of(owner))) {
+            let resource = borrow_global_mut<ByteResource>(signer::address_of(owner));
+            *(&mut resource.data) = data;
+        } else {
+            let resource = ByteResource { data };
+            move_to<ByteResource>(owner, resource);
+        }
+    }
 
     // used to initialize `Resource`
     const NAME: vector<u8> = b"hello";

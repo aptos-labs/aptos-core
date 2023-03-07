@@ -1,10 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
+    access_path::AccessPath,
+    state_store::state_key::{StateKey, StateKeyInner},
+    write_set::TransactionWrite,
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -27,7 +30,7 @@ pub trait ModulePath {
 
 impl ModulePath for StateKey {
     fn module_path(&self) -> Option<AccessPath> {
-        if let StateKey::AccessPath(ap) = self {
+        if let StateKeyInner::AccessPath(ap) = self.inner() {
             if ap.is_code() {
                 return Some(ap.clone());
             }
@@ -59,7 +62,7 @@ pub trait ExecutorTask: Sync {
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Clone + Send + Sync + 'static;
+    type Error: Clone + Send + Sync + Eq + 'static;
 
     /// Type to intialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
@@ -78,7 +81,7 @@ pub trait ExecutorTask: Sync {
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 
-/// Trait for execution result of a transaction.
+/// Trait for execution result of a single transaction.
 pub trait TransactionOutput: Send + Sync {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;

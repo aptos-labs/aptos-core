@@ -4,9 +4,9 @@ slug: "index"
 hidden: false
 ---
 
-# Use Aptos SDKs
+# Use the Aptos SDKs
 
-Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/cli-tools/aptos-cli-tool/use-aptos-cli.md) for your development on the Aptos blockchain. 
+Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/cli-tools/aptos-cli-tool/use-aptos-cli.md) for your development on the Aptos blockchain.
 
 - ### [TypeScript SDK](ts-sdk/index.md)
 
@@ -15,3 +15,5 @@ Use these Aptos software development kits (SDKs), in combination with the [Aptos
 - ### [Rust SDK](rust-sdk.md)
 
 - ### [Unity SDK](unity-sdk.md)
+
+To get started, [develop with the Aptos SDKs](../tutorials/index.md) following our tutorials.

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{smoke_test_environment::new_local_swarm_with_aptos, txn_emitter::generate_traffic};
@@ -18,14 +18,14 @@ async fn test_consensus_only_with_txn_emitter() {
         &all_validators,
         Duration::from_secs(10),
         1,
-        vec![
-            (TransactionType::P2P, 70),
-            (TransactionType::AccountGeneration, 20),
-        ],
+        vec![vec![
+            (TransactionType::default_coin_transfer(), 70),
+            (TransactionType::default_account_generation(), 20),
+        ]],
     )
     .await
     .unwrap();
-    println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
+    println!("{:?}", txn_stat.rate());
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);

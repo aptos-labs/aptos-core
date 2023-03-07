@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -84,7 +85,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = BlockExecutor::<AptosVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
@@ -221,11 +222,14 @@ fn test_new_genesis() {
         ChangeSet::new(
             WriteSetMut::new(vec![
                 (
-                    StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
+                    StateKey::access_path(
+                        access_path_for_config(ValidatorSet::CONFIG_ID)
+                            .expect("access path in test"),
+                    ),
                     WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         CORE_CODE_ADDRESS,
                         ConfigurationResource::resource_path(),
                     )),
@@ -234,7 +238,7 @@ fn test_new_genesis() {
                     ),
                 ),
                 (
-                    StateKey::AccessPath(AccessPath::new(
+                    StateKey::access_path(AccessPath::new(
                         account1,
                         CoinStoreResource::resource_path(),
                     )),
@@ -255,7 +259,9 @@ fn test_new_genesis() {
                 ContractEvent::new(
                     *configuration.events().key(),
                     0,
-                    TypeTag::Struct(Box::new(ConfigurationResource::struct_tag())),
+                    TypeTag::Struct(Box::new(
+                        <ConfigurationResource as MoveStructType>::struct_tag(),
+                    )),
                     vec![],
                 ),
                 ContractEvent::new(

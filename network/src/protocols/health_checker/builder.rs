@@ -1,8 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::{
         health_checker::{
             interface::HealthCheckNetworkInterface, HealthChecker, HealthCheckerMsg,
@@ -32,14 +33,14 @@ impl HealthCheckerBuilder {
         ping_failures_tolerated: u64,
         network_sender: NetworkSender<HealthCheckerMsg>,
         network_rx: HealthCheckerNetworkEvents,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         let network_senders = hashmap! {network_context.network_id() => network_sender};
         let network_client = NetworkClient::new(
             vec![],
             vec![HealthCheckerRpc],
             network_senders,
-            peer_metadata_storage,
+            peers_and_metadata,
         );
         let service = HealthChecker::new(
             network_context,

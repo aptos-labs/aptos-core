@@ -1,15 +1,19 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
-use crate::state_store::{
-    buffered_state::CommitMessage,
-    state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
-    StateDb,
+use crate::{
+    state_store::{
+        buffered_state::CommitMessage,
+        state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
+        StateDb,
+    },
+    versioned_node_cache::VersionedNodeCache,
 };
 use aptos_logger::trace;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta};
+use static_assertions::const_assert;
 use std::{
     sync::{
         mpsc,
@@ -27,13 +31,19 @@ pub(crate) struct StateSnapshotCommitter {
 }
 
 impl StateSnapshotCommitter {
+    const CHANNEL_SIZE: usize = 0;
+
     pub fn new(
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
     ) -> Self {
+        // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
+        const_assert!(
+            StateSnapshotCommitter::CHANNEL_SIZE < VersionedNodeCache::NUM_VERSIONS_TO_CACHE
+        );
         // Rendezvous channel
         let (state_merkle_batch_commit_sender, state_merkle_batch_commit_receiver) =
-            mpsc::sync_channel(0);
+            mpsc::sync_channel(Self::CHANNEL_SIZE);
         let arc_state_db = Arc::clone(&state_db);
         let join_handle = std::thread::Builder::new()
             .name("state_batch_committer".to_string())
@@ -56,11 +66,7 @@ impl StateSnapshotCommitter {
     pub fn run(self) {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
-                CommitMessage::Data {
-                    data: delta_to_commit,
-                    prev_snapshot_ready_receiver,
-                    snapshot_ready_sender,
-                } => {
+                CommitMessage::Data(delta_to_commit) => {
                     let node_hashes = delta_to_commit
                         .current
                         .clone()
@@ -68,12 +74,6 @@ impl StateSnapshotCommitter {
                         .new_node_hashes_since(&delta_to_commit.base.clone().freeze());
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
-
-                    // Wait for the previous batch to commit before reading the snapshot from db.
-                    prev_snapshot_ready_receiver
-                        .expect("prev_snapshot_ready_receiver cannot be None")
-                        .recv()
-                        .unwrap();
 
                     let (batch, root_hash) = self
                         .state_db
@@ -90,15 +90,11 @@ impl StateSnapshotCommitter {
                         )
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Data {
-                            data: StateMerkleBatch {
-                                batch,
-                                root_hash,
-                                state_delta: delta_to_commit,
-                            },
-                            prev_snapshot_ready_receiver: None,
-                            snapshot_ready_sender,
-                        })
+                        .send(CommitMessage::Data(StateMerkleBatch {
+                            batch,
+                            root_hash,
+                            state_delta: delta_to_commit,
+                        }))
                         .unwrap();
                 },
                 CommitMessage::Sync(finish_sender) => {

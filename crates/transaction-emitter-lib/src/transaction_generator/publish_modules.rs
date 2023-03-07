@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction_generator::{
     publishing::publish_util::PackageHandler, TransactionGenerator, TransactionGeneratorCreator,
@@ -9,7 +9,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -17,7 +17,6 @@ pub struct PublishPackageGenerator {
     rng: StdRng,
     package_handler: Arc<RwLock<PackageHandler>>,
     txn_factory: TransactionFactory,
-    gas_price: u64,
 }
 
 impl PublishPackageGenerator {
@@ -25,13 +24,11 @@ impl PublishPackageGenerator {
         rng: StdRng,
         package_handler: Arc<RwLock<PackageHandler>>,
         txn_factory: TransactionFactory,
-        gas_price: u64,
     ) -> Self {
         Self {
             rng,
             package_handler,
             txn_factory,
-            gas_price,
         }
     }
 }
@@ -55,12 +52,8 @@ impl TransactionGenerator for PublishPackageGenerator {
             // use module published
             // for _ in 1..transactions_per_account - 1 {
             for _ in 1..transactions_per_account {
-                let request = package.use_transaction(
-                    &mut self.rng,
-                    account,
-                    &self.txn_factory,
-                    self.gas_price,
-                );
+                let request =
+                    package.use_random_transaction(&mut self.rng, account, &self.txn_factory);
                 requests.push(request);
             }
             // republish
@@ -76,31 +69,26 @@ impl TransactionGenerator for PublishPackageGenerator {
 }
 
 pub struct PublishPackageCreator {
-    rng: StdRng,
     txn_factory: TransactionFactory,
     package_handler: Arc<RwLock<PackageHandler>>,
-    gas_price: u64,
 }
 
 impl PublishPackageCreator {
-    pub fn new(rng: StdRng, txn_factory: TransactionFactory, gas_price: u64) -> Self {
+    pub fn new(txn_factory: TransactionFactory) -> Self {
         Self {
-            rng,
             txn_factory,
             package_handler: Arc::new(RwLock::new(PackageHandler::new())),
-            gas_price,
         }
     }
 }
 
 #[async_trait]
 impl TransactionGeneratorCreator for PublishPackageCreator {
-    async fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
-            self.rng.clone(),
+            StdRng::from_entropy(),
             self.package_handler.clone(),
             self.txn_factory.clone(),
-            self.gas_price,
         ))
     }
 }

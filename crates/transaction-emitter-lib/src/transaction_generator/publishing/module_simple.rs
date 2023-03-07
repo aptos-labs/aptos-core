@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
@@ -16,7 +16,7 @@ use move_binary_format::{
     file_format::{FunctionHandleIndex, IdentifierIndex, SignatureToken},
     CompiledModule,
 };
-use rand::{distributions::Alphanumeric, prelude::StdRng, Rng};
+use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
 
 //
@@ -100,129 +100,183 @@ pub fn scramble(module: &mut CompiledModule, fn_count: usize, rng: &mut StdRng) 
 //
 // List of entry points to expose
 //
-enum EntryPoints {
+// More info in the Simple.move
+#[derive(Debug, Copy, Clone)]
+pub enum EntryPoints {
     // 0 args
-    Nop = 0,
-    Step = 1,
-    GetCounter = 2,
-    ResetData = 3,
-    Double = 4,
-    Half = 5,
+    /// Empty (NoOp) function
+    Nop,
+    /// Increment global resource - COUNTER_STEP
+    Step,
+    /// Fetch global resource - COUNTER_STEP
+    GetCounter,
+    /// Reset resource `Resource`
+    ResetData,
+    /// Double the size of `Resource`
+    Double,
+    /// Half the size of `Resource`
+    Half,
     // 1 arg
-    Loopy = 6,
-    GetFromRandomConst = 7,
-    SetId = 8,
-    SetName = 9,
+    /// run a for loop
+    Loopy {
+        loop_count: Option<u64>,
+    },
+    /// Return value from constant array (RANDOM)
+    GetFromConst {
+        const_idx: Option<u64>,
+    },
+    /// Set the `Resource.id`
+    SetId,
+    /// Set the `Resource.name`
+    SetName,
     // 2 args
     // next 2 functions, second arg must be existing account address with data
-    Maximize = 10,
-    Minimize = 11,
+    // Sets `Resource` to the max from two addresses
+    Maximize,
+    // Sets `Resource` to the min from two addresses
+    Minimize,
     // 3 args
-    MakeOrChange = 12,
+    /// Explicitly change Resource
+    MakeOrChange {
+        string_length: Option<usize>,
+        data_length: Option<usize>,
+    },
+    BytesMakeOrChange {
+        data_length: Option<usize>,
+    },
 }
 
-const ENTRY_POINTS_START: u8 = EntryPoints::Nop as u8;
-const ENTRY_POINTS_END: u8 = EntryPoints::MakeOrChange as u8;
-const ZERO_ARG_ENTRY_POINTS_START: u8 = EntryPoints::Nop as u8;
-const ZERO_ARG_ENTRY_POINTS_END: u8 = EntryPoints::Half as u8;
-const ONE_ARG_ENTRY_POINTS_START: u8 = EntryPoints::Loopy as u8;
-const ONE_ARG_ENTRY_POINTS_END: u8 = EntryPoints::SetName as u8;
-const TWO_ARG_ENTRY_POINTS_START: u8 = EntryPoints::Maximize as u8;
-const TWO_ARG_ENTRY_POINTS_END: u8 = EntryPoints::Minimize as u8;
-const THREE_ARG_ENTRY_POINTS_START: u8 = EntryPoints::MakeOrChange as u8;
-const THREE_ARG_ENTRY_POINTS_END: u8 = EntryPoints::MakeOrChange as u8;
-
-impl TryFrom<u8> for EntryPoints {
-    type Error = &'static str;
-
-    fn try_from(val: u8) -> Result<EntryPoints, &'static str> {
-        match val {
-            0 => Ok(EntryPoints::Nop),
-            1 => Ok(EntryPoints::Step),
-            2 => Ok(EntryPoints::GetCounter),
-            3 => Ok(EntryPoints::ResetData),
-            4 => Ok(EntryPoints::Double),
-            5 => Ok(EntryPoints::Half),
-            6 => Ok(EntryPoints::Loopy),
-            7 => Ok(EntryPoints::GetFromRandomConst),
-            8 => Ok(EntryPoints::SetId),
-            9 => Ok(EntryPoints::SetName),
-            10 => Ok(EntryPoints::Maximize),
-            11 => Ok(EntryPoints::Minimize),
-            12 => Ok(EntryPoints::MakeOrChange),
-            _ => Err("Value out of range for EntryPoints"),
+impl EntryPoints {
+    pub fn create_payload(
+        &self,
+        module_id: ModuleId,
+        rng: Option<&mut StdRng>,
+        other: Option<AccountAddress>,
+    ) -> TransactionPayload {
+        match self {
+            // 0 args
+            EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
+            EntryPoints::GetCounter => {
+                get_payload_void(module_id, ident_str!("get_counter").to_owned())
+            },
+            EntryPoints::ResetData => {
+                get_payload_void(module_id, ident_str!("reset_data").to_owned())
+            },
+            EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
+            EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
+            // 1 arg
+            EntryPoints::Loopy { loop_count } => loopy(
+                module_id,
+                loop_count
+                    .unwrap_or_else(|| rng.expect("Must provide RNG").gen_range(0u64, 1000u64)),
+            ),
+            EntryPoints::GetFromConst { const_idx } => get_from_random_const(
+                module_id,
+                const_idx.unwrap_or_else(
+                    // TODO: get a value in range for the const array in Simple.move
+                    || rng.expect("Must provide RNG").gen_range(0u64, 1u64),
+                ),
+            ),
+            EntryPoints::SetId => set_id(rng.expect("Must provide RNG"), module_id),
+            EntryPoints::SetName => set_name(rng.expect("Must provide RNG"), module_id),
+            // 2 args, second arg existing account address with data
+            EntryPoints::Maximize => maximize(module_id, other.expect("Must provide other")),
+            EntryPoints::Minimize => minimize(module_id, other.expect("Must provide other")),
+            // 3 args
+            EntryPoints::MakeOrChange {
+                string_length,
+                data_length,
+            } => {
+                let rng = rng.expect("Must provide RNG");
+                let str_len = string_length.unwrap_or_else(|| rng.gen_range(0usize, 100usize));
+                let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
+                make_or_change(rng, module_id, str_len, data_len)
+            },
+            EntryPoints::BytesMakeOrChange { data_length } => {
+                let rng = rng.expect("Must provide RNG");
+                let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
+                bytes_make_or_change(rng, module_id, data_len)
+            },
         }
     }
 }
 
-fn call_function(
-    fun_idx: u8,
-    rng: &mut StdRng,
-    module_id: ModuleId,
-    other: Option<AccountAddress>,
-) -> TransactionPayload {
-    match EntryPoints::try_from(fun_idx).expect("Must pick a function in range, bogus id generated")
-    {
-        // 0 args
-        EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
-        EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
-        EntryPoints::GetCounter => {
-            get_payload_void(module_id, ident_str!("get_counter").to_owned())
-        },
-        EntryPoints::ResetData => get_payload_void(module_id, ident_str!("reset_data").to_owned()),
-        EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
-        EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
-        // 1 arg
-        EntryPoints::Loopy => loopy(rng, module_id),
-        EntryPoints::GetFromRandomConst => get_from_random_const(rng, module_id),
-        EntryPoints::SetId => set_id(rng, module_id),
-        EntryPoints::SetName => set_name(rng, module_id),
-        // 2 args, second arg existing account address with data
-        EntryPoints::Maximize => maximize(module_id, other.expect("Must provide other")),
-        EntryPoints::Minimize => minimize(module_id, other.expect("Must provide other")),
-        // 3 args
-        EntryPoints::MakeOrChange => make_or_change(rng, module_id),
-    }
-}
-
-pub fn any_function(
-    rng: &mut StdRng,
-    module_id: ModuleId,
-    other: Option<AccountAddress>,
-) -> TransactionPayload {
-    let fun_idx = rng.gen_range(ENTRY_POINTS_START, ENTRY_POINTS_END + 1);
-    call_function(fun_idx, rng, module_id, other)
-}
+const ZERO_ARG_ENTRY_POINTS: &[EntryPoints; 6] = &[
+    EntryPoints::Nop,
+    EntryPoints::Step,
+    EntryPoints::GetCounter,
+    EntryPoints::ResetData,
+    EntryPoints::Double,
+    EntryPoints::Half,
+];
+const ONE_ARG_ENTRY_POINTS: &[EntryPoints; 4] = &[
+    EntryPoints::Loopy { loop_count: None },
+    EntryPoints::GetFromConst { const_idx: None },
+    EntryPoints::SetId,
+    EntryPoints::SetName,
+];
+const SIMPLE_ENTRY_POINTS: &[EntryPoints; 9] = &[
+    EntryPoints::Nop,
+    EntryPoints::Step,
+    EntryPoints::GetCounter,
+    EntryPoints::ResetData,
+    EntryPoints::Double,
+    EntryPoints::Half,
+    EntryPoints::Loopy { loop_count: None },
+    EntryPoints::GetFromConst { const_idx: None },
+    EntryPoints::SetId,
+];
+const GEN_ENTRY_POINTS: &[EntryPoints; 12] = &[
+    EntryPoints::Nop,
+    EntryPoints::Step,
+    EntryPoints::GetCounter,
+    EntryPoints::ResetData,
+    EntryPoints::Double,
+    EntryPoints::Half,
+    EntryPoints::Loopy { loop_count: None },
+    EntryPoints::GetFromConst { const_idx: None },
+    EntryPoints::SetId,
+    EntryPoints::SetName,
+    EntryPoints::MakeOrChange {
+        string_length: None,
+        data_length: None,
+    },
+    EntryPoints::BytesMakeOrChange { data_length: None },
+];
 
 pub fn rand_simple_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    let fun_idx = rng.gen_range(ZERO_ARG_ENTRY_POINTS_START, EntryPoints::SetName as u8);
-    call_function(fun_idx, rng, module_id, None)
+    SIMPLE_ENTRY_POINTS
+        .choose(rng)
+        .unwrap()
+        .create_payload(module_id, Some(rng), None)
 }
 
 pub fn zero_args_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    let fun_idx = rng.gen_range(ZERO_ARG_ENTRY_POINTS_START, ZERO_ARG_ENTRY_POINTS_END + 1);
-    call_function(fun_idx, rng, module_id, None)
+    ZERO_ARG_ENTRY_POINTS
+        .choose(rng)
+        .unwrap()
+        .create_payload(module_id, Some(rng), None)
 }
 
 pub fn rand_gen_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    let fun_idx = rng.gen_range(ZERO_ARG_ENTRY_POINTS_START, ONE_ARG_ENTRY_POINTS_END + 1);
-    call_function(fun_idx, rng, module_id, None)
+    GEN_ENTRY_POINTS
+        .choose(rng)
+        .unwrap()
+        .create_payload(module_id, Some(rng), None)
 }
 
 //
 // Entry points payload
 //
 
-fn loopy(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    let count = rng.gen_range(0u64, 1000u64);
+fn loopy(module_id: ModuleId, count: u64) -> TransactionPayload {
     get_payload(module_id, ident_str!("loopy").to_owned(), vec![
         bcs::to_bytes(&count).unwrap(),
     ])
 }
 
-fn get_from_random_const(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
-    // TODO: get a value in range for the const array in Simple.move
-    let idx = rng.gen_range(0u64, 1u64);
+fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
     get_payload(
         module_id,
         ident_str!("get_from_random_const").to_owned(),
@@ -261,22 +315,39 @@ fn minimize(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
     ])
 }
 
-fn make_or_change(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+fn make_or_change(
+    rng: &mut StdRng,
+    module_id: ModuleId,
+    str_len: usize,
+    data_len: usize,
+) -> TransactionPayload {
     let id: u64 = rng.gen();
-    let len = rng.gen_range(0usize, 100usize);
     let name: String = rng
         .sample_iter(&Alphanumeric)
-        .take(len)
+        .take(str_len)
         .map(char::from)
         .collect();
-    let len = rng.gen_range(0usize, 1000usize);
-    let mut bytes = Vec::<u8>::with_capacity(len);
+    let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
     get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![
         bcs::to_bytes(&id).unwrap(),
         bcs::to_bytes(&name).unwrap(),
         bcs::to_bytes(&bytes).unwrap(),
     ])
+}
+
+fn bytes_make_or_change(
+    rng: &mut StdRng,
+    module_id: ModuleId,
+    data_len: usize,
+) -> TransactionPayload {
+    let mut bytes = Vec::<u8>::with_capacity(data_len);
+    rng.fill_bytes(&mut bytes);
+    get_payload(
+        module_id,
+        ident_str!("bytes_make_or_change").to_owned(),
+        vec![bcs::to_bytes(&bytes).unwrap()],
+    )
 }
 
 fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayload {

@@ -1,10 +1,14 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
     storage::{db_backup, db_restore},
-    test_utils::{check_create_mint_transfer_node, swarm_utils::insert_waypoint},
+    test_utils::{
+        check_create_mint_transfer_node, swarm_utils::insert_waypoint, MAX_CATCH_UP_WAIT_SECS,
+        MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+    },
     workspace_builder,
     workspace_builder::workspace_root,
 };
@@ -18,6 +22,7 @@ use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use regex::Regex;
 use std::{
     fs,
+    path::PathBuf,
     process::Command,
     str::FromStr,
     time::{Duration, Instant},
@@ -31,9 +36,11 @@ fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig)
 }
 
 async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize) {
-    let deadline = Instant::now().checked_add(Duration::from_secs(60)).unwrap();
+    let healthy_deadline = Instant::now()
+        .checked_add(Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
+        .unwrap();
     validator
-        .wait_until_healthy(deadline)
+        .wait_until_healthy(healthy_deadline)
         .await
         .unwrap_or_else(|err| {
             let lsof_output = Command::new("lsof").arg("-i").output().unwrap();
@@ -43,8 +50,12 @@ async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize
             );
         });
     info!("Validator restart health check passed");
+
+    let connectivity_deadline = Instant::now()
+        .checked_add(Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))
+        .unwrap();
     validator
-        .wait_for_connectivity(expected_to_connect, deadline)
+        .wait_for_connectivity(expected_to_connect, connectivity_deadline)
         .await
         .unwrap();
     info!("Validator restart connectivity check passed");
@@ -61,9 +72,7 @@ async fn test_genesis_transaction_flow() {
     let aptos_cli = workspace_builder::get_bin("aptos");
 
     // prebuild tools.
-    workspace_builder::get_bin("db-backup");
-    workspace_builder::get_bin("db-restore");
-    workspace_builder::get_bin("db-backup-verify");
+    workspace_builder::get_bin("aptos-db-tool");
 
     println!("0. pre-building finished.");
 
@@ -80,7 +89,7 @@ async fn test_genesis_transaction_flow() {
     update_node_config_restart(node, new_config.clone());
     wait_for_node(node, num_nodes - 1).await;
     // wait for some versions
-    env.wait_for_all_nodes_to_catchup_to_version(10, Duration::from_secs(10))
+    env.wait_for_all_nodes_to_catchup_to_version(10, Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -99,7 +108,7 @@ async fn test_genesis_transaction_flow() {
     node.start().unwrap();
 
     println!("4. verify all nodes are at the same round and no progress being made");
-    env.wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+    env.wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
 
@@ -136,6 +145,13 @@ async fn test_genesis_transaction_flow() {
     let genesis_blob_path = TempPath::new();
     genesis_blob_path.create_as_file().unwrap();
 
+    let framework_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("aptos-move")
+        .join("framework")
+        .join("aptos-framework");
+
     Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
         .args(&vec![
@@ -147,8 +163,8 @@ async fn test_genesis_transaction_flow() {
             CORE_CODE_ADDRESS.clone().to_hex().as_str(),
             "--script-path",
             move_script_path.as_path().to_str().unwrap(),
-            "--framework-git-rev",
-            "HEAD",
+            "--framework-local-dir",
+            framework_path.as_os_str().to_str().unwrap(),
             "--assume-yes",
         ])
         .output()
@@ -232,7 +248,7 @@ async fn test_genesis_transaction_flow() {
         4
     );
 
-    println!("10. nuke DB on node 3, and run db-restore, test if it rejoins the network okay.");
+    println!("10. nuke DB on node 3, and run db restore, test if it rejoins the network okay.");
     let node = env.validators_mut().nth(3).unwrap();
     node.stop();
     let mut node_config = node.config().clone();
@@ -241,7 +257,12 @@ async fn test_genesis_transaction_flow() {
 
     let db_dir = node.config().storage.dir();
     fs::remove_dir_all(&db_dir).unwrap();
-    db_restore(backup_path.path(), db_dir.as_path(), &[waypoint]);
+    db_restore(
+        backup_path.path(),
+        db_dir.as_path(),
+        &[waypoint],
+        node.config().storage.rocksdb_configs.use_state_kv_db,
+    );
 
     node.start().unwrap();
     wait_for_node(node, num_nodes - 2).await;

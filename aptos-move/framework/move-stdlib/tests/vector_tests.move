@@ -90,7 +90,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(vector_error, minor_status = 1, location = Self)]
     fun borrow_out_of_range() {
         let v = V::empty();
         V::push_back(&mut v, 7);
@@ -133,7 +133,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 3, location = Self)]
+    #[expected_failure(vector_error, minor_status = 3, location = Self)]
     fun destroy_non_empty() {
         let v = V::empty();
         V::push_back(&mut v, 42);
@@ -154,7 +154,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2, location = Self)]
+    #[expected_failure(vector_error, minor_status = 2, location = Self)]
     fun pop_out_of_range() {
         let v = V::empty<u64>();
         V::pop_back(&mut v);
@@ -228,14 +228,14 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000, location = Self)]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun remove_empty_vector() {
         let v = V::empty<u64>();
         V::remove(&mut v, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000, location = Self)]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun remove_out_of_bound_index() {
         let v = V::empty<u64>();
         V::push_back(&mut v, 0);
@@ -299,14 +299,14 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(vector_error, minor_status = 1, location = Self)]
     fun swap_empty() {
         let v = V::empty<u64>();
         V::swap(&mut v, 0, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(vector_error, minor_status = 1, location = Self)]
     fun swap_out_of_range() {
         let v = V::empty<u64>();
 
@@ -319,7 +319,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x20000, location = Self)]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun swap_remove_empty() {
         let v = V::empty<u64>();
         V::swap_remove(&mut v, 0);
@@ -377,7 +377,7 @@ module std::vector_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 1, location = Self)]
+    #[expected_failure(vector_error, minor_status = 1, location = std::vector)]
     fun swap_remove_out_of_range() {
         let v = V::empty();
         V::push_back(&mut v, 0);
@@ -499,5 +499,73 @@ module std::vector_tests {
             NotDroppable {},
             NotDroppable {}
         );
+    }
+
+    #[test]
+    fun test_for_each() {
+        let v = vector[1, 2, 3];
+        let s = 0;
+        V::for_each(v, |e| {
+            s = s + e;
+        });
+        assert!(s == 6, 0)
+    }
+
+    #[test]
+    fun test_for_each_ref() {
+        let v = vector[1, 2, 3];
+        let s = 0;
+        V::for_each_ref(&v, |e| s = s + *e);
+        assert!(s == 6, 0)
+    }
+
+    #[test]
+    fun test_for_each_mut() {
+        let v = vector[1, 2, 3];
+        let s = 2;
+        V::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
+        assert!(v == vector[2, 3, 4], 0)
+    }
+
+    #[test]
+    fun test_fold() {
+        let v = vector[1, 2, 3];
+        let s = V::fold(v, 0, |r, e| r + e);
+        assert!(s == 6 , 0)
+    }
+
+    #[test]
+    fun test_map() {
+        let v = vector[1, 2, 3];
+        let s = V::map(v, |x| x + 1);
+        assert!(s == vector[2, 3, 4] , 0)
+    }
+
+    #[test]
+    fun test_map_ref() {
+        let v = vector[1, 2, 3];
+        let s = V::map_ref(&v, |x| *x + 1);
+        assert!(s == vector[2, 3, 4] , 0)
+    }
+
+    #[test]
+    fun test_filter() {
+        let v = vector[1, 2, 3];
+        let s = V::filter(v, |x| *x % 2 == 0);
+        assert!(s == vector[2] , 0)
+    }
+
+    #[test]
+    fun test_any() {
+        let v = vector[1, 2, 3];
+        let r = V::any(&v, |x| *x > 2);
+        assert!(r, 0)
+    }
+
+    #[test]
+    fun test_all() {
+        let v = vector[1, 2, 3];
+        let r = V::all(&v, |x| *x >= 1);
+        assert!(r, 0)
     }
 }

@@ -126,6 +126,7 @@ module aptos_token::token_transfers {
         sender: address,
         token_id: TokenId,
     ) acquires PendingClaims {
+        assert!(exists<PendingClaims>(sender), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
             &mut borrow_global_mut<PendingClaims>(sender).pending_claims;
         let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
@@ -164,6 +165,7 @@ module aptos_token::token_transfers {
     ) acquires PendingClaims {
         let sender_addr = signer::address_of(sender);
         let token_offer_id = create_token_offer_id(receiver, token_id);
+        assert!(exists<PendingClaims>(sender_addr), ETOKEN_OFFER_NOT_EXIST);
         let pending_claims =
             &mut borrow_global_mut<PendingClaims>(sender_addr).pending_claims;
         let token = table::remove(pending_claims, token_offer_id);

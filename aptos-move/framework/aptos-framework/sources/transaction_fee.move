@@ -59,9 +59,17 @@ module aptos_framework::transaction_fee {
     }
 
     /// Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
-    public fun upgrade_burn_percentage(aptos_framework: &signer, new_burn_percentage: u8) acquires CollectedFeesPerBlock {
+    public fun upgrade_burn_percentage(
+        aptos_framework: &signer,
+        new_burn_percentage: u8
+    ) acquires AptosCoinCapabilities, CollectedFeesPerBlock {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(new_burn_percentage <= 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));
+
+        // Prior to upgrading the burn percentage, make sure to process collected
+        // fees. Otherwise we would use the new (incorrect) burn_percentage when
+        // processing fees later!
+        process_collected_fees();
 
         if (is_fees_collection_enabled()) {
             // Upgrade has no effect unless fees are being collected.
@@ -107,8 +115,12 @@ module aptos_framework::transaction_fee {
         };
         let collected_fees = borrow_global_mut<CollectedFeesPerBlock>(@aptos_framework);
 
-        // If there are no collected fees, do nothing.
+        // If there are no collected fees, only unset the proposer. See the rationale for
+        // setting proposer to option::none() below.
         if (coin::is_aggregatable_coin_zero(&collected_fees.amount)) {
+            if (option::is_some(&collected_fees.proposer)) {
+                let _ = option::extract(&mut collected_fees.proposer);
+            };
             return
         };
 

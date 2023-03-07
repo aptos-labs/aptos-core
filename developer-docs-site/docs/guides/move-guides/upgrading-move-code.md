@@ -79,6 +79,18 @@ installed at addresses `0x1` to `0xa` are exempted from the dependency check.
 This is necessary so one can define an `immutable` package based on the standard
 libraries, which have the `compatible` policy to allow critical upgrades and fixes.
 
+## Compatibility rules
+When using `compatible` upgrade policy, a module package can be upgraded. However, updates to existing modules already
+published previously need to be compatible and follow the rules below:
+- All existing structs' fields cannot be updated. This means no new fields can be added and existing fields cannot be
+modified. Struct abilities also cannot be changed (no new ones added or existing removed).
+- All public and entry functions cannot change their signature (argument types, type argument, return types). However,
+argument names can change.
+- Public(friend) functions are treated as private and thus their signature can arbitrarily change. This is safe as
+only modules in the same package can call friend functions anyway and they need to be updated if the signature changes.
+
+When updating your modules, if you see an incompatible error, make sure to check the above rules and fix any violations.
+
 ## Security considerations for dependencies
 
 As mentioned above, even compatible upgrades can have disastrous effects for

@@ -1,32 +1,38 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TransactionCommitter, TransactionExecutor};
-use aptos_executor::block_executor::BlockExecutor;
+use crate::{
+    benchmark_transaction::BenchmarkTransaction, TransactionCommitter, TransactionExecutor,
+};
+use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::transaction::{Transaction, Version};
-use aptos_vm::AptosVM;
+use aptos_types::transaction::Version;
 use std::{
+    marker::PhantomData,
     sync::{mpsc, Arc},
     thread::JoinHandle,
 };
 
-pub struct Pipeline {
+pub struct Pipeline<V> {
     join_handles: Vec<JoinHandle<()>>,
+    phantom: PhantomData<V>,
 }
 
-impl Pipeline {
+impl<V> Pipeline<V>
+where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
     pub fn new(
-        executor: BlockExecutor<AptosVM>,
+        executor: BlockExecutor<V, BenchmarkTransaction>,
         version: Version,
-    ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
+    ) -> (Self, mpsc::SyncSender<Vec<BenchmarkTransaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
         let (block_sender, block_receiver) =
-            mpsc::sync_channel::<Vec<Transaction>>(50 /* bound */);
+            mpsc::sync_channel::<Vec<BenchmarkTransaction>>(50 /* bound */);
         let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
 
         let exe_thread = std::thread::Builder::new()
@@ -53,7 +59,13 @@ impl Pipeline {
             .expect("Failed to spawn transaction committer thread.");
         let join_handles = vec![exe_thread, commit_thread];
 
-        (Self { join_handles }, block_sender)
+        (
+            Self {
+                join_handles,
+                phantom: PhantomData,
+            },
+            block_sender,
+        )
     }
 
     pub fn join(self) {

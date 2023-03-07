@@ -852,7 +852,7 @@ Target utilization is set to 2 billion items and 1 TB.
 | Data style | Operation | Minimum gas | Maximum gas |
 |------------|-----------|-------------|-------------|
 | Per item   | Read      | 300K        | 300K * 100  |
-| Per item   | Create    | 5M          | 5M * 100    |
+| Per item   | Create    | 300k        | 300k * 100    |
 | Per item   | Write     | 300K        | 300K * 100  |
 | Per byte   | Read      | 300         | 300 * 100   |
 | Per byte   | Create    | 5K          | 5K * 100    |
@@ -888,7 +888,7 @@ target utilization.
     <b>let</b> item_config = <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
         target_usage: 2 * k * m, // 2 billion
         read_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300 * k, 300 * k * 100),
-        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(5 * m, 5 * m * 100),
+        create_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300 * k, 300 * k * 100),
         write_curve: <a href="storage_gas.md#0x1_storage_gas_base_8192_exponential_curve">base_8192_exponential_curve</a>(300 * k, 300 * k * 100),
     };
     <b>let</b> byte_config = <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {

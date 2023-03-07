@@ -1,14 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_config::{
-    config::{
-        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
-    },
-    utils::get_genesis_txn,
-};
+use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
@@ -65,18 +59,8 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
     fs::create_dir_all(&checkpoint_dir).unwrap();
 
     // Open the database and create a checkpoint
-    AptosDB::open(
-        &source_dir,
-        false,                       /* readonly */
-        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-        RocksdbConfigs::default(),
-        false,
-        BUFFERED_STATE_TARGET_ITEMS,
-        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    )
-    .expect("AptosDB open failure.")
-    .create_checkpoint(&checkpoint_dir)
-    .expect("AptosDB checkpoint creation failed.");
+    AptosDB::create_checkpoint(&source_dir, &checkpoint_dir)
+        .expect("AptosDB checkpoint creation failed.");
 
     // Create a consensus db checkpoint
     aptos_consensus::create_checkpoint(&source_dir, &checkpoint_dir)

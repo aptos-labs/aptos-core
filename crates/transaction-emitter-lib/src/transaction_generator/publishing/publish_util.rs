@@ -1,6 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::module_simple::EntryPoints;
 use crate::transaction_generator::publishing::module_simple;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
@@ -146,21 +147,35 @@ impl Package {
     }
 
     // Return a transaction to use the current package
-    pub fn use_transaction(
+    pub fn use_random_transaction(
         &self,
         rng: &mut StdRng,
         account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
-        gas_price: u64,
     ) -> SignedTransaction {
         match self {
             Self::Simple(modules, _) => {
                 let module_id = modules[0].self_id();
                 // let payload = module_simple::rand_gen_function(rng, module_id);
                 let payload = module_simple::rand_simple_function(rng, module_id);
-                account.sign_with_transaction_builder(
-                    txn_factory.payload(payload).gas_unit_price(gas_price),
-                )
+                account.sign_with_transaction_builder(txn_factory.payload(payload))
+            },
+        }
+    }
+
+    pub fn use_specific_transaction(
+        &self,
+        fun: EntryPoints,
+        account: &mut LocalAccount,
+        txn_factory: &TransactionFactory,
+        rng: Option<&mut StdRng>,
+        other: Option<AccountAddress>,
+    ) -> SignedTransaction {
+        match self {
+            Self::Simple(modules, _) => {
+                let module_id = modules[0].self_id();
+                let payload = fun.create_payload(module_id, rng, other);
+                account.sign_with_transaction_builder(txn_factory.payload(payload))
             },
         }
     }

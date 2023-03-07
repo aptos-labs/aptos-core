@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod backup_service_client;
@@ -56,19 +57,25 @@ pub struct GlobalBackupOpt {
 
 #[derive(Clone, Parser)]
 pub struct RocksdbOpt {
-    #[clap(long, default_value = "5000")]
+    #[clap(long, hidden(true), default_value = "5000")]
     ledger_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     ledger_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "5000")]
+    #[clap(long, hidden(true), default_value = "5000")]
     state_merkle_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "1000")]
+    #[clap(long, hidden(true))]
+    use_state_kv_db: bool,
+    #[clap(long, hidden(true), default_value = "5000")]
+    state_kv_db_max_open_files: i32,
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
+    state_kv_db_max_total_wal_size: u64,
+    #[clap(long, hidden(true), default_value = "1000")]
     index_db_max_open_files: i32,
-    #[clap(long, default_value = "1073741824")] // 1GB
+    #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     index_db_max_total_wal_size: u64,
-    #[clap(long, default_value = "16")]
+    #[clap(long, hidden(true), default_value = "16")]
     max_background_jobs: i32,
 }
 
@@ -84,6 +91,13 @@ impl From<RocksdbOpt> for RocksdbConfigs {
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
+                max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
+            },
+            use_state_kv_db: opt.use_state_kv_db,
+            state_kv_db_config: RocksdbConfig {
+                max_open_files: opt.state_kv_db_max_open_files,
+                max_total_wal_size: opt.state_kv_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },

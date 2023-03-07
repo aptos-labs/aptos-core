@@ -7,14 +7,14 @@ id: "install-aptos-cli"
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging Move contracts, and conducting node operations. This document describes how to install the `aptos` CLI tool using precompiled binaries that reduce variables in setting up your environment. Also see:
 
-* [Building Aptos CLI from Source](../build-from-source.md) for an advanced alternative to using the precompiled binaries.
+* [Installing the Aptos CLI](./index.md) for an alternative to using the precompiled binaries.
 * [Installing the Move Prover](../install-move-prover.md) for an optional tool to validate your Move code.
 * [Using Aptos CLI](use-aptos-cli.md) for detailed instructions on employing the Aptos CLI.
 
-To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow the instructions below. Whenever possible, install the CLI by downloading the precompiled binary for your platform, as described below. If needed, you may build from source.
+To download the Aptos source code, related tools, and IDE plugins for the Move programming language, follow the instructions below. Whenever possible, install the CLI by downloading the precompiled binary for your platform, as described below. If needed, you may build from source or use one the other [methods of installation](./index.md).
 
 :::tip Use setup script
-Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies. 
+Aptos offers the [`dev_setup.sh`](https://github.com/aptos-labs/aptos-core/blob/main/scripts/dev_setup.sh) script for establishing your development environment. This script currently supports macOS and Ubuntu Linux with other Linux distributions working but untested. The script does not support Windows. See the instructions below to manually install necessary dependencies.
 :::
 
 <details>
@@ -27,7 +27,7 @@ These instructions have been tested on macOS Monterey (12.6)
 
 
 1. Go to the [Aptos CLI Release](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true) list.
-1. Click the **Assets** expandable menu for the latest release. 
+1. Click the **Assets** expandable menu for the latest release.
 1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
 1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. For example, on macOS it is the `~/Downloads` folder.
 1. Move this extracted `aptos` binary file into your preferred local folder. For example, place it in the `~/bin/aptos` folder on macOS to make it accessible from the command line.
@@ -52,12 +52,13 @@ These instructions have been tested on Ubuntu 20.04.
 :::
 
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
-1. Click the **Assets** expandable menu for the latest release. 
+1. Click the **Assets** expandable menu for the latest release.
 1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
-1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. 
-1. Move this extracted `aptos` binary file into your preferred local folder. 
+1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder.
+1. Move this extracted `aptos` binary file into your preferred local folder.
 
-   :::tip Upgrading? Remember to look in the default download folder
+   :::tip
+   Upgrading? Remember to look in the default download folder
    When you update the CLI binary with the latest version, note that the newer version binary will be downloaded to your default Downloads folder. Remember to move this newer version binary from the Downloads folder to `~/bin/aptos` folder (overwriting the older version).
    :::
 
@@ -78,7 +79,7 @@ These instructions have been tested on Windows 11 and Windows Server 2022. Windo
 :::
 
 1. Go to the [Aptos CLI release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
-1. Click the **Assets** expandable menu for the latest release. 
+1. Click the **Assets** expandable menu for the latest release.
 1. You will see the zip files with the filename of the format: `aptos-cli-<version>-<platform>`. These are the platform-specific pre-compiled binaries of the CLI. Download the zip file for your platform, dismissing any warnings.
 1. Unzip the downloaded file. This will extract the `aptos` CLI binary file into your default downloads folder. For example, on Windows it is the `\Users\user\Downloads` folder.
 1. Move this extracted `aptos` binary file into your preferred local folder.

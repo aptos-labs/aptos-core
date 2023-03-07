@@ -1,26 +1,35 @@
 ---
-title: "Adhere to Wallet Standard"
+title: "Aptos Wallet Standard"
 slug: "wallet-standard"
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Adhere to Wallet Standard
+# Aptos Wallet Standard
 
-In order to allow for Aptos' wallet interoperability, the following is required:
-1. Mnemonics - a set of words that can derive account private keys
-2. dApp API - entry points into the wallet to support access to identity managed by the wallet
-3. Key rotation - handling both the relationship around mnemonics and the recovery of accounts in different wallets
+The wallet standard provides guidelines for interoperability between wallet types.  This ensures dapp developers do not need to change
+their applications to handle different wallets. This standard offers a single interface for all dapp developers, allowing easy additions of new wallets and more users to each application. This interoperability allows users to choose which wallet they want without worrying about whether apps support their use cases.
 
-## Mnemonics
-While [Petra wallet](../guides/install-petra-wallet.md) recommends 1 mnemonic <-> 1 account, we recognize that some wallets may want to support 1 mnemonic <-> n accounts coming from other chains. To support both of these use cases we are using a [BIP44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) derive path for mnemonics to accounts.
+In order to ensure interoperability across Aptos wallets, the following is required:
+1. Mnemonics - a set of words that can be used to derive account private keys
+2. dapp API - entry points into the wallet to support access to identity managed by the wallet
+3. Key rotation - the feature handling both the relationship around mnemonics and the recovery of accounts in different wallets
 
-### Creating an Aptos Account
-1. Generate mnemonic using something like BIP39
-2. Get a master seed from that mnemonic using BIP39
-3. Use the BIP44 derive path to retrieve an account address (e.g. `m/44'/637'/0'/0'/0'`)
-    - See Aptos' [typescript SDK implementation for the derive path](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_account.ts#L49-L69))
-    - In the case of Petra, we will always use the path `m/44'/637'/0'/0'/0'` since we have 1 mnemonic <-> 1 account
+## Mnemonics phrases
+
+A mnemonic phrase is a multiple word phrase that can be used to generate account addresses.
+We recommend one mnemonic per account in order to handle key rotation better.  For example, [Petra wallet](../guides/install-petra-wallet.md) uses a one-to-one matching of mnemonic to account system.
+However, some wallets may want to support one mnemonic to many accounts coming from other chains. To support both of these use cases, the Aptos wallet standard uses a [Bitcoin Improvement Proposal (BIP44)](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) to derive path for mnemonics to accounts.
+
+### Creating an Aptos account
+
+Aptos account creation can be supported across wallets in the following manner:
+
+1. Generate a mnemonic phrase, for example with BIP39.
+2. Get the master seed from that mnemonic phrase.
+3. Use the BIP44-derived path to retrieve an account address (e.g. `m/44'/637'/0'/0'/0'`)
+    - See the [Aptos TypeScript SDK's implementation for the derive path](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_account.ts#L49-L69))
+    - For example, Petra Wallet always uses the path `m/44'/637'/0'/0'/0'` since there is one mnemonic per one account.
 
 
 ```typescript
@@ -48,14 +57,17 @@ While [Petra wallet](../guides/install-petra-wallet.md) recommends 1 mnemonic <-
   }
 ```
 
-### Supporting 1 Mnemonic <-> N Account Wallets
-Again, because the 1 mnemonic <-> n accounts paradigm doesn't fit well with key rotation. We don't recommend this approach currently. But to support importing these type of accounts we will follow this standard.
+### Supporting one mnemonic per multiple account wallets
 
-1. Same as above steps 1-3
-2. Use the BIP44 derive path to retrieve private keys (e.g. m/44'/637'/i'/0'/0') where i is the account index
-3. Now we will iterate i until we get all the accounts the user wants to import
-    - We don't want to iterate to infinity to we will be checking if the accounts exist on chain. If an account doesn't exist during iteration we will keep iterating for a constant `address_gap_limit` (10 for now) to see if there are any other accounts. If an account is found we will continue to iterate as normal.
+This is not recommended because the one-mnemonic-to-many-accounts paradigm makes it harder to handle rotated keys (the mnemonic changes for one account but not others).
+However, many wallets from other ecosystems use this paradigm, and take these steps to generate accounts
 
+1. Generate a mnemonic phrase, for example with BIP39.
+2. Get the master seed from that mnemonic phrase.
+4. Use the BIP44-derived path to retrieve private keys (e.g. `m/44'/637'/i'/0'/0'`) where `i` is the account index.
+    - See the [Aptos TypeScript SDK's implementation for the derive path](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_account.ts#L49-L69))
+6. Increase `i` until all of the accounts the user wants to import are found.
+    - Note: The iteration should be limited, if an account doesn't exist during iteration, keep iterating for a constant `address_gap_limit` (10 for now) to see if there are any other accounts. If an account is found we will continue to iterate as normal.
 
 ie.
 ```typescript
@@ -75,11 +87,11 @@ for (let i = 0; currentGap < gapLimit; i += 1) {
 }
 ```
 
-## dApp API
-**[Forum post with discussion](https://forum.aptoslabs.com/t/wallet-dapp-api-standards/11765/33)**
-There will be some APIs that certain wallets may add but there should be a few apis that are standard across wallets. This will make mass adoption easier and will make dApp developers' lives easier.
+## dapp API
 
-- `connect()`, `disconnect()`, and `isConnected()`
+More important than account creation, is how wallets connect to dapps. Additionally, following these APIs will allow for the wallet developer to integrate with the [Aptos Wallet Adapter Standard](../concepts/wallet-adapter-concept.md).  The APIs are as follows:
+
+- `connect()`, `disconnect()`
 - `account()`
 - `network()`
 - `signAndSubmitTransaction(transaction: EntryFunctionPayload)`
@@ -103,7 +115,7 @@ type NetworkInfo = {
   url: string;
 };
 
-// The important thing to return here is the transaction hash the dApp can wait for it
+// The important thing to return here is the transaction hash, the dApp can wait for it
 type [PendingTransaction](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/generated/models/PendingTransaction.ts)
 
 type [EntryFunctionPayload](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/generated/models/EntryFunctionPayload.ts)
@@ -111,39 +123,48 @@ type [EntryFunctionPayload](https://github.com/aptos-labs/aptos-core/blob/1bc5fd
 
 ```
 
-### connect(), disconnect(), isConnected()
-It is important that dApps, aren't allow to send requests to the wallet until the user acknowledges that they want to see these requests.
+### Connection APIs
 
-- `connect()` will prompt the user 
+The connection APIs ensure that wallets don't accept requests until the user acknowledges that they want to see the requests. This keeps
+the user state clean and prevents the user from unknowingly having prompts.
+
+- `connect()` will prompt the user for a connection
     - return `Promise<AccountInfo>`
-- `disconnect()` allows the user to stop giving access to a dApp and also helps the dApp with state management
+- `disconnect()` allows the user to stop giving access to a dapp and also helps the dapp with state management
     - return `Promise<void>`
-- `isConnected()` able to make requests to the wallet to get current state of connection
-    - return `Promise<boolean>`
 
+### State APIs
+#### Get Account
+**Connection required**
 
-### account()
-**Needs to be connected**
-The dApp may want to query for the current connected account to get the address or public key.
+Allows a dapp to query for the current connected account address and public key
 
 - `account()` no prompt to the user
     - returns `Promise<AccountInfo>`
 
-### network()
-**Needs to be connected**
-The dApp may want to query for the current connected network to get the network name, chain_id and url.
+#### Get Network
+**Connection required**
+
+Allows a dapp to query for the current connected network name, chain ID, and URL
 
 - `network()` no prompt to the user
     - returns `Promise<NetworkInfo>`
 
-### signAndSubmitTransaction(transaction: EntryFunctionPayload)
-We will be generate a transaction from payload(simple JSON) using the [SDK](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_client.ts#L217-L221) and then sign and submit it to the wallet's node.
+### Signing APIs
+#### Sign and submit transaction
+**Connection required**
+
+Allows a dapp to send a simple JSON payload using the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/1bc5fd1f5eeaebd2ef291ac741c0f5d6f75ddaef/ecosystem/typescript/sdk/src/aptos_client.ts#L217-L221)
+for signing and submission to the current network. The user should be prompted for approval.
 
 - `signAndSubmitTransaction(transaction: EntryFunctionPayload)` will prompt the user with the transaction they are signing
     - returns `Promise<PendingTransaction>`
 
-### signMessage(payload: SignMessagePayload)
-The most common usecase for this function is to verify identity, but there are a few other possible use cases. You may notice some wallets from other chains just provide an interface to sign arbitrary strings. This can be susceptible to man-in-the-middle attacks, signing string transactions, etc.
+#### Sign message
+**Connection required**
+
+Allows a dapp to sign a message with their private key. The most common use case is to verify identity, but there are a few other possible use
+cases. The user should be prompted for approval. You may notice some wallets from other chains just provide an interface to sign arbitrary strings. This can be susceptible to man-in-the-middle attacks, signing string transactions, etc.
 
 Types:
 ```typescript
@@ -184,12 +205,22 @@ nonce: 1234034
 message: Welcome to dApp!
 ```
 
-If the wallet is single-signer account, there is one signature and `bitmap` is null.
+Aptos has support for both single-signer and multi-signer accounts. If the wallet is single-signer account, there is exactly one signature and `bitmap` is null. If the wallet is a multi-signer account, there are multiple `signature` and `bitmap` values. The `bitmap` masks that public key that has signed the message.
 
-If the wallet is multi-signers account, there are multiple `signature` and `bitmap` value. `bitmap` masks which public key has signed message.
+### Event listening
 
-### Event listening (In progress)
+To be added in the future:
+- Event listening (`onAccountChanged(listener)`, `onNetworkChanged(listener)`)
 
-## Key Rotation (In Progress)
+## Key rotation
 
-Mapping has been [implemented](https://github.com/aptos-labs/aptos-core/pull/2972) but SDK integration is in progress. This will be updated soon.
+Key rotation is currently not implemented in any wallets. Mapping of rotated keys has been [implemented](https://github.com/aptos-labs/aptos-core/pull/2972), but SDK integration is in progress.
+
+Wallets that import a private key will have to do the following:
+1. Derive the authentication key.
+2. Lookup the authentication key onchain in the Account origination table
+  - If the account doesn't exist, it's a new account. The address to be used is the authentication key.
+  - If the account does exist, it's a rotated key account, and the address to be used will come from the table.
+
+## Appendix
+- **[Forum post with discussion](https://forum.aptoslabs.com/t/wallet-dapp-api-standards/11765/33)** about the dapp API

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
@@ -10,11 +10,13 @@ pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
 /// Example invocations:
 ///
 /// ```
-/// let target_metrics_provider = get_provider!(
+/// # use std::io;
+/// let target_metrics_provider = aptos_node_checker_lib::get_provider!(
 ///     input.target_metrics_provider,
 ///     true,
 ///     MetricsProvider
-/// );
+/// )?;
+/// # Ok::<_, io::Error>(vec![])
 /// ```
 ///
 /// The first argument is the Option, the second is `required`, and the last is

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
@@ -208,9 +209,7 @@ fn test_get_account_sequence_number() {
         .latest_state_checkpoint_view()
         .unwrap();
     assert_eq!(
-        get_account_sequence_number(&state_view, root_address,)
-            .unwrap()
-            .min_seq(),
+        get_account_sequence_number(&state_view, root_address).unwrap(),
         0
     );
     assert_eq!(
@@ -218,8 +217,7 @@ fn test_get_account_sequence_number() {
             &state_view,
             AccountAddress::new([5u8; AccountAddress::LENGTH]),
         )
-        .unwrap()
-        .min_seq(),
+        .unwrap(),
         0
     );
 }

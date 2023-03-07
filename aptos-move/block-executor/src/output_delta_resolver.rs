@@ -1,42 +1,37 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::view::ResolvedData;
+use crate::{executor::RAYON_EXEC_POOL, task::Transaction};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_mvhashmap::{EntryCell, MVHashMap};
+use aptos_state_view::TStateView;
 use aptos_types::write_set::{TransactionWrite, WriteOp};
-use std::{hash::Hash, thread::spawn};
 
-pub struct OutputDeltaResolver<K, V> {
-    versioned_outputs: MVHashMap<K, V>,
+pub(crate) struct OutputDeltaResolver<T: Transaction> {
+    versioned_outputs: MVHashMap<T::Key, T::Value>,
 }
 
-impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 'static>
-    OutputDeltaResolver<K, V>
-{
-    pub fn new(versioned_outputs: MVHashMap<K, V>) -> Self {
+impl<T: Transaction> OutputDeltaResolver<T> {
+    pub fn new(versioned_outputs: MVHashMap<T::Key, T::Value>) -> Self {
         Self { versioned_outputs }
     }
 
     /// Takes Self, vector of all involved aggregator keys (each with at least one
     /// delta to resolve in the output), resolved values from storage for each key,
     /// and blocksize, and returns a Vec of materialized deltas per transaction index.
-    pub fn resolve(
+    pub(crate) fn resolve(
         self,
-        aggregator_keys: Vec<(K, anyhow::Result<ResolvedData>)>,
+        base_view: &impl TStateView<Key = T::Key>,
         block_size: usize,
-    ) -> Vec<Vec<(K, WriteOp)>> {
-        let mut ret: Vec<Vec<(K, WriteOp)>> = (0..block_size).map(|_| Vec::new()).collect();
+    ) -> Vec<Vec<(T::Key, WriteOp)>> {
+        let mut ret: Vec<Vec<(T::Key, WriteOp)>> = vec![vec![]; block_size];
 
         // TODO: with more deltas, re-use executor threads and process in parallel.
-        for (key, storage_val) in aggregator_keys.into_iter() {
-            let mut latest_value: Option<u128> = match storage_val
+        for key in self.versioned_outputs.aggregator_keys() {
+            let mut latest_value: Option<u128> = base_view
+                .get_state_value_bytes(&key)
                 .ok() // Was anything found in storage
-                .map(|value| value.map(|bytes| deserialize(&bytes)))
-            {
-                None => None,
-                Some(v) => v,
-            };
+                .and_then(|value| value.map(|bytes| deserialize(&bytes)));
 
             let indexed_entries = self
                 .versioned_outputs
@@ -66,7 +61,7 @@ impl<K: Hash + Clone + Eq + Send + 'static, V: TransactionWrite + Send + Sync + 
             }
         }
 
-        spawn(move || drop(self));
+        RAYON_EXEC_POOL.spawn(move || drop(self));
 
         ret
     }

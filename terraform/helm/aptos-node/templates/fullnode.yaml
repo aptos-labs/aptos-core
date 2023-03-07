@@ -24,7 +24,7 @@ spec:
     port: 8080
 
 ---
-
+{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (printf "%s-%d-%s-e%s" (include "aptos-validator.fullname" $) $i .name (toYaml $.Values.chain.era)) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -75,7 +75,11 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: fullnode
+        {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $fullnode_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+        {{- end }}
         imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
         {{- if not $.Values.pyroscope.enabled }}
         command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]

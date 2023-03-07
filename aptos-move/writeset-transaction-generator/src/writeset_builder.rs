@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::format_err;
@@ -11,7 +12,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{FeatureFlag, Features},
+    on_chain_config::{Features, TimedFeatures},
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -114,13 +115,13 @@ where
         NativeGasParameters::zeros(),
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-        Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
+        Features::default(),
+        TimedFeatures::enable_all(),
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
-    let session_out = {
+    let change_set_ext = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session = GenesisSession(
@@ -131,19 +132,15 @@ where
         session.enable_reconfiguration();
         session
             .0
-            .finish()
+            .finish(
+                &mut (),
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };
 
     // Genesis never produces the delta change set.
-    let (_, change_set) = session_out
-        .into_change_set(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-        .unwrap()
-        .into_inner();
+    let (_delta_change_set, change_set) = change_set_ext.into_inner();
     change_set
 }

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -17,7 +18,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::block,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{Transaction, TransactionListWithProof, TransactionOutputListWithProof},
 };
 use rand::Rng;
 
@@ -263,7 +264,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<MockVM>::new(db);
+        let executor = BlockExecutor::<MockVM, Transaction>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
 
@@ -310,7 +311,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<MockVM>::new(db);
+        let executor = BlockExecutor::<MockVM, Transaction>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
 

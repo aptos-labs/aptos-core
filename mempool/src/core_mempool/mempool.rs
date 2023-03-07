@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Mempool is used to track transactions which have been submitted but not yet
@@ -19,7 +20,6 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
@@ -115,10 +115,9 @@ impl Mempool {
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
-        sequence_info: AccountSequenceInfo,
+        db_sequence_number: u64,
         timeline_state: TimelineState,
     ) -> MempoolStatus {
-        let db_sequence_number = sequence_info.min_seq();
         trace!(
             LogSchema::new(LogEntry::AddTxn)
                 .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
@@ -143,7 +142,7 @@ impl Mempool {
             expiration_time,
             ranking_score,
             timeline_state,
-            AccountSequenceInfo::Sequential(db_sequence_number),
+            db_sequence_number,
             now,
         );
 

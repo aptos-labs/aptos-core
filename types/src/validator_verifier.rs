@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -11,6 +12,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, bls12381::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
+use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -213,6 +215,10 @@ impl ValidatorVerifier {
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
+    }
+
+    pub fn get_ordered_account_addresses(&self) -> Vec<AccountAddress> {
+        self.get_ordered_account_addresses_iter().collect_vec()
     }
 
     /// This function will successfully return when at least quorum_size signatures of known authors

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -16,6 +17,7 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
 use anyhow::Result;
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -58,7 +60,6 @@ impl VerifyCoordinator {
             info!("Verify coordinator exiting with success.");
             VERIFY_COORDINATOR_SUCC_TS.set(unix_timestamp_sec());
         }
-
         ret
     }
 
@@ -117,7 +118,7 @@ impl VerifyCoordinator {
             txn_manifests,
             None, /* replay_from_version */
             Some(epoch_history),
-            vec![],
+            VerifyExecutionMode::NoVerify,
         )
         .run()
         .await?;

@@ -1,9 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
 use crate::{
-    application::{interface::NetworkClient, storage::PeerMetadataStorage, types::PeerInfo},
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{
         self, conn_notifs_channel, ConnectionRequest, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
@@ -31,7 +32,7 @@ struct TestHarness {
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl TestHarness {
@@ -56,12 +57,12 @@ impl TestHarness {
             HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
 
         let network_context = NetworkContext::mock();
-        let peer_metadata_storage = PeerMetadataStorage::test();
+        let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
         let network_client = NetworkClient::new(
             vec![],
             vec![HealthCheckerRpc],
             hashmap! {network_context.network_id() => network_sender},
-            peer_metadata_storage.clone(),
+            peers_and_metadata.clone(),
         );
 
         let health_checker = HealthChecker::new(
@@ -80,7 +81,7 @@ impl TestHarness {
                 peer_mgr_notifs_tx,
                 connection_reqs_rx,
                 connection_notifs_tx,
-                peer_metadata_storage,
+                peers_and_metadata,
             },
             health_checker,
         )
@@ -175,14 +176,16 @@ impl TestHarness {
             .unwrap();
         delivered_rx.await.unwrap();
 
-        // Insert a new connection metadata into the peer metadata storage
+        // Insert a new connection metadata into the peers and metadata
         let mut connection_metadata = ConnectionMetadata::mock(peer_id);
         connection_metadata.application_protocols =
             ProtocolIdSet::from_iter(vec![HealthCheckerRpc]);
-        self.peer_metadata_storage.insert(
-            PeerNetworkId::new(network_context.network_id(), peer_id),
-            PeerInfo::new(connection_metadata),
-        );
+        self.peers_and_metadata
+            .insert_connection_metadata(
+                PeerNetworkId::new(network_context.network_id(), peer_id),
+                connection_metadata,
+            )
+            .unwrap();
     }
 }
 

@@ -76,8 +76,5 @@ serviceAccount:
   # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
   name:
 
-# -- LEGACY: create PodSecurityPolicy, which exists at the cluster-level
-podSecurityPolicy: true
-
 # Additional labels
 labels:

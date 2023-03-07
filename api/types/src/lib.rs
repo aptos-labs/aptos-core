@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod account;
@@ -15,7 +16,7 @@ mod ledger_info;
 pub mod mime_types;
 mod move_types;
 mod table;
-mod transaction;
+pub mod transaction;
 mod view;
 mod wrappers;
 
@@ -43,12 +44,13 @@ pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
     GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction, ModuleBundlePayload,
-    MultiAgentSignature, MultiEd25519Signature, PendingTransaction, ScriptPayload, ScriptWriteSet,
-    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
-    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
-    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
-    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
-    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
+    MultiAgentSignature, MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload,
+    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
 pub use view::ViewRequest;
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
