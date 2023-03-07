@@ -4,7 +4,9 @@
 #[cfg(feature = "testing")]
 use crate::natives::util::make_test_only_native_from_func;
 use crate::natives::{cryptography::algebra::gas::GasParameters, util::make_native_from_func};
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ec::{CurveGroup, Group};
+use ark_ec::pairing::Pairing;
+use ark_ec::short_weierstrass::Projective;
 use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
@@ -254,7 +256,7 @@ fn serialize_internal(
                 handle,
                 scheme.as_slice(),
                 ark_bls12_381::G1Projective,
-                serialize
+                serialize_compressed
             );
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         },
@@ -282,7 +284,7 @@ fn serialize_internal(
                 handle,
                 scheme.as_slice(),
                 ark_bls12_381::G2Projective,
-                serialize
+                serialize_compressed
             );
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         },
@@ -411,7 +413,7 @@ fn serialize_v2_internal(
                 handle,
                 SerializationFormat::BLS12381G1Compressed,
                 ark_bls12_381::G1Projective,
-                serialize
+                serialize_compressed
             );
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         },
@@ -435,7 +437,7 @@ fn serialize_v2_internal(
                 handle,
                 SerializationFormat::BLS12381G2Compressed,
                 ark_bls12_381::G2Projective,
-                serialize
+                serialize_compressed
             );
             Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
         },
@@ -493,7 +495,7 @@ macro_rules! ark_ec_point_deserialize_internal {
     ) => {{
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
-                let element_proj = element.into_projective();
+                let element_proj = Projective::from(element);
                 let handle = store_obj!($context, element_proj);
                 Ok(NativeResult::ok(
                     $gas_params.deserialize($structure, $scheme),
@@ -616,7 +618,7 @@ fn deserialize_internal(
                 Structure::BLS12381G1,
                 scheme.as_slice(),
                 ark_bls12_381::G1Affine,
-                deserialize
+                deserialize_compressed
             )
         },
         (Some(Structure::BLS12381G2), scheme)
@@ -654,7 +656,7 @@ fn deserialize_internal(
                 Structure::BLS12381G2,
                 scheme.as_slice(),
                 ark_bls12_381::G2Affine,
-                deserialize
+                deserialize_compressed
             )
         },
         (Some(Structure::BLS12381Gt), scheme)
@@ -729,7 +731,7 @@ macro_rules! ark_ec_point_deserialize_v2_internal {
     ) => {{
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
-                let element_proj = element.into_projective();
+                let element_proj = Projective::from(element);
                 let handle = store_obj!($context, element_proj);
                 Ok(NativeResult::ok(
                     $gas_params.deserialize_v2($structure, $format),
@@ -843,7 +845,7 @@ fn deserialize_v2_internal(
                 Structure::BLS12381G1,
                 SerializationFormat::BLS12381G1Compressed,
                 ark_bls12_381::G1Affine,
-                deserialize
+                deserialize_compressed
             )
         },
         (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Unompressed)) => {
@@ -877,7 +879,7 @@ fn deserialize_v2_internal(
                 Structure::BLS12381G2,
                 SerializationFormat::BLS12381G2Compressed,
                 ark_bls12_381::G2Affine,
-                deserialize
+                deserialize_compressed
             )
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
@@ -1616,8 +1618,7 @@ macro_rules! ark_multi_scalar_mul_internal {
             let all_scalar_bits_concat: Vec<bool> = bits_from_bytes(scalar_bytes, num_scalar_bits_needed);
             let scalars_bytes: Vec<Vec<u8>> = (0..num_elements).map(|i|bytes_from_bits(&all_scalar_bits_concat[scalar_size_in_bits*i..scalar_size_in_bits*(i+1)])).collect();
             let scalars = scalars_bytes.iter().map(|scalar_bytes|ark_bls12_381::Fr::from_le_bytes_mod_order(scalar_bytes.as_slice())).collect_vec();
-            let big_integers: Vec<ark_ff::BigInteger256> = scalars.iter().map(|s|s.into_repr()).collect();
-            let new_element = ark_ec::msm::VariableBaseMSM::multi_scalar_mul(bases.as_slice(), big_integers.as_slice());
+            let new_element: $typ = ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
             let new_handle = store_obj!($context, new_element);
             Ok(NativeResult::ok($gas_params.group_multi_scalar_mul($structure, num_elements, scalar_size_in_bits), smallvec![Value::u64(new_handle as u64)] ))
     }};
@@ -1663,15 +1664,15 @@ macro_rules! ark_multi_scalar_mul_typed_internal {
                     element.into_affine()
                 })
                 .collect::<Vec<_>>();
-            let big_integers = scalar_handles
+            let scalars = scalar_handles
                 .iter()
                 .map(|&handle|{
                     let scalar_ptr = get_obj_pointer!($context, handle as usize);
-                    let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
-                    scalar.into_repr()
+                    let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap().clone();
+                    scalar
                 })
                 .collect::<Vec<_>>();
-            let new_element = ark_ec::msm::VariableBaseMSM::multi_scalar_mul(bases.as_slice(), big_integers.as_slice());
+            let new_element: $element_typ = ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
             let new_handle = store_obj!($context, new_element);
             Ok(NativeResult::ok($gas_params.group_multi_scalar_mul_typed($structure, num_elements), smallvec![Value::u64(new_handle as u64)] ))
     }};
@@ -1708,7 +1709,7 @@ fn group_multi_scalar_mul_typed_internal(
 
 static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(|| {
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();
-    ark_bls12_381::Fq12::deserialize(buf.as_slice()).unwrap()
+    ark_bls12_381::Fq12::deserialize_uncompressed(buf.as_slice()).unwrap()
 });
 
 static BLS12381_R_LENDIAN: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -1721,7 +1722,7 @@ static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(|| {
 
 macro_rules! ark_group_generator_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty) => {{
-        let element = <$typ>::prime_subgroup_generator();
+        let element = <$typ>::generator();
         let handle = store_obj!($context, element);
         Ok(NativeResult::ok(
             $gas_params.group_generator($structure),
@@ -1812,7 +1813,8 @@ fn insecure_random_element_internal(
         },
         Some(Structure::BLS12381Gt) => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
-            let element = BLS12381_GT_GENERATOR.pow(k.into_repr());
+            let k_bigint: ark_ff::BigInteger256 = k.into();
+            let element = BLS12381_GT_GENERATOR.pow(k_bigint);
             let handle = store_obj!(context, element);
             Ok(NativeResult::ok(InternalGas::zero(), smallvec![
                 Value::u64(handle as u64)
@@ -1945,7 +1947,8 @@ macro_rules! ark_group_scalar_mul_typed_internal {
         let element = element_ptr.downcast_ref::<$group_typ>().unwrap();
         let scalar_ptr = get_obj_pointer!($context, scalar_handle);
         let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
-        let new_element = element.$op(scalar.into_repr());
+        let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
+        let new_element = element.$op(scalar_bigint);
         let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
             $gas_params.group_scalar_mul($group_structure),
@@ -1973,7 +1976,7 @@ fn group_scalar_mul_typed_internal(
                 Structure::BLS12_381_Fr,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr,
-                mul
+                mul_bigint
             )
         },
         (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
@@ -1985,20 +1988,24 @@ fn group_scalar_mul_typed_internal(
                 Structure::BLS12_381_Fr,
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr,
-                mul
+                mul_bigint
             )
         },
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
-            ark_group_scalar_mul_typed_internal!(
-                gas_params,
-                context,
-                args,
-                Structure::BLS12381Gt,
-                Structure::BLS12_381_Fr,
-                ark_bls12_381::Fq12,
-                ark_bls12_381::Fr,
-                pow
-            )
+            let scalar_handle = pop_arg!( args , u64 ) as usize;
+            let element_handle = pop_arg!( args , u64 ) as usize;
+            let element_ptr = get_obj_pointer!( context , element_handle );
+            let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            let scalar_ptr = get_obj_pointer!( context , scalar_handle );
+            let scalar = scalar_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
+            let new_element = element.pow
+            (scalar_bigint);
+            let new_handle = store_obj!( context , new_element );
+            Ok(NativeResult::ok(
+                gas_params.group_scalar_mul(Structure::BLS12381Gt),
+                smallvec![ Value :: u64 ( new_handle as u64 ) ],
+            ))
         },
         _ => unreachable!(),
     }
@@ -2070,7 +2077,7 @@ fn group_scalar_mul_internal(
                 Structure::BLS12_381_Fr,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr,
-                mul
+                mul_bigint
             )
         },
         Some(Structure::BLS12381G2) => {
@@ -2082,7 +2089,7 @@ fn group_scalar_mul_internal(
                 Structure::BLS12_381_Fr,
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr,
-                mul
+                mul_bigint
             )
         },
         Some(Structure::BLS12381Gt) => {

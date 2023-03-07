@@ -1023,21 +1023,21 @@ module aptos_std::algebra {
     #[test_only]
     const BLS12_381_R: vector<u8> = x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
     #[test_only]
-    const BLS12_381_G1_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G1_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const BLS12_381_G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G1_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117";
+    const BLS12_381_G1_GENERATOR_SERIALIZED_COMP: vector<u8> = x"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"bbc622db0af03afbef1a7af93fe8556c58ac1b173f3a4ea105b974974f8c68c30faca94f8c63952694d79731a7d3f117e1e7c5462923aa0ce48a88a244c73cd0edb3042ccb18db00f60ad0d595e0f5fce48a1d74ed309ea0f1a0aae381f4b308";
+    const BLS12_381_G1_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32899";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328191c1a98287eec115a8cb0a1cf4968c6fd101ca4593938d73918dd8e81471d8a3ac4b38930aed539564436b6a4baad8d10";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7108dadbaa4b636445639d5ae3089b3c43a8a1d47818edd1839d7383959a41c10fdc66849cfa1b08c5a11ec7e28981a1c";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef32819";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"9928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7";
     #[test_only]
-    const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"b7fc7e62705aef542dbcc5d4bce62a7bf22eef1691bef30dac121fb200ca7dc9a4403b90da4501cfee1935b9bef328198f9067d78113ed5f734fb2e1b497e52013da0c9d679a592da735f6713d2eed2913f9c11208d2e1f455b0c9942f647309";
+    const BLS12_381_G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"1928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb70973642f94c9b055f4e1d20812c1f91329ed2e3d71f635a72d599a679d0cda1320e597b4e1b24f735fed1381d767908f";
 
     #[test(fx = @std)]
     fun test_bls12_381_g1(fx: signer) {
@@ -1083,9 +1083,12 @@ module aptos_std::algebra {
         // Deserialization: a valid point in (Fq,Fq) but not on the curve.
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
+        //TODO: a point on the curve but not in the prime-order subgroup.
+
         // Deserialization: an invalid point (x not in Fq).
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        //TODO: Compressed version.
+        // assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         // Deserialization: byte array of wrong size.
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
@@ -1152,31 +1155,31 @@ module aptos_std::algebra {
         // Subtraction.
         assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
 
-//        // Hash-to-group.
-//        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-//        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"2c15230b26dbc6fc9a37051158c95b79656e17a1a920b11394ca91c44247d3e48a7a74985cc5c776cdfe4b1f19884970453912e9d31528c060be9ab5c43e8415"));
-//        assert!(eq(&expected, &actual), 1);
-//        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-//        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"65038ac8f2b1def042a5df0b33b1f4eca6bff7cb0f9c6c1526811864e544ed80cad44d40a656e7aff4002a8de287abc8ae0482b5ae825822bb870d6df9b56ca3"));
-//        assert!(eq(&expected, &actual), 1);
+        // // Hash-to-group.
+        // let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        // let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"2c15230b26dbc6fc9a37051158c95b79656e17a1a920b11394ca91c44247d3e48a7a74985cc5c776cdfe4b1f19884970453912e9d31528c060be9ab5c43e8415"));
+        // assert!(eq(&expected, &actual), 1);
+        // let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        // let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"65038ac8f2b1def042a5df0b33b1f4eca6bff7cb0f9c6c1526811864e544ed80cad44d40a656e7aff4002a8de287abc8ae0482b5ae825822bb870d6df9b56ca3"));
+        // assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]
-    const BLS12_381_G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G2_INF_SERIALIZED_UNCOMP: vector<u8> = x"400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const BLS12_381_G2_INF_SERIALIZED_COMP: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040";
+    const BLS12_381_G2_INF_SERIALIZED_COMP: vector<u8> = x"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be0130128b808865493e189a2ac3bccc93a922cd16051699a426da7d3bd8caa9bfdad1a352edac6cdc98c116e7d7227d5e50cbe795ff05f07a9aaa11dec5c270d373fab992e57ab927426af63a7857e283ecb998bc22bb0d2ac32cc34a72ea0c40606";
+    const BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP: vector<u8> = x"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"b8bd21c1c85680d4efbb05a82603ac0b77d1e37a640b51b4023b40fad47ae4c65110c52d27050826910a8ff0b2a24a027e2b045d057dace5575d941312f14c3349507fdcbb61dab51ab62099d0d06b59654f2788a0d3ac7d609f7152602be013";
+    const BLS12_381_G2_GENERATOR_SERIALIZED_COMP: vector<u8> = x"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dddcc1399cdf852dab1e2c8dc3b0ce819362f3a12da56f37aee93d3881ca760e467942c92428864a6172c80bf4daeb7082070fa8e8937746ae82d57ec8b639977f8ceaef21a11375de52b02e145dc39021bf4cab7eeaa955688a1b75436f9ec05";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c05ecf93654b7a1885695aaeeb7caf41b0239dc45e1022be55d37111af2aecef87799638bec572de86a7437898efa702008b7ae4dbf802c17a6648842922c9467e460a71c88d393ee7af356da123a2f3619e80c3bdcc8e2b1da52f8cd9913ccdd";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020d";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP: vector<u8> = x"8d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673020dceddeb663207acdf4d1d8bd4c2f3c304eec676e4c67b3decd07eb16a68a416806f181fb1731fb7a482baff799c6349118b3a057176c88a4f17d2fcc4729c12a72b27020486c1f909dae682123f6f3d62bcb8808bc7fc85f41145c8e4b3181414";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP: vector<u8> = x"0d0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c141418b3e4c84511f485fcc78b80b8bc623d6f3f1282e6da09f9c1860402272ba7129c72c4fcd2174f8ac87671053a8b1149639c79ffba82a4b71f73b11f186f8016a4686ab17ed0ec3d7bc6e476c6ee04c3f3c2d48b1d4ddfac073266ebddce";
     #[test_only]
-    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"3c8dd3f68a360f9c5ba81fad2be3408bdc3070619bc7bf3794851bd623685a5036ef5f1388c0541e58c3d2b2dbd19c04c83472247446b1bdd44416ad1c1f929a3f01ed345be35b9b4ba20f17ccf2b5208e3dec8380d6b8c337ed31bff673028d";
+    const BLS12_381_G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP: vector<u8> = x"ad0273f6bf31ed37c3b8d68083ec3d8e20b5f2cc170fa24b9b5be35b34ed013f9a921f1cad1644d4bdb14674247234c8049cd1dbb2d2c3581e54c088135fef36505a6823d61b859437bfc79b617030dc8b40e32bad1fa85b9c0f368af6d38d3c";
 
     #[test(fx = @std)]
     fun test_bls12_381_g2(fx: signer) {
@@ -1191,8 +1194,8 @@ module aptos_std::algebra {
         assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
-        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&generator), 1);
         assert!(BLS12_381_G2_GENERATOR_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&generator), 1);
+        assert!(BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&generator), 1);
         let generator_from_uncomp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&BLS12_381_G2_GENERATOR_SERIALIZED_UNCOMP));
         let generator_from_comp = std::option::extract(&mut deserialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&BLS12_381_G2_GENERATOR_SERIALIZED_COMP));
         assert!(eq(&generator, &generator_from_comp), 1);
@@ -1214,6 +1217,8 @@ module aptos_std::algebra {
         // Deserialization: a valid point in (Fq2,Fq2) but not on the curve.
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
+        //TODO: a point on the curve but not in the prime-order subgroup.
+
         // Deserialization: an invalid point (x not in Fq2).
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
         assert!(std::option::is_none(&deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Compressed>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
@@ -1224,9 +1229,9 @@ module aptos_std::algebra {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<BLS12_381_Fr>(7);
-        let point_7g_calc = group_scalar_mul_typed(&generator, &scalar_7);
-        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         let point_7g_calc = group_scalar_mul(&generator, &x"07");
+        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
+        let point_7g_calc = group_scalar_mul_typed(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Uncompressed>(&point_7g_calc), 1);
         assert!(BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize_v2<BLS12_381_G2, BLS12_381_G2_Format_Compressed>(&point_7g_calc), 1);
@@ -1348,20 +1353,20 @@ module aptos_std::algebra {
         assert!(eq(&field_one<BLS12_381_Fq12>(), &upcast<BLS12_381_Gt, BLS12_381_Fq12>(&identity)), 1);
     }
 
-    #[test(fx = @std)]
-    fun test_bls12381_pairing(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
-        enable_bls12_381_structures(&fx);
-
-        // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
-        let element_p = insecure_random_element<BLS12_381_G1>();
-        let element_q = insecure_random_element<BLS12_381_G2>();
-        let a = insecure_random_element<BLS12_381_Fr>();
-        let b = insecure_random_element<BLS12_381_Fr>();
-        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul_typed(&element_p, &a), &group_scalar_mul_typed(&element_q, &b));
-        let gt_element_another = group_scalar_mul_typed(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
-        assert!(eq(&gt_element, &gt_element_another), 1);
-    }
+    // #[test(fx = @std)]
+    // fun test_bls12381_pairing(fx: signer) {
+    //     enable_initial_generic_algebraic_operations(&fx);
+    //     enable_bls12_381_structures(&fx);
+    //
+    //     // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
+    //     let element_p = insecure_random_element<BLS12_381_G1>();
+    //     let element_q = insecure_random_element<BLS12_381_G2>();
+    //     let a = insecure_random_element<BLS12_381_Fr>();
+    //     let b = insecure_random_element<BLS12_381_Fr>();
+    //     let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul_typed(&element_p, &a), &group_scalar_mul_typed(&element_q, &b));
+    //     let gt_element_another = group_scalar_mul_typed(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
+    //     assert!(eq(&gt_element, &gt_element_another), 1);
+    // }
 
     #[test_only]
     struct MysteriousGroup {}

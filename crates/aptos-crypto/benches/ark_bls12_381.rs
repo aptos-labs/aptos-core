@@ -6,20 +6,23 @@ extern crate criterion;
 
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
+use ark_ec::{AffineCurve, AffineRepr, CurveGroup, PairingEngine, ProjectiveCurve};
 use ark_ff::{BigInteger256, Field, One, PrimeField, UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::Criterion;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg};
+use ark_ec::short_weierstrass::Projective;
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
 
 fn rand_g1_affine() -> G1Affine {
     let k = Fr::rand(&mut test_rng());
-    G1Affine::prime_subgroup_generator().mul(k).into_affine()
+    let g = G1Affine::generator();
+    let e = g.mul(k).into_affine();
+    e
 }
 
 fn rand_g2_affine() -> G2Affine {
@@ -99,15 +102,6 @@ fn bench_group(c: &mut Criterion) {
             },
             |(k_1, k_2)| {
                 let _res = k_1 == k_2;
-            },
-        )
-    });
-
-    group.bench_function("fr_from_u128", move |b| {
-        b.iter_with_setup(
-            || u128::rand(&mut test_rng()),
-            |val| {
-                let _k = Fr::from(val);
             },
         )
     });
@@ -351,7 +345,7 @@ fn bench_group(c: &mut Criterion) {
                 (p1, p2)
             },
             |(p1, p2)| {
-                let _res = p1 == p2;
+                let _res = p1 == Projective::from(p2);
             },
         )
     });
@@ -554,7 +548,7 @@ fn bench_group(c: &mut Criterion) {
                 (p1, p2)
             },
             |(p1, p2)| {
-                let _res = p1 == p2;
+                let _res = p1 == Projective::from(p2);
             },
         )
     });
