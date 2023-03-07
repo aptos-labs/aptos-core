@@ -4,7 +4,7 @@
 use crate::quorum_store::{
     batch_coordinator::BatchCoordinatorCommand,
     counters,
-    quorum_store_db::BatchIdDB,
+    quorum_store_db::QuorumStoreStorage,
     types::BatchId,
     utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
@@ -39,7 +39,7 @@ pub enum ProofError {
 }
 
 pub struct BatchGenerator {
-    db: Arc<dyn BatchIdDB>,
+    db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
@@ -53,10 +53,10 @@ pub struct BatchGenerator {
 }
 
 impl BatchGenerator {
-    pub fn new(
+    pub(crate) fn new(
         epoch: u64,
         config: QuorumStoreConfig,
-        db: Arc<dyn BatchIdDB>,
+        db: Arc<dyn QuorumStoreStorage>,
         mempool_tx: Sender<QuorumStoreRequest>,
         batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
         mempool_txn_pull_timeout_ms: u64,
