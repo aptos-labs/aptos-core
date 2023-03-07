@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     network::NetworkSender,
     payload_manager::PayloadManager,
@@ -14,7 +15,6 @@ use crate::{
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
-        quorum_store_db::QuorumStoreDB,
     },
     round_manager::VerifiedEvent,
 };
@@ -32,7 +32,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures_channel::mpsc::{Receiver, Sender};
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -129,8 +129,7 @@ pub struct InnerBuilder {
     batch_reader_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchReaderCommand>>,
     back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
-    quorum_store_storage_path: PathBuf,
-    quorum_store_storage: Option<Arc<QuorumStoreDB>>,
+    quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
@@ -138,7 +137,7 @@ pub struct InnerBuilder {
 }
 
 impl InnerBuilder {
-    pub fn new(
+    pub(crate) fn new(
         epoch: u64,
         author: Author,
         config: QuorumStoreConfig,
@@ -149,7 +148,7 @@ impl InnerBuilder {
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
         backend: SecureBackend,
-        quorum_store_storage_path: PathBuf,
+        quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -207,8 +206,7 @@ impl InnerBuilder {
             batch_reader_cmd_rx: Some(batch_reader_cmd_rx),
             back_pressure_tx,
             back_pressure_rx: Some(back_pressure_rx),
-            quorum_store_storage_path,
-            quorum_store_storage: None,
+            quorum_store_storage,
             quorum_store_msg_tx,
             quorum_store_msg_rx: Some(quorum_store_msg_rx),
             remote_batch_coordinator_cmd_tx,
@@ -256,7 +254,7 @@ impl InnerBuilder {
             self.batch_store_cmd_tx.clone(),
             self.batch_reader_cmd_tx.clone(),
             batch_reader_cmd_rx,
-            self.quorum_store_storage.as_ref().unwrap().clone(),
+            self.quorum_store_storage.clone(),
             self.verifier.clone(),
             Arc::new(signer),
             self.config.batch_expiry_round_gap_when_init,
@@ -277,8 +275,6 @@ impl InnerBuilder {
     }
 
     fn spawn_quorum_store_wrapper(mut self) -> Sender<CoordinatorCommand> {
-        let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
-
         // TODO: parameter? bring back back-off?
         let interval = tokio::time::interval(Duration::from_millis(
             self.config.mempool_pulling_interval as u64,
@@ -305,7 +301,7 @@ impl InnerBuilder {
         let batch_generator = BatchGenerator::new(
             self.epoch,
             self.config.clone(),
-            quorum_store_storage,
+            self.quorum_store_storage.clone(),
             self.quorum_store_to_mempool_sender,
             self.batch_coordinator_cmd_tx.clone(),
             self.mempool_txn_pull_timeout_ms,
@@ -389,10 +385,6 @@ impl InnerBuilder {
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        self.quorum_store_storage = Some(Arc::new(QuorumStoreDB::new(
-            self.quorum_store_storage_path.clone(),
-        )));
-
         let batch_reader = self.spawn_quorum_store();
 
         (
