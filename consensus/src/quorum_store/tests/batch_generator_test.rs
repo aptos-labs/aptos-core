@@ -1,15 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::DbError,
-    quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand,
-        batch_generator::BatchGenerator,
-        quorum_store_db::MockQuorumStoreDB,
-        tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
-        types::{BatchId, SerializedTransaction},
-    },
+use crate::quorum_store::{
+    batch_coordinator::BatchCoordinatorCommand,
+    batch_generator::BatchGenerator,
+    quorum_store_db::MockQuorumStoreDB,
+    tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
+    types::{BatchId, SerializedTransaction},
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::common::TransactionSummary;
