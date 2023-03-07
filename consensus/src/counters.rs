@@ -184,6 +184,14 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|
     )
 });
 
+/// Counts when chain_health backoff is triggered
+pub static CONSENSUS_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "aptos_consensus_backpressure_on_proposal_triggered",
+        "Counts when chain_health backoff is triggered",
+    )
+});
+
 /// How many pending blocks are there, when we make a proposal
 pub static PROPOSER_PENDING_BLOCKS_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

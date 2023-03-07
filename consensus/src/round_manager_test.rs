@@ -246,6 +246,7 @@ impl NodeSetup {
             10,
             1000,
             10,
+            None,
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
         );

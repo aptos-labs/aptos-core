@@ -6,11 +6,11 @@ use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
 };
 use crate::{
-    block_storage::BlockReader, counters::{CHAIN_HEALTH_BACKOFF_TRIGGERED, PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION},
+    block_storage::BlockReader, counters::{CHAIN_HEALTH_BACKOFF_TRIGGERED, PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION, CONSENSUS_BACKPRESSURE_ON_PROPOSAL_TRIGGERED},
     state_replication::PayloadClient, util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
-use aptos_config::config::ChainHealthBackoffValues;
+use aptos_config::config::{ChainHealthBackoffValues, ConsensusBackpressureValues};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
@@ -111,6 +111,7 @@ pub struct ProposalGenerator {
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
 
+    consensus_backpressure: Option<ConsensusBackpressureValues>,
     chain_health_backoff_config: ChainHealthBackoffConfig,
 
     // Last round that a proposal was generated
@@ -127,6 +128,7 @@ impl ProposalGenerator {
         max_block_txns: u64,
         max_block_bytes: u64,
         max_failed_authors_to_store: usize,
+        consensus_backpressure: Option<ConsensusBackpressureValues>,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
     ) -> Self {
@@ -138,6 +140,7 @@ impl ProposalGenerator {
             max_block_txns,
             max_block_bytes,
             max_failed_authors_to_store,
+            consensus_backpressure,
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
@@ -187,10 +190,6 @@ impl ProposalGenerator {
             bail!("Already proposed in the round {}", round);
         }
 
-        let chain_health_backoff = self
-            .chain_health_backoff_config
-            .get_backoff(round, proposer_election);
-
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
         let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
@@ -231,25 +230,41 @@ impl ProposalGenerator {
             // the local time exceeds it.
             let timestamp = self.time_service.get_current_timestamp();
 
-            let (max_block_txns, max_block_bytes) = if let Some(value) = chain_health_backoff {
-                let max_block_txns = self
-                    .max_block_txns
-                    .min(value.max_sending_block_txns_override);
-                let max_block_bytes = self
-                    .max_block_bytes
-                    .min(value.max_sending_block_bytes_override);
+            let mut values_max_block_txns = vec![self.max_block_txns];
+            let mut values_max_block_bytes = vec![self.max_block_bytes];
 
+            let chain_health_backoff = self
+                .chain_health_backoff_config
+                .get_backoff(round, proposer_election);
+            if let Some(value) = chain_health_backoff {
+                values_max_block_txns.push(value.max_sending_block_txns_override);
+                values_max_block_bytes.push(value.max_sending_block_bytes_override);
                 CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1);
-                warn!(
-                    "Generating proposal reducing limits to {} txns and {} bytes, due to chain health backoff",
-                    max_block_txns,
-                    max_block_bytes,
-                );
-                (max_block_txns, max_block_bytes)
             } else {
                 CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0);
-                (self.max_block_txns, self.max_block_bytes)
+            }
+
+            let consensus_backpressure = self.block_store.back_pressure();
+            if let Some(values) = if consensus_backpressure { &self.consensus_backpressure } else { &None } {
+                values_max_block_txns.push(values.max_sending_block_txns_override);
+                values_max_block_bytes.push(values.max_sending_block_bytes_override);
+                CONSENSUS_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1);
+            } else {
+                CONSENSUS_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(0);
             };
+
+            let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
+            let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
+
+            if consensus_backpressure || chain_health_backoff.is_some() {
+                warn!(
+                    "Generating proposal reducing limits to {} txns and {} bytes, due to consensu_backpressure: {}, chain health backoff: {}",
+                    max_block_txns,
+                    max_block_bytes,
+                    consensus_backpressure,
+                    chain_health_backoff.is_some(),
+                );
+            }
 
             let max_pending_block_len = pending_blocks.iter().map(|block| block.payload().map_or(0, |p| p.len())).max().unwrap_or(0);
             let max_pending_block_bytes = pending_blocks.iter().map(|block| block.payload().map_or(0, |p| p.size())).max().unwrap_or(0);

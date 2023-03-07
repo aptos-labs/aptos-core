@@ -679,7 +679,7 @@ impl EpochManager {
             state_computer,
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            onchain_config.back_pressure_limit(),
+            self.config.consensus_backpressure.back_pressure_limit,
             payload_manager.clone(),
         ));
 
@@ -696,6 +696,7 @@ impl EpochManager {
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
             onchain_config.max_failed_authors_to_store(),
+            Some(self.config.consensus_backpressure.clone()),
             chain_health_backoff_config,
             self.quorum_store_enabled,
         );

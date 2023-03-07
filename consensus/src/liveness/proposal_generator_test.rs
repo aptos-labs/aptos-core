@@ -36,6 +36,7 @@ async fn test_proposal_generation_empty_tree() {
         1,
         10,
         10,
+        None,
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -74,6 +75,7 @@ async fn test_proposal_generation_parent() {
         1,
         1000,
         10,
+        None,
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -144,6 +146,7 @@ async fn test_old_proposal_generation() {
         1,
         1000,
         10,
+        None,
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -179,6 +182,7 @@ async fn test_correct_failed_authors() {
         1,
         1000,
         10,
+        None,
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );

@@ -164,6 +164,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         1,
         1024,
         10,
+        None,
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
