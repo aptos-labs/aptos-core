@@ -6,7 +6,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { AptosClient, AptosAccount, FaucetClient, TokenClient, CoinClient } from "aptos";
+import { AptosClient, AptosAccount, FaucetClient, TokenClient, CoinClient, Network, Provider } from "aptos";
 import { NODE_URL, FAUCET_URL } from "./common";
 
 (async () => {
@@ -26,6 +26,9 @@ import { NODE_URL, FAUCET_URL } from "./common";
   // :!:>section_2
   const alice = new AptosAccount();
   const bob = new AptosAccount(); // <:!:section_2
+
+  console.log("=== network ===");
+  console.log(NODE_URL);
 
   // Print out account addresses.
   console.log("=== Addresses ===");
@@ -160,4 +163,13 @@ import { NODE_URL, FAUCET_URL } from "./common";
   const bobBalance3 = await tokenClient.getTokenForAccount(bob.address(), tokenId);
   console.log(`Alice's token balance: ${aliceBalance3["amount"]}`);
   console.log(`Bob's token balance: ${bobBalance3["amount"]}`);
+
+  const provider = new Provider(Network.DEVNET);
+  console.log("\n=== Getting Alices's NFTs ===");
+  const aliceNfts = await provider.getAccountNFTs(alice.address().hex());
+  console.log(`Alice current token ownership: ${aliceNfts.current_token_ownerships[0].amount}. Should be 1`);
+
+  console.log("\n=== Getting Bob's NFTs ===");
+  const bobNfts = await provider.getAccountNFTs(bob.address().hex());
+  console.log(`Bob current token ownership: ${bobNfts.current_token_ownerships.length}. Should be 0`);
 })();
