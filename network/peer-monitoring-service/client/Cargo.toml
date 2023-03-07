@@ -27,6 +27,7 @@ async-trait = { workspace = true }
 enum_dispatch = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -37,5 +38,4 @@ aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-peer-monitoring-service-server = { workspace = true }
 bcs = { workspace = true }
 maplit = { workspace = true }
-rand = { workspace = true }
 tokio-stream = { workspace = true }
