@@ -35,20 +35,6 @@ impl OnChainConsensusConfig {
         }
     }
 
-    /// Backpressure controls
-    /// 1. how much gaps can be between ordered and committed blocks in decoupled execution setup.
-    /// 2. how much gaps can be between the root and the remote sync info ledger.
-    pub fn back_pressure_limit(&self) -> u64 {
-        if !self.decoupled_execution() {
-            return 10;
-        }
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.back_pressure_limit
-            },
-        }
-    }
-
     // Trim the list of failed authors from immediatelly preceeding rounds
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
@@ -104,7 +90,7 @@ impl OnChainConfig for OnChainConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub decoupled_execution: bool,
-    pub back_pressure_limit: u64,
+    pub _back_pressure_limit: u64,
     pub exclude_round: u64,
     pub proposer_election_type: ProposerElectionType,
     pub max_failed_authors_to_store: usize,
@@ -114,7 +100,7 @@ impl Default for ConsensusConfigV1 {
     fn default() -> Self {
         Self {
             decoupled_execution: true,
-            back_pressure_limit: 10,
+            _back_pressure_limit: 10,
             exclude_round: 40,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(

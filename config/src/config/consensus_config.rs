@@ -55,10 +55,20 @@ pub struct ConsensusConfig {
     pub wait_for_full_blocks_above_recent_fill_threshold: f32,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
+    pub vote_back_pressure_limit: u64,
+    pub backpressure_proposal_delay_ms: u64,
+    pub pipeline_backpressure: Vec<PipelineBackpressureValues>,
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct PipelineBackpressureValues {
+    pub back_pressure_pipeline_latency_limit_ms: u64,
+    pub max_sending_block_txns_override: u64,
+    pub max_sending_block_bytes_override: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -106,6 +116,44 @@ impl Default for ConsensusConfig {
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
 
+            // Voting backpressure is only used as a backup, to make sure pending rounds don't
+            // increase uncontrollably, and we know when to go to state sync.
+            vote_back_pressure_limit: 30,
+            // If there is backpressure, giving some more breathing room to go through the backlog,
+            // and making sure rounds don't go extremely fast (even if they are smaller blocks)
+            // Set to fixed small value so it is unlikely to affect proposer being able to finish the round in time.
+            // If we want to dynamically increase it, we need to adjust timeouts other nodes use for the backpressured round.
+            backpressure_proposal_delay_ms: 150,
+            pipeline_backpressure: vec![
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 1500,
+                    max_sending_block_txns_override: 2000,
+                    max_sending_block_bytes_override: 500 * 1024,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2000,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: 250 * 1024,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2500,
+                    max_sending_block_txns_override: 500,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3000,
+                    // stop reducing size, so 100k transactions can still go through
+                    max_sending_block_txns_override: 300,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 4000,
+                    // in practice, latencies make it such that 2-4 blocks/s is max,
+                    // meaning that most aggressively we limit to ~200-400 TPS
+                    max_sending_block_txns_override: 100,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+            ],
             window_for_chain_health: 100,
             chain_health_backoff: vec![
                 ChainHealthBackoffValues {
@@ -126,14 +174,15 @@ impl Default for ConsensusConfig {
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
                     max_sending_block_txns_override: 200,
-                    max_sending_block_bytes_override: 50 * 1024,
+                    // stop reducing size, so 100k transactions can still go through
+                    max_sending_block_bytes_override: 100 * 1024,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 69,
                     // in practice, latencies make it such that 2-4 blocks/s is max,
                     // meaning that most aggressively we limit to ~200-400 TPS
                     max_sending_block_txns_override: 100,
-                    max_sending_block_bytes_override: 25 * 1024,
+                    max_sending_block_bytes_override: 100 * 1024,
                 },
             ],
         }

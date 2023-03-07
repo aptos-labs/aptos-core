@@ -6,7 +6,9 @@ use crate::{
     block_storage::{BlockReader, BlockStore},
     experimental::buffer_manager::OrderedBlocks,
     liveness::{
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
+        },
         proposer_election::ProposerElection,
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, RoundState},
@@ -246,6 +248,8 @@ impl NodeSetup {
             10,
             1000,
             10,
+            Duration::ZERO,
+            PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
         );
