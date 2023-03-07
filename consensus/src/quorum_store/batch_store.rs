@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     network::QuorumStoreSender,
     quorum_store::{
         batch_reader::{BatchReader, BatchReaderCommand},
         counters,
         proof_coordinator::ProofCoordinatorCommand,
-        quorum_store_db::QuorumStoreDB,
         types::{Batch, PersistedValue},
     },
 };
@@ -67,7 +67,7 @@ pub(crate) struct BatchStore<T> {
     my_peer_id: PeerId,
     network_sender: T,
     batch_reader: Arc<BatchReader>,
-    db: Arc<QuorumStoreDB>,
+    db: Arc<dyn QuorumStoreStorage>,
     validator_signer: Arc<ValidatorSigner>,
 }
 
@@ -82,7 +82,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         batch_store_tx: Sender<BatchStoreCommand>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         batch_reader_rx: Receiver<BatchReaderCommand>,
-        db: Arc<QuorumStoreDB>,
+        db: Arc<dyn QuorumStoreStorage>,
         validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
         batch_expiry_round_gap_when_init: Round,

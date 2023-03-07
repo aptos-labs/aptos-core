@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     network::NetworkSender,
     payload_manager::PayloadManager,
@@ -129,7 +130,7 @@ pub struct InnerBuilder {
     batch_reader_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchReaderCommand>>,
     back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
-    quorum_store_storage: Arc<QuorumStoreDB>,
+    quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
@@ -137,7 +138,7 @@ pub struct InnerBuilder {
 }
 
 impl InnerBuilder {
-    pub fn new(
+    pub(crate) fn new(
         epoch: u64,
         author: Author,
         config: QuorumStoreConfig,
@@ -148,7 +149,7 @@ impl InnerBuilder {
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
         backend: SecureBackend,
-        quorum_store_storage: Arc<QuorumStoreDB>,
+        quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
