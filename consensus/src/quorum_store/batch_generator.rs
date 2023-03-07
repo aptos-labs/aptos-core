@@ -38,6 +38,12 @@ pub enum ProofError {
     Timeout(BatchId),
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct BackPressure {
+    pub txn_count: bool,
+    pub batch_count: bool,
+}
+
 pub struct BatchGenerator {
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
@@ -49,7 +55,7 @@ pub struct BatchGenerator {
     latest_logical_time: LogicalTime,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
-    back_pressure: bool,
+    back_pressure: BackPressure,
 }
 
 impl BatchGenerator {
@@ -88,7 +94,10 @@ impl BatchGenerator {
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
             last_end_batch_time: Instant::now(),
-            back_pressure: false,
+            back_pressure: BackPressure {
+                txn_count: false,
+                batch_count: false,
+            },
         }
     }
 
@@ -242,7 +251,7 @@ impl BatchGenerator {
     pub async fn start(
         mut self,
         mut cmd_rx: tokio::sync::mpsc::Receiver<BatchGeneratorCommand>,
-        mut back_pressure_rx: tokio::sync::mpsc::Receiver<bool>,
+        mut back_pressure_rx: tokio::sync::mpsc::Receiver<BackPressure>,
         mut interval: Interval,
     ) {
         let start = Instant::now();
@@ -269,7 +278,7 @@ impl BatchGenerator {
                 },
                 _ = interval.tick() => {
                     let now = Instant::now();
-                    if self.back_pressure {
+                    if self.back_pressure.txn_count {
                         // multiplicative decrease, every second
                         if back_pressure_decrease_latest.elapsed() >= back_pressure_decrease_duration {
                             back_pressure_decrease_latest = now;
@@ -298,11 +307,7 @@ impl BatchGenerator {
                         now.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
-                    if !self.back_pressure || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
-                        let since_last_pull_ms = std::cmp::min(
-                            now.duration_since(last_non_empty_pull).as_millis(),
-                            self.config.batch_generation_max_interval_ms as u128
-                        );
+                    if !self.back_pressure.batch_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
                         last_non_empty_pull = now;
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);

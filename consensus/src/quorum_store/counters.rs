@@ -202,6 +202,16 @@ pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of total batches/PoS left after cleaning up commit notifications.
+pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_total_proofs_left_on_commit",
+        "Histogram for the number of total batches/PoS left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+        .unwrap()
+});
+
 /// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
 pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(

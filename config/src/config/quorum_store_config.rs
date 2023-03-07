@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreBackPressureConfig {
     pub backlog_txn_limit_count: u64,
+    pub backlog_batch_limit_count: u64,
     pub decrease_duration_ms: u64,
     pub increase_duration_ms: u64,
     pub decrease_fraction: f64,
@@ -21,6 +22,8 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            // QS will create batches immediately until this number is reached
+            backlog_batch_limit_count: 80,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
