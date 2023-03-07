@@ -14,13 +14,23 @@ use aptos_logger::{debug, info};
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
 
-/// The name of the quorum store db file
-pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDB";
+pub(crate) trait QuorumStoreStorage: Sync + Send {
+    fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError>;
 
-pub trait BatchIdDB: Send + Sync {
+    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>>;
+
+    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError>;
+
+    fn get_batch(&self, digest: HashValue) -> Result<Option<PersistedValue>, DbError>;
+
+    fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
+
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError>;
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError>;
 }
+
+/// The name of the quorum store db file
+pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDB";
 
 pub struct QuorumStoreDB {
     db: DB,
@@ -47,8 +57,10 @@ impl QuorumStoreDB {
 
         Self { db }
     }
+}
 
-    pub(crate) fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
+impl QuorumStoreStorage for QuorumStoreDB {
+    fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
         let batch = SchemaBatch::new();
         for digest in digests.iter() {
             debug!("QS: db delete digest {}", digest);
@@ -58,17 +70,13 @@ impl QuorumStoreDB {
         Ok(())
     }
 
-    pub(crate) fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
+    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
         let mut iter = self.db.iter::<BatchSchema>(ReadOptions::default())?;
         iter.seek_to_first();
         iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()
     }
 
-    pub(crate) fn save_batch(
-        &self,
-        digest: HashValue,
-        batch: PersistedValue,
-    ) -> Result<(), DbError> {
+    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError> {
         debug!(
             "QS: db persists digest {} expiration {:?}",
             digest, batch.expiration
@@ -76,7 +84,7 @@ impl QuorumStoreDB {
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }
 
-    pub(crate) fn get_batch(&self, digest: HashValue) -> Result<Option<PersistedValue>, DbError> {
+    fn get_batch(&self, digest: HashValue) -> Result<Option<PersistedValue>, DbError> {
         Ok(self.db.get::<BatchSchema>(&digest)?)
     }
 
@@ -86,9 +94,7 @@ impl QuorumStoreDB {
         self.db.write_schemas(batch)?;
         Ok(())
     }
-}
 
-impl BatchIdDB for QuorumStoreDB {
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError> {
         let mut iter = self.db.iter::<BatchIdSchema>(ReadOptions::default())?;
         iter.seek_to_first();
@@ -108,5 +114,44 @@ impl BatchIdDB for QuorumStoreDB {
 
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError> {
         Ok(self.db.put::<BatchIdSchema>(&epoch, &batch_id)?)
+    }
+}
+
+pub(crate) struct MockQuorumStoreDB {}
+
+impl MockQuorumStoreDB {
+    #[cfg(test)]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl QuorumStoreStorage for MockQuorumStoreDB {
+    fn delete_batches(&self, _: Vec<HashValue>) -> Result<(), DbError> {
+        Ok(())
+    }
+
+    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
+        Ok(HashMap::new())
+    }
+
+    fn save_batch(&self, _: HashValue, _: PersistedValue) -> Result<(), DbError> {
+        Ok(())
+    }
+
+    fn get_batch(&self, _: HashValue) -> Result<Option<PersistedValue>, DbError> {
+        Ok(None)
+    }
+
+    fn delete_batch_id(&self, _: u64) -> Result<(), DbError> {
+        Ok(())
+    }
+
+    fn clean_and_get_batch_id(&self, _: u64) -> Result<Option<BatchId>, DbError> {
+        Ok(Some(BatchId::new_for_test(0)))
+    }
+
+    fn save_batch_id(&self, _: u64, _: BatchId) -> Result<(), DbError> {
+        Ok(())
     }
 }
