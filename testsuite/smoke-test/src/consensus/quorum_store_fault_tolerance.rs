@@ -376,6 +376,19 @@ async fn test_swarm_with_bad_non_qs_node() {
         .unwrap();
 
     info!("generate traffic");
+    let tx_stat = generate_traffic(
+        &mut swarm,
+        &[dishonest_peer_id],
+        Duration::from_secs(20),
+        1,
+        vec![vec![
+            (TransactionType::default_coin_transfer(), 70),
+            (TransactionType::default_account_generation(), 20),
+        ]],
+    )
+    .await;
+    assert!(tx_stat.is_err());
+
     generate_traffic_and_assert_committed(
         &mut swarm,
         &validator_peer_ids[1..],
