@@ -128,7 +128,12 @@ async fn test_db_restore() {
 
     info!("---------- 3. stopped node 0, gonna restore DB.");
     // restore db from backup
-    db_restore(backup_path.path(), db_dir.as_path(), &[]);
+    db_restore(
+        backup_path.path(),
+        db_dir.as_path(),
+        &[],
+        node0_config.storage.rocksdb_configs.use_state_kv_db,
+    );
 
     expected_balance_0 -= 3;
     expected_balance_1 += 3;
@@ -370,7 +375,12 @@ pub(crate) fn db_backup(
     backup_path
 }
 
-pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: &[Waypoint]) {
+pub(crate) fn db_restore(
+    backup_path: &Path,
+    db_path: &Path,
+    trusted_waypoints: &[Waypoint],
+    use_state_kv_db: bool,
+) {
     let now = Instant::now();
     let bin_path = workspace_builder::get_bin("aptos-db-tool");
     let metadata_cache_path = TempPath::new();
@@ -383,6 +393,10 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
     });
+
+    if use_state_kv_db {
+        cmd.arg("--use-state-kv-db");
+    }
 
     let status = cmd
         .args([
