@@ -656,6 +656,7 @@ impl TransactionStore {
         if let Some(insertion_time) = oldest_insertion_time {
             if let Ok(age) = SystemTime::now().duration_since(insertion_time) {
                 if age > eager_expire_threshold {
+                    counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT.inc();
                     return gc_time.saturating_add(self.eager_expire_time);
                 }
             }
