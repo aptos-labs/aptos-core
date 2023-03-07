@@ -33,7 +33,7 @@ The Aptos Unity SDK supports these use cases:
 
 ### Dependencies
 
-> As of Unity 2021.x.x, Newtonsoft Json is a common dependency. Prior versions of Unity require intalling Newtonsoft.
+> As of Unity 2021.x.x, Newtonsoft Json is a common dependency. Prior versions of Unity require installing Newtonsoft.
 
 - [Chaos.NaCl.Standard](https://www.nuget.org/packages/Chaos.NaCl.Standard/)
 - Microsoft.Extensions.Logging.Abstractions.1.0.0 — required by NBitcoin.7.0.22
