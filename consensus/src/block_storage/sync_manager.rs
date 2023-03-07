@@ -51,7 +51,8 @@ impl BlockStore {
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
         (self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id()))
-            || self.commit_root().round() + 2 * self.back_pressure_limit < li.commit_info().round()
+            || self.commit_root().round() + 2 * self.vote_back_pressure_limit
+                < li.commit_info().round()
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC
