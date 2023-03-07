@@ -378,7 +378,7 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
 
     let mut version = 0;
     let mut current_state_values = HashMap::new();
-    let pruner = StateKvPrunerManager::new(Arc::clone(&db.ledger_db), StateKvPrunerConfig {
+    let pruner = StateKvPrunerManager::new(Arc::clone(&db.state_kv_db), StateKvPrunerConfig {
         enable: true,
         prune_window: 0,
         batch_size: 1,
