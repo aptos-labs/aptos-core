@@ -1,5 +1,5 @@
 # This workflow ensures that aptos-core branches do
-# not have inconsistent commits.
+# not have inconsistent commits..
 
 name: "check-branch-commits"
 on:
