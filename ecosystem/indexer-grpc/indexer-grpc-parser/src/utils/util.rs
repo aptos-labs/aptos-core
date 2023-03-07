@@ -8,7 +8,7 @@ use aptos_protos::transaction::testing1::v1::UserTransactionRequest;
 use aptos_protos::transaction::testing1::v1::{
     transaction_payload::Payload as PayloadPB, UserTransaction as UserTransactionPB,
 };
-use bigdecimal::{BigDecimal, Signed, Zero};
+use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use sha2::Digest;
@@ -35,6 +35,10 @@ pub fn truncate_str(val: &str, max_chars: usize) -> String {
 
 pub fn u64_to_bigdecimal(val: u64) -> BigDecimal {
     BigDecimal::from(val)
+}
+
+pub fn bigdecimal_to_u64(val: &BigDecimal) -> u64 {
+    val.to_u64().expect("Unable to convert big decimal to u64")
 }
 
 pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {

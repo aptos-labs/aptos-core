@@ -303,22 +303,22 @@ pub enum TokenWriteSet {
 impl TokenWriteSet {
     pub fn from_table_item_type(
         data_type: &str,
-        data: &serde_json::Value,
+        data: &str,
         txn_version: i64,
     ) -> Result<Option<TokenWriteSet>> {
         match data_type {
-            "0x3::token::TokenDataId" => serde_json::from_value(data.clone())
+            "0x3::token::TokenDataId" => serde_json::from_str(data.clone())
                 .map(|inner| Some(TokenWriteSet::TokenDataId(inner))),
-            "0x3::token::TokenId" => serde_json::from_value(data.clone())
+            "0x3::token::TokenId" => serde_json::from_str(data.clone())
                 .map(|inner| Some(TokenWriteSet::TokenId(inner))),
-            "0x3::token::TokenData" => serde_json::from_value(data.clone())
+            "0x3::token::TokenData" => serde_json::from_str(data.clone())
                 .map(|inner| Some(TokenWriteSet::TokenData(inner))),
             "0x3::token::Token" => {
-                serde_json::from_value(data.clone()).map(|inner| Some(TokenWriteSet::Token(inner)))
+                serde_json::from_str(data.clone()).map(|inner| Some(TokenWriteSet::Token(inner)))
             },
-            "0x3::token::CollectionData" => serde_json::from_value(data.clone())
+            "0x3::token::CollectionData" => serde_json::from_str(data.clone())
                 .map(|inner| Some(TokenWriteSet::CollectionData(inner))),
-            "0x3::token_transfers::TokenOfferId" => serde_json::from_value(data.clone())
+            "0x3::token_transfers::TokenOfferId" => serde_json::from_str(data.clone())
                 .map(|inner| Some(TokenWriteSet::TokenOfferId(inner))),
             _ => Ok(None),
         }

@@ -8,9 +8,9 @@
 use super::token_utils::{TokenDataIdType, TokenEvent};
 use crate::{
     schema::token_activities,
-    util::{parse_timestamp, standardize_address},
+    utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::{Event as APIEvent, Transaction as APITransaction};
+use aptos_protos::transaction::testing1::v1::transaction::TxnData;
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -58,10 +58,14 @@ struct TokenActivityHelper<'a> {
 impl TokenActivity {
     pub fn from_transaction(transaction: &APITransaction) -> Vec<Self> {
         let mut token_activities = vec![];
-        if let APITransaction::UserTransaction(user_txn) = transaction {
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
+        if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = user_txn.info.version.0 as i64;
-                let event_type = event.typ.to_string();
+                let event_type = event.type.to_string();
                 if let Some(token_event) =
                     TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
                 {

@@ -10,12 +10,12 @@ use super::{
     tokens::TableHandleToOwner,
 };
 use crate::{
-    database::PgPoolConnection,
+    utils::database::PgPoolConnection,
     schema::{collection_datas, current_collection_datas},
-    util::standardize_address,
+    utils::util::standardize_address,
 };
 use anyhow::Context;
-use aptos_api_types::WriteTableItem as APIWriteTableItem;
+use aptos_protos::transaction::testing1::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;
@@ -84,7 +84,7 @@ pub struct CurrentCollectionDataQuery {
 
 impl CollectionData {
     pub fn from_write_table_item(
-        table_item: &APIWriteTableItem,
+        table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,

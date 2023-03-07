@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::coin_utils::{CoinInfoType, CoinResource};
-use crate::{database::PgPoolConnection, schema::coin_infos, util::standardize_address};
+use crate::{utils::database::PgPoolConnection, schema::coin_infos, utils::util::standardize_address};
 use aptos_protos::transaction::testing1::v1::WriteResource;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
@@ -55,8 +55,9 @@ impl CoinInfo {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinInfoResource(inner)) => {
                 let coin_info_type = &CoinInfoType::from_move_type(
-                    &write_resource.type_str,
-                    &write_resource.r#type.as_ref().unwrap().address.as_str(),
+                    &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
+                    write_resource.r#type.as_ref().unwrap().address.as_str(),
+                    txn_version,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
                     .get_aggregator_metadata()

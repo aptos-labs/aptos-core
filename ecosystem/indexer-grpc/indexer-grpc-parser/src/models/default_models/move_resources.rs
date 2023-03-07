@@ -3,7 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::Transaction;
-use crate::{schema::move_resources, util::standardize_address};
+use crate::{schema::move_resources, utils::util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::testing1::v1::{
     DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,

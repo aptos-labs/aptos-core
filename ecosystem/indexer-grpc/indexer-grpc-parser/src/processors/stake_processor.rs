@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    database::{
+    utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
     },
     indexer::{

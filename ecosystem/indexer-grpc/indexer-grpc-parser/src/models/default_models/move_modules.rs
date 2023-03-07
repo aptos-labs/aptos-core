@@ -3,7 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::Transaction;
-use crate::{schema::move_modules, util::standardize_address};
+use crate::{schema::move_modules, utils::util::standardize_address};
 use aptos_protos::transaction::testing1::v1::{
     DeleteModule, MoveModule as MoveModulePB, MoveModuleBytecode, WriteModule,
 };

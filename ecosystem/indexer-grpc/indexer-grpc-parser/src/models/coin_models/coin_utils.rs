@@ -6,9 +6,10 @@
 
 use crate::{
     models::default_models::move_resources::MoveResource,
-    util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
+    utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
 };
 use anyhow::{Context, Result};
+use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::{
     move_type::Content, MoveStructTag, MoveType, WriteResource,
 };
@@ -156,10 +157,18 @@ pub struct CoinInfoType {
 }
 
 impl CoinInfoType {
-    pub fn from_move_type(move_type: &str, address: &str) -> Self {
-        Self {
-            coin_type: move_type.to_string(),
-            creator_address: standardize_address(address),
+    pub fn from_move_type(move_type: &MoveType, address: &str, txn_version: i64) -> Self {
+        if let Content::Struct(struct_tag) = move_type.content.as_ref().unwrap() {
+            Self {
+                coin_type: format!(
+                    "{}::{}::{}",
+                    struct_tag.address, struct_tag.module, struct_tag.name
+                ),
+                creator_address: standardize_address(address),
+            }
+        } else {
+            error!(txn_version = txn_version, move_type = ?move_type, "Expected struct tag");
+            panic!();
         }
     }
 

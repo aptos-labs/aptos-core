@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::coin_infos::CoinInfoQuery;
-use crate::schema::coin_supply;
+use crate::{models::default_models::move_tables::TableItem, schema::coin_supply};
 use anyhow::Context;
 use aptos_protos::transaction::testing1::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
@@ -56,8 +56,13 @@ impl CoinSupply {
                 {
                     return Ok(None);
                 }
+
+                // Convert to TableItem model. Some fields are just placeholders
+                let (table_item_model, _) =
+                    TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
+
                 // Return early if not aptos coin aggregator key
-                let table_key = &data.key;
+                let table_key = &table_item_model.decoded_key.as_str().unwrap();
                 if table_key
                     != aptos_coin_info
                         .supply_aggregator_table_key
@@ -67,10 +72,18 @@ impl CoinSupply {
                     return Ok(None);
                 }
                 // Everything matches. Get the coin supply
-                let supply = data.value.parse::<BigDecimal>().context(format!(
-                    "cannot parse string as u128: {}, version {}",
-                    data.value, txn_version
-                ))?;
+                let supply = table_item_model
+                    .decoded_value
+                    .as_ref()
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .parse::<BigDecimal>()
+                    .context(format!(
+                        "cannot parse string as u128: {:?}, version {}",
+                        table_item_model.decoded_value.as_ref(),
+                        txn_version
+                    ))?;
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     coin_type_hash: aptos_coin_info.coin_type_hash.clone(),

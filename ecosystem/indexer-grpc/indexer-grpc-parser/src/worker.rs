@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    database::new_db_pool,
     processors::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         Processor,
     },
+    utils::database::new_db_pool,
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;

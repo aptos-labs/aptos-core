@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     schema::{coin_balances, current_coin_balances},
-    util::standardize_address,
+    utils::util::standardize_address,
 };
 use aptos_protos::transaction::testing1::v1::WriteResource;
 use bigdecimal::BigDecimal;
@@ -53,8 +53,9 @@ impl CoinBalance {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinStoreResource(inner)) => {
                 let coin_info_type = &CoinInfoType::from_move_type(
-                    &write_resource.type_str,
+                    &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     write_resource.r#type.as_ref().unwrap().address.as_str(),
+                    txn_version,
                 );
                 let owner_address = standardize_address(write_resource.address.as_str());
                 let coin_balance = Self {
@@ -83,8 +84,6 @@ impl CoinBalance {
                         coin_balance.coin_type.clone(),
                     ),
                 ]);
-                aptos_logger::info!(i = ?event_to_coin_mapping, "wtf is happening");
-
                 Ok(Some((
                     coin_balance,
                     current_coin_balance,

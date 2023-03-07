@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::util;
+use crate::utils::util;
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 use std::collections::HashMap;

@@ -5,7 +5,7 @@
 use super::transactions::Transaction;
 use crate::{
     schema::{current_table_items, table_items, table_metadatas},
-    util::{hash_str, standardize_address},
+    utils::util::{hash_str, standardize_address},
 };
 use aptos_protos::transaction::testing1::v1::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
@@ -64,24 +64,28 @@ impl TableItem {
                 transaction_block_height,
                 key: write_table_item.key.to_string(),
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
-                decoded_key: serde_json::Value::String(
-                    write_table_item.data.as_ref().unwrap().key.clone(),
-                ),
-                decoded_value: Some(serde_json::Value::String(
-                    write_table_item.data.as_ref().unwrap().value.clone(),
-                )),
+                decoded_key: serde_json::from_str(
+                    write_table_item.data.as_ref().unwrap().key.as_str(),
+                )
+                .unwrap(),
+                decoded_value: serde_json::from_str(
+                    write_table_item.data.as_ref().unwrap().value.as_str(),
+                )
+                .unwrap(),
                 is_deleted: false,
             },
             CurrentTableItem {
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
                 key_hash: hash_str(&write_table_item.key.to_string()),
                 key: write_table_item.key.to_string(),
-                decoded_key: serde_json::Value::String(
-                    write_table_item.data.as_ref().unwrap().key.clone(),
-                ),
-                decoded_value: Some(serde_json::Value::String(
-                    write_table_item.data.as_ref().unwrap().value.clone(),
-                )),
+                decoded_key: serde_json::from_str(
+                    write_table_item.data.as_ref().unwrap().key.as_str(),
+                )
+                .unwrap(),
+                decoded_value: serde_json::from_str(
+                    write_table_item.data.as_ref().unwrap().value.as_str(),
+                )
+                .unwrap(),
                 last_transaction_version: transaction_version,
                 is_deleted: false,
             },
@@ -112,7 +116,11 @@ impl TableItem {
                 transaction_block_height,
                 key: delete_table_item.key.to_string(),
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
-                decoded_key: serde_json::Value::String(decoded_key.clone()),
+                decoded_key: serde_json::from_str(
+                    delete_table_item.data.as_ref().unwrap().key.as_str(),
+                )
+                .unwrap(),
+
                 decoded_value: None,
                 is_deleted: true,
             },
@@ -120,7 +128,10 @@ impl TableItem {
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
                 key_hash: hash_str(&delete_table_item.key.to_string()),
                 key: delete_table_item.key.to_string(),
-                decoded_key: serde_json::Value::String(decoded_key),
+                decoded_key: serde_json::from_str(
+                    delete_table_item.data.as_ref().unwrap().key.as_str(),
+                )
+                .unwrap(),
                 decoded_value: None,
                 last_transaction_version: transaction_version,
                 is_deleted: true,

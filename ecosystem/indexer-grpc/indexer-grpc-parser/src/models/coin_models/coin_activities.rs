@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     schema::coin_activities,
-    util::{get_entry_function_from_user_request, standardize_address},
+    utils::util::{get_entry_function_from_user_request, standardize_address},
 };
 use aptos_protos::transaction::testing1::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,

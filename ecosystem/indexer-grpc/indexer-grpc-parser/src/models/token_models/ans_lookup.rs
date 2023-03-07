@@ -7,9 +7,13 @@
 
 use crate::{
     schema::current_ans_lookup,
-    util::{bigdecimal_to_u64, parse_timestamp_secs, standardize_address},
+    utils::util::{
+        bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
+    },
 };
-use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
+use aptos_protos::transaction::testing1::v1::{
+    move_type::Content, transaction::TxnData, Transaction as TransactionPB,
+};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -72,32 +76,38 @@ impl OptionalString {
 
 impl CurrentAnsLookup {
     pub fn from_transaction(
-        transaction: &APITransaction,
+        transaction: &TransactionPB,
         ans_contract_address: Option<String>,
     ) -> HashMap<CurrentAnsLookupPK, Self> {
         let mut current_ans_lookups: HashMap<CurrentAnsLookupPK, Self> = HashMap::new();
         if let Some(addr) = ans_contract_address {
-            if let APITransaction::UserTransaction(user_txn) = transaction {
+            // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
+            let txn_data = transaction
+                .txn_data
+                .as_ref()
+                .expect("Txn Data doesn't exit!");
+            if let TxnData::User(user_txn) = txn_data {
                 for event in &user_txn.events {
-                    let (event_addr, event_type) = if let MoveType::Struct(inner) = &event.typ {
-                        (
-                            inner.address.to_string(),
-                            format!("{}::{}", inner.module, inner.name),
-                        )
-                    } else {
-                        continue;
-                    };
+                    let (event_addr, event_type) =
+                        if let Content::Struct(inner) = &event.r#type.unwrap().content.unwrap() {
+                            (
+                                inner.address.to_string(),
+                                format!("{}::{}", inner.module, inner.name),
+                            )
+                        } else {
+                            continue;
+                        };
                     if event_addr != addr {
                         continue;
                     }
-                    let txn_version = user_txn.info.version.0 as i64;
+                    let txn_version = transaction.version as i64;
                     let maybe_ans_event = match event_type.as_str() {
                         "domains::SetNameAddressEventV1" => {
-                            serde_json::from_value(event.data.clone())
+                            serde_json::from_str(event.data.as_str())
                                 .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner)))
                         },
                         "domains::RegisterNameEventV1" => {
-                            serde_json::from_value(event.data.clone())
+                            serde_json::from_str(event.data.as_str())
                                 .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner)))
                         },
                         _ => Ok(None),

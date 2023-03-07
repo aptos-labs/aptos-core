@@ -11,12 +11,10 @@
 #[macro_use]
 extern crate diesel;
 
-pub mod counters;
-pub mod database;
 pub mod models;
 pub mod processors;
 pub mod schema;
-mod util;
+mod utils;
 pub mod worker;
 
 /// By default, skips test unless `INDEXER_DATABASE_URL` is set.

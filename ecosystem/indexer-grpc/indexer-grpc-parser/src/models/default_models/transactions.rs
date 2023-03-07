@@ -13,9 +13,9 @@ use super::{
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel, WriteSetChangeQuery},
 };
 use crate::{
-    database::PgPoolConnection,
     schema::{block_metadata_transactions, transactions, user_transactions},
-    util::{standardize_address, u64_to_bigdecimal},
+    utils::database::PgPoolConnection,
+    utils::util::{standardize_address, u64_to_bigdecimal},
 };
 use aptos_protos::transaction::testing1::v1::{
     transaction::{TransactionType, TxnData},

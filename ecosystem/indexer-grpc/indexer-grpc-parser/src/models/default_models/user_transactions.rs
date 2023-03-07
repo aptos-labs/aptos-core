@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     schema::user_transactions,
-    util::{get_entry_function_from_user_request, parse_timestamp, u64_to_bigdecimal, standardize_address},
+    utils::util::{get_entry_function_from_user_request, parse_timestamp, u64_to_bigdecimal, standardize_address},
 };
 use aptos_protos::transaction::testing1::v1::UserTransaction as UserTransactionPB;
 use bigdecimal::BigDecimal;
