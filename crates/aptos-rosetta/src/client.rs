@@ -370,7 +370,7 @@ impl RosettaClient {
             None,
             sender,
             operator.map(AccountIdentifier::base_account),
-            amount
+            amount,
         )];
 
         self.submit_operations(

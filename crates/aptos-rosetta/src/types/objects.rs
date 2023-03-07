@@ -9,8 +9,7 @@ use crate::{
     common::{is_native_coin, native_coin, native_coin_tag},
     construction::{
         parse_create_stake_pool_operation, parse_reset_lockup_operation,
-        parse_set_operator_operation, parse_set_voter_operation,
-        parse_unlock_stake_operation,
+        parse_set_operator_operation, parse_set_voter_operation, parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -807,7 +806,7 @@ fn parse_failed_operations_from_txn_payload(
                 } else {
                     warn!("Failed to parse unlock stake {:?}", inner);
                 }
-            }
+            },
             _ => {
                 // If we don't recognize the transaction payload, then we can't parse operations
             },
@@ -1526,9 +1525,7 @@ impl InternalOperation {
                         Ok(OperationType::UnlockStake) => {
                             if let (
                                 Some(OperationMetadata {
-                                    operator,
-                                    amount,
-                                    ..
+                                    operator, amount, ..
                                 }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
@@ -1636,7 +1633,10 @@ impl InternalOperation {
                 reset_lockup.owner,
             ),
             InternalOperation::UnlockStake(unlock_stake) => (
-                aptos_stdlib::staking_contract_unlock_stake(unlock_stake.operator, unlock_stake.amount),
+                aptos_stdlib::staking_contract_unlock_stake(
+                    unlock_stake.operator,
+                    unlock_stake.amount,
+                ),
                 unlock_stake.owner,
             ),
         })
