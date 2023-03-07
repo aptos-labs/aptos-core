@@ -110,9 +110,17 @@ module std::vector {
         destroy_empty(other);
     }
 
-    /// Trim a vector to a smaller size, returning the evicted elements in reverse order
+    /// Trim a vector to a smaller size, returning the evicted elements in order
     public fun trim<Element>(v: &mut vector<Element>, new_len: u64): vector<Element> {
+        let res = trim_reverse(v, new_len);
+        reverse(&mut res);
+        res
+    }
+
+    /// Trim a vector to a smaller size, returning the evicted elements in reverse order
+    public fun trim_reverse<Element>(v: &mut vector<Element>, new_len: u64): vector<Element> {
         let len = length(v);
+        assert!(new_len <= len, EINDEX_OUT_OF_BOUNDS);
         let result = empty();
         while (new_len < len) {
             push_back(&mut result, pop_back(v));

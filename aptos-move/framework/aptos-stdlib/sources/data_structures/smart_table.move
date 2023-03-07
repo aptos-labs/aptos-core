@@ -150,7 +150,7 @@ module aptos_std::smart_table {
             let entry: &Entry<K, V> = e; // Explicit type to satisfy compiler
             bucket_index(table.level, table.num_buckets, entry.hash) != new_bucket_index
         });
-        let new_bucket = vector::trim(old_bucket, p);
+        let new_bucket = vector::trim_reverse(old_bucket, p);
         table_with_length::add(&mut table.buckets, new_bucket_index, new_bucket);
     }
 

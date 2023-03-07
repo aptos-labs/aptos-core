@@ -30,6 +30,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `append`](#0x1_vector_append)
 -  [Function `reverse_append`](#0x1_vector_reverse_append)
 -  [Function `trim`](#0x1_vector_trim)
+-  [Function `trim_reverse`](#0x1_vector_trim_reverse)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
@@ -414,7 +415,7 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 ## Function `trim`
 
-Trim a vector to a smaller size, returning the evicted elements in reverse order
+Trim a vector to a smaller size, returning the evicted elements in order
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
@@ -427,7 +428,35 @@ Trim a vector to a smaller size, returning the evicted elements in reverse order
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> res = <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>(v, new_len);
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> res);
+    res
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_trim_reverse"></a>
+
+## Function `trim_reverse`
+
+Trim a vector to a smaller size, returning the evicted elements in reverse order
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>assert</b>!(new_len &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
     <b>let</b> result = <a href="vector.md#0x1_vector_empty">empty</a>();
     <b>while</b> (new_len &lt; len) {
         <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v));

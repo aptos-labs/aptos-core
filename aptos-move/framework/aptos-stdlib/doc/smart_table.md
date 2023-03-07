@@ -435,7 +435,7 @@ Decide which is the next bucket to split and split it into two with the elements
         <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e; // Explicit type <b>to</b> satisfy compiler
         <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
     });
-    <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim">vector::trim</a>(old_bucket, p);
+    <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(old_bucket, p);
     <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, new_bucket_index, new_bucket);
 }
 </code></pre>
