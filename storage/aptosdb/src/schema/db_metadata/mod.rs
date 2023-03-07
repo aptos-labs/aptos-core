@@ -47,6 +47,7 @@ pub enum DbMetadataKey {
     LedgerPrunerProgress,
     StateMerklePrunerProgress,
     EpochEndingStateMerklePrunerProgress,
+    StateKvPrunerProgress,
     StateSnapshotRestoreProgress(Version),
     LedgerCommitProgress,
     StateKVCommitProgress,
