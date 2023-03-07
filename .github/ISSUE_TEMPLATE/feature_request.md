@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-# 🚀 Feature Request
+# Feature Request
 
 <!-- A clear and concise description of the feature you are requesting -->
 
