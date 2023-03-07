@@ -124,6 +124,7 @@ locals {
     numValidators     = var.num_validators
     numFullnodeGroups = var.num_fullnode_groups
     imageTag          = var.image_tag
+    mangeImages       = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
     chain = {
       era      = var.era
       chain_id = var.chain_id

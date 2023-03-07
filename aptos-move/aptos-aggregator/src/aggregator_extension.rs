@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::delta_change_set::{addition, deserialize, subtraction};
@@ -368,7 +368,7 @@ mod test {
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{
-            state_key::StateKey, state_storage_usage::StateStorageUsage,
+            state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
             table::TableHandle as AptosTableHandle,
         },
     };
@@ -394,8 +394,12 @@ mod test {
     impl TStateView for FakeTestStorage {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-            Ok(self.data.get(state_key).cloned())
+        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<StateValue>> {
+            Ok(self
+                .data
+                .get(state_key)
+                .cloned()
+                .map(StateValue::new_legacy))
         }
 
         fn is_genesis(&self) -> bool {
@@ -414,7 +418,7 @@ mod test {
             key: &[u8],
         ) -> Result<Option<Vec<u8>>, anyhow::Error> {
             let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
-            self.get_state_value(&state_key)
+            self.get_state_value_bytes(&state_key)
         }
     }
 

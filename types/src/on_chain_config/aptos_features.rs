@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
@@ -17,7 +17,8 @@ pub enum FeatureFlag {
     MULTI_ED25519_PK_VALIDATE_V2_NATIVES = 7,
     BLAKE2B_256_NATIVE = 8,
     RESOURCE_GROUPS = 9,
-    DELEGATION_POOLS = 10,
+    MULTISIG_ACCOUNTS = 10,
+    DELEGATION_POOLS = 11,
 }
 
 /// Representation of features on chain as a bitset.

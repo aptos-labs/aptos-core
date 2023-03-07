@@ -10,5 +10,7 @@ export const $TransactionPayload = {
         type: 'TransactionPayload_ScriptPayload',
     }, {
         type: 'TransactionPayload_ModuleBundlePayload',
+    }, {
+        type: 'TransactionPayload_MultisigPayload',
     }],
 } as const;

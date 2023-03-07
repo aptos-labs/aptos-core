@@ -481,7 +481,7 @@ Create two accounts on devnet for deploying and managing this contract:
 
 In this section, we will create a [resource account](../resource-accounts.md) from the `source-account` and publish the module on devnet under the resource account’s address. A resource account is used here to programmatically signed for transactions and avoids the need for multiple signatures.
 
-In the [NFT Tutorial](https://github.com/aptos-labs/nft-tutorial/tree/main/tutorial) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
+In the [NFT Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) smart contract, we store the resource account’s signer capability in the `ModuleData` resource so that it can automatically sign for transactions in the contract. If we don’t store the signer capability within the module, we’d need to provide the resource account’s signer; but we no longer have access to the resource account’s signer because the resource account is meant to be autonomous, and the contracts published under a resource account are immutable. Once the contract is published, the resource account no longer has access to the signer.
 
 1. Clone the NFT Tutorial:
   ```shell

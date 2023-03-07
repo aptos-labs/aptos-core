@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account_minter;
@@ -43,6 +43,8 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for a full day.
 const MAX_TXNS: u64 = 10_000_000_000;
 
+const MAX_RETRIES: usize = 6;
+
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
 // account sequence numbers). If these fail, the whole test fails. We do not use
@@ -50,7 +52,7 @@ const MAX_TXNS: u64 = 10_000_000_000;
 // This retry policy means an operation will take 8 seconds at most.
 pub static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
     RetryPolicy::exponential(Duration::from_millis(125))
-        .with_max_retries(6)
+        .with_max_retries(MAX_RETRIES)
         .with_jitter(true)
 });
 
@@ -119,23 +121,40 @@ impl Default for TransactionType {
 pub struct EmitModeParams {
     pub txn_expiration_time_secs: u64,
 
+    pub endpoints: usize,
     pub workers_per_endpoint: usize,
     pub accounts_per_worker: usize,
 
     /// Max transactions per account in mempool
     pub transactions_per_account: usize,
     pub max_submit_batch_size: usize,
-    pub start_offset_multiplier_millis: f64,
-    pub start_jitter_millis: u64,
+    pub worker_offset_mode: WorkerOffsetMode,
     pub wait_millis: u64,
     pub check_account_sequence_only_once_fraction: f32,
     pub check_account_sequence_sleep_millis: u64,
 }
 
 #[derive(Clone, Debug)]
+pub enum WorkerOffsetMode {
+    NoOffset,
+    Jitter { jitter_millis: u64 },
+    Spread,
+    Wave { wave_ratio: f64, num_waves: f64 },
+}
+
+#[derive(Clone, Debug)]
 pub enum EmitJobMode {
-    MaxLoad { mempool_backlog: usize },
-    ConstTps { tps: usize },
+    MaxLoad {
+        mempool_backlog: usize,
+    },
+    ConstTps {
+        tps: usize,
+    },
+    WaveTps {
+        average_tps: usize,
+        wave_ratio: f32,
+        num_waves: usize,
+    },
 }
 
 impl EmitJobMode {
@@ -321,15 +340,20 @@ impl EmitJobRequest {
                     transactions_per_account: transactions_per_account
                         .min(num_workers_per_endpoint * clients_count),
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
-                    start_offset_multiplier_millis: 0.0,
-                    start_jitter_millis: 5000,
+                    worker_offset_mode: WorkerOffsetMode::Jitter {
+                        jitter_millis: 5000,
+                    },
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
+                    endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 0.0,
                     check_account_sequence_sleep_millis: 300,
                 }
             },
-            EmitJobMode::ConstTps { tps } => {
+            EmitJobMode::ConstTps { tps }
+            | EmitJobMode::WaveTps {
+                average_tps: tps, ..
+            } => {
                 // We are going to create ConstTps (open-loop) txn-emitter, by:
                 // - having a single worker handle a single account, with:
                 //   - issuing a batch request (which generally either suceeeds or fails)
@@ -394,18 +418,86 @@ impl EmitJobRequest {
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
                     transactions_per_account,
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
-                    start_offset_multiplier_millis: (wait_seconds * 1000) as f64
-                        / (num_workers_per_endpoint * clients_count) as f64,
-                    // Using jitter here doesn't make TPS vary enough, as we have many workers.
-                    // If we wanted to support that, we could for example incrementally vary the offset.
-                    start_jitter_millis: 0,
+                    worker_offset_mode: if let EmitJobMode::WaveTps {
+                        wave_ratio,
+                        num_waves,
+                        ..
+                    } = self.mode
+                    {
+                        WorkerOffsetMode::Wave {
+                            wave_ratio: wave_ratio as f64,
+                            num_waves: num_waves as f64,
+                        }
+                    } else {
+                        WorkerOffsetMode::Spread
+                    },
                     accounts_per_worker: 1,
                     workers_per_endpoint: num_workers_per_endpoint,
+                    endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
                     check_account_sequence_sleep_millis: 300,
                 }
             },
         }
+    }
+}
+
+impl EmitModeParams {
+    pub fn get_all_start_sleep_durations(&self, mut rng: ::rand::rngs::StdRng) -> Vec<Duration> {
+        let index_range = 0..self.endpoints * self.workers_per_endpoint;
+        match self.worker_offset_mode {
+            WorkerOffsetMode::NoOffset => index_range.map(|_i| 0).collect(),
+            WorkerOffsetMode::Jitter { jitter_millis } => index_range
+                .map(|_i| {
+                    if jitter_millis > 0 {
+                        rng.gen_range(0, jitter_millis)
+                    } else {
+                        0
+                    }
+                })
+                .collect(),
+            WorkerOffsetMode::Spread => index_range
+                .map(|i| {
+                    let start_offset_multiplier_millis = self.wait_millis as f64
+                        / (self.workers_per_endpoint * self.endpoints) as f64;
+                    (start_offset_multiplier_millis * i as f64) as u64
+                })
+                .collect(),
+            WorkerOffsetMode::Wave {
+                wave_ratio,
+                num_waves,
+            } => {
+                // integral (1 - wave_ratio cos((2PI num_waves x)/wait_millis)) dx =
+                // (x - (wave_ratio wait_millis sin( (num_waves 2PI x)/wait_millis ))  /  (num_waves 2PI))
+
+                let time_scale = 2.0 * std::f64::consts::PI * num_waves;
+
+                let integral = |time: f64| -> f64 {
+                    time - (wave_ratio
+                        * self.wait_millis as f64
+                        * ((time_scale * time) / self.wait_millis as f64).sin())
+                        / time_scale
+                };
+
+                let workers = self.endpoints * self.workers_per_endpoint;
+                let multiplier = workers as f64 / integral(self.wait_millis as f64);
+
+                let mut result = Vec::new();
+                for time in (0..self.wait_millis).step_by(10) {
+                    let wanted = (multiplier * integral(time as f64)) as usize;
+                    while wanted > result.len() {
+                        result.push(time);
+                    }
+                }
+                while workers > result.len() {
+                    result.push(self.wait_millis);
+                }
+                result
+            },
+        }
+        .into_iter()
+        .map(Duration::from_millis)
+        .collect()
     }
 }
 
@@ -419,15 +511,35 @@ pub struct EmitJob {
     workers: Vec<Worker>,
     stop: Arc<AtomicBool>,
     stats: Arc<DynamicStatsTracking>,
+    phase_starts: Vec<Instant>,
 }
 
 impl EmitJob {
-    pub fn start_next_phase(&self) {
-        self.stats.start_next_phase();
+    pub fn start_next_phase(&mut self) {
+        let cur_phase = self.stats.start_next_phase();
+
+        assert!(self.phase_starts.len() == cur_phase);
+        self.phase_starts.push(Instant::now());
     }
 
     pub fn get_cur_phase(&self) -> usize {
         self.stats.get_cur_phase()
+    }
+
+    pub async fn stop_and_accumulate(self) -> Vec<TxnStats> {
+        self.stop.store(true, Ordering::Relaxed);
+        for worker in self.workers {
+            let _accounts = worker
+                .join_handle
+                .await
+                .expect("TxnEmitter worker thread failed");
+        }
+
+        self.stats.accumulate(&self.phase_starts)
+    }
+
+    pub fn accumulate(&self) -> Vec<TxnStats> {
+        self.stats.accumulate(&self.phase_starts)
     }
 }
 
@@ -491,6 +603,7 @@ impl TxnEmitter {
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
+            max_retries: MAX_RETRIES,
         };
         let mut all_accounts = account_minter
             .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
@@ -535,6 +648,7 @@ impl TxnEmitter {
             total_workers
         );
 
+        let all_start_sleep_durations = mode_params.get_all_start_sleep_durations(self.from_rng());
         let mut all_accounts_iter = all_accounts.into_iter();
         let mut workers = vec![];
         for _ in 0..workers_per_endpoint {
@@ -545,6 +659,7 @@ impl TxnEmitter {
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
                 let txn_generator = txn_generator_creator.create_transaction_generator().await;
+                let worker_index = workers.len();
 
                 let worker = SubmissionWorker::new(
                     accounts,
@@ -553,8 +668,8 @@ impl TxnEmitter {
                     mode_params.clone(),
                     stats,
                     txn_generator,
-                    workers.len(),
-                    check_account_sequence_only_once_for.contains(&workers.len()),
+                    all_start_sleep_durations[worker_index],
+                    check_account_sequence_only_once_for.contains(&worker_index),
                     self.from_rng(),
                 );
                 let join_handle = tokio_handle.spawn(worker.run().boxed());
@@ -562,27 +677,21 @@ impl TxnEmitter {
             }
         }
         info!("Tx emitter workers started");
+
         Ok(EmitJob {
             workers,
             stop,
             stats,
+            phase_starts: vec![Instant::now()],
         })
     }
 
     pub async fn stop_job(self, job: EmitJob) -> Vec<TxnStats> {
-        job.stop.store(true, Ordering::Relaxed);
-        for worker in job.workers {
-            let _accounts = worker
-                .join_handle
-                .await
-                .expect("TxnEmitter worker thread failed");
-        }
-
-        job.stats.accumulate()
+        job.stop_and_accumulate().await
     }
 
     pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
-        job.stats.accumulate()
+        job.accumulate()
     }
 
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
@@ -600,7 +709,7 @@ impl TxnEmitter {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate(window));
+            info!("phase {}: {}", cur_phase, delta.rate());
         }
     }
 
@@ -613,7 +722,7 @@ impl TxnEmitter {
     ) -> Result<TxnStats> {
         let phases = emit_job_request.transaction_mix_per_phase.len();
 
-        let job = self
+        let mut job = self
             .start_job(source_account, emit_job_request, phases)
             .await?;
         info!(

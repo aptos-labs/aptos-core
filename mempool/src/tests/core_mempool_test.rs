@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,10 +11,7 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
-use aptos_types::{
-    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
-};
+use aptos_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
 use itertools::Itertools;
 use std::{
     collections::HashSet,
@@ -73,14 +71,14 @@ fn test_transaction_metrics() {
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        AccountSequenceInfo::Sequential(0),
+        0,
         TimelineState::NotReady,
     );
     let txn = TestTransaction::new(1, 0, 2).make_signed_transaction();
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
-        AccountSequenceInfo::Sequential(0),
+        0,
         TimelineState::NonQualified,
     );
 
@@ -511,7 +509,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::Accepted);
@@ -521,7 +519,7 @@ fn test_capacity_bytes() {
             let status = pool.add_txn(
                 txn.txn,
                 txn.ranking_score,
-                txn.sequence_info.account_sequence_number_type,
+                txn.sequence_info.account_sequence_number,
                 txn.timeline_state,
             );
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
@@ -538,7 +536,7 @@ fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> Mempool
         Duration::from_secs(1),
         1,
         TimelineState::NotReady,
-        AccountSequenceInfo::Sequential(0),
+        0,
         SystemTime::now(),
     )
 }
@@ -608,12 +606,7 @@ fn test_gc_ready_transaction() {
 
     // Insert in the middle transaction that's going to be expired.
     let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
-    pool.add_txn(
-        txn,
-        1,
-        AccountSequenceInfo::Sequential(0),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn, 1, 0, TimelineState::NotReady);
 
     // Insert few transactions after it.
     // They are supposed to be ready because there's a sequential path from 0 to them.
@@ -652,12 +645,7 @@ fn test_clean_stuck_transactions() {
     }
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn,
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn, 1, db_sequence_number, TimelineState::NotReady);
     let block = pool.get_batch(1, 1024, HashSet::new());
     assert_eq!(block.len(), 1);
     assert_eq!(block[0].sequence_number(), 10);
@@ -668,12 +656,7 @@ fn test_get_transaction_by_hash() {
     let mut pool = setup_mempool().0;
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn.clone(),
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
     let hash = txn.clone().committed_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
@@ -687,12 +670,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let mut pool = setup_mempool().0;
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
-    pool.add_txn(
-        txn.clone(),
-        1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
-        TimelineState::NotReady,
-    );
+    pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
     let hash = txn.committed_hash();
 
     // new txn with higher gas price
@@ -700,7 +678,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     pool.add_txn(
         new_txn.clone(),
         1,
-        AccountSequenceInfo::Sequential(db_sequence_number),
+        db_sequence_number,
         TimelineState::NotReady,
     );
     let new_txn_hash = new_txn.clone().committed_hash();

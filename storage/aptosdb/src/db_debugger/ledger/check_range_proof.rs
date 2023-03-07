@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_debugger::common::DbDir, ledger_store::LedgerStore};
@@ -24,7 +24,7 @@ pub struct Cmd {
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let db = Arc::new(self.db_dir.open_ledger_db()?);
-        let store = LedgerStore::new(db.clone());
+        let store = LedgerStore::new(db);
         let ledger_info = store.get_latest_ledger_info()?;
         println!("Latest LedgerInfo: {:?}", ledger_info);
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
@@ -124,8 +124,14 @@ async fn test_old_indexer() {
 
     // Set up accounts, generate some traffic
     // TODO(Gas): double check this
-    let mut account1 = info.create_and_fund_user_account(50_000_000).await.unwrap();
-    let account2 = info.create_and_fund_user_account(50_000_000).await.unwrap();
+    let mut account1 = info
+        .create_and_fund_user_account(50_000_000_000)
+        .await
+        .unwrap();
+    let account2 = info
+        .create_and_fund_user_account(50_000_000_000)
+        .await
+        .unwrap();
     // This transfer should emit events
     let t_tx = info.transfer(&mut account1, &account2, 717).await.unwrap();
     // test NFT creation event indexing

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, DbReader};
@@ -153,6 +153,7 @@ impl ProofFetcher for AsyncProofFetcher {
 mod tests {
     use super::*;
     use crate::mock::MockDbReaderWriter;
+    use aptos_types::state_store::state_key::StateKeyInner;
     use assert_unordered::assert_eq_unordered;
 
     #[test]
@@ -160,13 +161,13 @@ mod tests {
         let fetcher = AsyncProofFetcher::new(Arc::new(MockDbReaderWriter));
         let mut expected_key_hashes = vec![];
         for i in 0..10 {
-            let state_key = StateKey::Raw(format!("test_key_{}", i).into_bytes());
+            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).into_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
                 .fetch_state_value_and_proof(&state_key, 0, None)
                 .expect("Should not fail.");
-            let expected_value = StateValue::from(match state_key {
-                StateKey::Raw(key) => key,
+            let expected_value = StateValue::from(match state_key.into_inner() {
+                StateKeyInner::Raw(key) => key,
                 _ => unreachable!(),
             });
             assert_eq!(result.0, Some(expected_value));

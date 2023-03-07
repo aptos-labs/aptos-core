@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{data_notification::DataNotification, data_stream::DataStreamListener, error::Error};
@@ -260,7 +261,7 @@ impl AptosDataClient for MockAptosDataClient {
         let mut state_keys_and_values = vec![];
         for _ in start_index..=end_index {
             state_keys_and_values.push((
-                StateKey::Raw(HashValue::random().to_vec()),
+                StateKey::raw(HashValue::random().to_vec()),
                 StateValue::from(vec![]),
             ));
         }

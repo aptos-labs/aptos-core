@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
@@ -91,7 +91,7 @@ async fn test_txn_emmitter() {
     )
     .await
     .unwrap();
-    println!("{:?}", txn_stat.rate(Duration::from_secs(10)));
+    println!("{:?}", txn_stat.rate());
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);

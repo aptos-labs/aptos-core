@@ -1,17 +1,24 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::SafetyRulesConfig;
+use crate::config::{QuorumStoreConfig, SafetyRulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusConfig {
     pub max_sending_block_txns: u64,
+    pub max_sending_block_txns_quorum_store_override: u64,
     pub max_sending_block_bytes: u64,
+    pub max_sending_block_bytes_quorum_store_override: u64,
     pub max_receiving_block_txns: u64,
+    pub max_receiving_block_txns_quorum_store_override: u64,
     pub max_receiving_block_bytes: u64,
+    pub max_receiving_block_bytes_quorum_store_override: u64,
     pub max_pruned_blocks_in_mem: usize,
     // Timeout for consensus to get an ack from mempool for executed transactions (in milliseconds)
     pub mempool_executed_txn_timeout_ms: u64,
@@ -30,6 +37,7 @@ pub struct ConsensusConfig {
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
     pub intra_consensus_channel_buffer_size: usize,
+    pub quorum_store_configs: QuorumStoreConfig,
 
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
@@ -49,11 +57,17 @@ impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
             max_sending_block_txns: 2500,
+            max_sending_block_txns_quorum_store_override:
+                MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 600 * 1024, // 600 KB
+            max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
             max_receiving_block_txns: 10000,
+            max_receiving_block_txns_quorum_store_override: 2
+                * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
+            max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -65,10 +79,10 @@ impl Default for ConsensusConfig {
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded
-
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
             intra_consensus_channel_buffer_size: 10,
+            quorum_store_configs: QuorumStoreConfig::default(),
 
             window_for_chain_health: 100,
             chain_health_backoff: vec![
@@ -107,6 +121,14 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    // TODO: This is ugly. Remove this and configs when quorum store is always the default.
+    pub fn apply_quorum_store_overrides(&mut self) {
+        self.max_sending_block_txns = self.max_sending_block_txns_quorum_store_override;
+        self.max_sending_block_bytes = self.max_sending_block_bytes_quorum_store_override;
+        self.max_receiving_block_txns = self.max_receiving_block_txns_quorum_store_override;
+        self.max_receiving_block_bytes = self.max_receiving_block_bytes_quorum_store_override;
     }
 }
 

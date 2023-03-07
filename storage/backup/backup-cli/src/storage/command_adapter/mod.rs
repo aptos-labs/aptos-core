@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod command;
@@ -21,16 +22,27 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::Parser;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::{path::PathBuf, str::FromStr};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-#[derive(Parser)]
+#[derive(Parser, Debug, Serialize, Deserialize)]
 pub struct CommandAdapterOpt {
     #[clap(
         long = "config",
         help = "Config file for the command adapter backup store."
     )]
     config: PathBuf,
+}
+
+impl FromStr for CommandAdapterOpt {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(CommandAdapterOpt {
+            config: PathBuf::from(s),
+        })
+    }
 }
 
 /// A BackupStorage that delegates required APIs to configured command lines.

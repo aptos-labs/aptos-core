@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -10,7 +11,9 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
 };
 use std::ops::Deref;
@@ -29,8 +32,14 @@ pub trait TStateView {
         StateViewId::Miscellaneous
     }
 
+    /// Gets the state value bytes for a given state key.
+    fn get_state_value_bytes(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        let val_opt = self.get_state_value(state_key)?;
+        Ok(val_opt.map(|val| val.into_bytes()))
+    }
+
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>>;
+    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>>;
 
     /// VM needs this method to know whether the current state view is for genesis state creation.
     /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.
@@ -67,7 +76,7 @@ where
         self.deref().id()
     }
 
-    fn get_state_value(&self, state_key: &K) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &K) -> Result<Option<StateValue>> {
         self.deref().get_state_value(state_key)
     }
 

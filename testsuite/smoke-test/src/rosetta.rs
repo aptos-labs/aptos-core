@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
@@ -279,7 +279,7 @@ async fn test_account_balance() {
 
     let mut account_4 = swarm
         .aptos_public_info()
-        .create_and_fund_user_account(10_000_000)
+        .create_and_fund_user_account(10_000_000_000)
         .await
         .unwrap();
 

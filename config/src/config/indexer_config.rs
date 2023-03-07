@@ -1,14 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
+use std::fmt::{Debug, Formatter};
 
 pub const DEFAULT_BATCH_SIZE: u16 = 500;
 pub const DEFAULT_FETCH_TASKS: u8 = 5;
 pub const DEFAULT_PROCESSOR_TASKS: u8 = 5;
 pub const DEFAULT_EMIT_EVERY: u64 = 1000;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct IndexerConfig {
     /// Whether the indexer is enabled or not
@@ -69,6 +70,32 @@ pub struct IndexerConfig {
     /// Which address does the ans contract live at. Only available for token_processor. If null, disable ANS indexing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ans_contract_address: Option<String>,
+}
+
+impl Debug for IndexerConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let postgres_uri = self.postgres_uri.as_ref().map(|u| {
+            let mut parsed_url = url::Url::parse(u).expect("Invalid postgres uri");
+            if parsed_url.password().is_some() {
+                parsed_url.set_password(Some("*")).unwrap();
+            }
+            parsed_url.to_string()
+        });
+        f.debug_struct("IndexerConfig")
+            .field("enabled", &self.enabled)
+            .field("postgres_uri", &postgres_uri)
+            .field("processor", &self.processor)
+            .field("starting_version", &self.starting_version)
+            .field("skip_migrations", &self.skip_migrations)
+            .field("check_chain_id", &self.check_chain_id)
+            .field("batch_size", &self.batch_size)
+            .field("fetch_tasks", &self.fetch_tasks)
+            .field("processor_tasks", &self.processor_tasks)
+            .field("emit_every", &self.emit_every)
+            .field("gap_lookback_versions", &self.gap_lookback_versions)
+            .field("ans_contract_address", &self.ans_contract_address)
+            .finish()
+    }
 }
 
 pub fn env_or_default<T: std::str::FromStr>(

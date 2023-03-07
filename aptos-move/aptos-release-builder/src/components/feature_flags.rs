@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::*;
@@ -7,7 +7,7 @@ use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as 
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
     pub enabled: Vec<FeatureFlag>,
     pub disabled: Vec<FeatureFlag>,
@@ -26,6 +26,7 @@ pub enum FeatureFlag {
     MultiEd25519PkValidateV2Natives,
     Blake2b256Native,
     ResourceGroups,
+    MultisigAccounts,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -124,6 +125,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
+            FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
         }
     }
 }
@@ -147,6 +149,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
+            AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
         }
     }
 }

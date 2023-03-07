@@ -1,8 +1,8 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This file contains utilities that are helpful for performing
-///! database restore operations, as required by db-restore and
+///! database restore operations, as required by restore and
 ///! state sync v2.
 use crate::{
     event_store::EventStore, ledger_store::LedgerStore,

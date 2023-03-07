@@ -1,10 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
 mod manifest;
 pub mod package_hooks;
+
 pub use package_hooks::*;
+
 pub mod stored_package;
 mod transactional_tests_runner;
 
@@ -26,11 +28,11 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    docgen::DocgenOptions, natives::code::UpgradePolicy, prover::ProverOptions, BuildOptions,
-    BuiltPackage,
+    build_model, docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy,
+    prover::ProverOptions, BuildOptions, BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -38,14 +40,27 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use itertools::Itertools;
-use move_cli::{self, base::test::UnitTestResult};
+use move_cli::{
+    self,
+    base::{coverage::CoverageSummaryOptions, test::UnitTestResult},
+};
 use move_command_line_common::env::MOVE_HOME;
+use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     u256::U256,
 };
+use move_coverage::{
+    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
+    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
+};
+use move_disassembler::disassembler::Disassembler;
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use serde::Serialize;
@@ -84,6 +99,8 @@ pub enum MoveTool {
     Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    View(ViewFunction),
+    Coverage(CoveragePackage),
 }
 
 impl MoveTool {
@@ -106,6 +123,8 @@ impl MoveTool {
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::View(tool) => tool.execute_serialized().await,
+            MoveTool::Coverage(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -119,8 +138,6 @@ pub(crate) fn set_bytecode_version(version: Option<u32>) {
     //       environment variables.
     if let Some(ver) = version {
         env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
-    } else if env::var(VAR_BYTECODE_VERSION) == Err(env::VarError::NotPresent) {
-        env::set_var(VAR_BYTECODE_VERSION, "5");
     }
 }
 
@@ -297,7 +314,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .build_options(
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
-                    self.move_options.bytecode_version_or_detault(),
+                    self.move_options.bytecode_version,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -356,7 +373,7 @@ impl CompileScript {
             ..IncludedArtifacts::None.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.bytecode_version_or_detault(),
+                self.move_options.bytecode_version,
             )
         };
         let package_dir = self.move_options.get_package_path()?;
@@ -412,6 +429,9 @@ pub struct TestPackage {
         long = "instructions"
     )]
     pub instruction_execution_bound: u64,
+    /// Collect coverage information for later use with the various `aptos move coverage` subcommands
+    #[clap(long = "coverage")]
+    pub compute_coverage: bool,
 }
 
 #[async_trait]
@@ -422,17 +442,35 @@ impl CliCommand<&'static str> for TestPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         set_bytecode_version(self.move_options.bytecode_version);
-        let config = BuildConfig {
+        let mut config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let result = move_cli::base::test::run_move_unit_tests(
+
+        // Build the Move model for extended checks
+        let model = &build_model(
             self.move_options.get_package_path()?.as_path(),
-            config,
+            self.move_options.named_addresses(),
+            None,
+        )?;
+        let _ = extended_checks::run_extended_checks(model);
+        if model.diag_count(Severity::Warning) > 0 {
+            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+            model.report_diag(&mut error_writer, Severity::Warning);
+            if model.has_errors() {
+                return Err(CliError::MoveCompilationError(
+                    "extended checks failed".to_string(),
+                ));
+            }
+        }
+        let path = self.move_options.get_package_path()?;
+        let result = move_cli::base::test::run_move_unit_tests(
+            path.as_path(),
+            config.clone(),
             UnitTestingConfig {
-                filter: self.filter,
+                filter: self.filter.clone(),
                 report_stacktrace_on_abort: true,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
@@ -443,10 +481,21 @@ impl CliCommand<&'static str> for TestPackage {
                 AbstractValueSizeGasParameters::zeros(),
             ),
             None,
-            false,
+            self.compute_coverage,
             &mut std::io::stdout(),
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+
+        // Print coverage summary if --coverage is set
+        if self.compute_coverage {
+            config.test_mode = false;
+            let summary = CoverageSummaryOptions::Summary {
+                functions: false,
+                output_csv: false,
+            };
+            generate_coverage_info(summary, path.as_path(), config, self.filter).unwrap();
+            println!("Please use `aptos move coverage -h` for more detailed test coverage of this package");
+        }
 
         match result {
             UnitTestResult::Success => Ok("Success"),
@@ -516,6 +565,118 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 }
 
+/// Generate coverage info
+fn generate_coverage_info(
+    options: CoverageSummaryOptions,
+    path: &Path,
+    config: BuildConfig,
+    filter: Option<String>,
+) -> anyhow::Result<()> {
+    let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"))?;
+    let package = config.compile_package(path, &mut Vec::new())?;
+    match options {
+        CoverageSummaryOptions::Source { module_name } => {
+            let unit = package.get_module_by_name_from_root(&module_name)?;
+            let source_path = &unit.source_path;
+            let (module, source_map) = match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule {
+                    module, source_map, ..
+                }) => (module, source_map),
+                _ => panic!("Should all be modules"),
+            };
+            let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
+            source_coverage
+                .compute_source_coverage(source_path)
+                .output_source_coverage(&mut std::io::stdout())
+                .unwrap();
+        },
+        CoverageSummaryOptions::Summary {
+            functions,
+            output_csv,
+            ..
+        } => {
+            let modules: Vec<_> = package
+                .root_modules()
+                .filter_map(|unit| {
+                    let mut retain = true;
+                    if let Some(filter_str) = &filter {
+                        if !&unit.unit.name().as_str().contains(filter_str.as_str()) {
+                            retain = false;
+                        }
+                    }
+                    match &unit.unit {
+                        CompiledUnit::Module(NamedCompiledModule { module, .. }) if retain => {
+                            Some(module.clone())
+                        },
+                        _ => None,
+                    }
+                })
+                .collect();
+            let coverage_map = coverage_map.to_unified_exec_map();
+            if output_csv {
+                format_csv_summary(
+                    modules.as_slice(),
+                    &coverage_map,
+                    summarize_inst_cov,
+                    &mut std::io::stdout(),
+                )
+            } else {
+                format_human_summary(
+                    modules.as_slice(),
+                    &coverage_map,
+                    summarize_inst_cov,
+                    &mut std::io::stdout(),
+                    functions,
+                )
+            }
+        },
+        CoverageSummaryOptions::Bytecode { module_name } => {
+            let unit = package.get_module_by_name_from_root(&module_name)?;
+            let mut disassembler = Disassembler::from_unit(&unit.unit);
+            disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
+            println!("{}", disassembler.disassemble()?);
+        },
+    }
+    Ok(())
+}
+
+/// Computes coverage for a package
+///
+/// Computes coverage on a previous unit test run for a package.  Coverage input must
+/// first be built with `aptos move test --coverage`
+#[derive(Parser)]
+pub struct CoveragePackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    #[clap(subcommand)]
+    pub coverage_options: CoverageSummaryOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for CoveragePackage {
+    fn command_name(&self) -> &'static str {
+        "CoveragePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        set_bytecode_version(self.move_options.bytecode_version);
+
+        let config = BuildConfig {
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: false,
+            install_dir: self.move_options.output_dir.clone(),
+            ..Default::default()
+        };
+        let path = self.move_options.get_package_path()?;
+        let result = generate_coverage_info(self.coverage_options, path.as_path(), config, None);
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(e) => Err(CliError::CoverageError(format!("{:#}", e))),
+        }
+    }
+}
+
 /// Documents a Move package
 ///
 /// This converts the content of the package into markdown for documentation.
@@ -550,7 +711,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             named_addresses: move_options.named_addresses(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
-            bytecode_version: Some(move_options.bytecode_version_or_detault()),
+            bytecode_version: move_options.bytecode_version,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -624,7 +785,7 @@ impl IncludedArtifacts {
         self,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
-        bytecode_version: u32,
+        bytecode_version: Option<u32>,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -636,7 +797,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
@@ -646,7 +807,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
             All => BuildOptions {
@@ -656,7 +817,7 @@ impl IncludedArtifacts {
                 with_error_map: true,
                 named_addresses,
                 skip_fetch_latest_git_deps,
-                bytecode_version: Some(bytecode_version),
+                bytecode_version,
                 ..BuildOptions::default()
             },
         }
@@ -683,7 +844,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -770,7 +931,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let options = included_artifacts_args.included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -865,7 +1026,9 @@ impl CliCommand<&'static str> for DownloadPackage {
     }
 }
 
-/// Downloads a package and verifies that the bytecode matches a local compilation of the Move code
+/// Downloads a package and verifies the bytecode
+///
+/// Downloads the package from onchain and verifies the bytecode matches a local compilation of the Move code
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
@@ -895,11 +1058,11 @@ impl CliCommand<&'static str> for VerifyPackage {
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            bytecode_version: Some(self.move_options.bytecode_version_or_detault()),
+            bytecode_version: self.move_options.bytecode_version,
             ..self.included_artifacts.build_options(
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.bytecode_version_or_detault(),
+                self.move_options.bytecode_version,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -1098,6 +1261,58 @@ impl CliCommand<TransactionSummary> for RunFunction {
             )))
             .await
             .map(TransactionSummary::from)
+    }
+}
+
+/// Run a Move function
+#[derive(Parser)]
+pub struct ViewFunction {
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
+    #[clap(long)]
+    pub(crate) function_id: MemberId,
+
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
+    fn command_name(&self) -> &'static str {
+        "RunViewFunction"
+    }
+
+    async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
+        let mut args: Vec<serde_json::Value> = vec![];
+        for arg in self.args {
+            args.push(arg.to_json()?);
+        }
+
+        let view_request = ViewRequest {
+            function: EntryFunctionId {
+                module: self.function_id.module_id.into(),
+                name: self.function_id.member_id.into(),
+            },
+            type_arguments: self.type_args,
+            arguments: args,
+        };
+
+        self.txn_options.view(view_request).await
     }
 }
 
@@ -1395,6 +1610,71 @@ impl ArgWithType {
             _ty: FunctionArgType::Raw,
             arg,
         }
+    }
+
+    pub fn to_json(&self) -> CliTypedResult<serde_json::Value> {
+        match self._ty.clone() {
+            FunctionArgType::Address => {
+                serde_json::to_value(bcs::from_bytes::<AccountAddress>(&self.arg)?)
+            },
+            FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
+            FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+            FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U64 => {
+                serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U128 => {
+                serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
+            },
+            FunctionArgType::U256 => {
+                serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+            },
+            FunctionArgType::Raw => serde_json::to_value(&self.arg),
+            FunctionArgType::HexArray => {
+                serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+            },
+            FunctionArgType::Vector(inner) => match inner.deref() {
+                FunctionArgType::Address => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<AccountAddress>>(&self.arg)?)
+                },
+                FunctionArgType::Bool => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<bool>>(&self.arg)?)
+                },
+                FunctionArgType::Hex => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<Vec<u8>>>(&self.arg)?)
+                },
+                FunctionArgType::String => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<String>>(&self.arg)?)
+                },
+                FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
+                FunctionArgType::U16 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u16>>(&self.arg)?)
+                },
+                FunctionArgType::U32 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u32>>(&self.arg)?)
+                },
+                FunctionArgType::U64 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u64>>(&self.arg)?)
+                },
+                FunctionArgType::U128 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<u128>>(&self.arg)?)
+                },
+                FunctionArgType::U256 => {
+                    serde_json::to_value(bcs::from_bytes::<Vec<U256>>(&self.arg)?)
+                },
+                FunctionArgType::Raw | FunctionArgType::HexArray | FunctionArgType::Vector(_) => {
+                    return Err(CliError::UnexpectedError(
+                        "Nested vectors not supported".to_string(),
+                    ));
+                },
+            },
+        }
+        .map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
+        })
     }
 }
 

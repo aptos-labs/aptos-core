@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
@@ -7,10 +7,17 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
+use aptos_network::application::interface::NetworkClientInterface;
+use aptos_peer_monitoring_service_server::{
+    network::PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer,
+};
+use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
+use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, thread, time::Instant};
@@ -27,6 +34,7 @@ pub fn bootstrap_api_and_indexer(
     chain_id: ChainId,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
+    Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
 )> {
@@ -46,11 +54,24 @@ pub fn bootstrap_api_and_indexer(
         None
     };
 
+    // Creates the indexer grpc runtime
+    let indexer_grpc = bootstrap_indexer_grpc(
+        node_config,
+        chain_id,
+        aptos_db.clone(),
+        mempool_client_sender.clone(),
+    );
+
     // Create the indexer runtime
     let indexer_runtime =
         indexer::bootstrap_indexer(node_config, chain_id, aptos_db, mempool_client_sender)?;
 
-    Ok((mempool_client_receiver, api_runtime, indexer_runtime))
+    Ok((
+        mempool_client_receiver,
+        api_runtime,
+        indexer_runtime,
+        indexer_grpc,
+    ))
 }
 
 /// Starts consensus and returns the runtime
@@ -113,6 +134,49 @@ pub fn start_node_inspection_service(node_config: &NodeConfig) {
     thread::spawn(move || {
         aptos_inspection_service::inspection_service::start_inspection_service(node_config)
     });
+}
+
+/// Starts the peer monitoring service and returns the runtime
+pub fn start_peer_monitoring_service(
+    node_config: &NodeConfig,
+    network_interfaces: ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
+) -> Runtime {
+    // Get the network client and events
+    let network_client = network_interfaces.network_client;
+    let network_service_events = network_interfaces.network_service_events;
+
+    // Create a new runtime for the monitoring service
+    let peer_monitoring_service_runtime =
+        aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
+
+    // Create and spawn the peer monitoring server
+    let peer_monitoring_network_events =
+        PeerMonitoringServiceNetworkEvents::new(network_service_events);
+    let peer_monitoring_server = PeerMonitoringServiceServer::new(
+        node_config.clone(),
+        peer_monitoring_service_runtime.handle().clone(),
+        peer_monitoring_network_events,
+        network_client.get_peers_and_metadata(),
+    );
+    peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
+
+    // Spawn the peer monitoring client
+    if node_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client
+    {
+        peer_monitoring_service_runtime.spawn(
+            aptos_peer_monitoring_service_client::start_peer_monitor(
+                node_config.clone(),
+                network_client,
+                TimeService::real(),
+                Some(peer_monitoring_service_runtime.handle().clone()),
+            ),
+        );
+    }
+
+    // Return the runtime
+    peer_monitoring_service_runtime
 }
 
 /// Starts the telemetry service and grabs the build information

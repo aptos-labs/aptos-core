@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -835,6 +836,8 @@ async fn finalize_storage_and_send_commit<
             epoch_change_proofs,
         )
         .map_err(|error| format!("Failed to finalize the state snapshot! Error: {:?}", error))?;
+
+    info!("All states have synced, version: {}", version);
 
     // Update the metadata storage
     metadata_storage.update_last_persisted_state_value_index(

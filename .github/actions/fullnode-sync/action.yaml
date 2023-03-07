@@ -32,12 +32,11 @@ runs:
       run: |
         echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
         scripts/dev_setup.sh -b # Install dependencies
-        sudo apt-get update -y && sudo apt-get install -y expect
     - name: Run fullnode sync
       shell: bash
       run: |
         source "$HOME/.cargo/env" # Required for allowing python access to cargo
-        pip install pyyaml # Required for parsing YAML
+        pip install -r ${{ github.action_path }}/requirements.txt
         timeout "${{ inputs.TIMEOUT_MINUTES }}m" python3 ${{ github.action_path }}/fullnode_sync.py
       env:
         BRANCH: ${{ inputs.BRANCH }}

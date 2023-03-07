@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
@@ -129,10 +130,11 @@ impl LocalNode {
 
         // We print out the commands and PIDs for debugging of local swarms
         info!(
-            "Started node {} (PID: {}) with command: {:?}",
+            "Started node {} (PID: {}) with command: {:?}, log_path: {:?}",
             self.name,
             process.id(),
-            node_command
+            node_command,
+            self.log_path(),
         );
 
         // We print out the API endpoints of each node for local debugging

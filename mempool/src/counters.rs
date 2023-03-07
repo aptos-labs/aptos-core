@@ -1,11 +1,12 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    histogram_opts, op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge_vec, Histogram,
-    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
+    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -100,6 +101,13 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     100.0, 147.0, 215.0, 316.0, 464.0, 681.0, 1000.0, 1468.0, 2154.0, 3162.0, 4642.0, 6813.0,
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
+
+static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 #[cfg(test)]
 mod test {
@@ -257,9 +265,10 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
-        &["type"]
+        &["type"],
+        TRANSACTION_COUNT_BUCKETS.clone()
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn mempool_service_transactions(label: &'static str, num: usize) {

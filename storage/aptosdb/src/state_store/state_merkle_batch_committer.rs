@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This file defines the state merkle snapshot committer running in background thread.
@@ -75,7 +75,7 @@ impl StateMerkleBatchCommitter {
                         .expect("Current version should not be None");
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
                     self.state_db
-                        .state_pruner
+                        .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(current_version);
                     self.state_db
                         .epoch_snapshot_pruner
