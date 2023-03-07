@@ -13,16 +13,6 @@ Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better t
 
 ## Getting Started
 
-### Quick
-
-```sh
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-./scripts/dev_setup.sh
-cargo build
-cargo test
-```
-
 See [Prepare your Aptos Dev Environment](https://aptos.dev/guides/getting-started) for more details.
 
 ### Resources
