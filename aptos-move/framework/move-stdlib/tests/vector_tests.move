@@ -591,6 +591,24 @@ module std::vector_tests {
         assert!(&v == &vector[2, 4, 1, 3, 5], 1);
     }
 
+    fun test_insert() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        vector::insert(&mut v,2, 6);
+        assert!(&v == &vector[1, 2, 6, 3, 4, 5], 1);
+
+        vector::insert(&mut v,6, 7);
+        assert!(&v == &vector[1, 2, 6, 3, 4, 5, 7], 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_insert_out_of_bounds() {
+        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+
+        vector::insert(&mut v,6, 6);
+    }
+
     #[test_only]
     struct MoveOnly {}
 

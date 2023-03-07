@@ -156,6 +156,17 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Insert a new element at position 0 <= i <= length.
+    public fun insert<Element>(v: &mut vector<Element>, i: u64, e: Element) {
+        let len = length(v);
+        assert!(i <= len, EINDEX_OUT_OF_BOUNDS);
+        push_back(v, e);
+        while (i < len) {
+            swap(v, i, len);
+            i = i + 1;
+        };
+    }
+
     /// Remove the `i`th element of the vector `v`, shifting all subsequent elements.
     /// This is O(n) and preserves ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.

@@ -28,16 +28,16 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `reverse`](#0x1_vector_reverse)
 -  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
+-  [Function `reverse_append`](#0x1_vector_reverse_append)
 -  [Function `trim`](#0x1_vector_trim)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
+-  [Function `insert`](#0x1_vector_insert)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
--  [Function `test_stable_partition`](#0x1_vector_test_stable_partition)
 -  [Function `rotate`](#0x1_vector_rotate)
 -  [Function `rotate_slice`](#0x1_vector_rotate_slice)
--  [Function `stable_partition_internal`](#0x1_vector_stable_partition_internal)
 -  [Specification](#@Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
@@ -372,7 +372,36 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_append">append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
-    <b>while</b> (!<a href="vector.md#0x1_vector_is_empty">is_empty</a>(&other)) <a href="vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
+    <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>(lhs, other);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_reverse_append"></a>
+
+## Function `reverse_append`
+
+Pushes all of the elements of the <code>other</code> vector into the <code>lhs</code> vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&other);
+    <b>while</b> (len &gt; 0) {
+        <a href="vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
+        len = len - 1;
+    };
     <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(other);
 }
 </code></pre>
@@ -500,6 +529,37 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 </details>
 
+<a name="0x1_vector_insert"></a>
+
+## Function `insert`
+
+Insert a new element at position 0 <= i <= length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>assert</b>!(i &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+    <a href="vector.md#0x1_vector_push_back">push_back</a>(v, e);
+    <b>while</b> (i &lt; len) {
+        <a href="vector.md#0x1_vector_swap">swap</a>(v, i, len);
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_remove"></a>
 
 ## Function `remove`
@@ -556,37 +616,6 @@ Aborts if <code>i</code> is out of bounds.
     <b>let</b> last_idx = <a href="vector.md#0x1_vector_length">length</a>(v) - 1;
     <a href="vector.md#0x1_vector_swap">swap</a>(v, i, last_idx);
     <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_test_stable_partition"></a>
-
-## Function `test_stable_partition`
-
-
-
-<pre><code><b>fun</b> <a href="vector.md#0x1_vector_test_stable_partition">test_stable_partition</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="vector.md#0x1_vector_test_stable_partition">test_stable_partition</a>() {
-    <b>let</b> v:<a href="vector.md#0x1_vector">vector</a>&lt;u64&gt; = <a href="vector.md#0x1_vector">vector</a>[1, 2, 3, 4, 5];
-
-    <b>let</b> pred = map_ref2(&v, |n| *n % 2 == 0);
-    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&v);
-    <b>assert</b>!(<a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(&<b>mut</b> v, &pred,0, len) == 2, 0);
-
-    //<b>assert</b>!(stable_partition(&<b>mut</b> v, |n| *n % 2 == 0) == 2, 0);
-    <b>assert</b>!(&v == &<a href="vector.md#0x1_vector">vector</a>[2, 4, 1, 3, 5], 1);
 }
 </code></pre>
 
@@ -651,48 +680,6 @@ returns the
     <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, rot, right);
     <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, right);
     left + (right - rot)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_stable_partition_internal"></a>
-
-## Function `stable_partition_internal`
-
-For in-place stable partition we need recursion so we cannot use inline functions
-and thus we cannot use lambdas. Luckily it so happens that we can precompute the predicate
-in a secondary array. Note how the algorithm belows only start shuffling items after the
-predicate is checked.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, pred: &<a href="vector.md#0x1_vector">vector</a>&lt;bool&gt;, left: u64, right: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>&lt;Element&gt;(
-    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
-    pred: &<a href="vector.md#0x1_vector">vector</a>&lt;bool&gt;,
-    left: u64,
-    right: u64
-): u64 {
-    <b>if</b> (left == right) {
-        left
-    } <b>else</b> <b>if</b> (left + 1 == right) {
-        <b>if</b> (*<a href="vector.md#0x1_vector_borrow">borrow</a>(pred, left)) right <b>else</b> left
-    } <b>else</b> {
-        <b>let</b> mid = left + ((right - left) &gt;&gt; 1);
-        <b>let</b> p1 = <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(v, pred, left, mid);
-        <b>let</b> p2 = <a href="vector.md#0x1_vector_stable_partition_internal">stable_partition_internal</a>(v, pred, mid, right);
-        <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>(v, p1, mid, p2)
-    }
 }
 </code></pre>
 
