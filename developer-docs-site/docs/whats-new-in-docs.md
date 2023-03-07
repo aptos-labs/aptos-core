@@ -7,6 +7,19 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 07 March 2023
+
+- Published documentation for the new [Aptos Unity SDK](./sdks/unity-sdk.md) highlighting its uses and explaining how to install it.
+
+- Launched a [Community](./community/index.md) section of the site to enable more participation in the Aptos ecosystem. It contains these subpages:
+
+  * [Community Highlights](./community/contributions/index.md) - exemplary contributions to Aptos and Aptos.dev from our community members.
+  * [External Resources](./community/external-resources.md) - useful, technical posts to the Aptos Forum or links to Aptos-related technologies documented elsewhere.
+  * [Rust Coding Guidelines](./community/rust-coding-guidelines.md) - the coding guidelines for the Aptos Core Rust codebase.
+  * [Update Aptos.dev](./community/site-updates.md) - Follow the instructions on this page to update Aptos.dev, the developer website for the Aptos blockchain.
+  * [Follow Aptos Style](./community/aptos-style.md) - When making site updates, Aptos recommends adhering to this writing and formatting style guide for consistency with the rest of Aptos.dev.
+
+
 ## 01 March 2023
 
 - Enhanced the Aptos TypeScript SDK to include [IndexerClient](./sdks/ts-sdk/typescript-sdk-overview.md#indexerclient-class) and [Provider](./sdks/ts-sdk/typescript-sdk-overview.md#provider-class) classes. These new classes allow for querying the Aptos Indexer and using a single client to simultaneously query the indexer and retrieve account-related information, respectively.
