@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
+    common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
@@ -59,5 +59,7 @@ pub trait BlockReader: Send + Sync {
     fn sync_info(&self) -> SyncInfo;
 
     /// Return if the consensus is backpressured
-    fn back_pressure(&self) -> bool;
+    fn vote_back_pressure(&self) -> bool;
+
+    fn proposal_back_pressure(&self) -> Round;
 }

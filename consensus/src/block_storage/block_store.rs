@@ -500,11 +500,15 @@ impl BlockStore {
             .store(back_pressure, Ordering::Relaxed)
     }
 
-    pub fn back_pressure(&self) -> bool {
+    pub fn vote_back_pressure(&self) -> bool {
+        false
+    }
+
+    pub fn proposal_back_pressure(&self) -> Round {
         #[cfg(any(test, feature = "fuzzing"))]
         {
             if self.back_pressure_for_test.load(Ordering::Relaxed) {
-                return true;
+                return 100;
             }
         }
         let commit_round = self.commit_root().round();
@@ -512,7 +516,7 @@ impl BlockStore {
         counters::OP_COUNTERS
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
-        ordered_round > self.back_pressure_limit + commit_round
+        ordered_round.saturating_sub(commit_round)
     }
 }
 
@@ -575,8 +579,12 @@ impl BlockReader for BlockStore {
         )
     }
 
-    fn back_pressure(&self) -> bool {
-        self.back_pressure()
+    fn vote_back_pressure(&self) -> bool {
+        self.vote_back_pressure()
+    }
+
+    fn proposal_back_pressure(&self) -> Round {
+        self.proposal_back_pressure()
     }
 }
 

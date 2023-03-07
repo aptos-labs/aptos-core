@@ -53,10 +53,18 @@ pub struct ConsensusConfig {
     pub wait_for_full_blocks_above_recent_fill_threshold: f32,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
+    pub consensus_backpressure: Vec<ConsensusBackpressureValues>,
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConsensusBackpressureValues {
+    pub back_pressure_limit: u64,
+    pub max_sending_block_txns_override: u64,
+    pub max_sending_block_bytes_override: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -102,7 +110,36 @@ impl Default for ConsensusConfig {
             wait_for_full_blocks_above_recent_fill_threshold: 1.1,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
-
+            consensus_backpressure: vec![
+                ConsensusBackpressureValues {
+                    back_pressure_limit: 6,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: 250 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    back_pressure_limit: 7,
+                    max_sending_block_txns_override: 400,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    back_pressure_limit: 8,
+                    // stop reducing size, so 100k transactions can still go through
+                    max_sending_block_txns_override: 100,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    back_pressure_limit: 10,
+                    max_sending_block_txns_override: 50,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+                ConsensusBackpressureValues {
+                    back_pressure_limit: 12,
+                    // in practice, latencies make it such that 2-4 blocks/s is max,
+                    // meaning that most aggressively we limit to ~40-80 TPS
+                    max_sending_block_txns_override: 20,
+                    max_sending_block_bytes_override: 100 * 1024,
+                },
+            ],
             window_for_chain_health: 100,
             chain_health_backoff: vec![
                 ChainHealthBackoffValues {
@@ -123,14 +160,15 @@ impl Default for ConsensusConfig {
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
                     max_sending_block_txns_override: 200,
-                    max_sending_block_bytes_override: 50 * 1024,
+                    // stop reducing size, so 100k transactions can still go through
+                    max_sending_block_bytes_override: 100 * 1024,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 69,
                     // in practice, latencies make it such that 2-4 blocks/s is max,
                     // meaning that most aggressively we limit to ~200-400 TPS
                     max_sending_block_txns_override: 100,
-                    max_sending_block_bytes_override: 25 * 1024,
+                    max_sending_block_bytes_override: 100 * 1024,
                 },
             ],
         }

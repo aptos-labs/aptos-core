@@ -5,7 +5,9 @@
 use crate::{
     block_storage::BlockReader,
     liveness::{
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, ConsensusBackpressureConfig, ProposalGenerator,
+        },
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
@@ -36,6 +38,7 @@ async fn test_proposal_generation_empty_tree() {
         1,
         10,
         10,
+        ConsensusBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -74,6 +77,7 @@ async fn test_proposal_generation_parent() {
         1,
         1000,
         10,
+        ConsensusBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -144,6 +148,7 @@ async fn test_old_proposal_generation() {
         1,
         1000,
         10,
+        ConsensusBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -179,6 +184,7 @@ async fn test_correct_failed_authors() {
         1,
         1000,
         10,
+        ConsensusBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
