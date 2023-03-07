@@ -9,7 +9,7 @@ use crate::{
     pruner::{
         db_pruner::DBPruner,
         pruner_manager::PrunerManager,
-        state_pruner_worker::StatePrunerWorker,
+        state_merkle_pruner_worker::StateMerklePrunerWorker,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     pruner_utils,
@@ -28,7 +28,7 @@ use std::{sync::Arc, thread::JoinHandle};
 /// destruction. When destructed, it quits the worker thread eagerly without waiting for all
 /// pending work to be done.
 #[derive(Debug)]
-pub struct StatePrunerManager<S: StaleNodeIndexSchemaTrait>
+pub struct StateMerklePrunerManager<S: StaleNodeIndexSchemaTrait>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
@@ -40,8 +40,8 @@ where
     /// of the min_readable_version.
     pruner: Arc<StateMerklePruner<S>>,
     /// Wrapper class of the state pruner.
-    pub(crate) pruner_worker: Arc<StatePrunerWorker<S>>,
-    /// The worker thread handle for state_pruner, created upon Pruner instance construction and
+    pub(crate) pruner_worker: Arc<StateMerklePrunerWorker<S>>,
+    /// The worker thread handle for state_merkle_pruner, created upon Pruner instance construction and
     /// joined upon its destruction. It is `None` when state pruner is not enabled or it only
     /// becomes `None` after joined in `drop()`.
     worker_thread: Option<JoinHandle<()>>,
@@ -52,7 +52,7 @@ where
     latest_version: Arc<Mutex<Version>>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> PrunerManager for StatePrunerManager<S>
+impl<S: StaleNodeIndexSchemaTrait> PrunerManager for StateMerklePrunerManager<S>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
@@ -97,14 +97,14 @@ where
     }
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StatePrunerManager<S>
+impl<S: StaleNodeIndexSchemaTrait> StateMerklePrunerManager<S>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(state_merkle_rocksdb: Arc<DB>, config: StateMerklePrunerConfig) -> Self {
         let state_db_clone = Arc::clone(&state_merkle_rocksdb);
-        let pruner = pruner_utils::create_state_pruner(state_db_clone);
+        let pruner = pruner_utils::create_state_merkle_pruner(state_db_clone);
 
         if config.enable {
             PRUNER_WINDOW
@@ -116,14 +116,14 @@ where
                 .set(config.batch_size as i64);
         }
 
-        let pruner_worker = Arc::new(StatePrunerWorker::new(Arc::clone(&pruner), config));
-        let state_pruner_worker_clone = Arc::clone(&pruner_worker);
+        let pruner_worker = Arc::new(StateMerklePrunerWorker::new(Arc::clone(&pruner), config));
+        let state_merkle_pruner_worker_clone = Arc::clone(&pruner_worker);
 
         let worker_thread = if config.enable {
             Some(
                 std::thread::Builder::new()
-                    .name("aptosdb_state_pruner".into())
-                    .spawn(move || state_pruner_worker_clone.as_ref().work())
+                    .name("aptosdb_state_merkle_pruner".into())
+                    .spawn(move || state_merkle_pruner_worker_clone.as_ref().work())
                     .expect("Creating state pruner thread should succeed."),
             )
         } else {
@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<S: StaleNodeIndexSchemaTrait> Drop for StatePrunerManager<S>
+impl<S: StaleNodeIndexSchemaTrait> Drop for StateMerklePrunerManager<S>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
@@ -158,9 +158,9 @@ where
             assert!(self.worker_thread.is_some());
             self.worker_thread
                 .take()
-                .expect("Ledger pruner worker thread must exist.")
+                .expect("State merkle pruner worker thread must exist.")
                 .join()
-                .expect("Ledger pruner worker thread should join peacefully.");
+                .expect("State merkle pruner worker thread should join peacefully.");
         }
     }
 }

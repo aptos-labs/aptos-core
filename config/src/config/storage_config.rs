@@ -117,6 +117,11 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
+    state_kv_pruner_config: StateKvPrunerConfig {
+        enable: false,
+        prune_window: 0,
+        batch_size: 0,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -140,13 +145,12 @@ pub struct LedgerPrunerConfig {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateMerklePrunerConfig {
-    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
-    /// pruning state tree nodes.
+    /// Boolean to enable/disable the state merkle pruner. The state merkle pruner is responsible
+    /// for pruning state tree nodes.
     pub enable: bool,
-    /// The size of the window should be calculated based on disk space availability and system TPS.
+    /// Window size in versions.
     pub prune_window: u64,
-    /// Similar to the variable above but for state store pruner. It means the number of stale
-    /// nodes to prune a time.
+    /// Number of stale nodes to prune a time.
     pub batch_size: usize,
 }
 
@@ -158,6 +162,19 @@ pub struct EpochSnapshotPrunerConfig {
     /// other snapshots are pruned by the state merkle pruner.
     pub prune_window: u64,
     /// Number of stale nodes to prune a time.
+    pub batch_size: usize,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StateKvPrunerConfig {
+    /// Boolean to enable/disable the state kv pruner. The state pruner is responsible for
+    /// pruning state tree nodes.
+    pub enable: bool,
+    /// Window size in versions.
+    pub prune_window: u64,
+    /// Similar to the variable above but for state kv pruner. It means the number of versions to
+    /// prune a time.
     pub batch_size: usize,
 }
 
@@ -180,6 +197,7 @@ pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
     pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
+    pub state_kv_pruner_config: StateKvPrunerConfig,
 }
 
 impl Default for LedgerPrunerConfig {
@@ -226,6 +244,17 @@ impl Default for EpochSnapshotPrunerConfig {
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
+        }
+    }
+}
+
+impl Default for StateKvPrunerConfig {
+    fn default() -> Self {
+        Self {
+            // TODO(grao): Keep it the same as ledger pruner config for now, will revisit later.
+            enable: true,
+            prune_window: 150_000_000,
+            batch_size: 500,
         }
     }
 }
