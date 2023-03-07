@@ -278,7 +278,7 @@ impl InnerBuilder {
     ) {
         // TODO: parameter? bring back back-off?
         let interval = tokio::time::interval(Duration::from_millis(
-            self.config.mempool_pulling_interval as u64,
+            self.config.batch_generation_poll_interval_ms as u64,
         ));
 
         let coordinator_rx = self.coordinator_rx.take().unwrap();

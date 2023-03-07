@@ -12,8 +12,8 @@ pub struct QuorumStoreBackPressureConfig {
     pub decrease_duration_ms: u64,
     pub increase_duration_ms: u64,
     pub decrease_fraction: f64,
-    pub dynamic_min_batch_count: u64,
-    pub dynamic_max_batch_count: u64,
+    pub dynamic_min_txn_per_s: u64,
+    pub dynamic_max_txn_per_s: u64,
 }
 
 impl Default for QuorumStoreBackPressureConfig {
@@ -24,8 +24,8 @@ impl Default for QuorumStoreBackPressureConfig {
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_batch_count: 40,
-            dynamic_max_batch_count: 500,
+            dynamic_min_txn_per_s: 160,
+            dynamic_max_txn_per_s: 2000,
         }
     }
 }
@@ -36,7 +36,8 @@ pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
-    pub mempool_pulling_interval: usize,
+    pub batch_generation_poll_interval_ms: usize,
+    pub batch_generation_max_interval_ms: usize,
     pub end_batch_ms: u64,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
@@ -63,7 +64,8 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
-            mempool_pulling_interval: 250,
+            batch_generation_poll_interval_ms: 25,
+            batch_generation_max_interval_ms: 250,
             // TODO: This essentially turns fragments off, because there was performance degradation. Needs more investigation.
             end_batch_ms: 10,
             max_batch_bytes: 4 * 1024 * 1024,
