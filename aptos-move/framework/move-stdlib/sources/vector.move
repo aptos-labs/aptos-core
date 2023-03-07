@@ -156,7 +156,8 @@ module std::vector {
         pragma intrinsic = true;
     }
 
-    /// Insert a new element at position 0 <= i <= length.
+    /// Insert a new element at position 0 <= i <= length, using O(length - i) time.
+    /// Aborts if out of bounds.
     public fun insert<Element>(v: &mut vector<Element>, i: u64, e: Element) {
         let len = length(v);
         assert!(i <= len, EINDEX_OUT_OF_BOUNDS);
@@ -204,8 +205,10 @@ module std::vector {
 
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each_reverse<Element>(v: vector<Element>, f: |Element|) {
-        while (!is_empty(&v)) {
+        let len = length(&v);
+        while (len > 0) {
             f(pop_back(&mut v));
+            len = len - 1;
         };
         destroy_empty(v)
     }

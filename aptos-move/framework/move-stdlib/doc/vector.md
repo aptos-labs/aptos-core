@@ -533,7 +533,8 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 ## Function `insert`
 
-Insert a new element at position 0 <= i <= length.
+Insert a new element at position 0 <= i <= length, using O(length - i) time.
+Aborts if out of bounds.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element)
