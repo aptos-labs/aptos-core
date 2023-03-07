@@ -294,7 +294,7 @@ async fn process_streaming_response(
                         current_version = current_version,
                         chain_id = fullnode_chain_id,
                         tps = (tps_calculator.avg() * 1000.0) as u64,
-                        "[Indexer Cache] Successfully process current batch."
+                        "[Indexer Cache] Successfully processed current batch."
                     );
                 },
             },
