@@ -6,11 +6,10 @@ import os
 import pathlib
 import subprocess
 import traceback
-import typing
-from contextlib import contextmanager
 from dataclasses import dataclass
 
-from common import AccountInfo, build_image_name, recursive_chmod
+from aptos_sdk.client import RestClient
+from common import AccountInfo, build_image_name
 
 LOG = logging.getLogger(__name__)
 
@@ -24,9 +23,10 @@ class RunHelper:
     image_repo_with_project: str
     image_tag: str
     cli_path: str
-    passed_tests: typing.List[str]
-    failed_tests: typing.List[str]
-    volume_name: str
+    test_count: int
+
+    # This can be used by the tests to query the local testnet.
+    api_client: RestClient
 
     def __init__(
         self, host_working_directory, image_repo_with_project, image_tag, cli_path
@@ -39,8 +39,8 @@ class RunHelper:
         self.image_repo_with_project = image_repo_with_project
         self.image_tag = image_tag
         self.cli_path = cli_path
-        self.passed_tests = []
-        self.failed_tests = []
+        self.test_count = 0
+        self.api_client = RestClient(f"http://127.0.0.1:8080/v1")
 
     def build_image_name(self):
         return build_image_name(self.image_repo_with_project, self.image_tag)
@@ -50,7 +50,8 @@ class RunHelper:
     # that the container will write it results out to that directory. That way the CLI
     # state / configuration is preserved between test cases.
     def run_command(self, test_name, command, *args, **kwargs):
-        LOG.info(f"Running test: {test_name}")
+        file_name = f"{self.test_count:03}_{test_name}"
+        self.test_count += 1
 
         # Build command.
         if self.image_tag:
@@ -80,7 +81,7 @@ class RunHelper:
         pathlib.Path(out_path).mkdir(exist_ok=True)
 
         # Write the command we're going to run to file.
-        with open(os.path.join(out_path, f"{test_name}.command"), "w") as f:
+        with open(os.path.join(out_path, f"{file_name}.command"), "w") as f:
             f.write(" ".join(command))
 
         # Run command.
@@ -97,16 +98,16 @@ class RunHelper:
                 universal_newlines=True,
                 **kwargs,
             )
-            LOG.info(f"Test passed: {test_name}")
-            self.passed_tests.append(test_name)
+            LOG.debug(f"Subcommand succeeded: {test_name}")
 
-            out = result
-        except Exception as e:
-            LOG.warn(f"Test failed: {test_name}")
-            self.failed_tests.append(test_name)
+            write_subprocess_out(out_path, file_name, result)
+
+            return result
+        except subprocess.CalledProcessError as e:
+            LOG.warn(f"Subcommand failed: {test_name}")
 
             # Write the exception to file.
-            with open(os.path.join(out_path, f"{test_name}.exception"), "w") as f:
+            with open(os.path.join(out_path, f"{file_name}.exception"), "w") as f:
                 f.write(
                     "".join(
                         traceback.format_exception(
@@ -117,18 +118,9 @@ class RunHelper:
 
             # Fortunately the result and exception of subprocess.run both have the
             # stdout and stderr attributes on them.
-            out = e
+            write_subprocess_out(out_path, file_name, e)
 
-        LOG.debug(f"Stdout: {out.stdout}")
-        LOG.debug(f"Stderr: {out.stderr}")
-
-        # Write stdout and stderr to file.
-        with open(os.path.join(out_path, f"{test_name}.stdout"), "w") as f:
-            f.write(out.stdout)
-        with open(os.path.join(out_path, f"{test_name}.stderr"), "w") as f:
-            f.write(out.stderr)
-
-        return out
+            raise
 
     # If image_Tag is set, pull the test CLI image. We don't technically have to do
     # this separately but it makes the steps clearer. Otherwise, cli_path must be
@@ -168,3 +160,15 @@ class RunHelper:
             public_key=public_key,
             account_address=account_address,
         )
+
+
+# This function helps with writing the stdout / stderr of a subprocess to files.
+def write_subprocess_out(out_path, file_name, command_output):
+    LOG.debug(f"Stdout: {command_output.stdout}")
+    LOG.debug(f"Stderr: {command_output.stderr}")
+
+    # Write stdout and stderr to file.
+    with open(os.path.join(out_path, f"{file_name}.stdout"), "w") as f:
+        f.write(command_output.stdout)
+    with open(os.path.join(out_path, f"{file_name}.stderr"), "w") as f:
+        f.write(command_output.stderr)
