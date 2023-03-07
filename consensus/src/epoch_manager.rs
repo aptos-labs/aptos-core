@@ -36,7 +36,7 @@ use crate::{
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
-        quorum_store_db::{QuorumStoreDB, QuorumStoreStorage},
+        quorum_store_db::QuorumStoreStorage,
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},

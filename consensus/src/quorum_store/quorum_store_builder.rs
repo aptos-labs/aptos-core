@@ -15,7 +15,6 @@ use crate::{
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
-        quorum_store_db::QuorumStoreDB,
     },
     round_manager::VerifiedEvent,
 };
