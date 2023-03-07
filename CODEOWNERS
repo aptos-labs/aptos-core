@@ -70,10 +70,10 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @clay-aptos @gregnazario @christian-aptos
+/developer-docs-site/ @davidiw @clay-aptos @gregnazario @saharct
 
 # Auto-reviewers for all Markdown changes including READMEs
-*.md @clay-aptos @christian-aptos
+*.md @clay-aptos @saharct
 
 # Owner for docs tutorials for the token_standard and related tutorials.
 /developer-docs-site/docs/tutorials @areshand @gregnazario
