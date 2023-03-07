@@ -409,6 +409,19 @@ const sidebars = {
     "reference/glossary",
     "issues-and-workarounds",
   ],
+  comSidebar: [
+    {
+      type: "html",
+      value: "Aptos Community",
+      className: "sidebar-title",
+    },
+    "community/index",
+    "community/contributions/index",
+    "community/external-resources",
+    "community/rust-coding-guidelines",
+    "community/site-updates",
+    "community/aptos-style",
+  ],
 };
 
 module.exports = sidebars;
