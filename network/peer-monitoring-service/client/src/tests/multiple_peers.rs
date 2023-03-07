@@ -23,7 +23,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
-use aptos_network::{application::metadata::PeerMetadata, transport::ConnectionMetadata};
+use aptos_network::transport::ConnectionMetadata;
 use aptos_peer_monitoring_service_types::{
     LatencyPingResponse, NetworkInformationResponse, PeerMonitoringServiceRequest,
     PeerMonitoringServiceResponse,
@@ -107,13 +107,14 @@ async fn test_peer_updater_loop_multiple_peers() {
         let peer_state = peer_states.get_mut(peer).unwrap();
 
         // Update the network info
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         let distance_from_validators = get_distance_from_validators(peer);
         update_network_info_for_peer(
             peers_and_metadata.clone(),
             peer,
             peer_state,
-            connected_peers_and_metadata,
+            connected_peers,
             distance_from_validators,
             1.0,
         );
@@ -391,10 +392,11 @@ async fn test_network_info() {
         let peer_monitor_state = peer_monitor_state.clone();
         let handle_requests = async move {
             // Create a response for the network info requests
-            let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+            let connected_peers =
+                hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
             let response =
                 PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
-                    connected_peers_and_metadata: connected_peers_and_metadata.clone(),
+                    connected_peers: connected_peers.clone(),
                     distance_from_validators: 0,
                 });
 

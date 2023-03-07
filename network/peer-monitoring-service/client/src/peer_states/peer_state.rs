@@ -105,9 +105,7 @@ impl PeerState {
             .await;
 
             // Stop the timer and calculate the duration
-            let finish_time = time_service.now();
-            let request_duration: Duration = finish_time.duration_since(start_time);
-            let request_duration_secs = request_duration.as_secs_f64();
+            let request_duration_secs = start_time.elapsed().as_secs_f64();
 
             // Mark the in-flight request as now complete
             request_tracker.write().request_completed();
@@ -169,10 +167,10 @@ impl PeerState {
             .map(|network_info_response| network_info_response.distance_from_validators);
         peer_monitoring_metadata.distance_from_validators = distance_from_validators;
 
-        // Get and store the connected peers and metadata
+        // Get and store the connected peers and connection metadata
         let connected_peers_and_metadata = network_info_response
-            .map(|network_info_response| network_info_response.connected_peers_and_metadata);
-        peer_monitoring_metadata.connected_peers_and_metadata = connected_peers_and_metadata;
+            .map(|network_info_response| network_info_response.connected_peers);
+        peer_monitoring_metadata.connected_peers = connected_peers_and_metadata;
 
         Ok(peer_monitoring_metadata)
     }

@@ -345,7 +345,7 @@ impl Default for PeerMonitoringServiceConfig {
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
-            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent, so 1 sec is acceptable
+            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent
             metadata_update_interval_ms: 5000,
             network_monitoring: NetworkMonitoringConfig::default(),
             peer_monitor_interval_ms: 1000,
