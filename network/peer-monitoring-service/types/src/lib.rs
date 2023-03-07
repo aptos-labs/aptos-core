@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_network::transport::ConnectionMetadata;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom};
 use thiserror::Error;
@@ -87,7 +87,7 @@ pub struct LatencyPingResponse {
 /// A response for the network information request
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NetworkInformationResponse {
-    pub connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>, // Connected peers and metadata
+    pub connected_peers: HashMap<PeerNetworkId, ConnectionMetadata>, // Connected peers
     pub distance_from_validators: u64, // The distance of the peer from the validator set
                                        // TODO: add the rest of the information here!
 }

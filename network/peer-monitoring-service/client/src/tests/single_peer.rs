@@ -25,7 +25,7 @@ use aptos_config::{
     config::{NodeConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::{application::metadata::PeerMetadata, transport::ConnectionMetadata};
+use aptos_network::transport::ConnectionMetadata;
 use aptos_time_service::TimeServiceTrait;
 use aptos_types::PeerId;
 use maplit::hashmap;
@@ -56,16 +56,15 @@ async fn test_basic_peer_monitor_loop() {
 
     // Initialize all the peer states by running the peer monitor once
     let mock_time = time_service.into_mock();
-    let (connected_peers_and_metadata, distance_from_validators) =
-        initialize_and_verify_peer_states(
-            &network_id,
-            &mut mock_monitoring_server,
-            &peer_monitor_state,
-            &node_config,
-            &validator_peer,
-            &mock_time,
-        )
-        .await;
+    let (connected_peers, distance_from_validators) = initialize_and_verify_peer_states(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
 
     // Elapse enough time for a latency ping and verify correct execution
     verify_and_handle_latency_ping(
@@ -89,7 +88,7 @@ async fn test_basic_peer_monitor_loop() {
     verify_all_requests_and_respond(
         &network_id,
         &mut mock_monitoring_server,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
     )
     .await;
@@ -107,7 +106,7 @@ async fn test_basic_peer_monitor_loop() {
     verify_peer_monitor_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         3,
     );
@@ -197,12 +196,13 @@ async fn test_basic_peer_updater_loop() {
     // Update the network info for the fullnode several times
     for distance_from_validators in 2..10 {
         // Update the network info for the fullnode
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         update_network_info_for_peer(
             peers_and_metadata.clone(),
             &fullnode_peer,
             &mut peer_state,
-            connected_peers_and_metadata,
+            connected_peers,
             distance_from_validators,
             1.0,
         );
@@ -450,7 +450,8 @@ async fn test_network_info_requests() {
     // Handle many network info requests and responses
     let distance_from_validators = 0;
     for _ in 0..20 {
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         verify_and_handle_network_info_request(
             &network_id,
             &mut mock_monitoring_server,
@@ -458,7 +459,7 @@ async fn test_network_info_requests() {
             &node_config,
             &validator_peer,
             &mock_time,
-            &connected_peers_and_metadata,
+            &connected_peers,
             distance_from_validators,
         )
         .await;
@@ -489,16 +490,15 @@ async fn test_network_info_request_failures() {
 
     // Initialize all the peer states by running the peer monitor once
     let mock_time = time_service.into_mock();
-    let (connected_peers_and_metadata, distance_from_validators) =
-        initialize_and_verify_peer_states(
-            &network_id,
-            &mut mock_monitoring_server,
-            &peer_monitor_state,
-            &node_config,
-            &validator_peer,
-            &mock_time,
-        )
-        .await;
+    let (connected_peers, distance_from_validators) = initialize_and_verify_peer_states(
+        &network_id,
+        &mut mock_monitoring_server,
+        &peer_monitor_state,
+        &node_config,
+        &validator_peer,
+        &mock_time,
+    )
+    .await;
 
     // Handle several network info requests with bad responses
     for i in 0..5 {
@@ -506,11 +506,12 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send a bad response
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers_and_metadata,
+            &connected_peers,
             distance_from_validators,
             false,
             true,
@@ -526,7 +527,7 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         5,
     );
@@ -537,11 +538,12 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and send an invalid peer depth response
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers_and_metadata,
+            &connected_peers,
             distance_from_validators,
             true,
             false,
@@ -557,13 +559,14 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         10,
     );
 
     // Elapse enough time for a network info request and perform a successful execution
-    let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+    let connected_peers =
+        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,
@@ -571,7 +574,7 @@ async fn test_network_info_request_failures() {
         &node_config,
         &validator_peer,
         &mock_time,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
     )
     .await;
@@ -581,7 +584,7 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         0,
     );
@@ -592,11 +595,12 @@ async fn test_network_info_request_failures() {
         elapse_network_info_update_interval(node_config.clone(), mock_time.clone()).await;
 
         // Verify that a single network info request is received and don't send a response
-        let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+        let connected_peers =
+            hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
         verify_network_info_request_and_respond(
             &network_id,
             &mut mock_monitoring_server,
-            &connected_peers_and_metadata,
+            &connected_peers,
             distance_from_validators,
             false,
             false,
@@ -612,13 +616,14 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         5,
     );
 
     // Elapse enough time for a latency ping and perform a successful execution
-    let connected_peers_and_metadata = hashmap! { PeerNetworkId::random() => PeerMetadata::new(ConnectionMetadata::mock(PeerId::random())) };
+    let connected_peers =
+        hashmap! { PeerNetworkId::random() => ConnectionMetadata::mock(PeerId::random()) };
     verify_and_handle_network_info_request(
         &network_id,
         &mut mock_monitoring_server,
@@ -626,7 +631,7 @@ async fn test_network_info_request_failures() {
         &node_config,
         &validator_peer,
         &mock_time,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
     )
     .await;
@@ -636,7 +641,7 @@ async fn test_network_info_request_failures() {
     verify_peer_network_state(
         &peer_monitor_state,
         &validator_peer,
-        &connected_peers_and_metadata,
+        &connected_peers,
         distance_from_validators,
         0,
     );
