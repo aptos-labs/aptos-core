@@ -1,15 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::DbError,
-    quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand,
-        batch_generator::BatchGenerator,
-        quorum_store_db::BatchIdDB,
-        tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
-        types::{BatchId, SerializedTransaction},
-    },
+use crate::quorum_store::{
+    batch_coordinator::BatchCoordinatorCommand,
+    batch_generator::BatchGenerator,
+    quorum_store_db::MockQuorumStoreDB,
+    tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
+    types::{BatchId, SerializedTransaction},
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::common::TransactionSummary;
@@ -21,28 +18,6 @@ use futures::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
-
-pub struct MockBatchIdDB {}
-
-impl MockBatchIdDB {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl BatchIdDB for MockBatchIdDB {
-    // The first batch will be index 1
-    fn clean_and_get_batch_id(
-        &self,
-        _current_epoch: u64,
-    ) -> anyhow::Result<Option<BatchId>, DbError> {
-        Ok(Some(BatchId::new_for_test(0)))
-    }
-
-    fn save_batch_id(&self, _epoch: u64, _batch_id: BatchId) -> anyhow::Result<(), DbError> {
-        Ok(())
-    }
-}
 
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
@@ -87,7 +62,7 @@ async fn test_batch_creation() {
     let mut batch_generator = BatchGenerator::new(
         0,
         config,
-        Arc::new(MockBatchIdDB::new()),
+        Arc::new(MockQuorumStoreDB::new()),
         quorum_store_to_mempool_tx,
         batch_coordinator_cmd_tx,
         1000,

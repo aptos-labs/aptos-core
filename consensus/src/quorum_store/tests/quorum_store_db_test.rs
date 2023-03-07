@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    quorum_store_db::{BatchIdDB, QuorumStoreDB},
+    quorum_store_db::{QuorumStoreDB, QuorumStoreStorage},
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
     types::{BatchId, PersistedValue},
 };

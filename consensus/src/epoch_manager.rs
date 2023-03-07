@@ -36,6 +36,7 @@ use crate::{
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
+        quorum_store_db::QuorumStoreStorage,
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -80,7 +81,6 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     mem::{discriminant, Discriminant},
-    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -124,13 +124,13 @@ pub struct EpochManager {
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
-    quorum_store_storage_path: PathBuf,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
+    quorum_store_storage: Arc<dyn QuorumStoreStorage>,
 }
 
 impl EpochManager {
-    pub fn new(
+    pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
         self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
@@ -139,6 +139,7 @@ impl EpochManager {
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
+        quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
@@ -165,9 +166,9 @@ impl EpochManager {
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
-            quorum_store_storage_path: node_config.storage.dir(),
             quorum_store_msg_tx: None,
             quorum_store_coordinator_tx: None,
+            quorum_store_storage,
         }
     }
 
@@ -644,7 +645,7 @@ impl EpochManager {
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
-                self.quorum_store_storage_path.clone(),
+                self.quorum_store_storage.clone(),
             ))
         } else {
             info!("Building DirectMempool");
