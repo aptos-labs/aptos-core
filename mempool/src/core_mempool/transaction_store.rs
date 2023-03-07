@@ -645,7 +645,7 @@ impl TransactionStore {
 
         let mut oldest_insertion_time = None;
         // Limit the worst-case linear search to 20.
-        for key in self.system_ttl_index.iter().rev().take(20) {
+        for key in self.system_ttl_index.iter().take(20) {
             if let Some(txn) = self.get_mempool_txn(&key.address, key.sequence_number) {
                 if !txn.was_parked {
                     oldest_insertion_time = Some(txn.insertion_time);
