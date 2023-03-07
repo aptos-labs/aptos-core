@@ -19,7 +19,7 @@ Try out the above tutorials (which include dependency installations) before movi
 
 This tutorial, a community contribution, was created for the [Python SDK](../sdks/python-sdk.md).
 
-Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index.md) and the [Rust SDK](../sdks/rust-sdk.md)!
+Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-sdk/index.md), [Rust SDK](../sdks/rust-sdk.md), and [Unity SDK](../sdks/unity-sdk.md)!
 
 ## Step 2: Start the example
 
