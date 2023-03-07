@@ -9,7 +9,7 @@ use crate::{
     common::{is_native_coin, native_coin, native_coin_tag},
     construction::{
         parse_create_stake_pool_operation, parse_reset_lockup_operation,
-        parse_set_operator_operation, parse_set_voter_operation,
+        parse_set_operator_operation, parse_set_voter_operation, parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -370,6 +370,23 @@ impl Operation {
             Some(OperationMetadata::reset_lockup(operator)),
         )
     }
+
+    pub fn unlock_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UnlockStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::unlock_stake(operator, amount)),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -418,6 +435,8 @@ pub struct OperationMetadata {
     pub staked_balance: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commission_percentage: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<U64>,
 }
 
 impl OperationMetadata {
@@ -467,6 +486,14 @@ impl OperationMetadata {
     pub fn reset_lockup(operator: Option<AccountIdentifier>) -> Self {
         OperationMetadata {
             operator,
+            ..Default::default()
+        }
+    }
+
+    pub fn unlock_stake(operator: Option<AccountIdentifier>, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            operator,
+            amount: amount.map(U64::from),
             ..Default::default()
         }
     }
@@ -767,6 +794,17 @@ fn parse_failed_operations_from_txn_payload(
                     }
                 } else {
                     warn!("Failed to parse create staking pool {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_unlock_stake_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse unlock stake {:?}", inner);
                 }
             },
             _ => {
@@ -1361,6 +1399,7 @@ pub enum InternalOperation {
     SetVoter(SetVoter),
     InitializeStakePool(InitializeStakePool),
     ResetLockup(ResetLockup),
+    UnlockStake(UnlockStake),
 }
 
 impl InternalOperation {
@@ -1483,6 +1522,28 @@ impl InternalOperation {
                                 }));
                             }
                         },
+                        Ok(OperationType::UnlockStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator, amount, ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Unlock Stake missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::UnlockStake(UnlockStake {
+                                    owner: account.account_address()?,
+                                    operator,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
                         _ => {},
                     }
                 }
@@ -1510,6 +1571,7 @@ impl InternalOperation {
             Self::SetVoter(inner) => inner.owner,
             Self::InitializeStakePool(inner) => inner.owner,
             Self::ResetLockup(inner) => inner.owner,
+            Self::UnlockStake(inner) => inner.owner,
         }
     }
 
@@ -1569,6 +1631,13 @@ impl InternalOperation {
             InternalOperation::ResetLockup(reset_lockup) => (
                 aptos_stdlib::staking_contract_reset_lockup(reset_lockup.operator),
                 reset_lockup.owner,
+            ),
+            InternalOperation::UnlockStake(unlock_stake) => (
+                aptos_stdlib::staking_contract_unlock_stake(
+                    unlock_stake.operator,
+                    unlock_stake.amount,
+                ),
+                unlock_stake.owner,
             ),
         })
     }
@@ -1727,4 +1796,11 @@ pub struct InitializeStakePool {
 pub struct ResetLockup {
     pub owner: AccountAddress,
     pub operator: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UnlockStake {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub amount: u64,
 }
