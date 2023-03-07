@@ -154,6 +154,7 @@ NFTs
 NHC
 NPM
 NetworkAddress
+Newtonsoft
 NoAvailablePeers
 ORM
 Octa
@@ -232,6 +233,7 @@ VM
 VMs
 VN
 VNs
+VR
 ValidateTransaction
 Validator
 Validators
@@ -239,9 +241,11 @@ Vm
 WAV
 WSL
 Waypoint
+WebGL
 Xeon
 YAML
 YAMLs
+Zxing
 accessors
 accountHasList
 ait
@@ -376,6 +380,8 @@ npm
 npmjs
 octa
 octas
+on-chain
+onboarding
 offchain
 onchain
 onwards
@@ -403,6 +409,7 @@ programmability
 programmatically
 propertymap
 prover
+proxied
 pseudocode
 pvc
 quickstart

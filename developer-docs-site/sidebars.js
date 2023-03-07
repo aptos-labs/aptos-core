@@ -403,6 +403,7 @@ const sidebars = {
         },
         "sdks/python-sdk",
         "sdks/rust-sdk",
+        "sdks/unity-sdk",
       ],
     },
     "reference/move",
