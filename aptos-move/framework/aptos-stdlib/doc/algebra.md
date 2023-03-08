@@ -71,7 +71,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Struct `BLS12_381_G1_Parent_Format_Compressed_BEndianFq`](#0x1_algebra_BLS12_381_G1_Parent_Format_Compressed_BEndianFq)
 -  [Struct `BLS12_381_G1`](#0x1_algebra_BLS12_381_G1)
 -  [Struct `BLS12_381_G1_Format_Uncompressed`](#0x1_algebra_BLS12_381_G1_Format_Uncompressed)
--  [Struct `BLS12_381_G1_Format_Uncompressed_BEndianFq`](#0x1_algebra_BLS12_381_G1_Format_Uncompressed_BEndianFq)
 -  [Struct `BLS12_381_G1_Format_Compressed`](#0x1_algebra_BLS12_381_G1_Format_Compressed)
 -  [Struct `BLS12_381_G1_Format_Compressed_BEndianFq`](#0x1_algebra_BLS12_381_G1_Format_Compressed_BEndianFq)
 -  [Struct `BLS12_381_G2_Parent`](#0x1_algebra_BLS12_381_G2_Parent)
@@ -730,36 +729,6 @@ Essentially <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent_Format_Unc
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_Format_Uncompressed">BLS12_381_G1_Format_Uncompressed</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_algebra_BLS12_381_G1_Format_Uncompressed_BEndianFq"></a>
-
-## Struct `BLS12_381_G1_Format_Uncompressed_BEndianFq`
-
-A serialization scheme for <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
-
-Essentially <code><a href="algebra.md#0x1_algebra_BLS12_381_G1_Parent_Format_Uncompressed_BEndianFq">BLS12_381_G1_Parent_Format_Uncompressed_BEndianFq</a></code> but only applied to <code><a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a></code> elements.
-
-
-<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_BLS12_381_G1_Format_Uncompressed_BEndianFq">BLS12_381_G1_Format_Uncompressed_BEndianFq</a>
 </code></pre>
 
 

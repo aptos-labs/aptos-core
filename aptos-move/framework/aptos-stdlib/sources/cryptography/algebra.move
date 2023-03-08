@@ -256,11 +256,6 @@ module aptos_std::algebra {
     /// Essentially `BLS12_381_G1_Parent_Format_Uncompressed` but only applied to `BLS12_381_G1` elements.
     struct BLS12_381_G1_Format_Uncompressed {}
 
-    /// A serialization scheme for `BLS12_381_G1` elements.
-    ///
-    /// Essentially `BLS12_381_G1_Parent_Format_Uncompressed_BEndianFq` but only applied to `BLS12_381_G1` elements.
-    struct BLS12_381_G1_Format_Uncompressed_BEndianFq {}
-
     /// Return the ID of a serialization scheme,
     /// which is essentially `bls12_381_g1_parent_compressed_format()` but only applicable to `BLS12_381_G1` elements.
     ///
@@ -1155,13 +1150,13 @@ module aptos_std::algebra {
         // Subtraction.
         assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
 
-        // // Hash-to-group.
-        // let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        // let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"2c15230b26dbc6fc9a37051158c95b79656e17a1a920b11394ca91c44247d3e48a7a74985cc5c776cdfe4b1f19884970453912e9d31528c060be9ab5c43e8415"));
-        // assert!(eq(&expected, &actual), 1);
-        // let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        // let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed_BEndianFq>(&x"65038ac8f2b1def042a5df0b33b1f4eca6bff7cb0f9c6c1526811864e544ed80cad44d40a656e7aff4002a8de287abc8ae0482b5ae825822bb870d6df9b56ca3"));
-        // assert!(eq(&expected, &actual), 1);
+        // Hash-to-group.
+        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
+        assert!(eq(&expected, &actual), 1);
+        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let expected = std::option::extract(&mut deserialize_v2<BLS12_381_G1, BLS12_381_G1_Format_Uncompressed>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
+        assert!(eq(&expected, &actual), 1);
     }
 
     #[test_only]

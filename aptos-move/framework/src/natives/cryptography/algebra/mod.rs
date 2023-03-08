@@ -7,6 +7,7 @@ use crate::natives::{cryptography::algebra::gas::GasParameters, util::make_nativ
 use ark_ec::{CurveGroup, Group};
 use ark_ec::pairing::Pairing;
 use ark_ec::short_weierstrass::Projective;
+use ark_ec::hashing::HashToCurve;
 use ark_ff::{Field, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
@@ -88,6 +89,20 @@ impl SerializationFormat {
     }
 }
 
+pub enum HashToStructureSuite {
+    HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_,
+    HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_,
+}
+
+impl HashToStructureSuite {
+    pub fn from_type_tag(type_tag: &TypeTag) -> Option<HashToStructureSuite> {
+        match type_tag.to_string().as_str() {
+            "0x1::algebra::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_),
+            "0x1::algebra::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_),
+            _ => None
+        }
+    }
+}
 #[derive(Tid, Default)]
 pub struct AlgebraContext {
     objs: Vec<Rc<dyn Any>>,
@@ -110,6 +125,13 @@ macro_rules! format_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
         SerializationFormat::from_type_tag(&type_tag)
+    }};
+}
+
+macro_rules! suite_from_ty_arg {
+    ($context:expr, $typ:expr) => {{
+        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        HashToStructureSuite::from_type_tag(&type_tag)
     }};
 }
 
@@ -2011,6 +2033,40 @@ fn group_scalar_mul_typed_internal(
     }
 }
 
+fn hash_to_group_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(2, ty_args.len());
+    let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let h2s_opt = suite_from_ty_arg!(context, &ty_args[1]);
+    match (group_opt, h2s_opt) {
+        (Some(Structure::BLS12381G1), Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_)) => {
+            let vector_ref = pop_arg!(args, VectorRef);
+            let bytes_ref = vector_ref.as_bytes_ref();
+            let msg = bytes_ref.as_slice();
+
+            let tag_ref = pop_arg!(args, VectorRef);
+            let bytes_ref = tag_ref.as_bytes_ref();
+            let dst = bytes_ref.as_slice();
+            let g1_mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
+                ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
+                ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
+                ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>>::new(dst).unwrap();
+            let new_element = ark_bls12_381::G1Projective::from(g1_mapper.hash(msg).unwrap());
+            let new_handle = store_obj!(context, new_element);
+            Ok(NativeResult::ok(
+                gas_params.hash_to_structure(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_, dst.len(), msg.len()),
+                smallvec![Value::u64(new_handle as u64)],
+            ))
+
+        }
+        _ => unreachable!(),
+    }
+}
+
 fn vec_u64_from_u8s(bytes: &[u8]) -> Vec<u64> {
     let num_u8 = bytes.len();
     let num_u64 = (num_u8 + 7) / 8;
@@ -2417,6 +2473,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "group_sub_internal",
             make_native_from_func(gas_params.clone(), group_sub_internal),
+        ),
+        (
+            "hash_to_group_internal",
+            make_native_from_func(gas_params.clone(), hash_to_group_internal),
         ),
         (
             "pairing_internal",

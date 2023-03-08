@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::algebra::{Structure, BLS12_381_FQ12_FORMAT, BLS12_381_FR_BENDIAN_FORMAT, BLS12_381_FR_FORMAT, BLS12_381_G1_COMPRESSED_FORMAT, BLS12_381_G1_UNCOMPRESSED_FORMAT, BLS12_381_G2_COMPRESSED_FORMAT, BLS12_381_G2_UNCOMPRESSED_FORMAT, BLS12_381_GT_FORMAT, SerializationFormat};
+use crate::natives::cryptography::algebra::{Structure, BLS12_381_FQ12_FORMAT, BLS12_381_FR_BENDIAN_FORMAT, BLS12_381_FR_FORMAT, BLS12_381_G1_COMPRESSED_FORMAT, BLS12_381_G1_UNCOMPRESSED_FORMAT, BLS12_381_G2_COMPRESSED_FORMAT, BLS12_381_G2_UNCOMPRESSED_FORMAT, BLS12_381_GT_FORMAT, SerializationFormat, HashToStructureSuite};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 
 #[derive(Debug, Clone)]
@@ -348,6 +348,11 @@ impl GasParameters {
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_div * NumArgs::one(),
             _ => unreachable!(),
         }
+    }
+
+    pub fn hash_to_structure(&self, suite: HashToStructureSuite, dst_len: usize, msg_len: usize) -> InternalGas {
+        //TODO
+        InternalGas::zero()
     }
 
     pub fn pairing(&self, g1: Structure, g2: Structure, g3: Structure) -> InternalGas {
