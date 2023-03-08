@@ -3,11 +3,14 @@
 
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    schema::epoch_by_version::EpochByVersionSchema,
-    transaction_info::TransactionInfoSchema,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        epoch_by_version::EpochByVersionSchema,
+    },
     utils::truncation_helper::{
         find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
-        truncate_ledger_db, truncate_state_merkle_db,
+        get_ledger_commit_progress, get_overall_commit_progress, get_state_kv_commit_progress,
+        truncate_state_merkle_db,
     },
     AptosDB, StateStore,
 };
@@ -41,6 +44,9 @@ pub struct Cmd {
 
     #[clap(long, group = "backup")]
     opt_out_backup_checkpoint: bool,
+
+    #[clap(long)]
+    use_state_kv_db: bool,
 }
 
 impl Cmd {
@@ -59,25 +65,36 @@ impl Cmd {
             println!("Opted out backup creation!.");
         }
 
-        let (ledger_db, state_merkle_db, _kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
-            RocksdbConfigs::default(),
-            /*readonly=*/ false,
-        )?;
+        let rocksdb_config = RocksdbConfigs {
+            use_state_kv_db: self.use_state_kv_db,
+            ..Default::default()
+        };
+        let (ledger_db, state_merkle_db, state_kv_db) =
+            AptosDB::open_dbs(&self.db_dir, rocksdb_config, /*readonly=*/ false)?;
 
-        // TODO(grao): Handle kv db once we enable it.
-
-        let ledger_db_version = Self::get_current_version_in_ledger_db(&ledger_db)?
+        let ledger_db = Arc::new(ledger_db);
+        let state_kv_db = if let Some(state_kv_db) = state_kv_db {
+            Arc::new(state_kv_db)
+        } else {
+            Arc::clone(&ledger_db)
+        };
+        let overall_version =
+            get_overall_commit_progress(&ledger_db)?.expect("Overall commit progress must exist.");
+        let ledger_db_version = get_ledger_commit_progress(&ledger_db)?
             .expect("Current version of ledger db must exist.");
+        let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?
+            .expect("Current version of state kv db must exist.");
         let state_merkle_db_version = get_current_version_in_state_merkle_db(&state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
 
-        assert_le!(state_merkle_db_version, ledger_db_version);
-        assert_le!(self.target_version, ledger_db_version);
+        assert_le!(overall_version, ledger_db_version);
+        assert_le!(overall_version, state_kv_db_version);
+        assert_le!(state_merkle_db_version, overall_version);
+        assert_le!(self.target_version, overall_version);
 
         println!(
-            "ledger_db_version: {}, state_merkle_db_version: {}, target_version: {}",
-            ledger_db_version, state_merkle_db_version, self.target_version,
+            "overall_version: {}, ledger_db_version: {}, state_kv_db_version: {}, state_merkle_db_version: {}, target_version: {}",
+            overall_version, ledger_db_version, state_kv_db_version, state_merkle_db_version, self.target_version,
         );
 
         // TODO(grao): We are using a brute force implementation for now. We might be able to make
@@ -103,14 +120,16 @@ impl Cmd {
             println!("Done!");
         }
 
-        println!("Starting ledger db truncation...");
-        let ledger_db = Arc::new(ledger_db);
-        truncate_ledger_db(
-            Arc::clone(&ledger_db),
-            ledger_db_version,
-            self.target_version,
-            self.ledger_db_batch_size,
+        println!("Starting ledger db and state kv db truncation...");
+        ledger_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::OverallCommitProgress,
+            &DbMetadataValue::Version(self.target_version),
         )?;
+        StateStore::sync_commit_progress(
+            Arc::clone(&ledger_db),
+            Arc::clone(&state_kv_db),
+            /*crash_if_difference_is_too_large=*/ false,
+        );
         println!("Done!");
 
         if let Some(state_merkle_db_version) =
@@ -127,12 +146,6 @@ impl Cmd {
         }
 
         Ok(())
-    }
-
-    fn get_current_version_in_ledger_db(ledger_db: &DB) -> Result<Option<Version>> {
-        let mut iter = ledger_db.iter::<TransactionInfoSchema>(ReadOptions::default())?;
-        iter.seek_to_last();
-        Ok(iter.next().transpose()?.map(|item| item.0))
     }
 
     fn find_tree_root_at_or_before(
@@ -220,6 +233,7 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
+                use_state_kv_db: false,
             };
 
             cmd.run().unwrap();

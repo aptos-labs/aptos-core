@@ -284,6 +284,46 @@ impl StateStore {
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
+        Self::sync_commit_progress(
+            Arc::clone(&ledger_db),
+            Arc::clone(&state_kv_db),
+            /*crash_if_difference_is_too_large=*/ true,
+        );
+        let state_merkle_db = Arc::new(StateMerkleDb::new(
+            state_merkle_db,
+            max_nodes_per_lru_cache_shard,
+        ));
+        let state_db = Arc::new(StateDb {
+            ledger_db,
+            state_merkle_db,
+            state_kv_db,
+            state_merkle_pruner,
+            epoch_snapshot_pruner,
+            state_kv_pruner,
+        });
+        let buffered_state = Mutex::new(
+            Self::create_buffered_state_from_latest_snapshot(
+                &state_db,
+                buffered_state_target_items,
+                hack_for_tests,
+                /*check_max_versions_after_snapshot=*/ true,
+            )
+            .expect("buffered state creation failed."),
+        );
+        Self {
+            state_db,
+            buffered_state,
+            buffered_state_target_items,
+        }
+    }
+
+    // We commit the overall commit progress at the last, and use it as the source of truth of the
+    // commit progress.
+    pub fn sync_commit_progress(
+        ledger_db: Arc<DB>,
+        state_kv_db: Arc<DB>,
+        crash_if_difference_is_too_large: bool,
+    ) {
         if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
             .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
             .expect("Failed to read overall commit progress.")
@@ -312,7 +352,9 @@ impl StateStore {
                     "Start truncation...",
                 );
                 let difference = ledger_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
                 truncate_ledger_db(
                     Arc::clone(&ledger_db),
                     ledger_commit_progress,
@@ -328,7 +370,9 @@ impl StateStore {
                     "Start truncation..."
                 );
                 let difference = state_kv_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
                 truncate_state_kv_db(
                     Arc::clone(&state_kv_db),
                     state_kv_commit_progress,
@@ -339,32 +383,6 @@ impl StateStore {
             }
         } else {
             info!("No overall commit progress was found!");
-        }
-        let state_merkle_db = Arc::new(StateMerkleDb::new(
-            state_merkle_db,
-            max_nodes_per_lru_cache_shard,
-        ));
-        let state_db = Arc::new(StateDb {
-            ledger_db,
-            state_merkle_db,
-            state_kv_db,
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
-        });
-        let buffered_state = Mutex::new(
-            Self::create_buffered_state_from_latest_snapshot(
-                &state_db,
-                buffered_state_target_items,
-                hack_for_tests,
-                /*check_max_versions_after_snapshot=*/ true,
-            )
-            .expect("buffered state creation failed."),
-        );
-        Self {
-            state_db,
-            buffered_state,
-            buffered_state_target_items,
         }
     }
 
