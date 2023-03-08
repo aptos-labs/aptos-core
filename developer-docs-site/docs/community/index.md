@@ -9,6 +9,10 @@ We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blo
 
 As always, adhere to the [Aptos Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md) when taking part in our ecosystem.
 
+## Take the survey
+
+Help us make the Aptos developer experience better: https://aptos.typeform.com/dev-survey
+
 ## Ask questions and offer answers
 
 Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to post topic-specific links, events, and more.
