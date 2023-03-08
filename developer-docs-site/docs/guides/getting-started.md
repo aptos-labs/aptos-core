@@ -132,10 +132,9 @@ If the script above does not work for you, you can install these manually, but i
 <details>
 <summary>Windows</summary>
 
-:::tip
-The aptos-core codebase currently has no script similar to the `dev_setup.sh` script for
-Windows.  All dependencies must be manually installed.
-:::
+**> Using the automated script**
+
+1. Run the dev setup script to prepare your environment: `./scripts/windows_dev_setup.ps1`
 
 **> Manual installation of dependencies**
 
