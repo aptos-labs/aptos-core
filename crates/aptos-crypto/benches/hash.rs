@@ -37,6 +37,9 @@ fn bench_group(c: &mut Criterion) {
         sizes.push(size);
     }
 
+    // This gives around 510 MiB / s hashing throughput on an Apple M1
+    sha3_256(&mut group, 1024*1024*1);
+
     for n in sizes {
         sha2_256(&mut group, n);
         sha2_512(&mut group, n);

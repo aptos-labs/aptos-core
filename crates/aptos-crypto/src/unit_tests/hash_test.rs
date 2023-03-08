@@ -249,34 +249,66 @@ proptest! {
     }
 }
 
+#[test]
+fn test_sha3_non_overflow_v256_keccak() {
+    let mut out = [0u8; 256 / 8];
+    let one = b"\x00".repeat(1);
+    let buffer = b"\x00".repeat(4294967295 - 1);
+    println!("Allocated {} bytes.", buffer.len());
+
+    let mut sha3 = Sha3::v256();
+    sha3.update(&one);
+    println!("Update(1) done.");
+    sha3.update(&buffer);
+    println!("Update({}) done.", buffer.len());
+    sha3.finalize(&mut out);
+    println!("Finalize done.");
+}
+
 /// Sha3 Buffer overflow tests: https://mouha.be/sha-3-buffer-overflow/
+///
+/// Execute in release mode with:
+/// `cargo test --release -- test_sha3_overflow_v256_keccak  --nocapture`
 #[test]
 fn test_sha3_overflow_v256_keccak() {
     let mut out = [0u8; 256/8];
     let one = b"\x00".repeat(1);
-    let buffer = b"\x00".repeat(4294967295);
+    let mut buffer = b"\x00".repeat(4294967295);
+    println!("Allocated {} bytes.", buffer.len());
 
+    // Will segfault, if vulnerable
+    println!("Testing Update(1) + Update({}) + Finalize()", buffer.len());
     let mut sha3 = Sha3::v256();
     sha3.update(&one);
+    println!("Update(1) done.");
     sha3.update(&buffer);
+    println!("Update({}) done.", buffer.len());
     sha3.finalize(&mut out);
+    println!("Finalize done: {:x?}", out);
 
     // let mut sha3 = Sha3::v256();
     // sha3.update(&buffer);
     // sha3.finalize(&mut out);
-    //
-    // buffer.push(0u8);   // of size 4294967295 + 1 now
-    // let mut sha3 = Sha3::v256();
-    // sha3.update(&buffer);
-    // sha3.finalize(&mut out);
+
+    // Will inifinite loop, if vulnerable
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    println!("Testing Update(1) + Update({}) + Finalize()", buffer.len());
+    let mut sha3 = Sha3::v256();
+    sha3.update(&one);
+    println!("Update(1) done.");
+    sha3.update(&buffer);
+    println!("Update({}) done.", buffer.len());
+    sha3.finalize(&mut out);
+    println!("Finalize done: {:x?}", out);
 }
 
 #[test]
 fn test_sha3_overflow_v224_keccak() {
     let mut out = [0u8; 224/8];
     let one = b"\x00".repeat(1);
-    let buffer = b"\x00".repeat(4294967295);
+    let mut buffer = b"\x00".repeat(4294967295);
 
+    // Will segfault, if vulnerable
     let mut sha3 = Sha3::v224();
     sha3.update(&one);
     sha3.update(&buffer);
@@ -285,18 +317,21 @@ fn test_sha3_overflow_v224_keccak() {
     // let mut sha3 = Sha3::v224();
     // sha3.update(&buffer);
     // sha3.finalize(&mut out);
-    //
-    // buffer.push(0u8);   // of size 4294967295 + 1 now
-    // let mut sha3 = Sha3::v224();
-    // sha3.update(&buffer);
-    // sha3.finalize(&mut out);
+
+    // Will inifinite loop, if vulnerable
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    let mut sha3 = Sha3::v224();
+    sha3.update(&one);
+    sha3.update(&buffer);
+    sha3.finalize(&mut out);
 }
 
 #[test]
 fn test_sha3_overflow_v256_sha3() {
     let one = b"\x00".repeat(1);
-    let buffer = b"\x00".repeat(4294967295);
+    let mut buffer = b"\x00".repeat(4294967295);
 
+    // Will segfault, if vulnerable
     let mut sha3 = sha3::Sha3_256::new();
     sha3.update(&one);
     sha3.update(&buffer);
@@ -305,17 +340,20 @@ fn test_sha3_overflow_v256_sha3() {
     // let mut sha3 = sha3::Sha3_256::new();
     // sha3.update(&buffer);
     // sha3.finalize();
-    //
-    // buffer.push(0u8);   // of size 4294967295 + 1 now
-    // let mut sha3 = sha3::Sha3_256::new();
-    // sha3.update(&buffer);
+
+    // Will inifinite loop, if vulnerable
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    let mut sha3 = sha3::Sha3_256::new();
+    sha3.update(&one);
+    sha3.update(&buffer);
 }
 
 #[test]
 fn test_sha3_overflow_v224_sha3() {
     let one = b"\x00".repeat(1);
-    let buffer = b"\x00".repeat(4294967295);
+    let mut buffer = b"\x00".repeat(4294967295);
 
+    // Will segfault, if vulnerable
     let mut sha3 = sha3::Sha3_224::new();
     sha3.update(&one);
     sha3.update(&buffer);
@@ -324,8 +362,10 @@ fn test_sha3_overflow_v224_sha3() {
     // let mut sha3 = sha3::Sha3_224::new();
     // sha3.update(&buffer);
     // sha3.finalize();
-    //
-    // buffer.push(0u8);   // of size 4294967295 + 1 now
-    // let mut sha3 = sha3::Sha3_224::new();
-    // sha3.update(&buffer);
+
+    // Will inifinite loop, if vulnerable
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    let mut sha3 = sha3::Sha3_224::new();
+    sha3.update(&one);
+    sha3.update(&buffer);
 }
