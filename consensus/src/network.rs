@@ -251,20 +251,7 @@ impl NetworkSender {
 
     pub async fn send_commit_vote(&mut self, commit_vote: CommitVote, recipient: Author) {
         fail_point!("consensus::send::commit_vote", |_| ());
-        println!("network send commit msg!");
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
-        self.send(msg, vec![recipient]).await
-    }
-
-    pub async fn broadcast_rand_share(&mut self, rand_share: RandShare) {
-        fail_point!("consensus::send::broadcast_rand_share", |_| ());
-        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
-        self.broadcast(msg).await
-    }
-
-    pub async fn send_rand_share(&mut self, rand_share: RandShare, recipient: Author) {
-        fail_point!("consensus::send::rand_share", |_| ());
-        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
         self.send(msg, vec![recipient]).await
     }
 
@@ -311,6 +298,18 @@ impl NetworkSender {
     pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::broadcast_commit_proof", |_| ());
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
+        self.broadcast(msg).await
+    }
+
+    pub async fn send_rand_share(&mut self, rand_share: RandShare, recipient: Author) {
+        fail_point!("consensus::send::rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
+        self.send(msg, vec![recipient]).await
+    }
+
+    pub async fn broadcast_rand_share(&mut self, rand_share: RandShare) {
+        fail_point!("consensus::send::broadcast_rand_share", |_| ());
+        let msg = ConsensusMsg::RandShareMsg(Box::new(rand_share));
         self.broadcast(msg).await
     }
 

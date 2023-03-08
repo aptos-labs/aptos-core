@@ -47,10 +47,6 @@ impl<T: Hashable> Buffer<T> {
         &self.tail
     }
 
-    pub fn get_hash(&mut self, elem: T) -> HashValue {
-        elem.hash()
-    }
-
     pub fn push_back(&mut self, elem: T) {
         self.count = self.count.checked_add(1).unwrap();
         let t_hash = elem.hash();
@@ -114,15 +110,15 @@ impl<T: Hashable> Buffer<T> {
         cursor.map_or(false, |key| self.map.contains_key(&key))
     }
 
-    /// find_elem returns the first item non-prior to `cursor` that compare(item) is true
+    /// find_elem_from returns the first item >= `cursor` that compare(item) is true
     /// if no such item exists, the function returns None
-    pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, compare: F) -> Cursor {
+    pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, satisfy: F) -> Cursor {
         let mut current = cursor;
         if !self.exist(&cursor) {
             return None;
         }
         while current.is_some() {
-            if compare(self.get(&current)) {
+            if satisfy(self.get(&current)) {
                 return current;
             }
             current = self.get_next(&current);
@@ -130,41 +126,17 @@ impl<T: Hashable> Buffer<T> {
         None
     }
 
-    /// find_elem returns the first item non-prior to `cursor` and prior to `end_cursor` that compare(item) is true
+    /// find_elem_from_with_prefix returns the first item >= `cursor` that compare(item) is true, but no item before it has must_not evaluated to be true
     /// if no such item exists, the function returns None
-    pub fn find_elem_until_cursor<F: Fn(&T) -> bool>(&self, cursor: Cursor, end_cursor: Cursor, compare: F) -> Cursor {
+    pub fn find_elem_from_with_prefix<F1: Fn(&T) -> bool, F2: Fn(&T) -> bool>(&self, cursor: Cursor, satisfy: F1, not_satisfy: F2) -> Cursor {
         let mut current = cursor;
-        if !self.exist(&cursor) {
-            return None;
-        }
-        while current.is_some() {
-            if compare(self.get(&current)) {
+        while current.is_some() && self.exist(&current) && !not_satisfy(self.get(&current)) {
+            if satisfy(self.get(&current)) {
                 return current;
             }
             current = self.get_next(&current);
-            if cursor == end_cursor {
-                return None;
-            }
         }
         None
-    }
-
-    /// find_elem returns the last item non-prior to `cursor` among the prefix that must_satisfy(item) is true
-    /// if no such item exists, the function returns None
-    pub fn find_last_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, must_satisfy: F) -> Cursor {
-        let mut current = cursor;
-        if !self.exist(&cursor) {
-            return None;
-        }
-        let mut res_cursor = None;
-        while current.is_some() {
-            if !must_satisfy(self.get(&current)) {
-                break;
-            }
-            res_cursor = current;
-            current = self.get_next(&current);
-        }
-        res_cursor
     }
 
     /// we make sure that the element found by the key is after `cursor`

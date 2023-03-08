@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
-
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::{commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
+    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -16,7 +14,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -49,14 +47,14 @@ fn verify_signatures(
     )
 }
 
-fn generate_executed_item_from_ordered(
+fn generate_executed_item_from_execution_ready(
     commit_info: BlockInfo,
     executed_blocks: Vec<ExecutedBlock>,
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
 ) -> BufferItem {
-    debug!("{} advance to executed from ordered", commit_info);
+    debug!("{} advance to executed from execution ready", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
         verified_signatures,
@@ -192,7 +190,7 @@ impl BufferItem {
                     // we can just use that proof and proceed to aggregated
                     assert_eq!(commit_proof.commit_info().clone(), commit_info);
                     debug!(
-                        "{} advance to aggregated from ordered",
+                        "{} advance to aggregated from execution ready",
                         commit_proof.commit_info()
                     );
                     Self::Aggregated(Box::new(AggregatedItem {
@@ -215,7 +213,7 @@ impl BufferItem {
                             validator,
                         );
                         debug!(
-                            "{} advance to aggregated from ordered",
+                            "{} advance to aggregated from execution ready",
                             commit_proof.commit_info()
                         );
                         Self::Aggregated(Box::new(AggregatedItem {
@@ -224,7 +222,7 @@ impl BufferItem {
                             callback,
                         }))
                     } else {
-                        generate_executed_item_from_ordered(
+                        generate_executed_item_from_execution_ready(
                             commit_info,
                             executed_blocks,
                             verified_signatures,
@@ -405,6 +403,13 @@ impl BufferItem {
         }
     }
 
+    pub fn get_rand(&self, block_idx: usize) -> Vec<u8> {
+        if let Self::ExecutionReady(execution_ready) = self {
+            return execution_ready.rand_vec[block_idx].clone();
+        }
+        vec![u8::MAX; 96]   // 96 bytes
+    }
+
     pub fn block_id(&self) -> HashValue {
         self.get_blocks().last().unwrap().id()
     }
@@ -526,40 +531,23 @@ impl BufferItem {
         }
     }
 
-    // the following functions are prototyping VRF-based randomness
-    pub fn into_execution_ready(
-        self,
-        rand_decision: RandDecision,
-    ) -> Self {
-        match self {
-            Self::Ordered(ordered_item) => {
-                println!(
-                    "{} advanced with randomness decision",
-                    rand_decision.block_info()
-                );
-                let num = ordered_item.ordered_blocks.len();
-                Self::ExecutionReady(Box::new(ExecutionReadyItem { unverified_signatures: ordered_item.unverified_signatures, commit_proof: ordered_item.commit_proof, callback: ordered_item.callback, ordered_blocks: ordered_item.ordered_blocks, ordered_proof: ordered_item.ordered_proof, rand_vec: vec![vec![u8::MAX; 96]; num] }))    // the aggregated share is 96 bytes
-            }
-            _ => {
-                self
-            }
-        }
-    }
-
-    pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) {
+    // return the index of the block if the randomness is successfully updated
+    pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) -> Option<usize> {
         if let Some(idx) = self.find_block_idx_from_ordered(block_id) {
             assert!(idx < self.get_blocks().len());
             if let Self::Ordered(ref mut ordered_item) = *self {
                 if ordered_item.maybe_rand_vec[idx].is_none() {
-                    (*ordered_item).maybe_rand_vec[idx] = Some(rand);
-                    (*ordered_item).num_rand_ready += 1;
+                    ordered_item.maybe_rand_vec[idx] = Some(rand);
+                    ordered_item.num_rand_ready += 1;
+                    return Some(idx);
                 }
             }
         }
+        None
     }
 
     // return None if not found
-    pub fn find_block_idx_from_ordered(&self, block_id: HashValue) -> Option<usize> {
+    pub fn find_block_idx_from_ordered(&mut self, block_id: HashValue) -> Option<usize> {
         match self {
             BufferItem::Ordered(item) => {
                 item.ordered_blocks.iter().position(|block| (*block).id() == block_id)
@@ -569,19 +557,24 @@ impl BufferItem {
     }
 
     pub fn is_rand_ready(&self) -> bool {
-        matches!(self, Self::Ordered(item) if item.num_rand_ready == self.get_blocks().len())
+        if let Self::Ordered(item) = self {
+            return item.num_rand_ready == self.get_blocks().len();
+        }
+        false
+        // matches!(self, Self::Ordered(item) if item.num_rand_ready == self.get_blocks().len())
     }
 
     pub fn try_advance_to_execution_ready(self) -> Self {
         if let Self::Ordered(ordered_item) = self {
-            println!("advance to execution ready");
+            let rand_vec = ordered_item.maybe_rand_vec.iter().map(|x| x.clone().unwrap()).collect_vec();
+            assert!(ordered_item.ordered_blocks.len() == rand_vec.len());
             return Self::ExecutionReady(Box::new(ExecutionReadyItem {
                 unverified_signatures: ordered_item.unverified_signatures,
                 commit_proof: ordered_item.commit_proof,
                 callback: ordered_item.callback,
                 ordered_blocks: ordered_item.ordered_blocks,
                 ordered_proof: ordered_item.ordered_proof,
-                rand_vec: ordered_item.maybe_rand_vec.iter().map(|x| x.clone().unwrap()).collect(),
+                rand_vec,
             }));
         }
         self
