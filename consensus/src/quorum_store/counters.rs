@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_gauge, Histogram, HistogramVec,
-    IntCounter, IntGauge,
+    register_histogram_vec, register_int_counter, AverageIntCounter, Histogram, HistogramVec,
+    IntCounter,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -400,20 +400,18 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static QS_BACKPRESSURE: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "quorum_store_backpressure",
         "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
     )
-    .unwrap()
 });
 
-pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "quorum_store_backpressure_dynamic_max",
-        "What the dynamic max is set to"
+        "What the dynamic max is set to",
     )
-    .unwrap()
 });
 
 /// Latencies
