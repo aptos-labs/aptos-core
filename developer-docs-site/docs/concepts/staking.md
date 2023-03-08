@@ -217,7 +217,7 @@ The Aptos mainnet epoch is set as 7200 seconds (two hours).
 ### Triggers at the epoch start
 
 :::tip
-See the [Triggers at epoch boundary section of `stake.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move#L982) for the full code.
+See the [Triggers at epoch boundary section of `stake.move`](https://github.com/aptos-labs/aptos-core/blob/256618470f2ad7d89757263fbdbae38ac7085317/aptos-move/framework/aptos-framework/sources/stake.move#L1036) for the full code.
 :::
 
 At the start of each epoch, the following key events are triggered:

@@ -403,11 +403,25 @@ const sidebars = {
         },
         "sdks/python-sdk",
         "sdks/rust-sdk",
+        "sdks/unity-sdk",
       ],
     },
     "reference/move",
     "reference/glossary",
     "issues-and-workarounds",
+  ],
+  comSidebar: [
+    {
+      type: "html",
+      value: "Aptos Community",
+      className: "sidebar-title",
+    },
+    "community/index",
+    "community/contributions/index",
+    "community/external-resources",
+    "community/rust-coding-guidelines",
+    "community/site-updates",
+    "community/aptos-style",
   ],
 };
 

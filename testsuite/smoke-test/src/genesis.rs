@@ -257,7 +257,12 @@ async fn test_genesis_transaction_flow() {
 
     let db_dir = node.config().storage.dir();
     fs::remove_dir_all(&db_dir).unwrap();
-    db_restore(backup_path.path(), db_dir.as_path(), &[waypoint]);
+    db_restore(
+        backup_path.path(),
+        db_dir.as_path(),
+        &[waypoint],
+        node.config().storage.rocksdb_configs.use_state_kv_db,
+    );
 
     node.start().unwrap();
     wait_for_node(node, num_nodes - 2).await;

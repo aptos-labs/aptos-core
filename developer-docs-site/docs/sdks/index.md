@@ -14,4 +14,6 @@ Use these Aptos software development kits (SDKs), in combination with the [Aptos
 
 - ### [Rust SDK](rust-sdk.md)
 
+- ### [Unity SDK](unity-sdk.md)
+
 To get started, [develop with the Aptos SDKs](../tutorials/index.md) following our tutorials.

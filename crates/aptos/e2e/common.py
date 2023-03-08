@@ -26,7 +26,7 @@ class AccountInfo:
     account_address: str
 
 
-ACCOUNT_ONE = AccountInfo(
+OTHER_ACCOUNT_ONE = AccountInfo(
     private_key="0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221",
     public_key="0x25caf00522e4d4664ec0a27166a69e8a32b5078959d0fc398da70d40d2893e8f",
     account_address="0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82",
@@ -42,3 +42,12 @@ def recursive_chmod(path, perms):
         os.chmod(dirpath, perms)
         for filename in filenames:
             os.chmod(os.path.join(dirpath, filename), perms)
+
+
+# Exception to use when a test fails, for the CLI did something unexpected, an
+# expected output was missing, etc. This is just a convenience, the framework
+# will still work if a different error is raised.
+#
+# For errors within the framework itself, use RuntimeError.
+class TestError(Exception):
+    pass

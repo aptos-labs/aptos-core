@@ -38,20 +38,26 @@ CMake
 CPU
 CPUs
 ChainID
+Clippy
 CoinStore
 CoinType
 CollectionData
 Concat
 Ctrl
 DAO
+DAO
+DAOs
 DApps
 DDoS
 DECL
 DM
 DNS
 Dapps
+Deref
+Deref
 Destructuring
 Dev
+DevEx
 Devnet
 DoS
 DocGen
@@ -88,6 +94,7 @@ EZERO
 Eg
 EntryFunction
 EntryFunctionPayload
+Enums
 EpochChangeProof
 Ethereum
 FAQ
@@ -115,6 +122,7 @@ Homebrew
 HotStuff
 IDE
 IDEs
+ide
 IMCODING
 IOPS
 IPFS
@@ -147,6 +155,7 @@ NFTs
 NHC
 NPM
 NetworkAddress
+Newtonsoft
 NoAvailablePeers
 ORM
 Octa
@@ -176,6 +185,8 @@ RawTransaction
 Recategorized
 Reusability
 Ruleset
+Rustdoc
+Rustdoc
 SDK
 SDKs
 SHA
@@ -183,6 +194,7 @@ SPLITABLE
 SSD
 STM
 SYNACK
+Samundra
 Scalable
 SeaLevel
 SignMessagePayload
@@ -222,6 +234,7 @@ VM
 VMs
 VN
 VNs
+VR
 ValidateTransaction
 Validator
 Validators
@@ -229,9 +242,11 @@ Vm
 WAV
 WSL
 Waypoint
+WebGL
 Xeon
 YAML
 YAMLs
+Zxing
 accessors
 accountHasList
 ait
@@ -257,6 +272,7 @@ bitwise
 blockchain
 blockchain's
 blockchains
+blocklist
 blogpost
 bool
 boolean
@@ -266,6 +282,8 @@ cancelled
 cfg
 changeset
 cli
+clippy
+cn
 codebase
 config
 configs
@@ -291,10 +309,12 @@ deserializing
 dev
 devnet
 doesnt
+dr
 eg
 endian
 entrancy
 enum
+enums
 failover
 faq
 fetchList
@@ -361,6 +381,8 @@ npm
 npmjs
 octa
 octas
+on-chain
+onboarding
 offchain
 onchain
 onwards
@@ -371,6 +393,8 @@ parallelization
 param
 pdf
 performant
+permissioned
+permissionless
 persistency
 petra
 pipelined
@@ -381,10 +405,12 @@ pre
 prebuilt
 precompiled
 preconfigure
+presale
 programmability
 programmatically
 propertymap
 prover
+proxied
 pseudocode
 pvc
 quickstart
@@ -426,6 +452,7 @@ synchronizer
 terraform
 testnet
 th
+tl
 todo
 todolist
 toml

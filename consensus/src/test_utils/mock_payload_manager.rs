@@ -26,7 +26,7 @@ pub struct MockPayloadManager {
 impl MockPayloadManager {
     pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<GetPayloadCommand>>) -> Self {
         let quorum_store_client =
-            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
+            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1, 1.1, 100));
         Self {
             _quorum_store_client: quorum_store_client,
         }
@@ -58,6 +58,8 @@ impl PayloadClient for MockPayloadManager {
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,
+        _pending_uncommitted_blocks: usize,
+        _recent_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok(random_payload(10))

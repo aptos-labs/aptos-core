@@ -16,6 +16,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
@@ -293,6 +294,7 @@ aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
@@ -494,9 +496,11 @@ move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = 
 move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-cli = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-command-line-common = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
+move-coverage = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-compiler ={ git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-core-types = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc", features = ["address32"] }
 move-docgen = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
+move-disassembler = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-ir-compiler = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-model = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
 move-package = { git = "https://github.com/move-language/move", rev = "69c1bd0b31827603653e03fa31752a10c275b0fc" }
