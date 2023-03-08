@@ -163,7 +163,7 @@ impl BatchCoordinator {
         if let Some(expiration) = fragment.maybe_expiration() {
             counters::DELIVERED_END_BATCH_COUNT.inc();
             // end batch message
-            debug!(
+            trace!(
                 "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
                 source,
                 fragment.batch_id(),
@@ -187,7 +187,7 @@ impl BatchCoordinator {
             }
             // Malformed request with an inconsistent expiry epoch.
             else {
-                debug!(
+                trace!(
                     "QS: got end batch message epoch {} {}",
                     expiration.epoch(),
                     self.epoch
@@ -230,7 +230,7 @@ impl BatchCoordinator {
                     break;
                 },
                 BatchCoordinatorCommand::AppendToBatch(fragment_payload, batch_id) => {
-                    debug!("QS: append to batch cmd received, batch id {}", batch_id);
+                    trace!("QS: append to batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                     self.network_sender.broadcast_fragment(msg).await;
 
@@ -242,7 +242,7 @@ impl BatchCoordinator {
                     logical_time,
                     proof_tx,
                 ) => {
-                    debug!("QS: end batch cmd received, batch id = {}", batch_id);
+                    trace!("QS: end batch cmd received, batch id = {}", batch_id);
                     let (persist_request, fragment) = self
                         .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
                         .await;

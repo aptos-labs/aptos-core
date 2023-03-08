@@ -67,7 +67,11 @@ impl ProofManager {
         logical_time: LogicalTime,
         digests: Vec<HashValue>,
     ) {
-        debug!("QS: got clean request from execution");
+        trace!(
+            "QS: got clean request from execution at epoch {}, round {}",
+            logical_time.epoch(),
+            logical_time.round()
+        );
         assert_eq!(
             self.latest_logical_time.epoch(),
             logical_time.epoch(),
@@ -119,7 +123,7 @@ impl ProofManager {
                     if proof_block.is_empty() {
                         Payload::empty(true)
                     } else {
-                        debug!(
+                        trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",
                             excluded_proofs.len(),
                             proof_block.len()
@@ -197,7 +201,7 @@ impl ProofManager {
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;
                                 if back_pressure_tx.send(back_pressure).await.is_err() {
-                                    debug!("Failed to send back_pressure for proposal");
+                                    debug!("Failed to send back_pressure for commit notification");
                                 }
                             }
                         },

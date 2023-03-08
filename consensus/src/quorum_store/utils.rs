@@ -13,7 +13,7 @@ use aptos_consensus_types::{
     proof_of_store::{LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info};
+use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
@@ -122,7 +122,7 @@ impl DigestTimeouts {
 
     pub(crate) fn expire(&mut self) -> Vec<HashValue> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
-        debug!(
+        trace!(
             "QS: expire cur time {} timeouts len {}",
             cur_time,
             self.timeouts.len()

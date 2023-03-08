@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::time::Duration;
@@ -56,9 +56,10 @@ impl BatchRequesterState {
     // TODO: if None, then return an error to the caller
     fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
         if let Some(payload) = maybe_payload {
-            debug!(
+            trace!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
-                digest, self.ret_tx
+                digest,
+                self.ret_tx
             );
             if self.ret_tx.send(Ok(payload)).is_err() {
                 debug!(
@@ -120,7 +121,7 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
         tokio::spawn(async move {
             while let Some(request_peers) = request_state.next_request_peers(request_num_peers) {
                 let mut futures = FuturesUnordered::new();
-                debug!("QS: requesting from {:?}", request_peers);
+                trace!("QS: requesting from {:?}", request_peers);
                 let request = BatchRequest::new(my_peer_id, epoch, digest);
                 for peer in request_peers {
                     counters::SENT_BATCH_REQUEST_COUNT.inc();
