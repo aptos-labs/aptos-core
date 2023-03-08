@@ -251,45 +251,83 @@ proptest! {
 
 /// Sha3 Buffer overflow tests: https://mouha.be/sha-3-buffer-overflow/
 #[test]
-fn test_sha3_overflow_v256_keccack() {
-    let buffer = b"\x00".repeat(4294967295);
-    let mut sha3 = Sha3::v256();
-    sha3.update(&buffer);
+fn test_sha3_overflow_v256_keccak() {
+    let mut out = [0u8; 256/8];
+    let one = b"\x00".repeat(1);
+    let mut buffer = b"\x00".repeat(4294967295);
 
-    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = Sha3::v256();
+    sha3.update(&one);
+    sha3.update(&buffer);
+    sha3.finalize(&mut out);
+
+
     let mut sha3 = Sha3::v256();
     sha3.update(&buffer);
+    sha3.finalize(&mut out);
+
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    let mut sha3 = Sha3::v256();
+    sha3.update(&buffer);
+    sha3.finalize(&mut out);
 }
 
 #[test]
-fn test_sha3_overflow_v224_keccack() {
-    let buffer = b"\x00".repeat(4294967295);
-    let mut sha3 = Sha3::v224();
-    sha3.update(&buffer);
+fn test_sha3_overflow_v224_keccak() {
+    let mut out = [0u8; 224/8];
+    let one = b"\x00".repeat(1);
+    let mut buffer = b"\x00".repeat(4294967295);
 
-    let buffer = b"\x00".repeat(4294967296);
+    let mut sha3 = Sha3::v224();
+    sha3.update(&one);
+    sha3.update(&buffer);
+    sha3.finalize(&mut out);
+
+
     let mut sha3 = Sha3::v224();
     sha3.update(&buffer);
+    sha3.finalize(&mut out);
+
+    buffer.push(0u8);   // of size 4294967295 + 1 now
+    let mut sha3 = Sha3::v224();
+    sha3.update(&buffer);
+    sha3.finalize(&mut out);
 }
 
 #[test]
 fn test_sha3_overflow_v256_sha3() {
-    let buffer = b"\x00".repeat(4294967295);
+    let one = b"\x00".repeat(1);
+    let mut buffer = b"\x00".repeat(4294967295);
+
+    let mut sha3 = sha3::Sha3_256::new();
+    sha3.update(&one);
+    sha3.update(&buffer);
+    sha3.finalize();
+
     let mut sha3 = sha3::Sha3_256::new();
     sha3.update(&buffer);
+    sha3.finalize();
 
-    let buffer = b"\x00".repeat(4294967296);
+    buffer.push(0u8);   // of size 4294967295 + 1 now
     let mut sha3 = sha3::Sha3_256::new();
     sha3.update(&buffer);
 }
 
 #[test]
 fn test_sha3_overflow_v224_sha3() {
-    let buffer = b"\x00".repeat(4294967295);
+    let one = b"\x00".repeat(1);
+    let mut buffer = b"\x00".repeat(4294967295);
+
+    let mut sha3 = sha3::Sha3_224::new();
+    sha3.update(&one);
+    sha3.update(&buffer);
+    sha3.finalize();
+
     let mut sha3 = sha3::Sha3_224::new();
     sha3.update(&buffer);
+    sha3.finalize();
 
-    let buffer = b"\x00".repeat(4294967296);
+    buffer.push(0u8);   // of size 4294967295 + 1 now
     let mut sha3 = sha3::Sha3_224::new();
     sha3.update(&buffer);
 }
