@@ -239,6 +239,15 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
        .unwrap()
 });
 
+/// Counter for number of periodic client garbage-collection (=GC) events that happen with eager
+/// expiration, regardless of how many txns were actually cleaned up in this GC event
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_gc_eager_expire_event_count",
+        "Number of times the periodic garbage-collection event triggers eager expiration, regardless of how many txns were actually removed")
+        .unwrap()
+});
+
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected
 pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
