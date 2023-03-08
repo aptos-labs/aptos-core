@@ -94,11 +94,8 @@ impl Default for ConsensusConfig {
             channel_size: 30, // hard-coded
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
-            // disable wait_for_full until fully tested
-            // We never go above 20-30 pending blocks, so this disables it
-            wait_for_full_blocks_above_pending_blocks: 100,
-            // Max is 1, so 1.1 disables it.
-            wait_for_full_blocks_above_recent_fill_threshold: 1.1,
+            wait_for_full_blocks_above_pending_blocks: 8,
+            wait_for_full_blocks_above_recent_fill_threshold: 0.8,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
 
