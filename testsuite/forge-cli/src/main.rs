@@ -991,6 +991,11 @@ fn validator_reboot_stress_test(config: ForgeConfig) -> ForgeConfig {
         }))
 }
 
+fn apply_quorum_store_configs_for_single_node(helm_values: &mut serde_yaml::Value) {
+    helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+        ["dynamic_max_txn_per_s"] = 5500.into();
+}
+
 fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
@@ -1001,6 +1006,9 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn setup_test(config: ForgeConfig) -> ForgeConfig {
@@ -1079,6 +1087,9 @@ fn network_partition(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn compat(config: ForgeConfig) -> ForgeConfig {
