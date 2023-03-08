@@ -52,19 +52,19 @@ Fresh accounts are generated for each example run, but the output should resembl
 
 ```zsh title=Output
 === Account addresses ===
-Alice: 0x9635724a9e3f7997c9975c76398e434504544d4044a6c34d5125f7825574e861
-Bob:   0x4509faa7d24179368cc340548345acb7fde777191f1a69bda0fad619f0df67fd
-Chad:  0x20454430a49bb2c7e4b768bfe586a543f4b2b25386e35a40aab18c1fa3413fd2
+Alice: 0x93c1b7298d53dd0d517f503f2d3188fc62f6812ab94a412a955720c976fecf96
+Bob:   0x85eb913e58d0885f6a966d98c76e4d00714cf6627f8db5903e1cd38cc86d1ce0
+Chad:  0x14cf8dc376878ac268f2efc7ba65a2ee0ac13ceb43338b6106dd88d8d23e087a
 
 === Authentication keys ===
-Alice: 0x9635724a9e3f7997c9975c76398e434504544d4044a6c34d5125f7825574e861
-Bob:   0x4509faa7d24179368cc340548345acb7fde777191f1a69bda0fad619f0df67fd
-Chad:  0x20454430a49bb2c7e4b768bfe586a543f4b2b25386e35a40aab18c1fa3413fd2
+Alice: 0x93c1b7298d53dd0d517f503f2d3188fc62f6812ab94a412a955720c976fecf96
+Bob:   0x85eb913e58d0885f6a966d98c76e4d00714cf6627f8db5903e1cd38cc86d1ce0
+Chad:  0x14cf8dc376878ac268f2efc7ba65a2ee0ac13ceb43338b6106dd88d8d23e087a
 
 === Public keys ===
-Alice: 0x850a1cb34a627ddca5f392c8039621dbfa737068fa08b179484cbe3d0edc31f8
-Bob:   0x30f1d8c34526625998ca7edd8a5fae6d9930588c12158510fe9ad54b9e9b3a0f
-Chad:  0x710790fa9cc2cb2540889b3c487d3417147dd6fbfa9f9dccf8da057cf34ca3cd
+Alice: 0x3f23f869632aaa4378f3d68560e08d18b1fc2e80f91d6f9d1b39d720b0ef7a3f
+Bob:   0xcf21e85337a313bdac33d068960a3e52d22ce0e6190e9acc03a1c9930e1eaf3e
+Chad:  0xa1a2aef8525eb20655387d3ed50b9a3ea1531ef6117f579d0da4bcf5a2e1f76d
 ```
 
 For each user, note the [account address](../concepts/accounts.md#account-address) and [authentication key](../concepts/accounts.md#single-signer-authentication) are identical, but the [public key](../concepts/accounts.md#creating-an-account) is different.
@@ -82,7 +82,7 @@ The multisig account address depends on the public keys of the single signers. (
 ```zsh title=Output
 === 2-of-3 Multisig account ===
 Account public key: 2-of-3 Multi-Ed25519 public key
-Account address:    0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
+Account address:    0x08cac3b7b7ce4fbc5b18bc039279d7854e4c898cbf82518ac2650b565ad4d364
 ```
 
 ## Step 5: Fund all accounts
@@ -118,8 +118,8 @@ Again, signatures vary for each example run:
 
 ```zsh title=Output
 === Individual signatures ===
-Alice: 0x370c9bdd467bb7de36ade1bffe66f29de153b0f4807a2a964d4c63f3e2c4dc0f7032e42db1f3c45ae55c6ea0cde0802ba1ccd4bfa655dcbd0040e507a7eea800
-Bob:   0xf8bf5676affd2a8f5d594844c5fed63c3b02c599b9f9e8067b941169366dc72257ae31313332d4fa52f877b709cddcb80719c44a0ca9870f9c886f90286f9000
+Alice: 0x41b9dd65857df2d8d8fba251336357456cc9f17974de93292c13226f560102eac1e70ddc7809a98cd54ddee9b79853e8bf7d18cfef23458f23e3a335c3189e0d
+Bob:   0x6305101f8f3ad5a75254a8fa74b0d9866756abbf359f9e4f2b54247917caf8c52798a36c5a81c77505ebc1dc9b80f2643e8fcc056bcc4f795e80b229fa41e509
 ```
 
 ### Step 6.2: Submit the multisig transaction
@@ -132,8 +132,8 @@ Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisi
 ```
 
 ```zsh title=Output
-=== Submitting transaction ===
-Transaction hash: 0x4da4bb16ff481e22f22cf049cda3faa2df60a4dbd2c40aabee441d890b23c1dd
+=== Submitting transfer transaction ===
+Transaction hash: 0x3ff2a848bf6145e6df3abb3ccb8b94fefd07ac16b4acb0c694fa7fa30b771f8c
 ```
 
 ### Step 6.3: Check balances
@@ -149,7 +149,7 @@ Check the new account balances:
 Alice's balance:  10000000
 Bob's balance:    20000000
 Chad's balance:   30000100
-Multisig balance: 39945700
+Multisig balance: 39999300
 ```
 
 Note that even though Alice and Bob signed the transaction, their account balances have not changed.
@@ -169,9 +169,9 @@ A fourth user, Deedee, wants her account address to start with `0xdd..`, so she 
 
 ```zsh title=Output
 === Funding vanity address ===
-Deedee's address:    0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
-Deedee's public key: 0x90b17d64843ca7ece0f96498bca49c269f585eda24105b0b9894ab7976c52c73
-Deedee's balance: 50000000
+Deedee's address:    0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
+Deedee's public key: 0xdbf02311c45903f0217e9ab76ca64007c2876363118bb422922410d4cfe9964c
+Deedee's balance:    50000000
 ```
 
 ### Step 7.2 Sign a rotation proof challenge
@@ -187,8 +187,8 @@ Here, Bob and Chad provide individual signatures for the multisig:
 
 ```zsh title=Output
 === Signing rotation proof challenge ===
-cap_rotate_key:   0x71e3b8357051409881de4286046b477612d59ee9826d03f017ade18b0b5025801eef302a113dc687bceec9618fe43f684f53d6eea48309ef7a146ac606180b0d
-cap_update_table: 0xa3c0f67cbe4a98cc3956373a62e15ca03f1d8b2cc61c5650e85157a84806fa9e8834197b75fd7cfc9d2b15230ef96ceed7f8e35e4ec0775c4fef2ebdf4ef15048cea52b850bc688ff658c643aa6974bd4b734d2d700f45c977a69bf7491fdb888b18f9ed28c317b91e37153920339534278bcacb985f1fbd500457628311590c60000000
+cap_rotate_key:   0x3b2906df78bb79f210051e910985c358572c2ec7cdd03f688480fb6adf8d538df48a52787d5651d85f2959dcca88d58da49709c9c0dc9c3c58b67169ec1e1c01
+cap_update_table: 0x965fd11d7afe14396e5af40b8ffb78e6eb6f7caa1f1b1d8c7b819fdd6045864e70258788ec1670a3989c85f8cc604f4b54e43e1ce173a59aa0a6f7cf124fd902dcbb2ad53467d05c144260b2be1814777c082d8db437698b00e6a2109a015a565ff5783e827a21a4c07ae332b56398b69dfdbcc08b8ad5585dc1ac649b74730760000000
 ```
 
 ### Step 7.3 Rotate the authentication key
@@ -202,12 +202,10 @@ After it executes, the rotated authentication key matches the address of the fir
 
 ```zsh title=Output
 === Submitting authentication key rotation transaction ===
-Auth key pre-rotation: 0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
-
-Waiting for API server to update...
-
-New auth key:         0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
-1st multisig address: 0x4779464145bf769bfaa550f95b473e8ea895fd1fd59d188a489cecf4b55601aa
+Auth key pre-rotation: 0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
+Transaction hash:      0x57c66089a1b81e2895a2d6919ab19eb90c4d3c3cbe9fecab8169eaeedff2c6e6
+New auth key:          0x08cac3b7b7ce4fbc5b18bc039279d7854e4c898cbf82518ac2650b565ad4d364
+1st multisig address:  0x08cac3b7b7ce4fbc5b18bc039279d7854e4c898cbf82518ac2650b565ad4d364
 ```
 
 In other words, Deedee generated an account with a vanity address so that Alice, Bob, and Chad could use it as a multisig account.
@@ -215,28 +213,27 @@ Then Deedee and the Alice/Bob/Chad group (under the authority of Bob and Chad) a
 
 ## Step 8: Perform Move package governance
 
-In this section, the multisig vanity account will publish a simple package, upgrade it, then invoke a [Move governance](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) script.
+In this section, the multisig vanity account will publish a simple package, upgrade it, then invoke a Move script.
 
-Here, [semantic versioning](https://semver.org/) is used to distinguish between versions `v1.0.0` and `v1.1.0` of the `UpgradeAndGovern` example package from the `move-examples` folder.
+Move source code for this section is found in the [`upgrade_and_govern`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/upgrade_and_govern) directory.
 
-### Step 8.1: Review v1.0.0
+### Step 8.1: Review genesis package
 
-Version 1.0.0 of the `UpgradeAndGovern` package contains a simple `.toml` manifest and a single Move source file:
+The `UpgradeAndGovern` genesis package (version `1.0.0`) contains a simple `.toml` manifest and a single Move source file:
 
 ```toml title="Move.toml"
-:!: static/move-examples/upgrade_and_govern/v1_0_0/Move.toml manifest
+:!: static/move-examples/upgrade_and_govern/genesis/Move.toml manifest
 ```
 
 ```rust title="parameters.move"
-:!: static/move-examples/upgrade_and_govern/v1_0_0/sources/parameters.move module
+:!: static/move-examples/upgrade_and_govern/genesis/sources/parameters.move module
 ```
 
-
-As soon as the package is published, a `GovernanceParameters` resource is moved to the package account with the values specified by `GENESIS_PARAMETER_1` and `GENESIS_PARAMETER_2`.
+As soon as the package is published, a `GovernanceParameters` resource is moved to the `upgrade_and_govern` package account with the values specified by `GENESIS_PARAMETER_1` and `GENESIS_PARAMETER_2`.
 Then, the `get_parameters()` function can be used to look up the governance parameters, but note that in this version there is no setter function.
 The setter function will be added later.
 
-### Step 8.2: Publish v1.0.0
+### Step 8.2: Publish genesis package
 
 Here, Alice and Chad will sign off on the publication transaction.
 
@@ -247,8 +244,8 @@ All compilation and publication operations are handled via the ongoing Python sc
 ```
 
 ```zsh title=Output
-=== Publishing v1.0.0 ===
-Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_0_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
+=== Genesis publication ===
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/genesis --named-addresses upgrade_and_govern=0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
 
 Compiling, may take a little while to download git dependencies...
 INCLUDING DEPENDENCY AptosFramework
@@ -256,50 +253,51 @@ INCLUDING DEPENDENCY AptosStdlib
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING UpgradeAndGovern
 
-Transaction hash: 0x3b7b974b3d4e525f21c1da2f083e01648476dd416c3c3ce7b2c44a4600692a38
-
-Waiting for API server to update...
-
+Transaction hash: 0x3c65c681194d6c64d73dc5d0cbcbad62e99a997b8600b8edad6847285e580c13
 Package name from on-chain registry: UpgradeAndGovern
 On-chain upgrade number: 0
 ```
 
-### Step 8.3: Review v1.1.0
+### Step 8.3: Review package upgrades
 
-Version 1.1.0 of the `UpgradeAndGovern` packages adds the following parameter setter functionality at the end of `parameters.move`:
+The `UpgradeAndGovern` upgrade package adds the following parameter setter functionality at the end of `parameters.move`:
 
 ```rust title=parameters.move
-:!: static/move-examples/upgrade_and_govern/v1_1_0/sources/parameters.move appended
+:!: static/move-examples/upgrade_and_govern/upgrade/sources/parameters.move appended
 ```
 
-Here, the account that the package is published under has the authority to change the `GovernanceParameter` values from the genesis values set in `v1.0.0` to the new `parameter_1` and `parameter_2` values.
+Here, the account that the package is published under, `upgrade_and_govern`, has the authority to change the `GovernanceParameter` values from the genesis values to the new `parameter_1` and `parameter_2` values.
 
 There is also a new module, `transfer.move`:
 
 ```rust title=transfer.move
-:!: static/move-examples/upgrade_and_govern/v1_1_0/sources/transfer.move module
+:!: static/move-examples/upgrade_and_govern/upgrade/sources/transfer.move module
 ```
 
 This module simply looks up the `GovernanceParameter` values, and treats them as the amount of octas to send to two recipients.
 
-Lastly, the manifest has been updated with the new version number:
+Lastly, the manifest has been updated with the new version number `1.1.0`:
 
 ```toml title=Move.toml
-:!: static/move-examples/upgrade_and_govern/v1_1_0/Move.toml manifest
+:!: static/move-examples/upgrade_and_govern/upgrade/Move.toml manifest
 ```
 
-### Step 8.4: Upgrade to v1.1.0
+### Step 8.4: Upgrade the package
 
 Alice, Bob, and Chad will all sign off on this publication transaction, which results in an upgrade.
-This process is almost identical to that of the `v1.0.0` publication:
+This process is almost identical to that of the genesis publication, with the new `transfer` module listed after the `parameters` module:
 
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_11
 ```
 
+:::tip
+Modules that `use` other modules must be listed *after* the modules they use.
+:::
+
 ```zsh title=Output
-=== Publishing v1.1.0 ===
-Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/v1_1_0 --named-addresses upgrade_and_govern=0xdd2f5d6df096759915ffadfe6e73898117a40a4a99852fcdf44c05d23e794211
+=== Upgrade publication ===
+Running aptos CLI command: aptos move compile --save-metadata --package-dir ../../../../aptos-move/move-examples/upgrade_and_govern/upgrade --named-addresses upgrade_and_govern=0xdd86860ae7f77f58d08188e1c39fbc6a2f7cec782f09f6767f8367d84357ed57
 
 Compiling, may take a little while to download git dependencies...
 INCLUDING DEPENDENCY AptosFramework
@@ -307,10 +305,7 @@ INCLUDING DEPENDENCY AptosStdlib
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING UpgradeAndGovern
 
-Transaction hash: 0xcfbb3207169a0058fb43467df4964b4d52855259bd183c648e8b358c1899190e
-
-Waiting for API server to update...
-
+Transaction hash: 0x0f0ea3bb7271ddeaceac5b49ff5503d6c652d4746c1510e47665ceee5a89aaf0
 On-chain upgrade number: 1
 ```
 
@@ -318,10 +313,10 @@ Note that the on-chain upgrade number has been incremented by 1.
 
 ### Step 8.6: Review the governance script
 
-`UpgradeAndGovern` version 1.1.0 also includes a Move script defined in `set_and_transfer.move`:
+The `UpgradeAndGovern` upgrade package also includes a Move script at `set_and_transfer.move`:
 
 ```rust title=set_and_transfer.move
-:!: static/move-examples/upgrade_and_govern/v1_1_0/scripts/set_and_transfer.move script
+:!: static/move-examples/upgrade_and_govern/upgrade/scripts/set_and_transfer.move script
 ```
 
 This script calls the governance parameter setter using hard-coded values defined at the top of the script, then calls the octa transfer function.
@@ -345,13 +340,10 @@ Here, the amounts sent to each account are specified in the hard-coded values fr
 
 ```zsh title=Output
 === Invoking Move script ===
-Transaction hash: 0x05903b30e3a88829d5ba802a671ba5b692c53bb870e2fb393a2b9cbdf153b120
-
-Waiting for API server to update...
-
-Alice's balance: 10000300
-Bob's balance:   20000200
-Chad's balance:  30000100
+Transaction hash: 0xd06de4bd9fb12a9f3cbd8ce1b9a9fd47ea2b923a8cfac21f9788869430e4149b
+Alice's balance:  10000300
+Bob's balance:    20000200
+Chad's balance:   30000100
 ```
 
 ---
