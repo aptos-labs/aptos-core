@@ -20,6 +20,7 @@
 !aptos-move/aptos-release-builder/data/release.yaml
 !aptos-move/framework/
 !crates/aptos/src/move_tool/*.bpl
+!crates/aptos-faucet/doc/
 !api/doc/
 !crates/indexer/migrations/**/*.sql
 !terraform/helm/aptos-node/
