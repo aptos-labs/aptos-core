@@ -59,14 +59,14 @@ use crate::{
     pruner::{
         db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
-        pruner_utils, state_kv_pruner::StateKvPruner,
-        state_kv_pruner_manager::StateKvPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
+        pruner_utils, state_kv_pruner_manager::StateKvPrunerManager,
+        state_merkle_pruner_manager::StateMerklePrunerManager,
     },
-    schema::*,
+    schema::{jellyfish_merkle_node::JellyfishMerkleNodeSchema, state_value::StateValueSchema, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-    state_store::StateStore,
+    state_merkle_db::StateMerkleDb,
+    state_store::{StateDb, StateStore},
     transaction_store::TransactionStore,
 };
 use anyhow::{bail, ensure, Result};
@@ -79,9 +79,10 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
+use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver, MAX_REQUEST_LIMIT,
@@ -2020,10 +2021,14 @@ impl DbWriter for AptosDB {
                 .pruner()
                 .save_min_readable_version(version, &batch)?;
 
-            let mut state_merkle_batch = SchemaBatch::new();
-            StateMerklePruner::prune_genesis(
+            let state_merkle_batch = SchemaBatch::new();
+            let state_kv_batch = SchemaBatch::new();
+            delete_state_kv_and_merkle_nodes_at_genesis_after_fast_sync(
+                &self.state_kv_db,
                 self.state_merkle_db.clone(),
-                &mut state_merkle_batch,
+                version,
+                &state_kv_batch,
+                &state_merkle_batch,
             )?;
 
             self.state_store
@@ -2034,12 +2039,6 @@ impl DbWriter for AptosDB {
                 .epoch_snapshot_pruner
                 .pruner()
                 .save_min_readable_version(version, &state_merkle_batch)?;
-
-            let mut state_kv_batch = SchemaBatch::new();
-            StateKvPruner::prune_genesis(
-                self.state_store.state_kv_db.clone(),
-                &mut state_kv_batch,
-            )?;
             self.state_store
                 .state_kv_pruner
                 .pruner()
@@ -2068,6 +2067,47 @@ impl DbWriter for AptosDB {
             Ok(())
         })
     }
+}
+
+fn delete_state_kv_and_merkle_nodes_at_genesis_after_fast_sync(
+    state_kv_db: &DB,
+    state_merkle_db: Arc<DB>,
+    fast_sync_version: Version,
+    state_kv_batch: &SchemaBatch,
+    state_merkle_batch: &SchemaBatch,
+) -> Result<()> {
+    let tree_reader = StateMerkleDb::new(state_merkle_db.clone(), 0);
+    let mut iter = state_merkle_db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+    iter.seek(&NodeKey::new_empty_path(0))?;
+    for item in iter {
+        let (node_key, node) = item?;
+
+        if node_key.version() != 0 {
+            break;
+        }
+
+        if let Node::Leaf(leaf_node) = node {
+            let state_key = leaf_node.value_index().0.clone();
+            let (version, _) = StateDb::get_state_value_with_version_by_version_ext(
+                state_kv_db,
+                &state_key,
+                fast_sync_version,
+            )?
+            .expect("Must exist.");
+            if version != 0
+                || tree_reader
+                    .get_with_proof_ext(&state_key, fast_sync_version)?
+                    .0
+                    .is_none()
+            {
+                state_kv_batch.delete::<StateValueSchema>(&(state_key, 0))?;
+                state_merkle_batch.delete::<JellyfishMerkleNodeSchema>(&node_key)?;
+            }
+        }
+
+        // TODO(grao): There might be some stale internal nodes not deleted, ignore for now.
+    }
+    Ok(())
 }
 
 // Convert requested range and order to a range in ascending order.

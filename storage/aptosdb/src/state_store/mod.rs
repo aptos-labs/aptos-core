@@ -184,10 +184,18 @@ impl StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
+        Self::get_state_value_with_version_by_version_ext(&self.state_kv_db, state_key, version)
+    }
+
+    pub fn get_state_value_with_version_by_version_ext(
+        state_kv_db: &DB,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.state_kv_db.iter::<StateValueSchema>(read_opts)?;
+        let mut iter = state_kv_db.iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()

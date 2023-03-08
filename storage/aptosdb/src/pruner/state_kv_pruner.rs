@@ -8,7 +8,6 @@ use crate::{
         db_pruner::DBPruner, db_sub_pruner::DBSubPruner,
         state_store::state_value_pruner::StateValuePruner,
     },
-    pruner_utils,
     schema::db_metadata::{DbMetadataKey, DbMetadataValue},
 };
 use aptos_schemadb::{SchemaBatch, DB};
@@ -99,18 +98,6 @@ impl StateKvPruner {
         };
         pruner.initialize();
         pruner
-    }
-
-    /// Prunes the genesis transaction and saves the db alterations to the given change set
-    pub fn prune_genesis(state_kv_db: Arc<DB>, db_batch: &mut SchemaBatch) -> anyhow::Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let state_kv_pruner = pruner_utils::create_state_kv_pruner(state_kv_db);
-        state_kv_pruner.set_target_version(target_version);
-        state_kv_pruner.prune_inner(max_version, db_batch)?;
-
-        Ok(())
     }
 
     fn prune_inner(

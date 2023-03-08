@@ -6,9 +6,8 @@ use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{db_pruner::DBPruner, state_store::generics::StaleNodeIndexSchemaTrait},
-    pruner_utils,
     schema::db_metadata::DbMetadataValue,
-    StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
@@ -217,29 +216,5 @@ where
             true
         };
         Ok((indices, is_end_of_target_version))
-    }
-}
-
-impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
-    /// Prunes the genesis state and saves the db alterations to the given change set
-    pub fn prune_genesis(state_merkle_db: Arc<DB>, batch: &mut SchemaBatch) -> Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let state_merkle_pruner = pruner_utils::create_state_merkle_pruner::<
-            StaleNodeIndexCrossEpochSchema,
-        >(state_merkle_db);
-        state_merkle_pruner.set_target_version(target_version);
-
-        let min_readable_version = state_merkle_pruner.min_readable_version();
-        let target_version = state_merkle_pruner.target_version();
-        state_merkle_pruner.prune_state_merkle(
-            min_readable_version,
-            target_version,
-            max_version,
-            Some(batch),
-        )?;
-
-        Ok(())
     }
 }
