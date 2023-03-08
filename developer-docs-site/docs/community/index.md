@@ -11,7 +11,7 @@ As always, adhere to the [Aptos Code of Conduct](https://github.com/aptos-labs/a
 
 ## Take the survey
 
-Help us make the Aptos developer experience better: https://aptos.typeform.com/dev-survey
+We need your input to make your interactions with Aptos smooth and enjoyable. Help us make the Aptos developer experience better by taking this short survey: https://aptos.typeform.com/dev-survey
 
 ## Ask questions and offer answers
 
