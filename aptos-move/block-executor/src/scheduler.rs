@@ -433,7 +433,7 @@ impl Scheduler {
                 .fetch_min(execution_target_idx, Ordering::SeqCst);
         }
 
-        let (cur_val_idx, cur_wave) =
+        let (cur_val_idx, mut cur_wave) =
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
 
         // If validation_idx is already lower than txn_idx, all required transactions will be
@@ -443,17 +443,13 @@ impl Scheduler {
                 // The transaction execution required revalidating all higher txns (not
                 // only itself), currently happens when incarnation writes to a new path
                 // (w.r.t. the write-set of its previous completed incarnation).
-                if let Some(wave) = self.decrease_validation_idx(txn_idx) {
-                    // Under lock, current wave monotonically increasing, can simply write.
-                    validation_status.max_triggered_wave = wave;
-                }
-            } else {
-                // Only transaction txn_idx requires validation. Return validation task
-                // back to the caller.
-                // Under lock, current wave is monotonically increasing, can simply write.
-                validation_status.required_wave = cur_wave;
-                return SchedulerTask::ValidationTask((txn_idx, incarnation), cur_wave);
+                if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
+                    cur_wave = wave;
+                };
             }
+            // Update the minimum wave this txn needs to pass.
+            validation_status.required_wave = cur_wave;
+            return SchedulerTask::ValidationTask((txn_idx, incarnation), cur_wave);
         }
 
         SchedulerTask::NoTask
@@ -462,18 +458,11 @@ impl Scheduler {
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, NoTask).
     pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
-        // Similar reason as in finish_execution to hold the validation lock throughout the
-        // function. Also note that we always lock validation status before execution status
-        // which is good to have a fixed order to avoid potential deadlocks.
-        let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_aborted_status(txn_idx, incarnation);
 
         // Schedule higher txns for validation, skipping txn_idx itself (needs to be
         // re-executed first).
-        if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
-            // Under lock, current wave monotonically increasing, can simply write.
-            validation_status.max_triggered_wave = wave;
-        }
+        self.decrease_validation_idx(txn_idx + 1);
 
         // txn_idx must be re-executed, and if execution_idx is lower, it will be.
         if self.execution_idx.load(Ordering::Acquire) > txn_idx {
@@ -508,6 +497,9 @@ impl Scheduler {
                 .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
+                        let mut validation_status = self.txn_status[target_idx].1.write();
+                        // Update the minimum wave all the suffix txn needs to pass.
+                        validation_status.max_triggered_wave = wave + 1;
                         // Pack into validation index.
                         Some((target_idx as u64) | ((wave as u64 + 1) << 32))
                     } else {
