@@ -9,7 +9,7 @@ use crate::{
     payload_manager::PayloadManager,
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
-        batch_generator::{BatchGenerator, BatchGeneratorCommand},
+        batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
         batch_requester::BatchRequester,
         batch_store::BatchStore,
         counters,
@@ -133,8 +133,8 @@ pub struct InnerBuilder {
     proof_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofCoordinatorCommand>>,
     proof_manager_cmd_tx: tokio::sync::mpsc::Sender<ProofManagerCommand>,
     proof_manager_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofManagerCommand>>,
-    back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
-    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
+    back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
@@ -278,7 +278,7 @@ impl InnerBuilder {
     ) {
         // TODO: parameter? bring back back-off?
         let interval = tokio::time::interval(Duration::from_millis(
-            self.config.mempool_pulling_interval as u64,
+            self.config.batch_generation_poll_interval_ms as u64,
         ));
 
         let coordinator_rx = self.coordinator_rx.take().unwrap();
@@ -355,6 +355,7 @@ impl InnerBuilder {
         let proof_manager = ProofManager::new(
             self.epoch,
             self.config.back_pressure.backlog_txn_limit_count,
+            self.config.back_pressure.backlog_batch_limit_count,
         );
         spawn_named!(
             "proof_manager",
