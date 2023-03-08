@@ -1,8 +1,7 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher};
 use aptos_gas::{
     AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
     LATEST_GAS_FEATURE_VERSION,
@@ -12,11 +11,8 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig},
-    proof::accumulator::InMemoryAccumulator,
-    transaction::{
-        ChangeSet, Transaction, TransactionInfo, TransactionOutput, TransactionStatus, Version,
-    },
+    on_chain_config::{Features, OnChainConfig, TimedFeatures},
+    transaction::{ChangeSet, Transaction, TransactionInfo, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
@@ -97,50 +93,9 @@ impl AptosDebugger {
             let txn_output = &txn_outputs[idx];
             let txn_info = &expected_txn_infos[idx];
             let version = first_version + idx as Version;
-            let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
-            if txn_output.status() != &expected_txn_status {
-                println!(
-                    "Mismatch: ver:{} status:{:?} on_chain:{:?}",
-                    version,
-                    txn_output.status(),
-                    expected_txn_status,
-                );
-            }
-
-            if txn_output.gas_used() != txn_info.gas_used() {
-                println!(
-                    "Mismatch: ver:{} gas_used:{} on_chain:{}",
-                    version,
-                    txn_output.gas_used(),
-                    txn_info.gas_used(),
-                );
-            }
-
-            let write_set_hash = txn_output.write_set().hash();
-            if write_set_hash != txn_info.state_change_hash() {
-                println!(
-                    "Mismatch: ver:{} write_set_hash:{} on_chain:{}",
-                    version,
-                    write_set_hash,
-                    txn_info.state_change_hash(),
-                );
-            }
-
-            let event_hashes = txn_output
-                .events()
-                .iter()
-                .map(CryptoHash::hash)
-                .collect::<Vec<_>>();
-            let event_root_hash =
-                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
-            if event_root_hash != txn_info.event_root_hash() {
-                println!(
-                    "Mismatch: ver:{} event_root_hash:{} on_chain:{}",
-                    version,
-                    event_root_hash,
-                    txn_info.event_root_hash(),
-                );
-            }
+            txn_output
+                .ensure_match_transaction_info(version, txn_info, None, None)
+                .unwrap_or_else(|err| println!("{}", err))
         }
     }
 
@@ -228,19 +183,19 @@ impl AptosDebugger {
             LATEST_GAS_FEATURE_VERSION,
             ChainId::test().id(),
             features,
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        session
-            .finish()
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?
-            .into_change_set(
+        let change_set_ext = session
+            .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-            .map(|res| res.into_inner().1)
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+        let (_delta_change_set, change_set) = change_set_ext.into_inner();
+        Ok(change_set)
     }
 }
 

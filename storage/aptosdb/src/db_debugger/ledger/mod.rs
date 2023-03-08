@@ -1,15 +1,15 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 mod check_range_proof;
-mod check_rxn_info_hashes;
+mod check_txn_info_hashes;
 
 use anyhow::Result;
 
 #[derive(clap::Subcommand)]
 #[clap(about = "Check the ledger.")]
 pub enum Cmd {
-    CheckTransactionInfoHashes(check_rxn_info_hashes::Cmd),
+    CheckTransactionInfoHashes(check_txn_info_hashes::Cmd),
     CheckRangeProof(check_range_proof::Cmd),
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::*;
@@ -14,6 +14,12 @@ pub fn generate_gas_upgrade_proposal(
     let mut result = vec![];
 
     let writer = CodeWriter::new(Loc::default());
+
+    emitln!(
+        writer,
+        "// source commit hash: {}\n",
+        aptos_build_info::get_git_hash()
+    );
 
     emitln!(writer, "// Gas schedule upgrade proposal\n");
 

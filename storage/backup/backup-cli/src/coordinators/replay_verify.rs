@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -11,10 +12,11 @@ use crate::{
     storage::BackupStorage,
     utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_db::backup::restore_handler::RestoreHandler;
+use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
+use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 
@@ -28,7 +30,7 @@ pub struct ReplayVerifyCoordinator {
     start_version: Version,
     end_version: Version,
     validate_modules: bool,
-    txns_to_skip: Vec<Version>,
+    verify_execution_mode: VerifyExecutionMode,
 }
 
 impl ReplayVerifyCoordinator {
@@ -42,7 +44,7 @@ impl ReplayVerifyCoordinator {
         start_version: Version,
         end_version: Version,
         validate_modules: bool,
-        txns_to_skip: Vec<Version>,
+        verify_execution_mode: VerifyExecutionMode,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -54,7 +56,7 @@ impl ReplayVerifyCoordinator {
             start_version,
             end_version,
             validate_modules,
-            txns_to_skip,
+            verify_execution_mode,
         })
     }
 
@@ -77,6 +79,7 @@ impl ReplayVerifyCoordinator {
 
     async fn run_impl(self) -> Result<()> {
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
@@ -155,11 +158,15 @@ impl ReplayVerifyCoordinator {
             txn_manifests,
             Some(replay_transactions_from_version), /* replay_from_version */
             None,                                   /* epoch_history */
-            self.txns_to_skip,
+            self.verify_execution_mode.clone(),
         )
         .run()
         .await?;
 
-        Ok(())
+        if self.verify_execution_mode.seen_error() {
+            bail!("Seen replay errors, check out logs.")
+        } else {
+            Ok(())
+        }
     }
 }

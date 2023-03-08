@@ -1,9 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod forge_setup_test;
+pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
@@ -12,6 +14,7 @@ pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod performance_with_fullnode_test;
+pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
@@ -104,6 +107,8 @@ pub enum LoadDestination {
     AllNodes,
     AllValidators,
     AllFullnodes,
+    // Send to AllFullnodes, if any exist, otherwise to AllValidators
+    FullnodesOtherwiseValidators,
     Peers(Vec<PeerId>),
 }
 
@@ -116,6 +121,13 @@ impl LoadDestination {
             LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
             LoadDestination::AllValidators => all_validators,
             LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::FullnodesOtherwiseValidators => {
+                if all_fullnodes.is_empty() {
+                    all_validators
+                } else {
+                    all_fullnodes
+                }
+            },
             LoadDestination::Peers(peers) => peers,
         }
     }
@@ -123,7 +135,7 @@ impl LoadDestination {
 
 pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
@@ -218,7 +230,7 @@ impl dyn NetworkLoadTest {
             stats_tracking_phases = 3;
         }
 
-        let job = rt
+        let mut job = rt
             .block_on(emitter.start_job(
                 ctx.swarm().chain_info().root_account,
                 emit_job_request,
@@ -295,17 +307,13 @@ impl dyn NetworkLoadTest {
         let stats_by_phase = rt.block_on(emitter.stop_job(job));
 
         info!("Stopped job");
-        info!("Warmup stats: {}", stats_by_phase[0].rate(warmup_duration));
+        info!("Warmup stats: {}", stats_by_phase[0].rate());
 
         let mut stats: Option<TxnStats> = None;
         let mut stats_and_duration_by_phase_filtered = Vec::new();
         for i in 0..stats_tracking_phases - 2 {
             let cur = &stats_by_phase[1 + i];
-            info!(
-                "Test stats [test phase {}]: {}",
-                i,
-                cur.rate(actual_phase_durations[i])
-            );
+            info!("Test stats [test phase {}]: {}", i, cur.rate());
             stats = if let Some(previous) = stats {
                 Some(&previous + cur)
             } else {
@@ -313,10 +321,7 @@ impl dyn NetworkLoadTest {
             };
             stats_and_duration_by_phase_filtered.push((cur.clone(), actual_phase_durations[i]));
         }
-        info!(
-            "Cooldown stats: {}",
-            stats_by_phase.last().unwrap().rate(cooldown_duration)
-        );
+        info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
 
         let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
             if let Some(start_t) = max_start_ledger_transactions {

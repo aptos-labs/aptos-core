@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -17,7 +18,7 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    state_store::state_storage_usage::StateStorageUsage,
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
 use claims::assert_none;
@@ -51,9 +52,11 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
         // When aggregator value has to be resolved from storage, pretend it is 100.
-        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE)))
+        Ok(Some(StateValue::new_legacy(serialize(
+            &STORAGE_AGGREGATOR_VALUE,
+        ))))
     }
 
     fn id(&self) -> StateViewId {
@@ -81,7 +84,7 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
 
@@ -153,6 +156,10 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
         } else {
             None
         }
+    }
+
+    fn as_state_value(&self) -> Option<StateValue> {
+        self.extract_raw_bytes().map(StateValue::new_legacy)
     }
 }
 
@@ -382,7 +389,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
@@ -404,7 +411,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Argument = ();
@@ -441,7 +448,7 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    reads_result.push(view.get_state_value(k).unwrap());
+                    reads_result.push(view.get_state_value_bytes(k).unwrap());
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
@@ -460,7 +467,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<(K, DeltaOp)>, Vec<Option<Vec<u8>>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Txn = Transaction<K, V>;

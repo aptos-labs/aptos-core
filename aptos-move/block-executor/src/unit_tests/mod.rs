@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -19,7 +20,7 @@ use std::{
 
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
     let data_view = DeltaDataView::<K, V> {

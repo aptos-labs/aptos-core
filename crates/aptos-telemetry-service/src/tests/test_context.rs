@@ -1,16 +1,16 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
-    index, CustomEventConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
+    index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use warp::{
     http::{header::CONTENT_TYPE, Response},
     hyper::body::Bytes,
@@ -31,11 +31,11 @@ pub async fn new_test_context() -> TestContext {
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
-        humio_url: "".into(),
         pfn_allowlist: HashMap::new(),
         log_env_map: HashMap::new(),
         peer_identities: HashMap::new(),
         metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
+        humio_ingest_config: LogIngestConfig::default_for_test(),
     };
 
     let peers = PeerStoreTuple::default();
@@ -47,7 +47,6 @@ pub async fn new_test_context() -> TestContext {
             server_private_key,
             peers,
             ClientTuple::new(None, Some(GroupedMetricsClients::new_empty()), None),
-            HashSet::new(),
             jwt_service,
             HashMap::new(),
             HashMap::new(),

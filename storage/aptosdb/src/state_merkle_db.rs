@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -28,7 +28,6 @@ pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 
-#[derive(Debug)]
 pub struct StateMerkleDb {
     pub(crate) db: Arc<DB>,
     enable_cache: bool,

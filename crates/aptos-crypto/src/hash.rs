@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines traits and implementations of
@@ -627,6 +628,16 @@ define_hasher! {
         SPARSE_MERKLE_INTERNAL_HASHER,
         SPARSE_MERKLE_INTERNAL_SEED,
         b"SparseMerkleInternal"
+    )
+}
+
+define_hasher! {
+    /// The hasher used as a placeholder.
+    (
+        DummyHasher,
+        DUMMY_HASHER,
+        DUMMY_SEED,
+        b"Dummy"
     )
 }
 

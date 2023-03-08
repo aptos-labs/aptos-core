@@ -8,18 +8,24 @@ runs:
   steps:
     - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
       shell: bash
+
     - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # pin@v1
       with:
         override: true
         components: rustfmt, clippy
-    - uses: bmwill/rust-cache@fb63fcd7a959767755b88b5af2f5cbf65fb8a127 # pin@v1
-      with:
-        path: ~/.cargo/registry/src/**/librocksdb-sys-*
+
+    # rust-cache action will cache ~/.cargo and ./target
+    # https://github.com/Swatinem/rust-cache#cache-details
+    - name: Run cargo cache
+      uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+
     - name: install protoc and related tools
       shell: bash
       run: scripts/dev_setup.sh -b -r
+
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash
+
     - name: Setup git credentials
       if: inputs.GIT_CREDENTIALS != ''
       shell: bash

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DiscoveryError;
@@ -87,7 +88,7 @@ mod tests {
             Box::pin(listener).run().await
         };
 
-        spawn_named!("[Network] Listner Task", listener_task);
+        spawn_named!("[Network] Listener Task", listener_task);
         conn_mgr_reqs_rx
     }
 

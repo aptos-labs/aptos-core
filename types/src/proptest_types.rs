@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -90,7 +91,7 @@ impl Arbitrary for WriteSet {
             .prop_map(|write_set| {
                 let write_set_mut =
                     WriteSetMut::new(write_set.iter().map(|(access_path, write_op)| {
-                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
+                        (StateKey::access_path(access_path.clone()), write_op.clone())
                     }));
                 write_set_mut
                     .freeze()
@@ -381,6 +382,15 @@ fn new_raw_transaction(
             sender,
             sequence_number,
             script_fn,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_time_secs,
+            chain_id,
+        ),
+        TransactionPayload::Multisig(multisig) => RawTransaction::new_multisig(
+            sender,
+            sequence_number,
+            multisig,
             max_gas_amount,
             gas_unit_price,
             expiration_time_secs,
@@ -786,9 +796,12 @@ impl TransactionToCommitGen {
                     .materialize(index, universe)
                     .into_resource_iter()
                     .map(move |(key, value)| {
-                        let state_key = StateKey::AccessPath(AccessPath::new(address, key));
+                        let state_key = StateKey::access_path(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), Some(StateValue::from(value.clone()))),
+                            (
+                                state_key.clone(),
+                                Some(StateValue::new_legacy(value.clone())),
+                            ),
                             (state_key, WriteOp::Modification(value)),
                         )
                     })

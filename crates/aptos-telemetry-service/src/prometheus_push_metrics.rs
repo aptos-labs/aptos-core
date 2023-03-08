@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,23 +13,6 @@ use crate::{
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
-
-/// TODO: Cleanup after v1 API is ramped up
-pub fn metrics_ingest_legacy(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("push-metrics")
-        .and(warp::post())
-        .and(context.clone().filter())
-        .and(with_auth(context, vec![
-            NodeType::Validator,
-            NodeType::ValidatorFullNode,
-            NodeType::PublicFullNode,
-        ]))
-        .and(warp::header::optional(CONTENT_ENCODING.as_str()))
-        .and(warp::body::content_length_limit(MAX_CONTENT_LENGTH))
-        .and(warp::body::bytes())
-        .and_then(handle_metrics_ingest)
-        .boxed()
-}
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
@@ -155,6 +138,7 @@ fn claims_to_extra_labels(claims: &Claims, common_name: Option<&String>) -> Vec<
         chain_name,
         format!("namespace={}", "telemetry-service"),
         pod_name,
+        format!("run_uuid={}", claims.run_uuid),
     ]
 }
 
@@ -166,6 +150,7 @@ mod test {
     use httpmock::MockServer;
     use reqwest::Url;
     use std::str::FromStr;
+    use uuid::Uuid;
 
     #[test]
     fn verify_labels() {
@@ -177,6 +162,7 @@ mod test {
                 epoch: 3,
                 exp: 123,
                 iat: 123,
+                run_uuid: Uuid::default(),
             },
             Some(&String::from("test_name")),
         );
@@ -186,7 +172,10 @@ mod test {
             "chain_name=25",
             "namespace=telemetry-service",
             "kubernetes_pod_name=peer_id:test_name//0x1",
+            &format!("run_uuid={}", Uuid::default()),
         ]);
+
+        let test_uuid = Uuid::new_v4();
 
         let claims = claims_to_extra_labels(
             &super::Claims {
@@ -196,6 +185,7 @@ mod test {
                 epoch: 3,
                 exp: 123,
                 iat: 123,
+                run_uuid: test_uuid,
             },
             None,
         );
@@ -205,6 +195,7 @@ mod test {
             "chain_name=25",
             "namespace=telemetry-service",
             "kubernetes_pod_name=peer_id:0x1",
+            &format!("run_uuid={}", test_uuid),
         ]);
     }
 

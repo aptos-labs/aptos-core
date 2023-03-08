@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides various indexes used by Mempool.
@@ -155,6 +156,10 @@ impl TTLIndex {
             address: txn.get_sender(),
             sequence_number: txn.sequence_info.transaction_sequence_number,
         }
+    }
+
+    pub(crate) fn iter(&self) -> Iter<TTLOrderingKey> {
+        self.data.iter()
     }
 
     pub(crate) fn size(&self) -> usize {

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 //! This module defines the physical storage schema for db wide miscellaneous metadata entries.
 //! For example, the progress of a db pruner.
@@ -47,7 +47,11 @@ pub enum DbMetadataKey {
     LedgerPrunerProgress,
     StateMerklePrunerProgress,
     EpochEndingStateMerklePrunerProgress,
+    StateKvPrunerProgress,
     StateSnapshotRestoreProgress(Version),
+    LedgerCommitProgress,
+    StateKVCommitProgress,
+    OverallCommitProgress,
 }
 
 define_schema!(

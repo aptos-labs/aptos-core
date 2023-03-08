@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
@@ -21,7 +21,11 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-db-bootstrapper \
+    -p aptos-db-tool \
     -p aptos-transaction-emitter \
+    -p aptos-indexer-grpc-cache-worker \
+    -p aptos-indexer-grpc-file-store \
+    -p aptos-indexer-grpc-data-service \
     "$@"
 
 # Build aptos-node separately
@@ -43,11 +47,12 @@ BINS=(
     aptos-node-checker
     aptos-openapi-spec-generator
     aptos-telemetry-service
+    aptos-indexer-grpc-cache-worker
+    aptos-indexer-grpc-file-store
+    aptos-indexer-grpc-data-service
     aptos-fn-check-client
-    db-backup
-    db-backup-verify
+    aptos-db-tool
     aptos-db-bootstrapper
-    db-restore
     forge
     aptos-transaction-emitter
 )

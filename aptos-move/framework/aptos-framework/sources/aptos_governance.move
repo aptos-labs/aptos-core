@@ -129,7 +129,8 @@ module aptos_framework::aptos_governance {
         signer_address: address,
         signer_cap: SignerCapability,
     ) acquires GovernanceResponsbility {
-        system_addresses::assert_framework_reserved_address(aptos_framework);
+        system_addresses::assert_aptos_framework(aptos_framework);
+        system_addresses::assert_framework_reserved(signer_address);
 
         if (!exists<GovernanceResponsbility>(@aptos_framework)) {
             move_to(aptos_framework, GovernanceResponsbility { signer_caps: simple_map::create<address, SignerCapability>() });
@@ -195,14 +196,17 @@ module aptos_framework::aptos_governance {
         );
     }
 
+    #[view]
     public fun get_voting_duration_secs(): u64 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).voting_duration_secs
     }
 
+    #[view]
     public fun get_min_voting_threshold(): u128 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).min_voting_threshold
     }
 
+    #[view]
     public fun get_required_proposer_stake(): u64 acquires GovernanceConfig {
         borrow_global<GovernanceConfig>(@aptos_framework).required_proposer_stake
     }

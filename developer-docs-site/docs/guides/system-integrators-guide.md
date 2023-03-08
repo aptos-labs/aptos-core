@@ -35,7 +35,7 @@ There are four well-supported networks for integrating with the Aptos blockchain
 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 
-See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment.
+See [Aptos Blockchain Deployments](../nodes/aptos-deployments.md) for full details on each environment. See [Check out release branch](./getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
 
 ### Run a local testnet
 
@@ -43,7 +43,7 @@ There are two options for running a local testnet:
 * Directly [run a local testnet](../nodes/local-testnet/run-a-local-testnet.md) using either the [Aptos-core source code](../nodes/local-testnet/run-a-local-testnet.md#using-the-aptos-core-source-code) or a [Docker image](../nodes/local-testnet/run-a-local-testnet.md#using-docker). These paths are useful for testing changes to the Aptos-core codebase or framework, or for building services on top of the Aptos blockchain, respectively.
 * [Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) and 2) start a [local node with a faucet](../nodes/local-testnet/using-cli-to-run-a-local-testnet.md#starting-a-local-testnet-with-a-faucet). This path is useful for developing on the Aptos blockchain, debugging Move contracts, and testing node operations.
 
-Either of these methods will expose a REST API service at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
+Either of these methods will expose a [REST API service](./aptos-apis.md) at `http://127.0.0.1:8080` and a Faucet API service at `http://127.0.0.1:8000` for option 1 run a local testnet or `http://127.0.0.1:8081` for option 2 install the Aptos CLI. The applications will output the location of the services.
 
 ### Production network access
 
@@ -82,7 +82,7 @@ Either of these methods will expose a REST API service at `http://127.0.0.1:8080
 Aptos currently provides three SDKs:
 1. [Typescript](../sdks/ts-sdk/index.md)
 2. [Python](../sdks/python-sdk.md)
-3. [Rust](../sdks/rust-sSDKs and Toolsdk.md)
+3. [Rust](../sdks/rust-sdk.md)
 
 Almost all developers will benefit from exploring the CLI. [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md) demonstrates how the CLI can be used to which includes creating accounts, transferring coins, and publishing modules.
 
@@ -496,6 +496,6 @@ By monitoring the events, you will find all balance changes in the `0x1::coin::C
 
 :::
 
-To create some sample data to explore, conduct ["Your first transaction"](../tutorials/your-first-transaction).
+To create some sample data to explore, conduct ["Your first transaction"](../tutorials/first-transaction.md).
 
-To learn more about coin creation, make ["Your First Coin"](../tutorials/your-first-coin).
+To learn more about coin creation, make ["Your First Coin"](../tutorials/first-coin.md).

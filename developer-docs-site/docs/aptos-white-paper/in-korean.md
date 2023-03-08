@@ -46,5 +46,5 @@ slug: "aptos-white-paper-in-korean"
 :::tip 전체 PDF 버전
 
 - **초록**: Aptos 백서의 한국어 버전 전체 PDF를 보려면 [여기를 클릭하십시오](/papers/whitepaper-korean.pdf).
-- **English**: Click [here for the full PDF of the Aptos White Paper](/papers/Aptos-Whitepaper.pdf).
+- **English**: Get the [full PDF of the Aptos White Paper](/papers/Aptos-Whitepaper.pdf).
 :::

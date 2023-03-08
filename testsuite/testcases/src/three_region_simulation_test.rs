@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
@@ -198,7 +198,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
             add_execution_delay(ctx.swarm(), config)?;
         }
 
-        Ok(LoadDestination::AllNodes)
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {

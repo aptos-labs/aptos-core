@@ -14,6 +14,7 @@ For that, we first need to check if the connected account has a `TodoList` resou
 To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sdk/index.md). The SDK provides classes and functions for us to easily interact and query the Aptos chain.
 
 To get started:
+
 1. Stop the local server if running.
 2. In the `client` directory, run: `npm i aptos@1.6.0`
 3. In the `App.tsx` file, import the `AptosClient` class like so:
@@ -53,6 +54,7 @@ function App (
 The `account` object is `null` if there is no account connected; when an account is connected, the `account` object holds the account information, including the account address.
 
 3. Next, we want to fetch the account’s TodoList resource.
+   Begin by importing `useEffect` by using ```jsx import useEffect from "react"; ```
    Let’s add a `useEffect` hook to our file that would call a function to fetch the resource whenever our account address changes:
 
 ```jsx
@@ -74,6 +76,8 @@ function App (
   ...
 )
 ```
+also import `useEffect` using 
+```import { useState, useEffect } from "react"; ```
 
 5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
@@ -85,7 +89,7 @@ const fetchList = async () => {
   try {
     const TodoListResource = await client.getAccountResource(
       account.address,
-      `${moduleAddress}::main::TodoList`
+      `${moduleAddress}::todolist::TodoList`
     );
     setAccountHasList(true);
   } catch (e: any) {
@@ -101,12 +105,15 @@ The `client.getAccountResource()`expects an *account address* that holds the res
 - account address - is the current connected account (we are getting it from the wallet account object)
 - Move struct type string syntax:
   - The account address who holds the move module = our profile account address (You might want to change the `moduleAddress` const to be your own account address)
-  - The module name the resource lives in = `main`
+  - The module name the resource lives in = `todolist`
   - The resource name = `TodoList`
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
 
-6. Let’s update our UI based on the `accountHasList` state:
+6. Let’s update ```import { Layout, Row, Col } from "antd"; ``` to import Button:
+   ```import { Layout, Row, Col, Button  } from "antd"; ```
+
+7. Let’s update our UI based on the `accountHasList` state:
 
 ```jsx
 return (

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -10,35 +10,52 @@ use aptos_crypto::HashValue;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
 
-/// Message sent from Consensus to QuorumStore.
-pub enum PayloadRequest {
+pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
-    GetBlockRequest(
+    GetPayloadRequest(
         Round,
         // max block size
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
-        oneshot::Sender<Result<ConsensusResponse>>,
+        oneshot::Sender<Result<GetPayloadResponse>>,
     ),
-    /// Request to clean quorum store at commit logical time
+}
+
+impl fmt::Display for GetPayloadCommand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            GetPayloadCommand::GetPayloadRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
+                write!(
+                    f,
+                    "GetPayloadRequest [round: {}, max_txns: {}, max_bytes: {}, return_non_full: {},  excluded: {}]",
+                    round, max_txns, max_bytes, return_non_full, excluded
+                )
+            },
+        }
+    }
+}
+
+pub enum CleanCommand {
     CleanRequest(LogicalTime, Vec<HashValue>),
 }
 
-impl fmt::Display for PayloadRequest {
+impl fmt::Display for CleanCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            PayloadRequest::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
-                write!(
-                    f,
-                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
-                    round, max_txns, max_bytes, excluded
-                )
-            },
-            PayloadRequest::CleanRequest(logical_time, digests) => {
+            CleanCommand::CleanRequest(logical_time, digests) => {
                 write!(
                     f,
                     "CleanRequest [epoch: {}, round: {}, digests: {:?}]",
@@ -51,6 +68,7 @@ impl fmt::Display for PayloadRequest {
     }
 }
 
-pub enum ConsensusResponse {
-    GetBlockResponse(Payload),
+#[derive(Debug)]
+pub enum GetPayloadResponse {
+    GetPayloadResponse(Payload),
 }

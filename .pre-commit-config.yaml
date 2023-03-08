@@ -16,6 +16,7 @@ repos:
     hooks:
       # - id: fmt // Not currently supported for the nightly build, e.g., https://github.com/doublify/pre-commit-rust/issues/15
       - id: cargo-check
+  # Once this issue is resolved, we can add the full license check: https://github.com/Lucas-C/pre-commit-hooks/issues/68
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.3.0
     hooks:

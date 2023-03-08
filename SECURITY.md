@@ -4,7 +4,7 @@
 
 **DO NOT CREATE AN ISSUE** to report a security problem.
 
-Send an email to [security@aptosfoundation.org](mailto:security@aptosfoundation.org) and provide your GitHub username. The team will create a new draft security advisory for further discussion.
+Go to https://github.com/aptos-labs/aptos-core/security/advisories and open a vulnerability report. Send an email to [security@aptosfoundation.org](mailto:security@aptosfoundation.org) and provide your GitHub username. The team will traige the issue from there.
 
 For security reasons, DO NOT include attachments or provide detail sufficient for exploitation regarding the security issue in this email. Instead, wait for the advisory to be created, and **provide any sensitive details in the private GitHub advisory**.
 
@@ -45,26 +45,25 @@ The scope includes code within
 
 Aptos Foundation considers the following levels of severity:
 
-**************** Critical — Up to $1,000,000 USD in APT tokens (locked for 12 months) ****************
+### Critical — Up to $1,000,000 USD in APT tokens (locked for 12 months)
 
 - Direct loss of funds to users or protocols with minimal preconditions, such as, Move type confusion.
-- Execute arbitrary system commands (RCE) on validator nodes.
 - Vulnerabilities in the Proof of Stake system which directly compromise consensus.
 - Unintended permanent chain split requiring hard fork (network partition requiring hardfork).
 - Permanent freezing, burning, or modification of funds (fix requires hardfork).
 
-**************** High — Up to $100,000 USD in APT tokens (locked for 12 months) ****************
+### High — Up to $100,000 USD in APT tokens (locked for 12 months)
 
 - Loss of funds with some pre-conditions, such as, halting the network.
 - Interrupting blockchain progress or halting the network.
 
-**************** Medium — Up to $25,000 USD in APT tokens (locked for 12 months) ****************
+### Medium — Up to $25,000 USD in APT tokens (locked for 12 months)
 
 - Denial of service issues which compromise the integrity or availability of the chain.
 - Loss of funds with many preconditions.
 - Ability to crash a production node with some pre-conditions.
 
-## **Payment of Bug Bounties**
+## Payment of Bug Bounties
 
 - Bounties are currently awarded on a rolling/weekly basis and paid out within 30 days upon receipt of successful KYC and payment contract.
 - The APT/USD conversion rate used for payments is the market price of APT (denominated in USD) at 11:59 PM PST the day that both KYC and the payment contract are completed.
@@ -109,16 +108,15 @@ The following vulnerabilities are excluded from the rewards for this bug bounty 
 - Attacks requiring physical access to the victim device.
 - Incorrect data supplied by third party oracles.
 
-********************** Blockchain: **********************
+### Blockchain:
 
-- Basic economic governance attacks (e.g., 51% attack).
+- Basic economic governance attacks (e.g. 51% attack).
 - Best practice critiques.
 - Missing or incorrect data in events.
-- Basic economic governance attacks (e.g. 51% attack).
 - Sybil attacks.
 - Centralization risk.
 
-******************************** Smart contracts: ********************************
+### Smart Contracts:
 
 - Incorrect data supplied by third-party oracles (not to exclude oracle manipulation/flash loan attacks; use of such methods to generate critical impacts remain in-scope for this program).
 - Basic economic governance attacks (e.g., 51% attack).

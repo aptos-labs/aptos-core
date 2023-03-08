@@ -9,14 +9,11 @@ spec aptos_framework::aptos_account {
     /// Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(auth_key: address) {
         include CreateAccountAbortsIf;
-
         ensures exists<account::Account>(auth_key);
         ensures exists<coin::CoinStore<AptosCoin>>(auth_key);
     }
-
     spec schema CreateAccountAbortsIf {
         auth_key: address;
-
         aborts_if exists<account::Account>(auth_key);
         aborts_if length_judgment(auth_key);
         aborts_if auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
@@ -45,8 +42,8 @@ spec aptos_framework::aptos_account {
     }
 
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        let addr = signer::address_of(account);
+        include !exists<DirectTransferConfig>(addr) ==> account::NewEventHandleAbortsIf;
     }
 
     spec batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
@@ -55,8 +52,11 @@ spec aptos_framework::aptos_account {
     }
 
     spec can_receive_direct_coin_transfers(account: address): bool {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        aborts_if false;
+        ensures result == (
+            !exists<DirectTransferConfig>(account) ||
+                global<DirectTransferConfig>(account).allow_arbitrary_coin_transfers
+        );
     }
 
     spec batch_transfer_coins<CoinType>(from: &signer, recipients: vector<address>, amounts: vector<u64>) {

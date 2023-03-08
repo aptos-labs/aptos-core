@@ -31,7 +31,7 @@ In the Aptos network, the Aptos governance sets the minimum gas unit price. Howe
 By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
 
 :::tip Unit of gas
-👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](/concepts/txns-states) for how a transaction submitted to the Aptos blockchain looks like.
+👉 A **unit of gas** is a dimensionless number, expressed as an integer. The total gas units consumed by your transaction depends on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
 ## Specifying gas fees within a transaction

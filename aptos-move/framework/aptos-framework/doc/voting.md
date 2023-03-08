@@ -739,8 +739,8 @@ Create a single-step or a multi-step proposal with the given parameters
 @param voting_forum_address The forum's address where the proposal will be stored.
 @param execution_content The execution content that will be given back at resolution time. This can contain
 data such as a capability resource used to scope the execution.
-@param execution_hash The hash for the execution script module. Only the same exact script module can resolve
-this proposal.
+@param execution_hash The sha-256 hash for the execution script module. Only the same exact script module can
+resolve this proposal.
 @param min_vote_threshold The minimum number of votes needed to consider this proposal successful.
 @param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.
 @param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.
@@ -1366,6 +1366,7 @@ Return true if the voting period of the given proposal has already ended.
 <b>aborts_if</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> register_account.guid_creation_num + 4 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
 <b>aborts_if</b> register_account.guid_creation_num + 4 &gt; MAX_U64;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;ProposalType&gt;();
 <b>ensures</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr);

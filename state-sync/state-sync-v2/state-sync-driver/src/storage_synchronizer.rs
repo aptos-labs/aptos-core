@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_event_notifications::EventSubscriptionService;
-use aptos_executor_types::ChunkExecutorTrait;
+use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
@@ -401,11 +402,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         metrics::STORAGE_SYNCHRONIZER_EXECUTE_CHUNK,
                     );
                     let num_transactions = transactions_with_proof.transactions.len();
-                    let result = chunk_executor.execute_chunk(
+                    let result = execute_transaction_chunk(
+                        chunk_executor.clone(),
                         transactions_with_proof,
-                        &target_ledger_info,
-                        end_of_epoch_ledger_info.as_ref(),
-                    );
+                        target_ledger_info,
+                        end_of_epoch_ledger_info,
+                    )
+                    .await;
                     if result.is_ok() {
                         info!(
                             LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
@@ -442,18 +445,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         metrics::STORAGE_SYNCHRONIZER_APPLY_CHUNK,
                     );
                     let num_outputs = outputs_with_proof.transactions_and_outputs.len();
-                    let chunk_executor_clone = chunk_executor.clone();
-                    // `spawn_blocking` so that the heavy synchronous function call doesn't
-                    // block the async thread.
-                    let result = tokio::task::spawn_blocking(move || {
-                        chunk_executor_clone.apply_chunk(
-                            outputs_with_proof,
-                            &target_ledger_info,
-                            end_of_epoch_ledger_info.as_ref(),
-                        )
-                    })
-                    .await
-                    .expect("spawn_blocking(apply_chunk) failed.");
+                    let result = apply_output_chunk(
+                        chunk_executor.clone(),
+                        outputs_with_proof,
+                        target_ledger_info,
+                        end_of_epoch_ledger_info,
+                    )
+                    .await;
                     if result.is_ok() {
                         info!(
                             LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
@@ -547,13 +545,7 @@ fn spawn_committer<
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
             );
-            let chunk_executor_clone = chunk_executor.clone();
-            let commit_fut = move || chunk_executor_clone.commit_chunk();
-            // `spawn_blocking` so that the heavy synchronous function call doesn't
-            // block the async thread.
-            let result = tokio::task::spawn_blocking(commit_fut)
-                .await
-                .expect("spawn_blocking(commit_chunk) failed.");
+            let result = commit_chunk(chunk_executor.clone()).await;
             match result {
                 Ok(notification) => {
                     // Log the event and update the metrics
@@ -758,6 +750,57 @@ fn spawn_state_snapshot_receiver<
     spawn(runtime, receiver)
 }
 
+/// Spawns a dedicated task that applies the given output chunk. We use
+/// `spawn_blocking` so that the heavy synchronous function doesn't
+/// block the async thread.
+async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
+    outputs_with_proof: TransactionOutputListWithProof,
+    target_ledger_info: LedgerInfoWithSignatures,
+    end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || {
+        chunk_executor.apply_chunk(
+            outputs_with_proof,
+            &target_ledger_info,
+            end_of_epoch_ledger_info.as_ref(),
+        )
+    })
+    .await
+    .expect("Spawn_blocking(apply_output_chunk) failed!")
+}
+
+/// Spawns a dedicated task that executes the given transaction chunk.
+/// We use `spawn_blocking` so that the heavy synchronous function
+/// doesn't block the async thread.
+async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
+    transactions_with_proof: TransactionListWithProof,
+    target_ledger_info: LedgerInfoWithSignatures,
+    end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || {
+        chunk_executor.execute_chunk(
+            transactions_with_proof,
+            &target_ledger_info,
+            end_of_epoch_ledger_info.as_ref(),
+        )
+    })
+    .await
+    .expect("Spawn_blocking(execute_transaction_chunk) failed!")
+}
+
+/// Spawns a dedicated task that commits a data chunk. We use
+/// `spawn_blocking` so that the heavy synchronous function doesn't
+/// block the async thread.
+async fn commit_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
+) -> anyhow::Result<ChunkCommitNotification> {
+    tokio::task::spawn_blocking(move || chunk_executor.commit_chunk())
+        .await
+        .expect("Spawn_blocking(commit_chunk) failed!")
+}
+
 /// Finalizes storage once all state values have been committed
 /// and sends a commit notification to the driver.
 async fn finalize_storage_and_send_commit<
@@ -793,6 +836,8 @@ async fn finalize_storage_and_send_commit<
             epoch_change_proofs,
         )
         .map_err(|error| format!("Failed to finalize the state snapshot! Error: {:?}", error))?;
+
+    info!("All states have synced, version: {}", version);
 
     // Update the metadata storage
     metadata_storage.update_last_persisted_state_value_index(

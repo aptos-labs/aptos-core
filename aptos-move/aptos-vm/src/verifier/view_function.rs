@@ -1,11 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt},
     verifier::transaction_arg_validation,
 };
-use aptos_framework::{KnownAttribute, RuntimeModuleMetadataV1};
+use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
@@ -24,7 +24,7 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
     let is_view = if let Some(data) = module_metadata {
         data.fun_attributes
             .get(fun_name.as_str())
-            .map(|attrs| attrs.contains(&KnownAttribute::view_function()))
+            .map(|attrs| attrs.iter().any(|attr| attr.is_view_function()))
             .unwrap_or_default()
     } else {
         false

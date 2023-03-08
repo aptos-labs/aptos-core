@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -28,8 +29,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
-    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
-    on_chain_config::OnChainConfigPayload, transaction::SignedTransaction,
+    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
+    transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -166,7 +167,7 @@ impl MockSharedMempool {
                     .add_txn(
                         txn.clone(),
                         txn.gas_unit_price(),
-                        AccountSequenceInfo::Sequential(0),
+                        0,
                         TimelineState::NotReady,
                     )
                     .code
@@ -182,7 +183,7 @@ impl MockSharedMempool {
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
         // assume txn size is less than 100kb
-        pool.get_batch(size, size * 102400, HashSet::new())
+        pool.get_batch(size, size * 102400, true, HashSet::new())
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {

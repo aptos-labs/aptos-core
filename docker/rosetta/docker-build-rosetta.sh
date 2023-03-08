@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) Aptos
+# Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 # This script is meant to build the rosetta docker image.

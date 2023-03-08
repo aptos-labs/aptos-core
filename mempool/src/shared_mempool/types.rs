@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects used by/related to shared mempool
@@ -164,11 +165,14 @@ pub enum QuorumStoreRequest {
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
         // transactions to exclude from the requested batch
         Vec<TransactionSummary>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
+    // TODO: Do we use it in the real QS as well?
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
@@ -181,11 +185,18 @@ pub enum QuorumStoreRequest {
 impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded_txns,
+                _,
+            ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
+                    return_non_full,
                     excluded_txns.len()
                 )
             },

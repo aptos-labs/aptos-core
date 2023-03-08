@@ -1,22 +1,26 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::aggregator_natives::{
-    helpers::{aggregator_info, unpack_aggregator_struct},
-    NativeAggregatorContext,
+use crate::{
+    natives::{
+        aggregator_natives::{
+            helpers::{aggregator_info, unpack_aggregator_struct},
+            NativeAggregatorContext,
+        },
+        helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
+    },
+    safely_pop_arg,
 };
 use aptos_aggregator::aggregator_extension::AggregatorID;
-use move_binary_format::errors::PartialVMResult;
+use aptos_types::on_chain_config::TimedFeatures;
 use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    pop_arg,
     values::{Struct, StructRef, Value},
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun add(aggregator: &mut Aggregator, value: u128);
@@ -31,15 +35,17 @@ pub struct AddGasParameters {
 
 fn native_add(
     gas_params: &AddGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 2);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
 
     // Get aggregator information and a value to add.
-    let value = pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
+    let value = safely_pop_arg!(args, u128);
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -48,11 +54,7 @@ fn native_add(
 
     aggregator.add(value)?;
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![]))
-}
-
-pub fn make_native_add(gas_params: AddGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_add(&gas_params, context, ty_args, args))
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -68,14 +70,16 @@ pub struct ReadGasParameters {
 
 fn native_read(
     gas_params: &ReadGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 1);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.base)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -84,13 +88,7 @@ fn native_read(
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![Value::u128(
-        value
-    )]))
-}
-
-pub fn make_native_read(gas_params: ReadGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_read(&gas_params, context, ty_args, args))
+    Ok(smallvec![Value::u128(value)])
 }
 
 /***************************************************************************************************
@@ -106,15 +104,17 @@ pub struct SubGasParameters {
 
 fn native_sub(
     gas_params: &SubGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 2);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
 
     // Get aggregator information and a value to subtract.
-    let value = pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
+    let value = safely_pop_arg!(args, u128);
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -123,11 +123,7 @@ fn native_sub(
 
     aggregator.sub(value)?;
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![]))
-}
-
-pub fn make_native_sub(gas_params: SubGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_sub(&gas_params, context, ty_args, args))
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -143,14 +139,16 @@ pub struct DestroyGasParameters {
 
 fn native_destroy(
     gas_params: &DestroyGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 1);
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.base)?;
 
     // First, unpack the struct.
-    let aggregator_struct = pop_arg!(args, Struct);
+    let aggregator_struct = safely_pop_arg!(args, Struct);
     let (handle, key, _) = unpack_aggregator_struct(aggregator_struct)?;
 
     // Get aggregator data.
@@ -161,11 +159,7 @@ fn native_destroy(
     let id = AggregatorID::new(handle, key);
     aggregator_data.remove_aggregator(id);
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![]))
-}
-
-pub fn make_native_destroy(gas_params: DestroyGasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| native_destroy(&gas_params, context, ty_args, args))
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -180,12 +174,27 @@ pub struct GasParameters {
     pub destroy: DestroyGasParameters,
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("add", make_native_add(gas_params.add)),
-        ("read", make_native_read(gas_params.read)),
-        ("sub", make_native_sub(gas_params.sub)),
-        ("destroy", make_native_destroy(gas_params.destroy)),
+        (
+            "add",
+            make_safe_native(gas_params.add, timed_features.clone(), native_add),
+        ),
+        (
+            "read",
+            make_safe_native(gas_params.read, timed_features.clone(), native_read),
+        ),
+        (
+            "sub",
+            make_safe_native(gas_params.sub, timed_features.clone(), native_sub),
+        ),
+        (
+            "destroy",
+            make_safe_native(gas_params.destroy, timed_features, native_destroy),
+        ),
     ];
 
     crate::natives::helpers::make_module_natives(natives)

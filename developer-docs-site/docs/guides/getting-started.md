@@ -8,11 +8,9 @@ import TabItem from '@theme/TabItem';
 
 # Prepare your Aptos Dev Environment
 
-To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-Aptos-core-repo).
+To kickstart your journey in the Aptos ecosystem, set up your environment as needed by your role. To interact with Aptos, you may simply [install the Aptos command line interface (CLI)](#install-the-cli). To develop Aptos itself, you will need to [clone the Aptos-core repository](#clone-the-aptos-core-repo).
 
 See the [Workflows](#workflows) for use cases associated with each path. See the [Aptos developer resources](#aptos-developer-resources) for quick links to Aptos networks, SDKs, and other tools.
-
-Then review the Aptos source code and [documentation](https://github.com/aptos-labs/aptos-core/tree/main/documentation) found in the [Aptos-core](https://github.com/aptos-labs/aptos-core) repository of GitHub and continue your journey through this site. The source contains READMEs and code comments invaluable to developing on Aptos.
 
 ## Use supported operating systems
 
@@ -28,8 +26,8 @@ See [Installing Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) for
 
 Aptos requires no specific hardware to develop on the blockchain. To run one of our nodes, see the hardware requirements for:
 
-* [Fullnodes](nodes/full-node/fullnode-source-code-or-docker.md#hardware-requirements)
-* [Validators](nodes/validator-node/operator/node-requirements.md#hardware-requirements)
+* [Fullnodes](../nodes/full-node/fullnode-source-code-or-docker.md#hardware-requirements)
+* [Validators](../nodes/validator-node/operator/node-requirements.md#hardware-requirements)
 
 ## Workflows
 
@@ -59,7 +57,7 @@ The [Aptos source files](https://github.com/aptos-labs/aptos-core) themselves al
 
 ## Install the Aptos CLI
 
-[Install the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
+[Install the Aptos CLI](../cli-tools/aptos-cli-tool/index.md) to interact with the Aptos network. As a developer in the Aptos ecosystem, set up your development environment as described in the link.
 This tool will help you compile, test, and publish contracts as well as run contracts directly on the blockchain.
 
 ## Clone the Aptos-core repo
@@ -152,42 +150,34 @@ Windows.  All dependencies must be manually installed.
 
 ## Check out release branch
 
-Optionally, check out a release branch to install an Aptos node:
+Optionally, check out a release branch to install an Aptos node. We suggest you check out `devnet` for your first development. See [Choose a network](./system-integrators-guide.md#choose-a-network) for an explanation of their differences. 
 
-    We suggest you check out `devnet` for your first development.
-
-    <Tabs groupId="network">
+<Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
-
-    Check out the `devnet` branch using:
 
     ```
     git checkout --track origin/devnet
     ```
-    </TabItem>
+</TabItem>
     <TabItem value="testnet" label="Testnet" default>
-
-    Check out the `testnet` branch using:
 
     ```
     git checkout --track origin/testnet
     ```
-    </TabItem>
-    <TabItem value="mainnet" label="Mainnet">
-
-    Check out the `mainnet` branch using:
+</TabItem>
+<TabItem value="mainnet" label="Mainnet">
 
     ```
     git checkout --track origin/mainnet
     ```
-    </TabItem>
-    </Tabs>
+</TabItem>
+</Tabs>
 
-Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](tutorials/index.md) to get started in Aptos.
+Now your basic Aptos development environment is ready. Head over to our [Developer Tutorials](../tutorials/index.md) to get started in Aptos.
 
 ## Create and fund test accounts
 
-Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`).
+Use the Aptos CLI and wallet of your choice to create and fund an Aptos account in `testnet` (or `devnet`). For more options and details, see [Create and Fund Aptos Accounts](./get-test-funds.md).
 
 ## Understand the Aptos Token Standard
 
@@ -239,7 +229,4 @@ This section contains links to frequently referred Aptos developer resources.
 
 ### IDE plugins for Move language
 
-- [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
-- [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
-- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
-- [Remix IDE Plugin for Move](https://docs.welldonestudio.io/code/getting-started): Web-based DevEnvironment. It is a no-setup tool with a GUI for developing Move modules.
+Install the [IDE plugins for the Move language](../guides/move-guides/index.md#ides-for-move) for even more handy features.
