@@ -2,9 +2,15 @@
 /// token. Applications should read the royalty from the token, as it will read the appropriate
 /// royalty.
 module token_objects::royalty {
+    use std::error;
     use std::option::{Self, Option};
 
     use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+
+    // Enforce that the royalty is between 0 and 1
+    const EROYALTY_EXCEEDS_MAXIMUM: u64 = 1;
+    // Enforce that the denominator of a royalty is not 0
+    const EROYALTY_DENOMINATOR_IS_ZERO: u64 = 2;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The royalty of a token within this collection -- this optional
@@ -38,6 +44,9 @@ module token_objects::royalty {
     }
 
     public fun create(numerator: u64, denominator: u64, payee_address: address): Royalty {
+        assert!(denominator != 0, error::out_of_range(EROYALTY_DENOMINATOR_IS_ZERO));
+        assert!(numerator <= denominator, error::out_of_range(EROYALTY_EXCEEDS_MAXIMUM));
+
         Royalty { numerator, denominator, payee_address }
     }
 
@@ -98,5 +107,17 @@ module token_objects::royalty {
         let update_royalty = create(1, 5, @0x123);
         update(&mutator_ref, update_royalty);
         assert!(option::some(update_royalty) == get(object), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x20001, location = Self)]
+    fun test_exceeds_maximum() {
+        create(6, 5, @0x1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x20002, location = Self)]
+    fun test_invalid_denominator() {
+        create(6, 0, @0x1);
     }
 }
