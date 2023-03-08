@@ -5,9 +5,9 @@
 
 import { AptosAccount } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
-import * as TokenTypes from "../token_types";
+import * as TokenTypes from "../aptos_types/token_types";
 import * as Gen from "../generated/index";
-import { HexString, MaybeHexString } from "../hex_string";
+import { HexString, MaybeHexString } from "../utils";
 import { TransactionBuilder, TransactionBuilderRemoteABI, TxnBuilderTypes } from "../transaction_builder";
 import { MAX_U64_BIG_INT } from "../bcs/consts";
 import { TOKEN_TRANSFER_OPT_IN } from "../abis";
@@ -20,7 +20,7 @@ import {
   TransactionArgumentU8Vector,
   TransactionPayloadScript,
 } from "../aptos_types";
-import { Token, TokenData } from "../token_types";
+import { Token, TokenData } from "../aptos_types/token_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens

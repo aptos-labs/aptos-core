@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from "./account";
-export * from "./providers/index";
+export * from "./providers";
 export * as BCS from "./bcs";
-export * from "./plugins/coin_client";
-export * from "./hex_string";
+export * from "./utils/hex_string";
 export * from "./plugins";
 export * from "./transaction_builder";
-export * as TokenTypes from "./token_types";
+export * as TokenTypes from "./aptos_types/token_types";
 export * as Types from "./generated/index";
 export { derivePath } from "./utils/hd-key";
 export {

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString, MaybeHexString } from "../hex_string";
+import { HexString, MaybeHexString } from "../utils";
 import {
   clear,
   DEFAULT_TXN_EXP_SEC_FROM_NOW,

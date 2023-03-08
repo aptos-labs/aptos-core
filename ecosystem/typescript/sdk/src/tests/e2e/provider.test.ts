@@ -2,7 +2,7 @@ import { AptosAccount } from "../../account/aptos_account";
 import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { Provider } from "../../providers/provider";
-import { FaucetClient } from "../../providers/faucet_client";
+import { FaucetClient } from "../../plugins/faucet_client";
 import { TokenClient } from "../../plugins/token_client";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
 import { API_TOKEN, longTestTimeout } from "../unit/test_helper.test";

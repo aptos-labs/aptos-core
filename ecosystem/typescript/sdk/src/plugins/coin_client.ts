@@ -3,8 +3,7 @@
 
 import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
-import { MaybeHexString } from "../hex_string";
-import { APTOS_COIN } from "../utils";
+import { MaybeHexString, APTOS_COIN } from "../utils";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 
 /**

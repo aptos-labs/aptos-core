@@ -9,8 +9,8 @@ import {
   TransactionBuilderMultiEd25519,
   TransactionBuilderRemoteABI,
 } from "../../transaction_builder";
-import { TokenClient } from "../../plugins/token_client";
-import { HexString } from "../../hex_string";
+import { TokenClient } from "../../plugins";
+import { HexString } from "../../utils";
 import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { Ed25519PublicKey } from "../../aptos_types";

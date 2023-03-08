@@ -9,8 +9,7 @@ import {
   Bytes,
 } from "../../bcs";
 import { AccountAddress } from "../../aptos_types";
-import { HexString } from "../../hex_string";
-import { TypeTagParser } from "../../transaction_builder";
+import { HexString } from "../../utils";
 
 test("test property_map_serializer", () => {
   function isSame(array1: Bytes, array2: Bytes): boolean {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from "./abi";
-export * from "../account";
+export * from "../account/account_address"; // moving it from here is a breaking change b/c it is exported as TxnBuilderTypes
 export * from "./authenticator";
 export * from "./transaction";
 export * from "./type_tag";

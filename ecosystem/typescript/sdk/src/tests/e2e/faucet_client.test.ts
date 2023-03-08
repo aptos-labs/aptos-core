@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "../../providers/aptos_client";
-import { FaucetClient } from "../../providers/faucet_client";
-import { AptosAccount } from "../../account/aptos_account";
-import { HexString } from "../../hex_string";
+import { AptosClient } from "../../providers";
+import { FaucetClient } from "../../plugins";
+import { AptosAccount } from "../../account";
+import { HexString } from "../../utils";
 import * as Gen from "../../generated/index";
 
 import { NODE_URL, getFaucetClient, longTestTimeout } from "../unit/test_helper.test";

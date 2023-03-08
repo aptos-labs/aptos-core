@@ -5,11 +5,10 @@
 import nacl from "tweetnacl";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "../../bcs";
-import { HexString } from "../../hex_string";
+import { HexString } from "../../utils";
 
 import { TransactionBuilderEd25519, TransactionBuilder } from "../../transaction_builder/index";
 import {
-  AccountAddress,
   ChainId,
   Ed25519Signature,
   RawTransaction,
@@ -26,6 +25,7 @@ import {
   TransactionArgumentU32,
   TransactionArgumentU256,
 } from "../../aptos_types";
+import { AccountAddress } from "../../account";
 
 const ADDRESS_1 = "0x1222";
 const ADDRESS_2 = "0xdd";

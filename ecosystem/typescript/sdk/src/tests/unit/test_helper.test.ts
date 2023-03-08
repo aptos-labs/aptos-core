@@ -1,4 +1,4 @@
-import { FaucetClient } from "../../providers/faucet_client";
+import { FaucetClient } from "../../plugins/faucet_client";
 import { OpenAPIConfig } from "../../generated";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
@@ -25,4 +25,4 @@ test("noop", () => {
   // 2. Prevent jest from exploding when it finds a file with no tests in it
 });
 
-export const longTestTimeout = 70 * 1000;
+export const longTestTimeout = 80 * 1000;

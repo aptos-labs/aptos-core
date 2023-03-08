@@ -1,7 +1,7 @@
 import { AptosAccount } from "../../account/aptos_account";
 import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
-import { FaucetClient } from "../../providers/faucet_client";
+import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { API_TOKEN, longTestTimeout } from "../unit/test_helper.test";

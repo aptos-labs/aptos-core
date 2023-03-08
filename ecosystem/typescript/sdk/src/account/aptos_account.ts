@@ -6,11 +6,12 @@ import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { derivePath } from "../utils/hd-key";
-import { HexString, MaybeHexString } from "../hex_string";
+import { HexString, MaybeHexString } from "../utils";
 import * as Gen from "../generated/index";
 import { Memoize } from "../utils";
-import { AccountAddress, AuthenticationKey, Ed25519PublicKey } from "../aptos_types";
+import { AuthenticationKey, Ed25519PublicKey } from "../aptos_types";
 import { bcsToBytes } from "../bcs";
+import { AccountAddress } from "../account";
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
