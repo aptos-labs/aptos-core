@@ -24,8 +24,8 @@ import {
   TransactionArgumentU16,
   TransactionArgumentU32,
   TransactionArgumentU256,
+  AccountAddress,
 } from "../../aptos_types";
-import { AccountAddress } from "../../account";
 
 const ADDRESS_1 = "0x1222";
 const ADDRESS_2 = "0xdd";

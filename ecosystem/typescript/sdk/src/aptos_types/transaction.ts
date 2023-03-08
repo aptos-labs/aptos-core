@@ -21,10 +21,10 @@ import {
   Uint16,
   Uint256,
 } from "../bcs";
-import { AccountAddress } from "../account";
 import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
+import { AccountAddress } from "./account_address";
 
 export class RawTransaction {
   /**
