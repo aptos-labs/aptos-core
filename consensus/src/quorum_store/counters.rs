@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, AverageIntCounter, Histogram, HistogramVec,
-    IntCounter,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, AverageIntCounter,
+    Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -369,6 +369,16 @@ pub static SENT_BATCH_REQUEST_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_sent_batch_request_retry_count",
         "Count of the number of batch request retry sent to other nodes."
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to batch retrieval per epoch task
+pub static BATCH_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_batch_retrieval_task_msgs_count",
+        "Counters(queued,dequeued,dropped) related to batch retrieval task",
+        &["state"]
     )
     .unwrap()
 });

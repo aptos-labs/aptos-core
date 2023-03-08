@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand,
+use crate::{
+    network::NetworkSender,
+    quorum_store::{batch_store::BatchStore, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
     block::Block,
@@ -22,14 +23,17 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<BatchReader>, Mutex<Sender<CoordinatorCommand>>),
+    InQuorumStore(
+        Arc<BatchStore<NetworkSender>>,
+        Mutex<Sender<CoordinatorCommand>>,
+    ),
 }
 
 impl PayloadManager {
     async fn request_transactions(
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
-        batch_reader: &BatchReader,
+        batch_store: &BatchStore<NetworkSender>,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
@@ -43,7 +47,7 @@ impl PayloadManager {
                 logical_time
             );
             if logical_time <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_reader.get_batch(pos).await));
+                receivers.push((*pos.digest(), batch_store.get_batch(pos)));
             } else {
                 debug!("QS: skipped expired pos");
             }
@@ -55,8 +59,8 @@ impl PayloadManager {
     pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
-                batch_reader.update_certified_round(logical_time).await;
+            PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
+                batch_store.update_certified_round(logical_time).await;
 
                 let digests: Vec<HashValue> = payloads
                     .into_iter()
@@ -96,13 +100,13 @@ impl PayloadManager {
         };
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
+            PayloadManager::InQuorumStore(batch_store, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
                             LogicalTime::new(block.epoch(), block.round()),
-                            batch_reader,
+                            batch_store,
                         )
                         .await;
                         proof_with_status
@@ -129,7 +133,7 @@ impl PayloadManager {
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_store, _),
                 Payload::InQuorumStore(proof_with_data),
             ) => {
                 let status = proof_with_data.status.lock().take();
@@ -152,7 +156,7 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again
@@ -169,7 +173,7 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again
