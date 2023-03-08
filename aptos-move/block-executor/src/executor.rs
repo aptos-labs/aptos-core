@@ -4,7 +4,10 @@
 
 use crate::{
     counters,
-    counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS},
+    counters::{
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+    },
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, Version, Wave},
@@ -201,6 +204,7 @@ where
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             // Only one thread try_commit to avoid contention.
@@ -252,6 +256,7 @@ where
         signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
@@ -265,6 +270,7 @@ where
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
 
+        let timer = RAYON_EXECUTION_SECONDS.start_timer();
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
@@ -280,6 +286,7 @@ where
                 });
             }
         });
+        drop(timer);
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
