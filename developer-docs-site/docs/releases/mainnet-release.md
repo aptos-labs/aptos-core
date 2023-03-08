@@ -11,19 +11,19 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos CLI
 
-|Release Tag | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
+|Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
 |[Aptos CLI Release v1.0.7](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.7)| `aptos-cli-v1.0.7` | `?` | ?| `?` |
 
 ## Aptos Framework
 
-|Release Tag | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
+|Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Framework Release v1.2.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.2.0)| `aptos-framework-v1.2.0)` | `?` | ?| `?` |
+|[Aptos Framework Release v1.2.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.2.0)| `aptos-framework-v1.2.0` | `?` | ?| `?` |
 
 
 ## Aptos Node
 
-|Release Tag | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
+|Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
 |[Aptos Node Hot-fix Release v1.2.6](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.2.6)| `aptos-node-v1.2.6` | `?` | [aptos-node-v1.2.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.2.0)| `?` |
