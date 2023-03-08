@@ -139,7 +139,7 @@ impl ProofManager {
     pub(crate) fn qs_back_pressure(&self) -> BackPressure {
         BackPressure {
             txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            batch_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,
+            proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,
         }
     }
 
@@ -152,7 +152,7 @@ impl ProofManager {
     ) {
         let mut back_pressure = BackPressure {
             txn_count: false,
-            batch_count: false,
+            proof_count: false,
         };
 
         loop {

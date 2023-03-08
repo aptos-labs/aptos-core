@@ -420,10 +420,17 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE: Lazy<AverageIntCounter> = Lazy::new(|| {
+pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
     AverageIntCounter::register(
-        "quorum_store_backpressure",
-        "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
+        "quorum_store_backpressure_txn_count",
+        "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
+    )
+});
+
+pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_proof_count",
+        "Indicator of whether Quorum Store is backpressured due to proof count exceeding threshold."
     )
 });
 

@@ -41,7 +41,7 @@ pub enum ProofError {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct BackPressure {
     pub txn_count: bool,
-    pub batch_count: bool,
+    pub proof_count: bool,
 }
 
 pub struct BatchGenerator {
@@ -96,7 +96,7 @@ impl BatchGenerator {
             last_end_batch_time: Instant::now(),
             back_pressure: BackPressure {
                 txn_count: false,
-                batch_count: false,
+                proof_count: false,
             },
         }
     }
@@ -278,6 +278,7 @@ impl BatchGenerator {
                 },
                 _ = interval.tick() => {
                     let now = Instant::now();
+                    // TODO: refactor back_pressure logic into its own function
                     if self.back_pressure.txn_count {
                         // multiplicative decrease, every second
                         if back_pressure_decrease_latest.elapsed() >= back_pressure_decrease_duration {
@@ -288,7 +289,7 @@ impl BatchGenerator {
                             );
                             debug!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
-                        counters::QS_BACKPRESSURE.observe(1);
+                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(1);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
                     } else {
                         // additive increase, every second
@@ -300,14 +301,19 @@ impl BatchGenerator {
                             );
                             debug!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
-                        counters::QS_BACKPRESSURE.observe(0);
+                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(0);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
+                    }
+                    if self.back_pressure.proof_count {
+                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(1);
+                    } else {
+                        counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0);
                     }
                     let since_last_pull_ms = std::cmp::min(
                         now.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
-                    if !self.back_pressure.batch_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
+                    if !self.back_pressure.proof_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
                         last_non_empty_pull = now;
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
