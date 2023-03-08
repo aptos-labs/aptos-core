@@ -416,7 +416,7 @@ if __name__ == "__main__":
     # :!:>section_12
     print("\n=== Invoking Move script ===")
 
-    with open(f"{build_path}bytecode_scripts/main.mv", "rb") as f:
+    with open(f"{build_path}bytecode_scripts/set_and_transfer.mv", "rb") as f:
         script_code = f.read()
 
     payload = Script(

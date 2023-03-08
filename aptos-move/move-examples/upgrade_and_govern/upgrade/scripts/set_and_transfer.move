@@ -6,7 +6,7 @@ script {
     const PARAMETER_1: u64 = 300;
     const PARAMETER_2: u64 = 200;
 
-    fun main(
+    fun set_and_transfer(
         upgrade_and_govern: &signer,
         to_1: address,
         to_2: address
