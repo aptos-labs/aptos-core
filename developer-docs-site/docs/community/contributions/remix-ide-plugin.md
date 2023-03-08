@@ -20,9 +20,9 @@ This tutorial details how to deploy and run Move modules on Remix IDE. It is a n
 
 ## Step 1: Connect to Remix IDE
 
-[WELLDONE Code](https://docs.welldonestudio.io/code) is the official Remix IDE Plug-in. Please visit the [Remix IDE](https://remix.ethereum.org/) and follow the guide below.
+[WELL DONE Code](https://docs.welldonestudio.io/code) is the official Remix IDE Plug-in. Please visit the [Remix IDE](https://remix.ethereum.org/) and follow the guide below.
 
-Click **Plugin Manager** button in the left bar and search for **CODE BY WELLDONE STUDIO** and click the Activate button.
+Click **Plugin Manager** button in the left bar and search for **CODE BY WELL DONE STUDIO** and click the Activate button.
 
 <center>
 <ThemedImage
@@ -37,7 +37,7 @@ width= "80%"
 
 ## Step 2: Select a Chain
 
-If you click the `Documentation` button, go to WELLDONE Docs, and if you find a problem or have any questions while using it, click the `Make an issue` button to go to the [Github Repository](https://github.com/welldonestudio/welldonestudio.github.io) and feel free to create an issue.
+If you click the `Documentation` button, go to WELL DONE Docs, and if you find a problem or have any questions while using it, click the `Make an issue` button to go to the [Github Repository](https://github.com/welldonestudio/welldonestudio.github.io) and feel free to create an issue.
 
 <center>
 <ThemedImage
@@ -53,18 +53,18 @@ width="50%"
 ## Step 3: Install a browser extension wallet
 
 :::info 
-Petra wallet will be supported soon, and WELLDONE Wallet can be used now.
+Petra wallet will be supported soon, and WELL DONE Wallet can be used now.
 :::
 
-After choosing a chain, click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
+After choosing a chain, click the `Connect to WELL DONE` button to connect to the **WELL DONE Wallet.** 
 
-If you haven't installed the WELLDONE Wallet yet, please follow the following [manual](https://docs.welldonestudio.io/wallet/manual/) to install and create a wallet and create an account for the selected chain. Finally, go into the Setting tab of your wallet and activate Developer Mode.
+If you haven't installed the WELL DONE Wallet yet, please follow the following [manual](https://docs.welldonestudio.io/wallet/manual/) to install and create a wallet and create an account for the selected chain. Finally, go into the Setting tab of your wallet and activate Developer Mode.
 
 And you must click the Refresh button in the upper right corner of the plug-in to apply changes to your wallet.
 
 ## Step 4: Create the Project
 
-In Aptos, you can write smart contracts with Move language. **WELLDONE Code** provides two features to help developers new to Aptos and Move.
+In Aptos, you can write smart contracts with Move language. **WELL DONE Code** provides two features to help developers new to Aptos and Move.
 
 ### Create Template
 
@@ -133,7 +133,7 @@ There are two ways to import contracts.
 :::
 
 1. You can check the modules and resources owned by the current account, and you can read the resources through the Get Resource button.
-2. You can select a function, enter parameters as needed, and click a button to run the function. For the entry function, not the view function, a signature from the WELLDONE Wallet is required because the transaction signature and request are required.
+2. You can select a function, enter parameters as needed, and click a button to run the function. For the entry function, not the view function, a signature from the WELL DONE Wallet is required because the transaction signature and request are required.
 
 <center>
 <ThemedImage
