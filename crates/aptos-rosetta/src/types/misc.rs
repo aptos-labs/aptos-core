@@ -102,6 +102,7 @@ pub enum OperationType {
 impl OperationType {
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
+    const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
     const FEE: &'static str = "fee";
     const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
     const RESET_LOCKUP: &'static str = "reset_lockup";
@@ -109,7 +110,6 @@ impl OperationType {
     const SET_VOTER: &'static str = "set_voter";
     const STAKING_REWARD: &'static str = "staking_reward";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
-    const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
     const WITHDRAW: &'static str = "withdraw";
 
     pub fn all() -> Vec<OperationType> {

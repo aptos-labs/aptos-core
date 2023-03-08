@@ -8,9 +8,9 @@
 use crate::{
     common::{is_native_coin, native_coin, native_coin_tag},
     construction::{
-        parse_create_stake_pool_operation, parse_reset_lockup_operation,
-        parse_set_operator_operation, parse_set_voter_operation,
-        parse_unlock_stake_operation, parse_distribute_staking_rewards_operation,
+        parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
+        parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
+        parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -840,11 +840,7 @@ fn parse_failed_operations_from_txn_payload(
                     warn!("Failed to parse unlock stake {:?}", inner);
                 }
             },
-            (
-                AccountAddress::ONE,
-                STAKING_CONTRACT_MODULE,
-                DISTRIBUTE_STAKING_REWARDS_FUNCTION,
-            ) => {
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, DISTRIBUTE_STAKING_REWARDS_FUNCTION) => {
                 if let Ok(mut ops) = parse_distribute_staking_rewards_operation(
                     sender,
                     inner.ty_args(),
