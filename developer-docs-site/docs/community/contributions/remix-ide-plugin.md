@@ -142,10 +142,6 @@ sources={{
     light: useBaseUrl('/img/docs/remix-view-function.png'),
     dark: useBaseUrl('/img/docs/remix-view-function.png'),
   }}
-  style={{
-    marginRight: "35px",
-    width: "30%"
-  }}
 />
 
 <ThemedImage
@@ -154,9 +150,5 @@ sources={{
     light: useBaseUrl('/img/docs/remix-entry-function.png'),
     dark: useBaseUrl('/img/docs/remix-entry-function.png'),
   }}
-style={{
-    marginRight: "35px",
-    width: "50%"
-}}
 />
 </center>
