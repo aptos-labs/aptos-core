@@ -7,6 +7,8 @@ slug: "aptos-quickstarts"
 
 If you are new to the Aptos blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you become familiar with how to develop for the Aptos blockchain using the Aptos SDK.
 
+These tutorials are intended for use in devnet or testnet and assume you have already [prepared your development environment for Aptos](../guides/getting-started.md).
+
 ### Install macOS prerequisites
 
 If running macOS, install the following packages in the order specified to take these tutorials:

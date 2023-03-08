@@ -10,9 +10,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This page describes how to employ data from the Aptos Indexer in your apps. To instead operate an indexer, follow [Run an Indexer](../nodes/indexer-fullnode.md).
 
-An application built on the Aptos blockchain, on any blockchain for that matter, requires that the raw data from the blockchain be shaped by the application-specific data model before the application can consume it. The [Aptos Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), using which a client can interact with the Aptos blockchain, is not designed to support data shaping. Moreover, the ledger data you get back using this API contains the data only for the transactions **initiated by you**. It does not provide the data for the transactions initiated by the others. This data is insufficient and too slow for an application that must access the blockchain data in an omniscient way to serve multiple users of the application. 
+Typical applications built on the Aptos blockchain, on any blockchain for that matter, require the raw blockchain data to be shaped and stored in an application-specific manner. This is essential to supporting low-latency and rich experiences when consuming blockchain data in end-user apps from millions of users. The [Aptos Node API](https://aptos.dev/nodes/aptos-api-spec#/) provides a lower level, stable and generic API and is not designed to support data shaping or therefore such rich end-user experiences directly.
 
-Indexer is a solution to this problem. See below a high-level block diagram of how Aptos indexing works. 
+The Aptos Indexer is the answer to this need, allowing the data shaping critical to real-time app use. See this high-level diagram for how Aptos indexing works:
 
 <center>
 <ThemedImage
@@ -34,7 +34,7 @@ Indexing on the Aptos blockchain works like this:
 
 Aptos supports the following ways to index the Aptos blockchain. 
 
-1. Use the Aptos-provided indexing service with GraphQL API. This API is rate-limited and is intended only for lightweight applications such as wallets. This option is not recommended for high-bandwidth applications. This indexing service supports the following modules:
+1. Use the Aptos Labs hosted indexing service with GraphQL API. This API is rate-limited and is intended only for lightweight applications such as wallets. This option is not recommended for high-bandwidth applications. This indexing service supports the following modules:
     1. **Token**: Only tokens that implement the Aptos `0x3::token::Token` standard. This indexer will only support 0x3 operations such as mint, create, transfer, offer, claim, and coin token swap. Also see Coin and Token.
     2. **Coin**: Supports only `0x1::coin::CoinStore`. This indexer will index any coins that appear in Aptos `CoinStore` standard but such coins may not have value unless they implement `0x1::coin::CoinInfo`.
 2. Run your own indexer-enabled Aptos fullnode. With this option, the indexer supports, in addition to the above coin and token modules, basic transactions, i.e., each write set, events and signatures. 
@@ -258,7 +258,7 @@ If you are running a backend (server-side) application and want to call the inde
 
 ## Run an indexer-enabled fullnode
 
-See [Indexer Fullnode](/nodes/indexer-fullnode).
+See [Indexer Fullnode](../nodes/indexer-fullnode.md).
 
 ## Define your own data model
 

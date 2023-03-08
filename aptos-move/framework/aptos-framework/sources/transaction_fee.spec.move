@@ -12,7 +12,7 @@ spec aptos_framework::transaction_fee {
     }
 
     spec initialize_fee_collection_and_distribution(aptos_framework: &signer, burn_percentage: u8) {
-        // TODO: missing aborts_if spec
+        // TODO: monomorphization issue. duplicated boogie procedures.
         pragma verify=false;
     }
 
@@ -22,13 +22,16 @@ spec aptos_framework::transaction_fee {
     }
 
     spec register_proposer_for_fee_collection(proposer_addr: address) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        aborts_if false;
+        ensures is_fees_collection_enabled() ==>
+            option::spec_borrow(global<CollectedFeesPerBlock>(@aptos_framework).proposer) == proposer_addr;
     }
 
     spec burn_coin_fraction(coin: &mut Coin<AptosCoin>, burn_percentage: u8) {
-        // TODO: missing aborts_if spec
-       pragma verify=false;
+        let amount_to_burn = (burn_percentage * coin::value(coin)) / 100;
+        aborts_if burn_percentage > 100;
+        aborts_if (amount_to_burn > 0) && !exists<AptosCoinCapabilities>(@aptos_framework);
+        include (amount_to_burn > 0) ==> coin::AbortsIfNotExistCoinInfo<AptosCoin>;
     }
 
     spec process_collected_fees() {
@@ -44,8 +47,9 @@ spec aptos_framework::transaction_fee {
     }
 
     spec collect_fee(account: address, fee: u64) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        aborts_if !exists<CollectedFeesPerBlock>(@aptos_framework);
+        aborts_if fee > 0 && !exists<coin::CoinStore<AptosCoin>>(account);
+        aborts_if fee > 0 && global<coin::CoinStore<AptosCoin>>(account).coin.value < fee;
     }
 
     /// Ensure caller is admin.

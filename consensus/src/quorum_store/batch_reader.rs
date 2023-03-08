@@ -331,7 +331,13 @@ impl BatchReader {
     // for lagging nodes to be able to catch up (without state-sync).
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
         debug!("QS: batch reader updating time {:?}", certified_time);
-        assert!(self.epoch() == certified_time.epoch(), "QS: wrong epoch");
+        assert_eq!(
+            self.epoch(),
+            certified_time.epoch(),
+            "QS: wrong epoch {} != {}",
+            self.epoch(),
+            certified_time.epoch()
+        );
 
         let prev_round = self
             .last_certified_round

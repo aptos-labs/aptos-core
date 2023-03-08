@@ -348,6 +348,84 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn unlock_stake(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        operator: Option<AccountAddress>,
+        amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        let operations = vec![Operation::unlock_stake(
+            0,
+            None,
+            sender,
+            operator.map(AccountIdentifier::base_account),
+            amount,
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            operator.is_none(),
+        )
+        .await
+    }
+
+    pub async fn distribute_staking_rewards(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        operator: AccountAddress,
+        staker: AccountAddress,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        let operations = vec![Operation::distribute_staking_rewards(
+            0,
+            None,
+            sender,
+            AccountIdentifier::base_account(operator),
+            AccountIdentifier::base_account(staker),
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            false,
+        )
+        .await
+    }
+
     pub async fn create_stake_pool(
         &self,
         network_identifier: &NetworkIdentifier,

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides an API for the accountable threshold multi-sig PureEdDSA signature scheme
@@ -17,7 +18,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
-use curve25519_dalek::edwards::CompressedEdwardsY;
 use rand::Rng;
 use serde::Serialize;
 use std::{convert::TryInto, fmt};
@@ -117,60 +117,6 @@ impl MultiEd25519PublicKey {
     pub fn to_bytes(&self) -> Vec<u8> {
         to_bytes(&self.public_keys, self.threshold)
     }
-
-    /// Checks that all sub PKs would deserialize correctly and are NOT in the small order subgroup.
-    ///
-    /// This function is called by our MultiEd25519 PK validation APIs in Move.
-    ///
-    /// We cannot rely on `TryFrom<&[u8]> for MultiEd25519PublicKey` since it does not exclude
-    /// sub-PKs that are of small order. (Due to limitations in `ed25519_dalek`'s APIs, we cannot
-    /// call the small-subgroup check API on an `ed25519_dalek::PublicKey` struct.) As a result, we
-    /// are forced to replicate some of its code here.
-    ///
-    /// Returns a tuple (`success`, `num_deserializations`, `num_small_order_checks`), where
-    /// `success` is true if the bytes represent a valid MultiEd25519 PK and false otherwise,
-    /// `num_deserializations` is the number of deserialization attempts on a sub PK, and
-    /// `num_small_order_checks` is the number of small order checks on a successfully-deserialized
-    /// PK.
-    ///
-    /// This function returns early as soon as a sub PK fails a check.
-    pub fn validate_bytes_and_count_checks(bytes: &[u8]) -> (bool, usize, usize) {
-        let mut num_deserializations = 0;
-        let mut num_small_order_checks = 0;
-
-        if bytes.is_empty() {
-            return (false, num_deserializations, num_small_order_checks);
-        }
-
-        // Checks that the threshold is correctly encoded in the last bytes of the PK, and that the
-        // # of sub-PKs is > 0 and <= MAX_NUM_OF_KEYS.
-        if check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH).is_err() {
-            return (false, num_deserializations, num_small_order_checks);
-        }
-
-        for chunk in bytes.chunks_exact(ED25519_PUBLIC_KEY_LENGTH) {
-            // Parse as a slice
-            let slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(chunk) {
-                Ok(slice) => slice,
-                Err(_) => return (false, num_deserializations, num_small_order_checks), // This should never happen because this is a ChunksExact iterator
-            };
-
-            // First, check this is a valid point on the curve.
-            num_deserializations += 1;
-            let point = match CompressedEdwardsY(slice).decompress() {
-                Some(point) => point,
-                None => return (false, num_deserializations, num_small_order_checks),
-            };
-
-            // Second, check this is NOT a small order point.
-            num_small_order_checks += 1;
-            if point.is_small_order() {
-                return (false, num_deserializations, num_small_order_checks);
-            }
-        }
-
-        (true, num_deserializations, num_small_order_checks)
-    }
 }
 
 ///////////////////////
@@ -267,7 +213,7 @@ impl TryFrom<&[u8]> for MultiEd25519PrivateKey {
         if bytes.is_empty() {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        let threshold = check_and_get_threshold(bytes, ED25519_PRIVATE_KEY_LENGTH)?;
+        let (threshold, _) = check_and_get_threshold(bytes, ED25519_PRIVATE_KEY_LENGTH)?;
 
         let private_keys: Result<Vec<Ed25519PrivateKey>, _> = bytes
             .chunks_exact(ED25519_PRIVATE_KEY_LENGTH)
@@ -356,7 +302,7 @@ impl TryFrom<&[u8]> for MultiEd25519PublicKey {
         if bytes.is_empty() {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        let threshold = check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH)?;
+        let (threshold, _) = check_and_get_threshold(bytes, ED25519_PUBLIC_KEY_LENGTH)?;
         let public_keys: Result<Vec<Ed25519PublicKey>, _> = bytes
             .chunks_exact(ED25519_PUBLIC_KEY_LENGTH)
             .map(Ed25519PublicKey::try_from)
@@ -622,11 +568,11 @@ fn to_bytes<T: ValidCryptoMaterial>(keys: &[T], threshold: u8) -> Vec<u8> {
     bytes
 }
 
-// Helper method to get threshold from a serialized MultiEd25519 key payload.
-fn check_and_get_threshold(
+/// Helper method to get the threshold `t` and the # of sub PKs `n` from a serialized `t`-out-of-`n` MultiEd25519 key payload.
+pub fn check_and_get_threshold(
     bytes: &[u8],
     key_size: usize,
-) -> std::result::Result<u8, CryptoMaterialError> {
+) -> std::result::Result<(u8, u8), CryptoMaterialError> {
     let payload_length = bytes.len();
     if bytes.is_empty() {
         return Err(CryptoMaterialError::WrongLengthError);
@@ -640,7 +586,7 @@ fn check_and_get_threshold(
     } else if threshold_byte == 0 || threshold_byte > num_of_keys as u8 {
         Err(CryptoMaterialError::ValidationError)
     } else {
-        Ok(threshold_byte)
+        Ok((threshold_byte, num_of_keys as u8))
     }
 }
 

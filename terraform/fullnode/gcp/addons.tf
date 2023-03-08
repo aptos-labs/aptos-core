@@ -32,7 +32,7 @@ data "google_dns_managed_zone" "pfn" {
 
 locals {
   dns_prefix = var.workspace_dns ? "${local.workspace_name}.${var.dns_prefix_name}." : "${var.dns_prefix_name}."
-  domain     = var.zone_name != "" ? "${local.dns_prefix}${data.google_dns_managed_zone.pfn[0].dns_name}" : null
+  domain     = var.zone_name != "" ? trimsuffix("${local.dns_prefix}${data.google_dns_managed_zone.pfn[0].dns_name}", ".") : null
 }
 
 resource "helm_release" "external-dns" {

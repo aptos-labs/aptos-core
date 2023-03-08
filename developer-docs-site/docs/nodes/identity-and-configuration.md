@@ -62,7 +62,7 @@ This section explains the following key and identity YAML files that are generat
 - `validator-identity.yaml`.
 - `validator-full-node-identity.yaml`.
 
-The following command is used to generate the above key and identity YAMLs. See, for example, [Step 10 while using AWS to deploy the validator node](validator-node/operator/running-validator-node/run-validator-node-using-aws), or in [Step 10 while using GCP](validator-node/operator/running-validator-node/run-validator-node-using-gcp). 
+The following command is used to generate the above key and identity YAMLs. See, for example, [Step 10 while using AWS to deploy the validator node](./validator-node/operator/running-validator-node/using-aws.md), or in [Step 10 while using GCP](./validator-node/operator/running-validator-node/using-gcp.md). 
 
 ```bash
 aptos genesis generate-keys --output-dir ~/$WORKSPACE/keys

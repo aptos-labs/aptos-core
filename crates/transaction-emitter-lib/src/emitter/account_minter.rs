@@ -77,31 +77,45 @@ impl<'t> AccountMinter<'t> {
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
-        let coins_per_seed_account = (expected_children_per_seed_account as u64)
-            .checked_mul(
-                coins_per_account
-                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
-            )
-            .unwrap()
-            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
-            .unwrap();
-        let coins_for_source = coins_per_seed_account
-            .checked_mul(expected_num_seed_accounts as u64)
-            .unwrap()
-            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
-            .unwrap();
         info!(
             "Account creation plan created for {} accounts with {} balance each.",
             num_accounts, coins_per_account
         );
         info!(
-            "    through {} seed accounts with {} each, each to fund {} accounts",
-            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
-        );
-        info!(
             "    because of expecting {} txns and {} gas at {} gas price for each ",
             req.expected_max_txns, req.expected_gas_per_txn, req.gas_price,
         );
+        let coins_per_seed_account = (expected_children_per_seed_account as u64)
+            .checked_mul(
+                coins_per_account
+                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+            )
+            .unwrap_or_else(|| {
+                panic!(
+                    "coins_per_seed_account exceeds u64: {} * ({} + {} * {} * {})",
+                    expected_children_per_seed_account,
+                    coins_per_account,
+                    req.max_gas_per_txn,
+                    req.gas_price,
+                    req.init_gas_price_multiplier
+                )
+            })
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
+            .unwrap();
+        info!(
+            "    through {} seed accounts with {} each, each to fund {} accounts",
+            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
+        );
+        let coins_for_source = coins_per_seed_account
+            .checked_mul(expected_num_seed_accounts as u64)
+            .unwrap_or_else(|| {
+                panic!(
+                    "coins_for_source exceeds u64: {} * {}",
+                    coins_per_seed_account, expected_num_seed_accounts
+                )
+            })
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
+            .unwrap();
 
         if req.mint_to_root {
             self.mint_to_root(txn_executor, coins_for_source).await?;
@@ -124,11 +138,10 @@ impl<'t> AccountMinter<'t> {
                     panic!("Aborting");
                 }
             } else {
-                let max_allowed = 2 * req
-                    .expected_max_txns
-                    .checked_mul(req.expected_gas_per_txn * req.gas_price)
+                let max_allowed = (2 * req.expected_max_txns as u128)
+                    .checked_mul((req.expected_gas_per_txn * req.gas_price).into())
                     .unwrap();
-                assert!(coins_for_source <= max_allowed,
+                assert!(coins_for_source as u128 <= max_allowed,
                     "Estimated total coins needed for load test ({}) are larger than expected_max_txns * expected_gas_per_txn, multiplied by 2 to account for rounding up ({})",
                     coins_for_source,
                     max_allowed,

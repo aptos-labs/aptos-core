@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     network::QuorumStoreSender,
     quorum_store::{
         batch_reader::{BatchReader, BatchReaderCommand},
         counters,
         proof_coordinator::ProofCoordinatorCommand,
-        quorum_store_db::QuorumStoreDB,
         types::{Batch, PersistedValue},
     },
 };
@@ -67,7 +67,7 @@ pub(crate) struct BatchStore<T> {
     my_peer_id: PeerId,
     network_sender: T,
     batch_reader: Arc<BatchReader>,
-    db: Arc<QuorumStoreDB>,
+    db: Arc<dyn QuorumStoreStorage>,
     validator_signer: Arc<ValidatorSigner>,
 }
 
@@ -82,7 +82,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         batch_store_tx: Sender<BatchStoreCommand>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         batch_reader_rx: Receiver<BatchReaderCommand>,
-        db: Arc<QuorumStoreDB>,
+        db: Arc<dyn QuorumStoreStorage>,
         validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
         batch_expiry_round_gap_when_init: Round,
@@ -158,6 +158,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             .save(persist_request.digest, persist_request.value.clone()) // TODO: what is this comes from old epoch?
         {
             Ok(needs_db) => {
+                let batch_author = persist_request.value.author;
                 let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
                 let num_bytes = persist_request.value.num_bytes as u64;
                 debug!("QS: sign digest");
@@ -168,6 +169,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         .expect("Could not write to DB");
                 }
                 Some(SignedDigest::new(
+                    batch_author,
                     self.epoch,
                     persist_request.digest,
                     expiration,

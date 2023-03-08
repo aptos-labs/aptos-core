@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -21,7 +22,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION,
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, TimedFeatures,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -108,6 +110,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        TimedFeatures::enable_all(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -219,6 +222,7 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        TimedFeatures::enable_all(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -413,6 +417,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
         FeatureFlag::BLAKE2B_256_NATIVE,
         FeatureFlag::RESOURCE_GROUPS,
+        FeatureFlag::MULTISIG_ACCOUNTS,
     ]
 }
 
@@ -886,6 +891,7 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
+        TimedFeatures::enable_all(),
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -1102,7 +1108,8 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::access_path(ValidatorSet::access_path());
+    let state_key =
+        StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
     let bytes = writeset
         .get(&state_key)
         .unwrap()

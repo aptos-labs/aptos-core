@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Support for mocking the Aptos data store.
@@ -56,7 +57,10 @@ impl FakeDataStore {
                 WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.set(state_key.clone(), blob.clone());
                 },
-                WriteOp::Deletion => {
+                WriteOp::ModificationWithMetadata { .. } | WriteOp::CreationWithMetadata { .. } => {
+                    unimplemented!()
+                },
+                WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => {
                     self.remove(state_key);
                 },
             }
@@ -86,7 +90,7 @@ impl FakeDataStore {
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
         let coin_info = CoinInfoResource::random(u128::MAX);
-        let write_set = coin_info.to_writeset();
+        let write_set = coin_info.to_writeset().expect("access path in test");
         self.add_write_set(&write_set)
     }
 
@@ -109,7 +113,11 @@ impl TStateView for FakeDataStore {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        Ok(self.state_data.get(state_key).cloned().map(StateValue::new))
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(StateValue::new_legacy))
     }
 
     fn is_genesis(&self) -> bool {

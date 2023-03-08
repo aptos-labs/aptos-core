@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -125,6 +126,22 @@ impl Context {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
+    }
+
+    pub fn state_view<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<u64>,
+    ) -> Result<(LedgerInfo, u64, DbStateView), E> {
+        let (latest_ledger_info, requested_ledger_version) =
+            self.get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
+
+        let state_view = self
+            .state_view_at_version(requested_ledger_version)
+            .map_err(|err| {
+                E::internal_with_code(err, AptosErrorCode::InternalError, &latest_ledger_info)
+            })?;
+
+        Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -343,12 +360,14 @@ impl Context {
             .flatten()
             .collect();
 
-        let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
-            StateKey::access_path(AccessPath::new(
+        let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
+            Some(StateKey::access_path(AccessPath::new(
                 address,
-                AccessPath::resource_path_vec(struct_tag),
-            ))
-        });
+                AccessPath::resource_path_vec(struct_tag)?,
+            )))
+        } else {
+            None
+        };
         Ok((kvs, next_key))
     }
 

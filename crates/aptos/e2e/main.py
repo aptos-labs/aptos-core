@@ -17,6 +17,9 @@ Example (testing locally built CLI binary):
 
 This means, run the CLI test suite using a CLI built from mainnet_0431e2251d0b42920d89a52c63439f7b9eda6ac3 against a local testnet built from the testnet branch of aptos-core.
 
+Example (using a different image repo):
+  See ~/.github/workflows/cli-e2e-tests.yaml
+
 When the test suite is complete, it will tell you which tests passed and which failed. To further debug a failed test, you can check the output in --working-directory, there will be files for each test containing the command run, stdout, stderr, and any exception.
 """
 
@@ -29,8 +32,9 @@ import sys
 from cases.account import test_account_create, test_account_fund_with_faucet
 from cases.init import test_init
 from common import Network
-from test_helpers import RunHelper
 from local_testnet import run_node, stop_node, wait_for_startup
+from test_helpers import RunHelper
+from test_results import test_results
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -50,8 +54,15 @@ def parse_args():
     )
     parser.add_argument("-d", "--debug", action="store_true")
     parser.add_argument(
-        "--image-repo",
-        help="What docker image repo to use for the local testnet. By default we use Docker Hub.",
+        "--image-repo-with-project",
+        default="aptoslabs",
+        help=(
+            "What docker image repo (+ project) to use for the local testnet. "
+            "By default we use Docker Hub: %(default)s (so, just aptoslabs for the "
+            "project since Docker Hub is the implied default repo). If you want to "
+            "specify a different repo, it might look like this: "
+            "docker.pkg.github.com/aptoslabs/aptos-core"
+        ),
     )
     parser.add_argument(
         "--base-network",
@@ -81,7 +92,6 @@ def parse_args():
         help="Where we'll run CLI commands from (in the host system). Default: %(default)s",
     )
     args = parser.parse_args()
-    args.image_repo = args.image_repo or ""
     return args
 
 
@@ -104,7 +114,7 @@ def main():
         logging.getLogger().setLevel(logging.INFO)
 
     # Run a node + faucet and wait for them to start up.
-    container_name = run_node(args.base_network, args.image_repo)
+    container_name = run_node(args.base_network, args.image_repo_with_project)
     wait_for_startup(container_name, args.base_startup_timeout)
 
     # Create the dir the test CLI will run from.
@@ -114,7 +124,7 @@ def main():
     # Build the RunHelper object.
     run_helper = RunHelper(
         host_working_directory=args.working_directory,
-        image_repo=args.image_repo,
+        image_repo_with_project=args.image_repo_with_project,
         image_tag=args.test_cli_tag,
         cli_path=args.test_cli_path,
     )
@@ -128,15 +138,16 @@ def main():
     # Stop the node + faucet.
     stop_node(container_name)
 
-    if run_helper.passed_tests:
+    # Print out the results.
+    if test_results.passed:
         LOG.info("These tests passed:")
-        for test_name in run_helper.passed_tests:
+        for test_name in test_results.passed:
             LOG.info(test_name)
 
-    if run_helper.failed_tests:
+    if test_results.failed:
         LOG.error("These tests failed:")
-        for test_name in run_helper.failed_tests:
-            LOG.error(test_name)
+        for test_name, exception in test_results.failed:
+            LOG.error(f"{test_name}: {exception}")
         return False
 
     LOG.info("All tests passed!")

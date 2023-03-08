@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
@@ -132,7 +133,7 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
         let module_bytes = self.get_module(&module_id).ok()??;
         let module = CompiledModule::deserialize(&module_bytes).ok()?;
-        aptos_framework::get_module_metadata(&module)
+        aptos_framework::get_metadata_from_compiled_module(&module)
     }
 
     fn get_resource_group_data(
@@ -149,7 +150,9 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError> {
-        let ap = AccessPath::resource_access_path(*address, struct_tag.clone());
+        let ap = AccessPath::resource_access_path(*address, struct_tag.clone()).map_err(|_| {
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+        })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 }

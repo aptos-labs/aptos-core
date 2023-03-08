@@ -2,116 +2,215 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_indexer_grpc_utils::{
-    get_file_store_bucket_name,
-    storage::{
-        generate_blob_name, get_file_store_metadata, upload_file_store_metadata, TransactionsBlob,
-        BLOB_TRANSACTION_CHUNK_SIZE,
-    },
+    build_protobuf_encoded_transaction_wrappers,
+    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    config::IndexerGrpcConfig,
+    constants::BLOB_STORAGE_SIZE,
+    file_store_operator::FileStoreOperator,
+    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
-use cloud_storage::Object;
-use redis::{Client, Commands};
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 
+// If the version is ahead of the cache head, retry after a short sleep.
+const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 1000;
+
+/// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
-    pub redis_client: Client,
-    current_version: u64,
-}
-
-async fn upload_blob_transactions(
-    bucket_name: String,
-    blob_object: TransactionsBlob,
-) -> anyhow::Result<()> {
-    match Object::create(
-        bucket_name.as_str(),
-        serde_json::to_vec(&blob_object).unwrap(),
-        generate_blob_name(blob_object.starting_version).as_str(),
-        "application/json",
-    )
-    .await
-    {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            aptos_logger::info!(
-                error = err.to_string(),
-                "[indexer file store] Failed to process a blob; retrying in 1 second"
-            );
-            sleep(Duration::from_secs(1));
-            Err(err.into())
-        },
-    }
+    cache_operator: Option<CacheOperator<redis::aio::Connection>>,
+    file_store_processor: Option<FileStoreOperator>,
+    cache_chain_id: Option<u64>,
+    config: IndexerGrpcConfig,
 }
 
 impl Processor {
-    pub fn new(redis_address: String) -> Self {
+    pub fn new(config: IndexerGrpcConfig) -> Self {
         Self {
-            redis_client: Client::open(format!("redis://{}", redis_address)).unwrap(),
-            current_version: 0,
+            cache_operator: None,
+            file_store_processor: None,
+            cache_chain_id: None,
+            config,
         }
+    }
+
+    /// Init the processor, including creating the redis connection and file store operator.
+    async fn init(&mut self) {
+        // Connection to redis is a hard dependency for file store processor.
+        let conn = redis::Client::open(format!("redis://{}", self.config.redis_address))
+            .expect("Create redis client failed.")
+            .get_async_connection()
+            .await
+            .expect("Create redis connection failed.");
+
+        let mut cache_operator = CacheOperator::new(conn);
+        let chain_id = cache_operator
+            .get_chain_id()
+            .await
+            .expect("Get chain id failed.");
+
+        let file_store_operator =
+            FileStoreOperator::new(self.config.file_store_bucket_name.clone());
+        file_store_operator.verify_storage_bucket_existence().await;
+
+        self.cache_operator = Some(cache_operator);
+        self.file_store_processor = Some(file_store_operator);
+        self.cache_chain_id = Some(chain_id);
     }
 
     // Starts the processing.
     pub async fn run(&mut self) {
-        let mut conn = self.redis_client.get_connection().unwrap();
-        let mut ma = MovingAverage::new(10_000);
+        self.init().await;
+        let cache_chain_id = self.cache_chain_id.unwrap();
 
-        let bucket_name = get_file_store_bucket_name();
+        // If file store and cache chain id don't match, panic.
+        let metadata = self
+            .file_store_processor
+            .as_mut()
+            .unwrap()
+            .create_default_file_store_metadata_if_absent(cache_chain_id)
+            .await
+            .unwrap();
 
-        let mut metadata = get_file_store_metadata(bucket_name.clone()).await;
-
-        // The current version is the version of the last blob that was uploaded.
-        self.current_version = metadata.version;
-
-        let mut metadata_ref = &mut metadata;
-        // TODO: fix this with a proper traffic control mechanism.
-        let mut prev_metadata_update_time = std::time::Instant::now();
-
+        // This implements a two-cursor approach:
+        //   * One curosr is to track the current cache version.
+        //   * The other cursor is to track the current file store version.
+        //   * Constrains:
+        //     * The current cache version >= the current file store version.
+        //     * The current file store version is always a multiple of BLOB_STORAGE_SIZE.
+        let mut current_cache_version = metadata.version;
+        let mut current_file_store_version = current_cache_version;
+        // The transactions buffer to store the transactions fetched from cache.
+        let mut transactions_buffer: Vec<EncodedTransactionWithVersion> = vec![];
+        let mut tps_calculator = MovingAverage::new(10_000);
         loop {
-            let versions = (self.current_version
-                ..self.current_version + BLOB_TRANSACTION_CHUNK_SIZE)
-                .map(|e| e.to_string())
-                .collect::<Vec<String>>();
-            let transactions_blob = match conn.mget::<Vec<String>, Vec<String>>(versions) {
-                Ok(data) => TransactionsBlob {
-                    starting_version: self.current_version,
-                    transactions: data,
-                },
-                Err(err) => {
-                    aptos_logger::info!(
-                        bucket = bucket_name,
-                        version = self.current_version,
-                        error = err.to_string(),
-                        "[indexer file store] Hit the head; retrying in 1 second"
-                    );
-                    sleep(Duration::from_secs(1));
+            // 0. Data verfiication.
+            // File store version has to be a multiple of BLOB_STORAGE_SIZE.
+            if current_file_store_version % BLOB_STORAGE_SIZE as u64 != 0 {
+                panic!("File store version is not a multiple of BLOB_STORAGE_SIZE.");
+            }
+
+            let batch_get_result = self
+                .cache_operator
+                .as_mut()
+                .unwrap()
+                .batch_get_encoded_proto_data(current_cache_version)
+                .await;
+
+            let batch_get_result =
+                fullnode_grpc_status_handling(batch_get_result, current_cache_version);
+
+            let current_transactions = match batch_get_result {
+                Some(transactions) => transactions,
+                None => {
+                    // Cache is not ready yet, i.e., ahead of current head. Wait.
+                    tokio::time::sleep(Duration::from_millis(
+                        AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS,
+                    ))
+                    .await;
                     continue;
                 },
             };
 
-            match upload_blob_transactions(bucket_name.clone(), transactions_blob).await {
-                Ok(_) => {
-                    self.current_version += BLOB_TRANSACTION_CHUNK_SIZE;
-                    metadata_ref.version += BLOB_TRANSACTION_CHUNK_SIZE;
+            let hit_head = current_transactions.len() != BLOB_STORAGE_SIZE;
+            // Update the current cache version.
+            current_cache_version += current_transactions.len() as u64;
+            transactions_buffer.extend(current_transactions);
 
-                    ma.tick_now(BLOB_TRANSACTION_CHUNK_SIZE);
-                    aptos_logger::info!(
-                        version = self.current_version,
-                        tps = (ma.avg() * 1000.0) as u64,
-                        "[indexer file store] Processed a blob"
-                    );
-                },
-                Err(err) => {
-                    aptos_logger::error!(
-                        error = err.to_string(),
-                        "[indexer file store] Failed to process a blob; retrying in 1 second"
-                    );
-                    continue;
-                },
+            // If not hit the head, we want to collect more transactions.
+            if !hit_head && transactions_buffer.len() < 10 * BLOB_STORAGE_SIZE {
+                // If we haven't hit the head, we want to collect more transactions.
+                continue;
             }
-            if prev_metadata_update_time + Duration::from_secs(10) < std::time::Instant::now() {
-                upload_file_store_metadata(bucket_name.clone(), *metadata_ref).await;
-                prev_metadata_update_time = std::time::Instant::now();
+            // If hit the head, we want to collect at least one batch of transactions.
+            if hit_head && transactions_buffer.len() < BLOB_STORAGE_SIZE {
+                continue;
             }
+            // Drain the transactions buffer and upload to file store in size of multiple of BLOB_STORAGE_SIZE.
+            let process_size = transactions_buffer.len() / BLOB_STORAGE_SIZE * BLOB_STORAGE_SIZE;
+            let current_batch = transactions_buffer.drain(..process_size).collect();
+
+            self.file_store_processor
+                .as_mut()
+                .unwrap()
+                .upload_transactions(cache_chain_id, current_batch)
+                .await
+                .unwrap();
+            tps_calculator.tick_now(process_size as u64);
+            aptos_logger::info!(
+                tps = (tps_calculator.avg() * 1000.0) as u64,
+                current_file_store_version = current_file_store_version,
+                "Upload transactions to file store."
+            );
+            current_file_store_version += process_size as u64;
         }
+    }
+}
+
+fn fullnode_grpc_status_handling(
+    fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
+    batch_start_version: u64,
+) -> Option<Vec<EncodedTransactionWithVersion>> {
+    match fullnode_rpc_status {
+        Ok(CacheBatchGetStatus::Ok(encoded_transactions)) => Some(
+            build_protobuf_encoded_transaction_wrappers(encoded_transactions, batch_start_version),
+        ),
+        Ok(CacheBatchGetStatus::NotReady) => None,
+        Ok(CacheBatchGetStatus::EvictedFromCache) => {
+            panic!(
+                "[indexer file]Cache evicted from cache. For file store worker, this is not expected."
+            );
+        },
+        Err(err) => {
+            panic!("Batch get encoded proto data failed: {}", err);
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verify_the_grpc_status_handling_ahead_of_cache() {
+        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
+            Ok(CacheBatchGetStatus::NotReady);
+        let batch_start_version = 0;
+        assert!(fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn verify_the_grpc_status_handling_evicted_from_cache() {
+        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
+            Ok(CacheBatchGetStatus::EvictedFromCache);
+        let batch_start_version = 0;
+        fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version);
+    }
+
+    #[test]
+    #[should_panic]
+    fn verify_the_grpc_status_handling_error() {
+        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
+            Err(anyhow::anyhow!("Error"));
+        let batch_start_version = 0;
+        fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version);
+    }
+
+    #[test]
+    fn verify_the_grpc_status_handling_ok() {
+        let batch_start_version = 2000;
+        let transactions: Vec<String> = std::iter::repeat("txn".to_string()).take(1000).collect();
+        let transactions_with_version: Vec<EncodedTransactionWithVersion> = transactions
+            .iter()
+            .enumerate()
+            .map(|(index, txn)| (txn.clone(), batch_start_version + index as u64))
+            .collect();
+        let fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus> =
+            Ok(CacheBatchGetStatus::Ok(transactions));
+        let actual_transactions =
+            fullnode_grpc_status_handling(fullnode_rpc_status, batch_start_version);
+        assert!(actual_transactions.is_some());
+        let actual_transactions = actual_transactions.unwrap();
+        assert_eq!(actual_transactions, transactions_with_version);
     }
 }

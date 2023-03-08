@@ -42,6 +42,9 @@ pub struct ReleaseConfig {
     pub consensus_config: Option<OnChainConsensusConfig>,
     #[serde(default)]
     pub is_multi_step: bool,
+    /// Execute the framework releases after setting all other flags.
+    #[serde(default)]
+    pub framework_release_at_end: bool,
 }
 
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
@@ -80,13 +83,23 @@ impl ReleaseConfig {
         let mut result: Vec<(String, String)> = vec![];
         let mut release_generation_functions: Vec<
             &dyn Fn(&Self, &Option<Client>, &mut Vec<(String, String)>) -> Result<()>,
-        > = vec![
-            &Self::generate_framework_release,
-            &Self::generate_gas_schedule,
-            &Self::generate_version_file,
-            &Self::generate_feature_flag_file,
-            &Self::generate_consensus_file,
-        ];
+        > = if self.framework_release_at_end {
+            vec![
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+                &Self::generate_framework_release,
+            ]
+        } else {
+            vec![
+                &Self::generate_framework_release,
+                &Self::generate_gas_schedule,
+                &Self::generate_version_file,
+                &Self::generate_feature_flag_file,
+                &Self::generate_consensus_file,
+            ]
+        };
         let client = self
             .remote_endpoint
             .as_ref()
@@ -113,7 +126,7 @@ impl ReleaseConfig {
             script_path.push(&proposal_name);
             script_path.set_extension("move");
 
-            std::fs::write(script_path.as_path(), script.as_bytes())
+            std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
                 .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
         }
 
@@ -323,7 +336,7 @@ impl Default for ReleaseConfig {
         ReleaseConfig {
             testnet: true,
             framework_release: Some(FrameworkReleaseConfig {
-                bytecode_version: 6,
+                bytecode_version: 6, // TODO: remove explicit bytecode version from sources
                 git_hash: None,
             }),
             gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
@@ -338,6 +351,7 @@ impl Default for ReleaseConfig {
             consensus_config: Some(OnChainConsensusConfig::default()),
             is_multi_step: false,
             remote_endpoint: None,
+            framework_release_at_end: false,
         }
     }
 }
@@ -366,4 +380,28 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
         .unwrap();
         hash.to_vec()
     }
+}
+
+fn append_script_hash(raw_script: String) -> String {
+    let temp_script_path = TempPath::new();
+    temp_script_path.create_as_file().unwrap();
+
+    let mut move_script_path = temp_script_path.path().to_path_buf();
+    move_script_path.set_extension("move");
+    std::fs::write(move_script_path.as_path(), raw_script.as_bytes())
+        .map_err(|err| {
+            anyhow!(
+                "Failed to get execution hash: failed to write to file: {:?}",
+                err
+            )
+        })
+        .unwrap();
+
+    let (_, hash) = GenerateExecutionHash {
+        script_path: Option::from(move_script_path),
+    }
+    .generate_hash()
+    .unwrap();
+
+    format!("// Script hash: {} \n{}", hash, raw_script)
 }

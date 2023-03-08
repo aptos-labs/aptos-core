@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -27,8 +28,8 @@ pub enum Error {
     StorageServiceError(#[from] StorageServiceError),
 }
 
-/// The interface for sending Storage Service requests and querying network peer
-/// information.
+/// The interface for sending Storage Service requests and
+/// querying network peer information.
 #[derive(Clone, Debug)]
 pub struct StorageServiceClient<NetworkClient> {
     network_client: NetworkClient,

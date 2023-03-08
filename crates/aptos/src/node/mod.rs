@@ -115,7 +115,9 @@ impl NodeTool {
 
 #[derive(Parser)]
 pub struct OperatorConfigFileArgs {
-    /// Operator Configuration file, created from the `genesis set-validator-configuration` command
+    /// Operator Configuration file
+    ///
+    /// Config file created from the `genesis set-validator-configuration` command
     #[clap(long, parse(from_os_str))]
     pub(crate) operator_config_file: Option<PathBuf>,
 }
@@ -184,7 +186,9 @@ impl ValidatorConsensusKeyArgs {
 
 #[derive(Parser)]
 pub struct ValidatorNetworkAddressesArgs {
-    /// Host and port pair for the validator e.g. 127.0.0.1:6180
+    /// Host and port pair for the validator
+    ///
+    /// e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: Option<HostAndPort>,
 
@@ -192,7 +196,9 @@ pub struct ValidatorNetworkAddressesArgs {
     #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
     pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
 
-    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
+    /// Host and port pair for the fullnode
+    ///
+    /// e.g. 127.0.0.1:6180.  Optional
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
 
@@ -409,7 +415,7 @@ impl CliCommand<StakePoolPerformance> for GetPerformance {
     }
 }
 
-/// Retrieves the stake pools associated with an account
+/// Retrieves all stake pools associated with an account
 pub async fn get_stake_pools(
     client: &Client,
     owner_address: AccountAddress,
@@ -582,7 +588,7 @@ fn get_stake_pool_state(
     }
 }
 
-/// Register the current account as a validator node operator
+/// Register the current account as a validator
 ///
 /// This will create a new stake pool for the given account.  The voter and operator fields will be
 /// defaulted to the stake pool account if not provided.
@@ -1223,6 +1229,8 @@ impl CliCommand<()> for RunLocalTestnet {
 }
 
 /// Update consensus key for the validator node
+///
+/// This will take effect in the next epoch
 #[derive(Parser)]
 pub struct UpdateConsensusKey {
     #[clap(flatten)]
@@ -1265,6 +1273,8 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
 }
 
 /// Update the current validator's network and fullnode network addresses
+///
+/// This will take effect in the next epoch
 #[derive(Parser)]
 pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
@@ -1579,7 +1589,7 @@ impl CliCommand<String> for CheckNetworkConnectivity {
     }
 }
 
-/// Show Epoch information
+/// Show epoch information
 ///
 /// Displays the current epoch, the epoch length, and the estimated time of the next epoch
 #[derive(Parser)]

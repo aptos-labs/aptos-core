@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -38,7 +39,11 @@ impl TStateView for GenesisStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        Ok(self.state_data.get(state_key).cloned().map(StateValue::new))
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(StateValue::new_legacy))
     }
 
     fn is_genesis(&self) -> bool {

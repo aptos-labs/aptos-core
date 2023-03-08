@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod rest_interface;
@@ -180,7 +181,7 @@ impl DebuggerStateView {
             .send((state_key.clone(), version, tx))
             .unwrap();
         let bytes_opt = rx.recv()?;
-        Ok(bytes_opt.map(StateValue::new))
+        Ok(bytes_opt.map(StateValue::new_legacy))
     }
 }
 

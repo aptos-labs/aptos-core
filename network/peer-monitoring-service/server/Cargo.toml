@@ -21,6 +21,7 @@ aptos-metrics-core = { workspace = true }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
+aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -29,3 +30,10 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-time-service = { workspace = true, features = ["testing"] }
+claims = { workspace = true }
+maplit = { workspace = true }
+rand = { workspace = true }

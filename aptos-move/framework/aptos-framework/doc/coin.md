@@ -1467,8 +1467,8 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
     <b>spec</b> {
         <b>assume</b> dst_coin.value + source_coin.<a href="coin.md#0x1_coin_value">value</a> &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
     };
-    dst_coin.value = dst_coin.value + source_coin.value;
-    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value: _ } = source_coin;
+    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value } = source_coin;
+    dst_coin.value = dst_coin.value + value;
 }
 </code></pre>
 
@@ -1847,6 +1847,12 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{<a href="account.md#0x1_account">account</a>: aptos_framework};
+<b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;
+</code></pre>
+
+
+
 <a name="@Specification_1_is_aggregatable_coin_zero"></a>
 
 ### Function `is_aggregatable_coin_zero`
@@ -1855,6 +1861,12 @@ Can only be updated by <code>@aptos_framework</code>.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_is_aggregatable_coin_zero">is_aggregatable_coin_zero</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;): bool
 </code></pre>
 
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (<a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(<a href="coin.md#0x1_coin">coin</a>.value) == 0);
+</code></pre>
 
 
 
@@ -1885,6 +1897,11 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_collect_into_aggregatable_coin"></a>
 
 ### Function `collect_into_aggregatable_coin`
@@ -1893,6 +1910,13 @@ Can only be updated by <code>@aptos_framework</code>.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_collect_into_aggregatable_coin">collect_into_aggregatable_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;)
 </code></pre>
 
+
+
+
+<pre><code><b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>aborts_if</b> amount &gt; 0 && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>aborts_if</b> amount &gt; 0 && coin_store.<a href="coin.md#0x1_coin">coin</a>.<a href="coin.md#0x1_coin_value">value</a> &lt; amount;
+</code></pre>
 
 
 
@@ -1949,10 +1973,10 @@ Get address by reflection.
 
 
 
-<a name="0x1_coin_ExistCoinInfo"></a>
+<a name="0x1_coin_AbortsIfNotExistCoinInfo"></a>
 
 
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt; {
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt; {
     <b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 }
@@ -1971,7 +1995,7 @@ Get address by reflection.
 
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt;;
+<pre><code><b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 </code></pre>
 
 
@@ -1987,7 +2011,7 @@ Get address by reflection.
 
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt;;
+<pre><code><b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 </code></pre>
 
 
@@ -2003,7 +2027,7 @@ Get address by reflection.
 
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt;;
+<pre><code><b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 </code></pre>
 
 
@@ -2020,7 +2044,7 @@ Get address by reflection.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt;;
+<b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 </code></pre>
 
 
@@ -2039,7 +2063,7 @@ Get address by reflection.
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
 <b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-<b>include</b> <a href="coin.md#0x1_coin_ExistCoinInfo">ExistCoinInfo</a>&lt;CoinType&gt;;
+<b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 <b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.value == 0;
 </code></pre>
 
@@ -2226,7 +2250,11 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address != account_addr;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
 </code></pre>
 
 
@@ -2345,6 +2373,7 @@ Updating <code>Account.guid_creation_num</code> will not overflow.
 
 <pre><code><b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(account_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && acc.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && acc.guid_creation_num + 2 &gt; <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(account_addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();

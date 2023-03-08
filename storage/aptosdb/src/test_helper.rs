@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This module provides reusable helpers in tests.
@@ -62,16 +63,19 @@ pub(crate) fn update_store(
                 version.checked_sub(1),
             )
             .unwrap();
-        let batch = SchemaBatch::new();
+        let ledger_batch = SchemaBatch::new();
+        let state_kv_batch = SchemaBatch::new();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
-                &batch,
+                &ledger_batch,
+                &state_kv_batch,
             )
             .unwrap();
-        store.ledger_db.write_schemas(batch).unwrap();
+        store.ledger_db.write_schemas(ledger_batch).unwrap();
+        store.state_kv_db.write_schemas(state_kv_batch).unwrap();
     }
     root_hash
 }

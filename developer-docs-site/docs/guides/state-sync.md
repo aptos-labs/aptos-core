@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # State Synchronization
 
-Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The state synchronization (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
+Nodes in an Aptos network, both the validator nodes and the fullnodes, must always be synchronized to the latest Aptos blockchain state. The [state synchronization](https://medium.com/aptoslabs/the-evolution-of-state-sync-the-path-to-100k-transactions-per-second-with-sub-second-latency-at-52e25a2c6f10) (state sync) component that runs on each node is responsible for this synchronization. To achieve this synchronization, state sync identifies and fetches new blockchain data from the peers, validates the data and persists it to the local storage.
 
 :::tip Need to start a node quickly?
 If you need to start a node quickly, here's what we recommend by use case:
@@ -56,7 +56,7 @@ configuration file (for example,`fullnode.yaml` or `validator.yaml`):
 
 :::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](../nodes/full-node/fullnode-source-code-or-docker.md#verify-initial-synchronization) metric gradually increase.
 :::
 
 ### Applying all transaction outputs
@@ -74,7 +74,7 @@ node configuration file:
 
 :::tip Verify node syncing
 While your node is syncing, you'll be able to see the
-[`aptos_state_sync_version{type="synced"}`](/nodes/full-node/fullnode-source-code-or-docker/#verify-initial-synchronization) metric gradually increase.
+[`aptos_state_sync_version{type="synced"}`](../nodes/full-node/fullnode-source-code-or-docker.md#verify-initial-synchronization) metric gradually increase.
 :::
 
 ## Fast syncing
@@ -132,7 +132,7 @@ To operate an archival node, which is a fullnode that contains all blockchain da
 since the start of the blockchain's history (that is, genesis), you should:
 1. Run a fullnode and configure it to execute all transactions, or apply all transaction outputs (see above).
 Do not select fast syncing, as the fullnode will not contain all data since genesis.
-2. Disable the ledger pruner, as described in the [Data Pruning document](../guides/data-pruning.md#disabling-the-ledger-pruner).
+2. Disable the ledger pruner, as described in the [Data Pruning document](data-pruning.md#disabling-the-ledger-pruner).
 This will ensure that no data is pruned and the fullnode contains all blockchain data.
 
 :::caution Proceed with caution

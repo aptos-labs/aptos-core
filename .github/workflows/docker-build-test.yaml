@@ -43,9 +43,11 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - testnet
       - mainnet
       - aptos-node-v*
+      - aptos-release-v*
       # experimental branches
       - performance_benchmark
       - quorum-store
+      - preview
 
 # cancel redundant builds
 concurrency:
@@ -179,6 +181,20 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
+  cli-e2e-tests:
+    needs: [rust-images, determine-docker-build-metadata]
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-sdk-integration-test') && (
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null) ||
+      contains(github.event.pull_request.body, '#e2e')
+    uses: ./.github/workflows/cli-e2e-tests.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+
   forge-e2e-test:
     needs:
       [rust-images, rust-images-failpoints, determine-docker-build-metadata]
@@ -224,6 +240,31 @@ jobs:
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+  
+  # Run forge framework upgradability test
+  forge-framework-upgrade-test:
+    needs:
+      [rust-images, rust-images-failpoints, determine-docker-build-metadata]
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
+        (github.event_name == 'push' && github.ref_name != 'main') ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: framework_upgrade
+      IMAGE_TAG: cb4ba0a57c998c60cbab65af31a64875d2588ca5  # This workflow only gets stablized after the 1.2 release because of the multi-step governance proposal.
+      FORGE_RUNNER_DURATION_SECS: 300
+      COMMENT_HEADER: forge-framework-upgrade
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
 
   forge-consensus-only-perf-test:
     needs:

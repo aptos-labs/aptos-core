@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod forge_setup_test;
+pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
 pub mod network_bandwidth_test;
@@ -12,6 +14,7 @@ pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod performance_with_fullnode_test;
+pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;

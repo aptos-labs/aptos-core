@@ -6,7 +6,9 @@ use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
-use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_gas::{
+    AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
+};
 use aptos_language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
@@ -14,9 +16,9 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::AccountResource,
+    account_config::{AccountResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
-    on_chain_config::{FeatureFlag, GasScheduleV2},
+    on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::state_key::StateKey,
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
@@ -36,6 +38,8 @@ use rand::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeMap, path::Path};
+
+const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -57,6 +61,8 @@ pub struct MoveHarness {
     pub executor: FakeExecutor,
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
+
+    default_gas_unit_price: u64,
 }
 
 impl MoveHarness {
@@ -66,6 +72,7 @@ impl MoveHarness {
         Self {
             executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
     }
 
@@ -74,6 +81,7 @@ impl MoveHarness {
         Self {
             executor: FakeExecutor::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
     }
 
@@ -82,6 +90,7 @@ impl MoveHarness {
         Self {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
     }
 
@@ -99,6 +108,7 @@ impl MoveHarness {
         Self {
             executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
+            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
         }
     }
 
@@ -200,7 +210,7 @@ impl MoveHarness {
             .transaction()
             .sequence_number(seq_no)
             .max_gas_amount(2_000_000)
-            .gas_unit_price(1)
+            .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
             .sign()
     }
@@ -271,6 +281,20 @@ impl MoveHarness {
     ) -> TransactionStatus {
         let txn = self.create_entry_function(account, fun, ty_args, args);
         self.run(txn)
+    }
+
+    /// Run the specified entry point `fun` and return the gas used.
+    pub fn evaluate_entry_function_gas(
+        &mut self,
+        account: &Account,
+        fun: MemberId,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> u64 {
+        let txn = self.create_entry_function(account, fun, ty_args, args);
+        let output = self.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        output.gas_used()
     }
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
@@ -385,7 +409,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path = AccessPath::resource_access_path(*addr, struct_tag);
+        let path =
+            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test");
         self.read_state_value(&StateKey::access_path(path))
     }
 
@@ -438,7 +463,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(addr, struct_tag);
+        let path = AccessPath::resource_access_path(addr, struct_tag).expect("access path in test");
         let state_key = StateKey::access_path(path);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
@@ -496,6 +521,31 @@ impl MoveHarness {
         self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
             .unwrap()
             .sequence_number()
+    }
+
+    pub fn modify_gas_schedule(&mut self, modify: impl FnOnce(&mut AptosGasParameters)) {
+        let gas_schedule: GasScheduleV2 = self
+            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
+            .unwrap();
+        let feature_version = gas_schedule.feature_version;
+        let mut gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+            &gas_schedule.to_btree_map(),
+            feature_version,
+        )
+        .unwrap();
+        modify(&mut gas_params);
+        self.set_resource(
+            CORE_CODE_ADDRESS,
+            GasScheduleV2::struct_tag(),
+            &GasScheduleV2 {
+                feature_version,
+                entries: gas_params.to_on_chain_gas_schedule(feature_version),
+            },
+        );
+    }
+
+    pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
+        self.default_gas_unit_price = gas_unit_price;
     }
 }
 

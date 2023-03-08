@@ -16,7 +16,7 @@
 
 name: "API + TS SDK CI"
 on:
-  # This is called from within the build-images.yaml workflow since we depend
+  # This is called from within the docker-build-test.yaml workflow since we depend
   # on the images having been built before this workflow runs.
   workflow_call:
     inputs:
@@ -129,20 +129,6 @@ jobs:
           timeout_minutes: 15
           command: cd ./ecosystem/typescript/sdk && pnpm test
       - run: cd ./ecosystem/typescript/sdk && pnpm build
-
-      # Ensure the version, changelog, etc. are valid.
-      - run: cd ./ecosystem/typescript/sdk && ./check.sh
-        if: github.event_name == 'push' && github.ref_name == 'devnet'
-
-      # Finally, if this is a push and the version in package.json is different,
-      # publish a new version of the package to npm.js. For more details on how
-      # this works, see ecosystem/typescript/sdk/checked_publish.sh. The package
-      # we publish to npmjs is meant to work with devnet, so we only release
-      # from that branch. See ecosystem/typescript/sdk/README.md for more.
-      - run: cd ./ecosystem/typescript/sdk && pnpm checked-publish
-        if: github.event_name == 'push' && github.ref_name == 'devnet'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
       - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}

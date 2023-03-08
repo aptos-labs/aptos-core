@@ -42,6 +42,9 @@ module aptos_framework::object {
     /// The resource is not stored at the specified address.
     const ERESOURCE_DOES_NOT_EXIST: u64 = 7;
 
+    /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
+    const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
+
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
@@ -184,7 +187,7 @@ module aptos_framework::object {
         assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
 
         let object_signer = create_signer(object);
-        let guid_creation_num = 0;
+        let guid_creation_num = INIT_GUID_CREATION_NUM;
         let transfer_events_guid = guid::create(object, &mut guid_creation_num);
 
         move_to(
@@ -320,6 +323,8 @@ module aptos_framework::object {
         transfer_raw(owner, object, to)
     }
 
+    /// Transfers ownership of the object (and all associated resources) at the specified address
+    /// for Object<T> to the "to" address.
     public fun transfer<T: key>(
         owner: &signer,
         object: Object<T>,
@@ -420,6 +425,35 @@ module aptos_framework::object {
         owner(object) == owner
     }
 
+    /// Return true if the provided address has indirect or direct ownership of the provided object.
+    public fun owns<T: key>(object: Object<T>, owner: address): bool acquires ObjectCore {
+        let current_address = object_address(&object);
+        if (current_address == owner) {
+            return true
+        };
+
+        assert!(
+            exists<ObjectCore>(current_address),
+            error::not_found(EOBJECT_DOES_NOT_EXIST),
+        );
+
+        let object = borrow_global<ObjectCore>(current_address);
+        let current_address = object.owner;
+
+        let count = 0;
+        while (owner != current_address) {
+            let count = count + 1;
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
+            if (!exists<ObjectCore>(current_address)) {
+                return false
+            };
+
+            let object = borrow_global<ObjectCore>(current_address);
+            current_address = object.owner;
+        };
+        true
+    }
+
     #[test_only]
     use std::option::{Self, Option};
 
@@ -505,7 +539,9 @@ module aptos_framework::object {
         let (_, hero) = create_hero(creator);
         let (_, weapon) = create_weapon(creator);
 
+        assert!(owns(weapon, @0x123), 0);
         hero_equip(creator, hero, weapon);
+        assert!(owns(weapon, @0x123), 1);
         hero_unequip(creator, hero, weapon);
     }
 
@@ -516,6 +552,7 @@ module aptos_framework::object {
         let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
         transfer_with_ref(linear_transfer_ref, @0x456);
         assert!(owner(hero) == @0x456, 0);
+        assert!(owns(hero, @0x456), 1);
     }
 
     #[test(creator = @0x123)]

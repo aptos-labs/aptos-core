@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -1091,7 +1092,7 @@ impl StorageReader {
     ) -> Result<Option<CompleteDataRange<Version>>, Error> {
         let pruner_enabled = self
             .storage
-            .is_state_pruner_enabled()
+            .is_state_merkle_pruner_enabled()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         if !pruner_enabled {
             return Ok(*transactions_range);

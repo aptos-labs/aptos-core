@@ -104,7 +104,7 @@ resource "google_container_node_pool" "utilities" {
       for_each = var.utility_instance_enable_taint ? ["utilities"] : []
       content {
         key    = "aptos.org/nodepool"
-        value  = taint.key
+        value  = taint.value
         effect = "NO_EXECUTE"
       }
     }
@@ -149,7 +149,7 @@ resource "google_container_node_pool" "validators" {
       for_each = var.validator_instance_enable_taint ? ["validators"] : []
       content {
         key    = "aptos.org/nodepool"
-        value  = taint.key
+        value  = taint.value
         effect = "NO_EXECUTE"
       }
     }

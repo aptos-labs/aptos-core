@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
@@ -580,7 +581,7 @@ pub fn test_open_publishing() {
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_0000_0000, 10);
     executor.add_account_data(&sender);
 
     let program = format!(
@@ -613,7 +614,7 @@ pub fn test_open_publishing() {
         .module(random_module)
         .sequence_number(10)
         .max_gas_amount(100_000)
-        .gas_unit_price(1)
+        .gas_unit_price(100)
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(

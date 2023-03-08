@@ -172,19 +172,25 @@ https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src
 
 
 ```bash
-$ cargo run -p aptos-backup-cli --bin db-backup coordinator run
-    Finished dev [unoptimized + debuginfo] target(s) in 0.52s
-     Running `target/debug/db-backup coordinator run`
-db-backup-coordinator-run
+$ cargo run -p aptos-db-tool backup continuously --help
+    Finished dev [unoptimized + debuginfo] target(s) in 1.06s
+     Running `target/debug/aptos-db-tool backup continuously --help`
+aptos-db-tool-backup-continuously 0.1.0
 Run the backup coordinator which backs up blockchain data continuously off a Aptos Node.
 
 USAGE:
-    db-backup coordinator run [OPTIONS] <SUBCOMMAND>
+    aptos-db-tool backup continuously [OPTIONS] <--local-fs-dir <LOCAL_FS_DIR>|--command-adapter-config <COMMAND_ADAPTER_CONFIG>>
 
 OPTIONS:
         --backup-service-address <ADDRESS>
             Backup service address. By default a Aptos Node runs the backup service serving on tcp
             port 6186 to localhost only. [default: http://localhost:6186]
+
+        --command-adapter-config <COMMAND_ADAPTER_CONFIG>
+            Select the CommandAdapter backup storage type, which reads shell commands with which it
+            communicates with either a local file system or a remote cloud storage. Compression or
+            other fitlers can be added as part of the commands. See a sample config here:
+            https://github.com/aptos-labs/aptos-networks/tree/main/testnet/backups
 
         --concurrent-downloads <CONCURRENT_DOWNLOADS>
             Number of concurrent downloads from the backup storage. This covers the initial metadata
@@ -193,14 +199,17 @@ OPTIONS:
     -h, --help
             Print help information
 
+        --local-fs-dir <LOCAL_FS_DIR>
+            Select the LocalFs backup storage type, which is used mainly for tests.
+
         --max-chunk-size <MAX_CHUNK_SIZE>
             Maximum chunk file size in bytes. [default: 134217728]
 
         --metadata-cache-dir <DIR>
             Metadata cache dir. If specified and shared across runs, metadata files in cache won't
             be downloaded again from backup source, speeding up tool boot up significantly. Cache
-            content can be messed up if used across the devnet, the testnet and the mainnet, hence it
-            [Defaults to temporary dir].
+            content can be messed up if used across the devnet, the testnet and the mainnet, hence
+            it [Defaults to temporary dir].
 
         --state-snapshot-interval-epochs <STATE_SNAPSHOT_INTERVAL_EPOCHS>
             Frequency (in number of epochs) to take state snapshots at epoch ending versions.
@@ -210,40 +219,32 @@ OPTIONS:
             transactions on top of it. Notice: If, while a snapshot is being taken, the chain
             advanced several epoch, past several new points where a snapshot is eligible according
             to this setting, we will skip those in the middle and take only at the newest epoch
-            among them. For example, if the setting is 5, then the snapshots will be at at 0, 5,
-            10 ... If when the snapshot at 5 ends the chain is already at 19, then snapshot at 15
-            will be taken instead of at 10 (not at 18). [default: 1]
+            among them. For example, if the setting is 5, then the snapshots will be at at 0, 5, 10
+            ... If when the snapshot at 5 ends the chain is already at 19, then snapshot at 15 will
+            be taken instead of at 10 (not at 18). [default: 1]
 
         --transaction-batch-size <TRANSACTION_BATCH_SIZE>
             The frequency (in transaction versions) to take an incremental transaction backup.
             Making a transaction backup every 10 Million versions will result in the latest
             transaction to appear in the backup potentially 10 Million versions later. If the net
-            work is running at 1 thousand transactions per second, that is roughly 3 hours. On
-            the other hand, if backups are too frequent and hence small, it slows down loading the
+            work is running at 1 thousand transactions per second, that is roughly 3 hours. On the
+            other hand, if backups are too frequent and hence small, it slows down loading the
             backup metadata by too many small files.  [default: 1000000]
 
-SUBCOMMANDS:
-    command-adapter    Select the CommandAdapter backup storage type, which reads shell
-                           commands with which it communicates with either a local file system
-                           or a remote cloud storage. Compression or other fitlers can be added
-                           as part of the commands. See a sample config here: https://github.com/
-                           aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src/storage/
-                           command_adapter/sample_configs/
-    help               Print this message or the help of the given subcommand(s)
-    local-fs           Select the LocalFs backup storage type, which is used mainly for tests.
+    -V, --version
+            Print version information
 ```
 
 Example command:
 ```
-$ cargo run -p aptos-backup-cli --bin db-backup -- \
-    coordinator run \
+$ cargo run -p aptos-db-tool backup continuously \
     --metadata-cache-dir ./mc \
     --state-snapshot-interval-epochs 1 \
     --concurrent-downloads 4 \
-    command-adapter --config s3.yaml
+    --command-adapter-config s3.yaml
 ```
 
-There are other subcommands of the db-backup tool, all of which are experimental
+There are other subcommands of the aptos-db-tool, all of which are experimental
 and can mess up with the backup storage, use only at your own risk.
 
 ### Creating an AptosDB with minimal data at the latest epoch ending in a backup
@@ -303,7 +304,7 @@ RUST_LOG=info ./aptos \
 ```
 
 This is basically the same functionality with
-the "auto" mode of `cargo run -p aptos-backup-cli --bin db-restore`, but with more
-limited options. The `db-restore` tool mentioned has the ability to manually
+the "auto" mode of `cargo run -p aptos-db-tool restore`, but with more
+limited options. The `restore` tool mentioned has the ability to manually
 hack a local DB and is highly experimental. It's not recommended is be used if
 you are not 100% aware of what you are doing.

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Support for running the VM to execute and verify transactions.
@@ -28,7 +29,9 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+    },
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -288,7 +291,8 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
+        let ap =
+            AccessPath::resource_access_path(*addr, T::struct_tag()).expect("access path in test");
         let data_blob =
             TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
                 .expect("account must exist in data store")
@@ -574,6 +578,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -581,6 +588,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
+                timed_features,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -628,6 +636,8 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
+            // FIXME: should probably read the timestamp from storage.
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

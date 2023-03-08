@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 // Re-export counter types from prometheus crate
@@ -10,5 +11,7 @@ pub use prometheus::{
     IntGaugeVec, TextEncoder,
 };
 
+mod avg_counter;
+pub use avg_counter::{AverageCounter, AverageIntCounter};
 pub mod const_metric;
 pub mod op_counters;

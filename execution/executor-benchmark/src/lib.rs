@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
@@ -16,14 +17,15 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, PrunerConfig, RocksdbConfigs};
+use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
+use aptos_logger::info;
 use aptos_storage_interface::DbReaderWriter;
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Instant};
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
@@ -36,7 +38,7 @@ where
             &config.storage.dir(),
             false, /* readonly */
             config.storage.storage_pruner_config,
-            RocksdbConfigs::default(),
+            config.storage.rocksdb_configs,
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
@@ -63,10 +65,12 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
 pub fn run_benchmark<V>(
     block_size: usize,
     num_transfer_blocks: usize,
+    transactions_per_sender: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -75,6 +79,7 @@ pub fn run_benchmark<V>(
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
+    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let version = db.reader.get_latest_version().unwrap();
@@ -88,9 +93,15 @@ pub fn run_benchmark<V>(
         source_dir,
         version,
     );
-    generator.run_transfer(block_size, num_transfer_blocks);
+
+    let start_time = Instant::now();
+    generator.run_transfer(block_size, num_transfer_blocks, transactions_per_sender);
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!("Overall TPS: transfer: {} txn/s", delta_v as f32 / elapsed,);
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
@@ -105,6 +116,7 @@ pub fn add_accounts<V>(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -118,6 +130,7 @@ pub fn add_accounts<V>(
         checkpoint_dir,
         pruner_config,
         verify_sequence_numbers,
+        use_state_kv_db,
     );
 }
 
@@ -129,12 +142,14 @@ fn add_accounts_impl<V>(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
+    use_state_kv_db: bool,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
+    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -149,6 +164,7 @@ fn add_accounts_impl<V>(
         version,
     );
 
+    let start_time = Instant::now();
     generator.run_mint(
         db.reader.clone(),
         generator.num_existing_accounts(),
@@ -158,6 +174,13 @@ fn add_accounts_impl<V>(
     );
     generator.drop_sender();
     pipeline.join();
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    info!(
+        "Overall TPS: account creation: {} txn/s",
+        delta_v as f32 / elapsed,
+    );
 
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
@@ -204,15 +227,18 @@ mod tests {
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             true,
+            false,
         );
 
         super::run_benchmark::<AptosVM>(
-            5, /* block_size */
+            6, /* block_size */
             5, /* num_transfer_blocks */
+            2, /* transactions per sender */
             storage_dir.as_ref(),
             checkpoint_dir,
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            false,
         );
     }
 }

@@ -24,6 +24,7 @@ Help us update this list by sending pull requests containing the errors you enco
 
 | Error | Meaning  | Possible Resolution |
 | --- | :---: | --- |
+|LOOKUP_FAILED| A function that is being called isn't present on the network being used | Check that your dependencies onchain have the same version |
 |UNKNOWN_VALIDATION_STATUS|We don't want the default value to be valid.| N/A |
 |INVALID_SIGNATURE|The transaction has a bad signature.| Submit a new transaction with a new signature |
 |INVALID_AUTH_KEY|Bad account authentication key.| Submit a new transaction with a new signature, check that the account matches the authentication key and hasn't been rotated |

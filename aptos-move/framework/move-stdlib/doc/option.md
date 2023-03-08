@@ -598,7 +598,7 @@ and an empty vector otherwise
 
 <pre><code><b>schema</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt; {
     t: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;;
-    <b>aborts_if</b> <a href="option.md#0x1_option_is_none">is_none</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>;
+    <b>aborts_if</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>;
 }
 </code></pre>
 
@@ -704,7 +704,18 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="option.md#0x1_option_is_none">is_none</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>(t);
+</code></pre>
+
+
+
+
+<a name="0x1_option_spec_is_none"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>&lt;Element&gt;(t: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
+   <a href="vector.md#0x1_vector_is_empty">vector::is_empty</a>(t.vec)
+}
 </code></pre>
 
 
@@ -722,7 +733,18 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="option.md#0x1_option_is_some">is_some</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t);
+</code></pre>
+
+
+
+
+<a name="0x1_option_spec_is_some"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>&lt;Element&gt;(t: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): bool {
+   !<a href="vector.md#0x1_vector_is_empty">vector::is_empty</a>(t.vec)
+}
 </code></pre>
 
 
@@ -769,7 +791,18 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t);
+</code></pre>
+
+
+
+
+<a name="0x1_option_spec_borrow"></a>
+
+
+<pre><code><b>fun</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>&lt;Element&gt;(t: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): Element {
+   t.vec[0]
+}
 </code></pre>
 
 
@@ -787,7 +820,7 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(t)) <a href="option.md#0x1_option_borrow">borrow</a>(t) <b>else</b> default_ref);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) <b>else</b> default_ref);
 </code></pre>
 
 
@@ -805,7 +838,7 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(t)) <a href="option.md#0x1_option_borrow">borrow</a>(t) <b>else</b> default);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) <b>else</b> default);
 </code></pre>
 
 
@@ -822,9 +855,9 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="option.md#0x1_option_is_some">is_some</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
-<b>ensures</b> <a href="option.md#0x1_option_is_some">is_some</a>(t);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(t) == e;
+<b>aborts_if</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
+<b>ensures</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t);
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) == e;
 </code></pre>
 
 
@@ -842,8 +875,8 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(<b>old</b>(t));
-<b>ensures</b> <a href="option.md#0x1_option_is_none">is_none</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(<b>old</b>(t));
+<b>ensures</b> <a href="option.md#0x1_option_spec_is_none">spec_is_none</a>(t);
 </code></pre>
 
 
@@ -861,7 +894,7 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t);
 </code></pre>
 
 
@@ -879,9 +912,9 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(<b>old</b>(t));
-<b>ensures</b> <a href="option.md#0x1_option_is_some">is_some</a>(t);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(t) == e;
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(<b>old</b>(t));
+<b>ensures</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t);
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) == e;
 </code></pre>
 
 
@@ -900,7 +933,7 @@ because it's 0 for "none" or 1 for "some".
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <b>old</b>(t);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(t) == e;
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) == e;
 </code></pre>
 
 
@@ -918,7 +951,7 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(t)) <a href="option.md#0x1_option_borrow">borrow</a>(t) <b>else</b> default);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t) <b>else</b> default);
 </code></pre>
 
 
@@ -936,7 +969,7 @@ because it's 0 for "none" or 1 for "some".
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(t);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(t);
 </code></pre>
 
 
@@ -953,7 +986,7 @@ because it's 0 for "none" or 1 for "some".
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="option.md#0x1_option_is_some">is_some</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
+<b>aborts_if</b> <a href="option.md#0x1_option_spec_is_some">spec_is_some</a>(t) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
 </code></pre>
 
 

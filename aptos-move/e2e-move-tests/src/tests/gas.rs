@@ -266,7 +266,7 @@ fn dollar_cost(gas_units: u64, price: u64) -> f64 {
     (gas_units as f64) / 100_000_000_f64 * (price as f64)
 }
 
-fn print_gas_cost(function: &str, gas_units: u64) {
+pub fn print_gas_cost(function: &str, gas_units: u64) {
     let gas_units = gas_units * 100;
     println!(
         "{:20} | {:8} | {:.3} | {:.3} | {:.3}",

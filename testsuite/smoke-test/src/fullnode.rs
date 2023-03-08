@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -48,7 +49,7 @@ async fn test_indexer() {
         .unwrap();
     // TODO(Gas): double check if this is correct
     chain_info
-        .mint(account1.address(), 10_000_000)
+        .mint(account1.address(), 10_000_000_000)
         .await
         .unwrap();
     chain_info

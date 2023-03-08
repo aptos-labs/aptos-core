@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_indexer_grpc_data_service::{get_grpc_address, service::DatastreamServer};
-use aptos_indexer_grpc_utils::get_health_check_port;
+use aptos_indexer_grpc_data_service::service::DatastreamServer;
 use aptos_protos::datastream::v1::indexer_stream_server::IndexerStreamServer;
+use clap::Parser;
 use std::{
     net::ToSocketAddrs,
     sync::{
@@ -14,23 +14,37 @@ use std::{
 use tonic::transport::Server;
 use warp::Filter;
 
+#[derive(Parser)]
+pub struct Args {
+    #[clap(short, long)]
+    pub config_path: String,
+}
+
 fn main() {
     aptos_logger::Logger::new().init();
     aptos_crash_handler::setup_panic_handler();
 
+    // Load config.
+    let args = Args::parse();
+    let config = aptos_indexer_grpc_utils::config::IndexerGrpcConfig::load(
+        std::path::PathBuf::from(args.config_path),
+    )
+    .unwrap();
+
+    let grpc_address = config
+        .data_service_grpc_listen_address
+        .clone()
+        .expect("grpc_address not set");
+    let health_port = config.health_check_port;
+
     let runtime = aptos_runtimes::spawn_named_runtime("indexerdata".to_string(), None);
     // Start serving.
     runtime.spawn(async move {
-        let server = DatastreamServer::new();
+        let server = DatastreamServer::new(config);
+
         Server::builder()
             .add_service(IndexerStreamServer::new(server))
-            .serve(
-                get_grpc_address()
-                    .to_socket_addrs()
-                    .unwrap()
-                    .next()
-                    .unwrap(),
-            )
+            .serve(grpc_address.to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
     });
@@ -40,7 +54,7 @@ fn main() {
         let readiness = warp::path("readiness")
             .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
         warp::serve(readiness)
-            .run(([0, 0, 0, 0], get_health_check_port()))
+            .run(([0, 0, 0, 0], health_port))
             .await;
     });
 

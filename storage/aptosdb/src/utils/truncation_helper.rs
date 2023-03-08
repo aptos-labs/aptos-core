@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use crate::{
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
@@ -53,6 +55,29 @@ pub(crate) fn truncate_ledger_db(
             start_version,
             end_version,
         )?;
+        current_version = start_version - 1;
+        status.set_current_version(current_version);
+    }
+    assert_eq!(current_version, target_version);
+    Ok(())
+}
+
+pub(crate) fn truncate_state_kv_db(
+    state_kv_db: Arc<DB>,
+    current_version: Version,
+    target_version: Version,
+    batch_size: usize,
+) -> Result<()> {
+    let status = StatusLine::new(Progress::new(target_version));
+
+    let mut current_version = current_version;
+    while current_version > target_version {
+        let start_version =
+            std::cmp::max(current_version - batch_size as u64 + 1, target_version + 1);
+        let end_version = current_version + 1;
+        let batch = SchemaBatch::new();
+        delete_state_value_and_index(&state_kv_db, start_version, end_version, &batch)?;
+        state_kv_db.write_schemas(batch)?;
         current_version = start_version - 1;
         status.set_current_version(current_version);
     }
@@ -160,6 +185,7 @@ fn truncate_ledger_db_single_batch(
     delete_transaction_index_data(transaction_store, start_version, end_version, &batch)?;
     delete_per_epoch_data(ledger_db, start_version, end_version, &batch)?;
     delete_per_version_data(start_version, end_version, &batch)?;
+    // TODO(grao): Remove this once we move to state K/V db.
     delete_state_value_and_index(ledger_db, start_version, end_version, &batch)?;
 
     event_store.prune_events(start_version, end_version, &batch)?;
@@ -229,12 +255,12 @@ fn delete_per_version_data(
 }
 
 fn delete_state_value_and_index(
-    ledger_db: &DB,
+    state_kv_db: &DB,
     start_version: Version,
     end_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = ledger_db.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+    let mut iter = state_kv_db.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
     iter.seek(&start_version)?;
 
     for item in iter {
