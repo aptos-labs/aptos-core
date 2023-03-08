@@ -1,4 +1,4 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
   - name: Questions and Help (on Stack Overflow)
     url: https://stackoverflow.com/questions/tagged/aptos
