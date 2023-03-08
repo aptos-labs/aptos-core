@@ -33,4 +33,17 @@ spec aptos_std::math64 {
             n * spec_pow(n, e-1)
         }
     }
+
+    spec floor_log2(x: u64): u8 {
+        aborts_if x == 0;
+        ensures (x >> result) == 1;
+    }
+
+    spec sqrt(x: u64): u64 {
+        pragma opaque;
+    }
+
+    spec log2(x: u64): FixedPoint32 {
+        pragma opaque;
+    }
 }

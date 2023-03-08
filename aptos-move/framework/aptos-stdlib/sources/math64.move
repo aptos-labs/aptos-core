@@ -60,12 +60,37 @@ module aptos_std::math64 {
         assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2));
         // Effectively the position of the most significant set bit
         let n = 32;
-        while (n > 0) {
+        let old_x = x;
+        spec {
+            assert x > 0;
+            assert (x >> 32) < (1 << 32);
+        };
+        while ({
+            spec {
+                invariant x > 0;
+                invariant res < 64;
+                invariant n == 0 || bv2int(((int2bv(n - 1)) & int2bv(n))) == 0;
+                invariant (n % 2) == 0 || n == 1;
+                invariant n <= 32;
+                invariant n > 0 ==> (x >> n) < (1 << n);
+                invariant n == 0 ==> x == 1;
+                invariant x == (old_x >> res);
+            };
+            n > 0
+        }) {
             if (x >= (1 << n)) {
                 x = x >> n;
                 res = res + n;
             };
+            spec {
+                assert x < (1 << n);
+                assert n % 2 == 0 ==> (x >> (n >> 1)) < (1 << (n >> 1));
+            };
             n = n >> 1;
+        };
+        spec {
+            assert x == 1;
+            assert (old_x >> res) == 1;
         };
         res
     }
