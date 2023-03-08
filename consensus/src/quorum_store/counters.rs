@@ -202,6 +202,16 @@ pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of total batches/PoS left after cleaning up commit notifications.
+pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_total_proofs_left_on_commit",
+        "Histogram for the number of total batches/PoS left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+        .unwrap()
+});
+
 /// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
 pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -410,10 +420,17 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE: Lazy<AverageIntCounter> = Lazy::new(|| {
+pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
     AverageIntCounter::register(
-        "quorum_store_backpressure",
-        "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
+        "quorum_store_backpressure_txn_count",
+        "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
+    )
+});
+
+pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_proof_count",
+        "Indicator of whether Quorum Store is backpressured due to proof count exceeding threshold."
     )
 });
 
