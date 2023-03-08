@@ -22,8 +22,6 @@ Standard math utilities missing in the Move Language.
     -  [Function `average`](#@Specification_1_average)
     -  [Function `pow`](#@Specification_1_pow)
     -  [Function `floor_log2`](#@Specification_1_floor_log2)
-    -  [Function `log2`](#@Specification_1_log2)
-    -  [Function `sqrt`](#@Specification_1_sqrt)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -222,12 +220,13 @@ Returns floor(lg2(x))
     <b>spec</b> {
         <b>assert</b> x &gt; 0;
         <b>assert</b> (x &gt;&gt; 32) &lt; (1 &lt;&lt; 32);
+        <b>assert</b> (1 &lt;&lt; 5) == n && (<b>exists</b> k: u8 : n == 1 &lt;&lt; k);
     };
     <b>while</b> ({
         <b>spec</b> {
             <b>invariant</b> x &gt; 0;
             <b>invariant</b> res &lt; 64;
-            <b>invariant</b> n == 0 || bv2int(((int2bv(n - 1)) & int2bv(n))) == 0;
+            <b>invariant</b> (n == 0) || (<b>exists</b> k: u8 : n == 1 &lt;&lt; k);
             <b>invariant</b> (n % 2) == 0 || n == 1;
             <b>invariant</b> n &lt;= 32;
             <b>invariant</b> n &gt; 0 ==&gt; (x &gt;&gt; n) &lt; (1 &lt;&lt; n);
@@ -477,38 +476,6 @@ to the most correct value up to last digit
 
 <pre><code><b>aborts_if</b> x == 0;
 <b>ensures</b> (x &gt;&gt; result) == 1;
-</code></pre>
-
-
-
-<a name="@Specification_1_log2"></a>
-
-### Function `log2`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_log2">log2</a>(x: u64): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-</code></pre>
-
-
-
-<a name="@Specification_1_sqrt"></a>
-
-### Function `sqrt`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_sqrt">sqrt</a>(x: u64): u64
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
 </code></pre>
 
 

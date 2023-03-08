@@ -64,12 +64,13 @@ module aptos_std::math64 {
         spec {
             assert x > 0;
             assert (x >> 32) < (1 << 32);
+            assert (1 << 5) == n && (exists k: u8 : n == 1 << k);
         };
         while ({
             spec {
                 invariant x > 0;
                 invariant res < 64;
-                invariant n == 0 || bv2int(((int2bv(n - 1)) & int2bv(n))) == 0;
+                invariant (n == 0) || (exists k: u8 : n == 1 << k);
                 invariant (n % 2) == 0 || n == 1;
                 invariant n <= 32;
                 invariant n > 0 ==> (x >> n) < (1 << n);
