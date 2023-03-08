@@ -550,6 +550,11 @@ async fn construction_parse(
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
                     parse_unlock_stake_operation(sender, &type_args, &args)?
                 },
+                (
+                    AccountAddress::ONE,
+                    STAKING_CONTRACT_MODULE,
+                    DISTRIBUTE_STAKING_REWARDS_FUNCTION,
+                ) => parse_distribute_staking_rewards_operation(sender, &type_args, &args)?,
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -850,6 +855,30 @@ pub fn parse_unlock_stake_operation(
     )])
 }
 
+pub fn parse_distribute_staking_rewards_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Distribute should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 0)?;
+    let staker: AccountAddress = parse_function_arg("distribute_staking_rewards", args, 1)?;
+
+    Ok(vec![Operation::distribute_staking_rewards(
+        0,
+        None,
+        sender,
+        AccountIdentifier::base_account(operator),
+        AccountIdentifier::base_account(staker),
+    )])
+}
+
 /// Construction payloads command (OFFLINE)
 ///
 /// Constructs payloads for given known operations
@@ -962,6 +991,23 @@ async fn construction_payloads(
             } else {
                 return Err(ApiError::InvalidInput(Some(format!(
                     "Unlock stake operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::DistributeStakingRewards(inner) => {
+            if let InternalOperation::DistributeStakingRewards(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.operator != metadata_op.operator || inner.staker != metadata_op.staker {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Distribute staking rewards operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Distribute staking rewards operation doesn't match metadata {:?} vs {:?}",
                     inner, metadata.internal_operation
                 ))));
             }
