@@ -40,8 +40,8 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
-// Max is 100k TPS for a full day.
-const MAX_TXNS: u64 = 10_000_000_000;
+// Max is 100k TPS for 3 hours
+const MAX_TXNS: u64 = 1_000_000_000;
 
 const MAX_RETRIES: usize = 6;
 
