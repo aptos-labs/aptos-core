@@ -438,6 +438,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
+ "aptos-vm-logging",
  "arc-swap",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "claims",
@@ -2975,6 +2976,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
+ "aptos-vm-logging",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
  "fail 0.5.0",
@@ -3019,6 +3021,21 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
+ "serde 1.0.149",
+]
+
+[[package]]
+name = "aptos-vm-logging"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-speculative-state-helper",
+ "aptos-state-view",
+ "aptos-types",
+ "arc-swap",
+ "once_cell",
  "serde 1.0.149",
 ]
 
@@ -6295,6 +6312,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
  "aptos-writeset-generator",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
