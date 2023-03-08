@@ -9,7 +9,7 @@ For testing purposes, you will want to create an Aptos account and fund it with 
 
 This document accompanies the command line instructions for the Aptos CLI on [creating](../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) and [funding](../cli-tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet) accounts with the [Aptos Faucet](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet), focusing upon the **testnet** network and leveraging a graphical wallet rather than the CLI.
 
-To see how to interact with the Aptos Faucet in software, conduct [Your First Transaction](../tutorials/first-transaction.md) in **devnet**. To fund your account in **mainnet**, you will need to purchase the Aptos token APT on one of the usual [cryptocurrency exchanges](https://en.wikipedia.org/wiki/Cryptocurrency_exchange).
+To see how to interact with the Aptos Faucet in software, conduct [Your First Transaction](../tutorials/first-transaction.md) in **devnet**. To utilize your account in **mainnet**, you will first need to obtain the Aptos APT tokens.
 
 Other than funding your account in mainnet, the rest of your workflow remains the same as in devnet and testnet. Just remember, in mainnet you are working with real, monetary value that cannot simply be recreated.
 
