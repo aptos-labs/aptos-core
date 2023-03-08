@@ -990,6 +990,10 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["config"]["consensus"]["quorum_store_configs"]
+                ["back_pressure"]["dynamic_max_txn_per_s"] = 5500.into();
+        }))
 }
 
 fn setup_test(config: ForgeConfig) -> ForgeConfig {
