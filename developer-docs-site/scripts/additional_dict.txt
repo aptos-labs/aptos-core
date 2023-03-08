@@ -122,6 +122,7 @@ Homebrew
 HotStuff
 IDE
 IDEs
+ide
 IMCODING
 IOPS
 IPFS
