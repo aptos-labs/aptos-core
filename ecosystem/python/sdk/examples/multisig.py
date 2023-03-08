@@ -13,7 +13,11 @@ from aptos_sdk.transactions import (EntryFunction, RawTransaction, Script,
 from aptos_sdk.type_tag import StructTag, TypeTag
 from common import FAUCET_URL, NODE_URL
 
-wait_for_user = True
+
+def wait():
+    """Wait for user to press Enter before starting next section."""
+    input("\nPress Enter to continue...")
+
 
 if __name__ == "__main__":
     rest_client = RestClient(NODE_URL)
@@ -39,8 +43,7 @@ if __name__ == "__main__":
     print(f"Bob:   {bob.public_key()}")
     print(f"Chad:  {chad.public_key()}")  # <:!:section_1
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_2
     threshold = 2
@@ -57,8 +60,7 @@ if __name__ == "__main__":
     print(f"Account public key: {multisig_public_key}")
     print(f"Account address:    {multisig_address}")  # <:!:section_2
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_3
     print("\n=== Funding accounts ===")
@@ -83,8 +85,7 @@ if __name__ == "__main__":
     multisig_balance = rest_client.account_balance(multisig_address)
     print(f"Multisig balance: {multisig_balance}")  # <:!:section_3
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_4
     entry_function = EntryFunction.natural(
@@ -119,8 +120,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice_signature}")
     print(f"Bob:   {bob_signature}")  # <:!:section_4
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_5
     sig_map = [  # Map from signatory public key to signature.
@@ -136,17 +136,13 @@ if __name__ == "__main__":
 
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
-    print("\n=== Submitting transaction ===")
+    print("\n=== Submitting transfer transaction ===")
 
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
-
+    rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash: {tx_hash}")  # <:!:section_5
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
-
-    print("\nWaiting for API server to update...")
-    time.sleep(2.5)
+    wait()
 
     # :!:>section_6
     print("\n=== New account balances===")
@@ -163,8 +159,7 @@ if __name__ == "__main__":
     multisig_balance = rest_client.account_balance(multisig_address)
     print(f"Multisig balance: {multisig_balance}")  # <:!:section_6
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_7
     print("\n=== Funding vanity address ===")
@@ -181,10 +176,9 @@ if __name__ == "__main__":
 
     faucet_client.fund_account(deedee.address(), deedee_start)
     deedee_balance = rest_client.account_balance(deedee.address())
-    print(f"Deedee's balance: {deedee_balance}")  # <:!:section_7
+    print(f"Deedee's balance:    {deedee_balance}")  # <:!:section_7
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_8
     print("\n=== Signing rotation proof challenge ===")
@@ -216,8 +210,7 @@ if __name__ == "__main__":
     print(f"cap_rotate_key:   {cap_rotate_key_hex}")
     print(f"cap_update_table: {cap_update_table_hex}")  # <:!:section_8
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_9
     print("\n=== Submitting authentication key rotation transaction ===")
@@ -249,34 +242,33 @@ if __name__ == "__main__":
 
     print(f"Auth key pre-rotation: {auth_key}")
 
-    rest_client.submit_bcs_transaction(signed_transaction)
-
-    print("\nWaiting for API server to update...\n")
-    time.sleep(2.5)
+    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    rest_client.wait_for_transaction(tx_hash)
+    print(f"Transaction hash:      {tx_hash}")
 
     auth_key = rest_client.account(deedee.address())["authentication_key"]
 
-    print(f"New auth key:         {auth_key}")
-    print(f"1st multisig address: {multisig_address}")  # <:!:section_9
+    print(f"New auth key:          {auth_key}")
+    print(f"1st multisig address:  {multisig_address}")  # <:!:section_9
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_10
-    print("\n=== Publishing v1.0.0 ===")
+    print("\n=== Genesis publication ===")
 
     packages_dir = "../../../../aptos-move/move-examples/upgrade_and_govern/"
 
     command = (
-        f"aptos move compile --save-metadata "
-        f"--package-dir {packages_dir}v1_0_0 "
+        f"aptos move compile "
+        f"--save-metadata "
+        f"--package-dir {packages_dir}genesis "
         f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
     )
 
     print(f"Running aptos CLI command: {command}\n")
     subprocess.run(command.split(), stdout=subprocess.PIPE)
 
-    build_path = f"{packages_dir}v1_0_0/build/UpgradeAndGovern/"
+    build_path = f"{packages_dir}genesis/build/UpgradeAndGovern/"
 
     with open(f"{build_path}package-metadata.bcs", "rb") as f:
         package_metadata = f.read()
@@ -325,10 +317,8 @@ if __name__ == "__main__":
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    rest_client.wait_for_transaction(tx_hash)
     print(f"\nTransaction hash: {tx_hash}")
-
-    print("\nWaiting for API server to update...\n")
-    time.sleep(2.5)
 
     registry = rest_client.account_resource(
         deedee.address(), "0x1::code::PackageRegistry"
@@ -340,22 +330,22 @@ if __name__ == "__main__":
     print(f"Package name from on-chain registry: {package_name}")
     print(f"On-chain upgrade number: {n_upgrades}")  # <:!:section_10
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_11
-    print("\n=== Publishing v1.1.0 ===")
+    print("\n=== Upgrade publication ===")
 
     command = (
-        f"aptos move compile --save-metadata "
-        f"--package-dir {packages_dir}v1_1_0 "
+        f"aptos move compile "
+        f"--save-metadata "
+        f"--package-dir {packages_dir}upgrade "
         f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
     )
 
     print(f"Running aptos CLI command: {command}\n")
     subprocess.run(command.split(), stdout=subprocess.PIPE)
 
-    build_path = f"{packages_dir}v1_1_0/build/UpgradeAndGovern/"
+    build_path = f"{packages_dir}upgrade/build/UpgradeAndGovern/"
 
     with open(f"{build_path}package-metadata.bcs", "rb") as f:
         package_metadata = f.read()
@@ -372,7 +362,7 @@ if __name__ == "__main__":
         ty_args=[],
         args=[
             TransactionArgument(package_metadata, Serializer.to_bytes),
-            TransactionArgument(
+            TransactionArgument(  # Transfer module listed second.
                 [parameters_module, transfer_module],
                 Serializer.sequence_serializer(Serializer.to_bytes),
             ),
@@ -410,10 +400,8 @@ if __name__ == "__main__":
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    rest_client.wait_for_transaction(tx_hash)
     print(f"\nTransaction hash: {tx_hash}")
-
-    print("\nWaiting for API server to update...\n")
-    time.sleep(2.5)
 
     registry = rest_client.account_resource(
         deedee.address(), "0x1::code::PackageRegistry"
@@ -423,8 +411,7 @@ if __name__ == "__main__":
 
     print(f"On-chain upgrade number: {n_upgrades}")  # <:!:section_11
 
-    if wait_for_user:
-        input("\nPress Enter to continue...")
+    wait()
 
     # :!:>section_12
     print("\n=== Invoking Move script ===")
@@ -470,14 +457,12 @@ if __name__ == "__main__":
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
     tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash: {tx_hash}")
 
-    print("\nWaiting for API server to update...\n")
-    time.sleep(2.5)
-
     alice_balance = rest_client.account_balance(alice.address())
-    print(f"Alice's balance: {alice_balance}")
+    print(f"Alice's balance:  {alice_balance}")
     bob_balance = rest_client.account_balance(bob.address())
-    print(f"Bob's balance:   {bob_balance}")
+    print(f"Bob's balance:    {bob_balance}")
     chad_balance = rest_client.account_balance(chad.address())
-    print(f"Chad's balance:  {chad_balance}")  # <:!:section_12
+    print(f"Chad's balance:   {chad_balance}")  # <:!:section_12
