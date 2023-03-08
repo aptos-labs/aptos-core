@@ -8,9 +8,9 @@
 use super::token_utils::TokenWriteSet;
 use crate::{
     schema::{current_token_datas, token_datas},
-    util::standardize_address,
+    utils::util::standardize_address,
 };
-use aptos_api_types::WriteTableItem as APIWriteTableItem;
+use aptos_protos::transaction::testing1::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ pub struct CurrentTokenData {
 
 impl TokenData {
     pub fn from_write_table_item(
-        table_item: &APIWriteTableItem,
+        table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, CurrentTokenData)>> {

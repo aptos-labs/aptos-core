@@ -6,8 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use super::transactions::{Transaction, TransactionQuery};
-use crate::{schema::block_metadata_transactions, utils::util::parse_timestamp_secs};
-use aptos_protos::transaction::testing1::v1::BlockMetadataTransaction as BlockMetadataTransactionPB;
+use crate::{schema::block_metadata_transactions, utils::util::parse_timestamp};
+use aptos_protos::{
+    transaction::testing1::v1::BlockMetadataTransaction as BlockMetadataTransactionPB,
+    util::timestamp::Timestamp,
+};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +58,7 @@ impl BlockMetadataTransaction {
         version: i64,
         block_height: i64,
         epoch: i64,
-        timestamp_in_secs: u64,
+        timestamp: &Timestamp,
     ) -> Self {
         Self {
             version,
@@ -68,7 +71,7 @@ impl BlockMetadataTransaction {
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
                 .unwrap(),
             // time is in microseconds
-            timestamp: parse_timestamp_secs(timestamp_in_secs, version),
+            timestamp: parse_timestamp(timestamp, version),
         }
     }
 }

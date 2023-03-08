@@ -98,17 +98,6 @@ impl TableItem {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, CurrentTableItem) {
-        let decoded_key = delete_table_item
-            .data
-            .as_ref()
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not extract data from DeletedTableItem '{:?}'",
-                    delete_table_item
-                )
-            })
-            .key
-            .clone();
         (
             Self {
                 transaction_version,

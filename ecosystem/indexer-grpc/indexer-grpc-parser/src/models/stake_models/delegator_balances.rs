@@ -4,14 +4,13 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    models::stake_models::stake_utils::StakeResource, schema::current_delegator_balances,
-    util::standardize_address,
+    models::{default_models::move_tables::TableItem, stake_models::stake_utils::StakeResource},
+    schema::current_delegator_balances,
+    utils::util::standardize_address,
 };
 use anyhow::Context;
-use aptos_api_types::{
-    DeleteTableItem as APIDeleteTableItem, Transaction as APITransaction,
-    WriteResource as APIWriteResource, WriteSetChange as APIWriteSetChange,
-    WriteTableItem as APIWriteTableItem,
+use aptos_protos::transaction::testing1::v1::{
+    write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
@@ -40,7 +39,7 @@ impl CurrentDelegatorBalance {
     /// We're only indexing active_shares for now because that's all the UI needs and indexing
     /// the inactive_shares or pending_withdrawal_shares would be more complicated.
     pub fn from_write_table_item(
-        write_table_item: &APIWriteTableItem,
+        write_table_item: &WriteTableItem,
         txn_version: i64,
         active_share_mapping: &ActiveShareMapping,
     ) -> anyhow::Result<Option<Self>> {
@@ -49,23 +48,22 @@ impl CurrentDelegatorBalance {
         if let Some(pool_address) = active_share_mapping.get(&table_handle) {
             let pool_address = standardize_address(pool_address);
             let delegator_address = standardize_address(&write_table_item.key.to_string());
-            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
-                panic!(
-                    "This table item should be an active share item, table_item {:?}, version {}",
-                    write_table_item, txn_version
-                )
-            });
-            let amount = data
-                .value
+
+            // Convert to TableItem model. Some fields are just placeholders
+            let (table_item_model, _) =
+                TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
+
+            let amount = table_item_model
+                .decoded_value
+                .as_ref()
+                .unwrap()
                 .as_str()
-                .map(|s| s.parse::<BigDecimal>())
+                .unwrap()
+                .parse::<BigDecimal>()
                 .context(format!(
-                    "value is not a string: {:?}, table_item {:?}, version {}",
-                    data.value, write_table_item, txn_version
-                ))?
-                .context(format!(
-                    "cannot parse string as u64: {:?}, version {}",
-                    data.value, txn_version
+                    "cannot parse string as u128: {:?}, version {}",
+                    table_item_model.decoded_value.as_ref(),
+                    txn_version
                 ))?;
 
             return Ok(Some(Self {
@@ -82,7 +80,7 @@ impl CurrentDelegatorBalance {
 
     // Setting amount to 0 if table item is deleted
     pub fn from_delete_table_item(
-        delete_table_item: &APIDeleteTableItem,
+        delete_table_item: &DeleteTableItem,
         txn_version: i64,
         active_share_mapping: &ActiveShareMapping,
     ) -> anyhow::Result<Option<Self>> {
@@ -104,7 +102,7 @@ impl CurrentDelegatorBalance {
     }
 
     pub fn get_active_share_map(
-        write_resource: &APIWriteResource,
+        write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<ActiveShareMapping>> {
         if let Some(StakeResource::DelegationPool(inner)) =
@@ -118,39 +116,36 @@ impl CurrentDelegatorBalance {
     }
 
     pub fn from_transaction(
-        transaction: &APITransaction,
+        transaction: &Transaction,
     ) -> anyhow::Result<CurrentDelegatorBalanceMap> {
         let mut active_share_mapping: ActiveShareMapping = HashMap::new();
         let mut current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
+
         // Do a first pass to get the mapping of active_share table handles to staking pool addresses
-        if let APITransaction::UserTransaction(user_txn) = transaction {
-            let txn_version = user_txn.info.version.0 as i64;
-            for wsc in &user_txn.info.changes {
-                if let APIWriteSetChange::WriteResource(write_resource) = wsc {
-                    let maybe_map =
-                        Self::get_active_share_map(write_resource, txn_version).unwrap();
-                    if let Some(map) = maybe_map {
-                        active_share_mapping.extend(map);
-                    }
+        let txn_version = transaction.version as i64;
+        for wsc in &transaction.info.as_ref().unwrap().changes {
+            if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                let maybe_map = Self::get_active_share_map(write_resource, txn_version).unwrap();
+                if let Some(map) = maybe_map {
+                    active_share_mapping.extend(map);
                 }
             }
-            // Now make a pass through table items to get the actual delegator balances
-            for wsc in &user_txn.info.changes {
-                if let APIWriteSetChange::WriteTableItem(table_item) = wsc {
-                    let txn_version = user_txn.info.version.0 as i64;
-                    let maybe_delegator_balance =
-                        Self::from_write_table_item(table_item, txn_version, &active_share_mapping)
-                            .unwrap();
-                    if let Some(delegator_balance) = maybe_delegator_balance {
-                        current_delegator_balances.insert(
-                            (
-                                delegator_balance.delegator_address.clone(),
-                                delegator_balance.pool_address.clone(),
-                                delegator_balance.pool_type.clone(),
-                            ),
-                            delegator_balance,
-                        );
-                    }
+        }
+        // Now make a pass through table items to get the actual delegator balances
+        for wsc in &transaction.info.as_ref().unwrap().changes {
+            if let Change::WriteTableItem(table_item) = wsc.change.as_ref().unwrap() {
+                let maybe_delegator_balance =
+                    Self::from_write_table_item(table_item, txn_version, &active_share_mapping)
+                        .unwrap();
+                if let Some(delegator_balance) = maybe_delegator_balance {
+                    current_delegator_balances.insert(
+                        (
+                            delegator_balance.delegator_address.clone(),
+                            delegator_balance.pool_address.clone(),
+                            delegator_balance.pool_type.clone(),
+                        ),
+                        delegator_balance,
+                    );
                 }
             }
         }

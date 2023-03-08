@@ -10,7 +10,7 @@ use crate::{
     schema::token_activities,
     utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_protos::transaction::testing1::v1::transaction::TxnData;
+use aptos_protos::transaction::testing1::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -56,7 +56,7 @@ struct TokenActivityHelper<'a> {
 }
 
 impl TokenActivity {
-    pub fn from_transaction(transaction: &APITransaction) -> Vec<Self> {
+    pub fn from_transaction(transaction: &Transaction) -> Vec<Self> {
         let mut token_activities = vec![];
         let txn_data = transaction
             .txn_data
@@ -64,17 +64,20 @@ impl TokenActivity {
             .expect("Txn Data doesn't exit!");
         if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
-                let txn_version = user_txn.info.version.0 as i64;
-                let event_type = event.type.to_string();
-                if let Some(token_event) =
-                    TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+                let txn_version = transaction.version as i64;
+                if let Some(token_event) = TokenEvent::from_event(
+                    event.type_str.as_str(),
+                    &event.data.as_str(),
+                    txn_version,
+                )
+                .unwrap()
                 {
                     token_activities.push(Self::from_parsed_event(
-                        &event_type,
+                        event.type_str.as_str(),
                         event,
                         &token_event,
                         txn_version,
-                        parse_timestamp(user_txn.timestamp.0, txn_version),
+                        parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version),
                         index as i64,
                     ))
                 }
@@ -85,15 +88,16 @@ impl TokenActivity {
 
     pub fn from_parsed_event(
         event_type: &str,
-        event: &APIEvent,
+        event: &Event,
         token_event: &TokenEvent,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
     ) -> Self {
-        let event_account_address = standardize_address(&event.guid.account_address.to_string());
-        let event_creation_number = event.guid.creation_number.0 as i64;
-        let event_sequence_number = event.sequence_number.0 as i64;
+        let event_account_address =
+            standardize_address(event.key.as_ref().unwrap().account_address.as_str());
+        let event_creation_number = event.key.as_ref().unwrap().creation_number as i64;
+        let event_sequence_number = event.sequence_number as i64;
         let token_activity_helper = match token_event {
             TokenEvent::MintTokenEvent(inner) => TokenActivityHelper {
                 token_data_id: &inner.id,

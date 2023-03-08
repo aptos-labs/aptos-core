@@ -11,12 +11,11 @@ use super::{
 };
 use crate::{
     schema::{current_token_ownerships, token_ownerships},
-    util::standardize_address,
+    utils::util::standardize_address,
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -66,7 +65,7 @@ impl TokenOwnership {
     pub fn from_token(
         token: &Token,
         table_item_key_type: &str,
-        table_item_key: &Value,
+        table_item_key: &str,
         amount: BigDecimal,
         table_handle: String,
         table_handle_to_owner: &TableHandleToOwner,

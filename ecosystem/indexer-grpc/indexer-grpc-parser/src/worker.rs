@@ -6,9 +6,16 @@ use crate::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
+        stake_processor::StakeTransactionProcessor,
+        token_processor::TokenTransactionProcessor,
         Processor,
     },
-    utils::database::new_db_pool,
+    utils::{
+        counters::{
+            LATEST_PROCESSED_VERSION, PROCESSOR_ERRORS, PROCESSOR_INVOCATIONS, PROCESSOR_SUCCESSES,
+        },
+        database::new_db_pool,
+    },
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -60,6 +67,10 @@ fn get_processor_name() -> String {
     std::env::var("PROCESSOR_NAME").expect("PROCESSOR_NAME is required.")
 }
 
+fn get_ans_address() -> Option<String> {
+    std::env::var("ANS_ADDRESS").ok()
+}
+
 pub struct Worker {
     pub db_pool: PgDbPool,
     pub datastream_service_address: String,
@@ -68,7 +79,7 @@ pub struct Worker {
 
 impl Worker {
     pub async fn new() -> Self {
-        let processor_name = &get_processor_name();
+        let processor_name = get_processor_name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
         let postgres_uri = get_postgres_connection_string();
@@ -90,7 +101,7 @@ impl Worker {
     }
 
     pub async fn run(&self) {
-        let processor_name = &get_processor_name();
+        let processor_name = get_processor_name();
         info!(
             processor_name = processor_name,
             "[Parser] Running migrations"
@@ -159,13 +170,13 @@ impl Worker {
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
-            // Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
-            //     self.db_pool.clone(),
-            //     config.ans_contract_address,
-            // )),
-            // Processor::StakeProcessor => {
-            //     Arc::new(StakeTransactionProcessor::new(conn_pool.clone()))
-            // },
+            Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
+                self.db_pool.clone(),
+                get_ans_address(),
+            )),
+            Processor::StakeProcessor => {
+                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
+            },
         };
 
         let mut ma = MovingAverage::new(10_000);
@@ -228,6 +239,9 @@ impl Worker {
                     let start_version = transactions.as_slice().first().unwrap().version;
                     let end_version = transactions.as_slice().last().unwrap().version;
 
+                    PROCESSOR_INVOCATIONS
+                        .with_label_values(&[&processor_name])
+                        .inc();
                     processor_clone
                         .process_transactions(transactions, start_version, end_version)
                         .await
@@ -243,7 +257,12 @@ impl Worker {
             let mut processed_versions = vec![];
             for res in batches {
                 let processed: ProcessingResult = match res {
-                    Ok(versions) => versions,
+                    Ok(versions) => {
+                        PROCESSOR_SUCCESSES
+                            .with_label_values(&[&processor_name])
+                            .inc();
+                        versions
+                    },
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -251,6 +270,7 @@ impl Worker {
                             error = ?e,
                             "[Parser] Error processing transactions"
                         );
+                        PROCESSOR_ERRORS.with_label_values(&[&processor_name]).inc();
                         panic!();
                     },
                 };
@@ -283,6 +303,9 @@ impl Worker {
             let batch_start = processed_versions_sorted.first().unwrap().0;
             let batch_end = processed_versions_sorted.last().unwrap().1;
 
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[&processor_name])
+                .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
                 .await

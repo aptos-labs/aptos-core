@@ -5,8 +5,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::stake_utils::StakeResource;
-use crate::{schema::current_staking_pool_voter, util::standardize_address};
-use aptos_api_types::{Transaction as APITransaction, WriteSetChange as APIWriteSetChange};
+use crate::{schema::current_staking_pool_voter, utils::util::standardize_address};
+use aptos_protos::transaction::testing1::v1::{Transaction, write_set_change::Change};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,32 +24,26 @@ pub struct CurrentStakingPoolVoter {
 }
 
 impl CurrentStakingPoolVoter {
-    pub fn from_transaction(transaction: &APITransaction) -> anyhow::Result<StakingPoolVoterMap> {
+    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<StakingPoolVoterMap> {
         let mut staking_pool_voters = HashMap::new();
-        let empty_change = vec![];
-        let (txn_version, changes) = match transaction {
-            APITransaction::UserTransaction(txn) => (txn.info.version.0 as i64, &txn.info.changes),
-            APITransaction::GenesisTransaction(txn) => {
-                (txn.info.version.0 as i64, &txn.info.changes)
-            },
-            APITransaction::BlockMetadataTransaction(txn) => {
-                (txn.info.version.0 as i64, &txn.info.changes)
-            },
-            _ => (0, &empty_change),
-        };
-        for wsc in changes {
-            if let APIWriteSetChange::WriteResource(write_resource) = wsc {
+
+        let txn_version = transaction.version as i64;
+        for wsc in &transaction.info.as_ref().unwrap().changes {
+            if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                 if let Some(StakeResource::StakePool(inner)) =
                     StakeResource::from_write_resource(write_resource, txn_version)?
                 {
                     let staking_pool_address =
                         standardize_address(&write_resource.address.to_string());
                     let voter_address = standardize_address(&inner.delegated_voter);
-                    staking_pool_voters.insert(staking_pool_address.clone(), Self {
-                        staking_pool_address,
-                        voter_address,
-                        last_transaction_version: txn_version,
-                    });
+                    staking_pool_voters.insert(
+                        staking_pool_address.clone(),
+                        Self {
+                            staking_pool_address,
+                            voter_address,
+                            last_transaction_version: txn_version,
+                        },
+                    );
                 }
             }
         }

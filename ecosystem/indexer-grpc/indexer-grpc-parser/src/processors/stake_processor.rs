@@ -2,13 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
-    },
-    indexer::{
-        errors::TransactionProcessingError, processing_result::ProcessingResult,
-        transaction_processor::TransactionProcessor,
-    },
     models::stake_models::{
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
@@ -16,12 +9,19 @@ use crate::{
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
     schema,
+    utils::database::{
+        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+    },
 };
-use aptos_api_types::Transaction as APITransaction;
+use anyhow::bail;
+use aptos_logger::error;
+use aptos_protos::transaction::testing1::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
+
+use super::processor_trait::{ProcessingResult, ProcessorTrait};
 
 pub const NAME: &str = "stake_processor";
 pub struct StakeTransactionProcessor {
@@ -208,17 +208,17 @@ fn insert_delegator_balances(
 }
 
 #[async_trait]
-impl TransactionProcessor for StakeTransactionProcessor {
+impl ProcessorTrait for StakeTransactionProcessor {
     fn name(&self) -> &'static str {
         NAME
     }
 
     async fn process_transactions(
         &self,
-        transactions: Vec<APITransaction>,
+        transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-    ) -> Result<ProcessingResult, TransactionProcessingError> {
+    ) -> anyhow::Result<ProcessingResult> {
         let mut all_current_stake_pool_voters: StakingPoolVoterMap = HashMap::new();
         let mut all_proposal_votes = vec![];
         let mut all_delegator_activities = vec![];
@@ -273,17 +273,17 @@ impl TransactionProcessor for StakeTransactionProcessor {
             all_delegator_balances,
         );
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(
-                self.name(),
-                start_version,
-                end_version,
-            )),
-            Err(err) => Err(TransactionProcessingError::TransactionCommitError((
-                anyhow::Error::from(err),
-                start_version,
-                end_version,
-                self.name(),
-            ))),
+            Ok(_) => Ok((start_version, end_version)),
+            Err(e) => {
+                error!(
+                    start_version = start_version,
+                    end_version = end_version,
+                    processor_name = self.name(),
+                    error = ?e,
+                    "[Parser] Error inserting transactions to db",
+                );
+                bail!(e)
+            },
         }
     }
 

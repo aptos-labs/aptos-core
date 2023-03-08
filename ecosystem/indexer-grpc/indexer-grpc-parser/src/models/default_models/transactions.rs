@@ -134,16 +134,15 @@ impl Transaction {
             .info
             .as_ref()
             .expect("Transaction info doesn't exist!");
-        let timestamp_in_seconds = transaction
+        let timestamp = transaction
             .timestamp
             .as_ref()
-            .expect("Transaction timestamp doesn't exist!")
-            .seconds;
+            .expect("Transaction timestamp doesn't exist!");
         match txn_data {
             TxnData::User(user_txn) => {
                 let (user_txn_output, signatures) = UserTransaction::from_transaction(
                     user_txn,
-                    timestamp_in_seconds,
+                    timestamp,
                     block_height,
                     epoch,
                     version,
@@ -228,7 +227,7 @@ impl Transaction {
                             version,
                             block_height,
                             epoch,
-                            timestamp_in_seconds as u64,
+                            timestamp,
                         ),
                     )),
                     EventModel::from_events(&block_metadata_txn.events, version, block_height),

@@ -4,9 +4,11 @@
 use std::str::FromStr;
 
 use crate::models::property_map::PropertyMap;
-use aptos_protos::transaction::testing1::v1::UserTransactionRequest;
-use aptos_protos::transaction::testing1::v1::{
-    transaction_payload::Payload as PayloadPB, UserTransaction as UserTransactionPB,
+use aptos_protos::{
+    transaction::testing1::v1::{
+        transaction_payload::Payload as PayloadPB, UserTransactionRequest,
+    },
+    util::timestamp::Timestamp,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer};
@@ -20,7 +22,11 @@ const MAX_ENTRY_FUNCTION_LENGTH: usize = 100;
 
 /// Standardizes all addresses and table handles to be length 66 (0x-64 length hash)
 pub fn standardize_address(handle: &str) -> String {
-    format!("0x{:0>64}", &handle[2..])
+    if handle.starts_with("0x") {
+        format!("0x{:0>64}", &handle[2..])
+    } else {
+        format!("0x{:0>64}", &handle)
+    }
 }
 
 pub fn hash_str(val: &str) -> String {
@@ -66,8 +72,8 @@ pub fn get_entry_function_from_user_request(
     ))
 }
 
-pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt((ts / 1000000) as i64, 0)
+pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
@@ -203,7 +209,13 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp() {
-        let ts = parse_timestamp(1649560602763949, 1);
+        let ts = parse_timestamp(
+            &Timestamp {
+                seconds: 1649560602,
+                nanos: 0,
+            },
+            1,
+        );
         assert_eq!(ts.timestamp(), 1649560602);
         assert_eq!(ts.year(), 2022);
 

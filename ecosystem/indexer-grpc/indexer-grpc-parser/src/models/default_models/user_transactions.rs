@@ -13,9 +13,14 @@ use super::{
 };
 use crate::{
     schema::user_transactions,
-    utils::util::{get_entry_function_from_user_request, parse_timestamp, u64_to_bigdecimal, standardize_address},
+    utils::util::{
+        get_entry_function_from_user_request, parse_timestamp, standardize_address,
+        u64_to_bigdecimal,
+    },
 };
-use aptos_protos::transaction::testing1::v1::UserTransaction as UserTransactionPB;
+use aptos_protos::{
+    transaction::testing1::v1::UserTransaction as UserTransactionPB, util::timestamp::Timestamp,
+};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -63,7 +68,7 @@ pub struct UserTransactionQuery {
 impl UserTransaction {
     pub fn from_transaction(
         txn: &UserTransactionPB,
-        timestamp_in_secs: i64,
+        timestamp: &Timestamp,
         block_height: i64,
         epoch: i64,
         version: i64,
@@ -91,14 +96,11 @@ impl UserTransaction {
                     user_request
                         .expiration_timestamp_secs
                         .as_ref()
-                        .expect("Expiration timestamp is not present in user txn")
-                        .seconds
-                        .try_into()
-                        .unwrap(),
+                        .expect("Expiration timestamp is not present in user txn"),
                     version,
                 ),
                 gas_unit_price: u64_to_bigdecimal(user_request.gas_unit_price),
-                timestamp: parse_timestamp(timestamp_in_secs.try_into().unwrap(), version),
+                timestamp: parse_timestamp(timestamp, version),
                 entry_function_id_str: get_entry_function_from_user_request(user_request)
                     .unwrap_or_default(),
                 epoch,

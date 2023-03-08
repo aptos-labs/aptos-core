@@ -107,4 +107,16 @@ impl MoveResource {
                 .unwrap_or(None),
         }
     }
+
+    pub fn get_outer_type_from_resource(write_resource: &WriteResource) -> String {
+        let move_struct_tag =
+            Self::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
+
+        format!(
+            "{}::{}::{}",
+            standardize_address(move_struct_tag.address.as_str()),
+            move_struct_tag.module.clone(),
+            move_struct_tag.name.clone(),
+        )
+    }
 }

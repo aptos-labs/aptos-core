@@ -13,15 +13,14 @@ use super::{
     token_utils::{TokenResource, TokenWriteSet},
 };
 use crate::{
-    database::PgPoolConnection,
-    models::move_resources::MoveResource,
+    models::default_models::move_resources::MoveResource,
     schema::tokens,
-    util::{ensure_not_negative, parse_timestamp, standardize_address},
+    utils::database::PgPoolConnection,
+    utils::util::{ensure_not_negative, parse_timestamp, standardize_address},
 };
-use aptos_api_types::{
-    DeleteTableItem as APIDeleteTableItem, Transaction as APITransaction,
-    WriteResource as APIWriteResource, WriteSetChange as APIWriteSetChange,
-    WriteTableItem as APIWriteTableItem,
+use aptos_protos::transaction::testing1::v1::{
+    transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
+    Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
@@ -68,7 +67,7 @@ impl Token {
     /// We also will compute current versions of the token tables which are at a higher granularity than the transactional tables (only
     /// state at the last transaction will be tracked, hence using hashmap to dedupe)
     pub fn from_transaction(
-        transaction: &APITransaction,
+        transaction: &Transaction,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection,
     ) -> (
@@ -81,7 +80,11 @@ impl Token {
         HashMap<TokenDataIdHash, CurrentCollectionData>,
         HashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
-        if let APITransaction::UserTransaction(user_txn) = transaction {
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
+        if let TxnData::User(_) = txn_data {
             let mut token_ownerships = vec![];
             let mut token_datas = vec![];
             let mut collection_datas = vec![];
@@ -100,51 +103,57 @@ impl Token {
                 CurrentTokenPendingClaim,
             > = HashMap::new();
 
-            let txn_version = user_txn.info.version.0 as i64;
-            let txn_timestamp = parse_timestamp(user_txn.timestamp.0, txn_version);
+            let txn_version = transaction.version as i64;
+            let txn_timestamp =
+                parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version);
+            let transaction_info = transaction
+                .info
+                .as_ref()
+                .expect("Transaction info doesn't exist!");
 
-            for wsc in &user_txn.info.changes {
+            for wsc in &transaction_info.changes {
                 // Basic token and ownership data
-                let (maybe_token_w_ownership, maybe_token_data, maybe_collection_data) = match wsc {
-                    APIWriteSetChange::WriteTableItem(write_table_item) => (
-                        Self::from_write_table_item(
-                            write_table_item,
-                            txn_version,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                        )
-                        .unwrap(),
-                        TokenData::from_write_table_item(
-                            write_table_item,
-                            txn_version,
-                            txn_timestamp,
-                        )
-                        .unwrap(),
-                        CollectionData::from_write_table_item(
-                            write_table_item,
-                            txn_version,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                            conn,
-                        )
-                        .unwrap(),
-                    ),
-                    APIWriteSetChange::DeleteTableItem(delete_table_item) => (
-                        Self::from_delete_table_item(
-                            delete_table_item,
-                            txn_version,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                        )
-                        .unwrap(),
-                        None,
-                        None,
-                    ),
-                    _ => (None, None, None),
-                };
+                let (maybe_token_w_ownership, maybe_token_data, maybe_collection_data) =
+                    match wsc.change.as_ref().unwrap() {
+                        WriteSetChangeEnum::WriteTableItem(write_table_item) => (
+                            Self::from_write_table_item(
+                                write_table_item,
+                                txn_version,
+                                txn_timestamp,
+                                table_handle_to_owner,
+                            )
+                            .unwrap(),
+                            TokenData::from_write_table_item(
+                                write_table_item,
+                                txn_version,
+                                txn_timestamp,
+                            )
+                            .unwrap(),
+                            CollectionData::from_write_table_item(
+                                write_table_item,
+                                txn_version,
+                                txn_timestamp,
+                                table_handle_to_owner,
+                                conn,
+                            )
+                            .unwrap(),
+                        ),
+                        WriteSetChangeEnum::DeleteTableItem(delete_table_item) => (
+                            Self::from_delete_table_item(
+                                delete_table_item,
+                                txn_version,
+                                txn_timestamp,
+                                table_handle_to_owner,
+                            )
+                            .unwrap(),
+                            None,
+                            None,
+                        ),
+                        _ => (None, None, None),
+                    };
                 // More advanced token contracts
-                let maybe_current_token_claim = match wsc {
-                    APIWriteSetChange::WriteTableItem(write_table_item) => {
+                let maybe_current_token_claim = match wsc.change.as_ref().unwrap() {
+                    WriteSetChangeEnum::WriteTableItem(write_table_item) => {
                         CurrentTokenPendingClaim::from_write_table_item(
                             write_table_item,
                             txn_version,
@@ -153,7 +162,7 @@ impl Token {
                         )
                         .unwrap()
                     },
-                    APIWriteSetChange::DeleteTableItem(delete_table_item) => {
+                    WriteSetChangeEnum::DeleteTableItem(delete_table_item) => {
                         CurrentTokenPendingClaim::from_delete_table_item(
                             delete_table_item,
                             txn_version,
@@ -233,7 +242,7 @@ impl Token {
     /// We get the mapping from resource.
     /// If the mapping is missing we'll just leave owner address as blank. This isn't great but at least helps us account for the token
     pub fn from_write_table_item(
-        table_item: &APIWriteTableItem,
+        table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
@@ -291,7 +300,7 @@ impl Token {
     /// Get token from delete table item. The difference from write table item is that value isn't there so
     /// we'll set amount to 0 and token property to blank.
     pub fn from_delete_table_item(
-        table_item: &APIDeleteTableItem,
+        table_item: &DeleteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
@@ -348,15 +357,22 @@ impl TableMetadataForToken {
     /// Mapping from table handle to owner type, including type of the table (AKA resource type)
     /// from user transactions in a batch of transactions
     pub fn get_table_handle_to_owner_from_transactions(
-        transactions: &[APITransaction],
+        transactions: &[Transaction],
     ) -> TableHandleToOwner {
         let mut table_handle_to_owner: TableHandleToOwner = HashMap::new();
         // Do a first pass to get all the table metadata in the batch.
         for transaction in transactions {
-            if let APITransaction::UserTransaction(user_txn) = transaction {
-                let txn_version = user_txn.info.version.0 as i64;
-                for wsc in &user_txn.info.changes {
-                    if let APIWriteSetChange::WriteResource(write_resource) = wsc {
+            if let TxnData::User(_) = transaction.txn_data.as_ref().unwrap() {
+                let txn_version = transaction.version as i64;
+
+                let transaction_info = transaction
+                    .info
+                    .as_ref()
+                    .expect("Transaction info doesn't exist!");
+                for wsc in &transaction_info.changes {
+                    if let WriteSetChangeEnum::WriteResource(write_resource) =
+                        wsc.change.as_ref().unwrap()
+                    {
                         let maybe_map = TableMetadataForToken::get_table_handle_to_owner(
                             write_resource,
                             txn_version,
@@ -374,15 +390,10 @@ impl TableMetadataForToken {
 
     /// Mapping from table handle to owner type, including type of the table (AKA resource type)
     fn get_table_handle_to_owner(
-        write_resource: &APIWriteResource,
+        write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<TableHandleToOwner>> {
-        let type_str = format!(
-            "{}::{}::{}",
-            write_resource.data.typ.address,
-            write_resource.data.typ.module,
-            write_resource.data.typ.name
-        );
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -395,7 +406,7 @@ impl TableMetadataForToken {
 
         let value = TableMetadataForToken {
             owner_address: standardize_address(&resource.address),
-            table_type: write_resource.data.typ.to_string(),
+            table_type: write_resource.type_str.clone(),
         };
         let table_handle: TableHandle = match TokenResource::from_resource(
             &type_str,

@@ -88,15 +88,16 @@ impl CurrentAnsLookup {
                 .expect("Txn Data doesn't exit!");
             if let TxnData::User(user_txn) = txn_data {
                 for event in &user_txn.events {
-                    let (event_addr, event_type) =
-                        if let Content::Struct(inner) = &event.r#type.unwrap().content.unwrap() {
-                            (
-                                inner.address.to_string(),
-                                format!("{}::{}", inner.module, inner.name),
-                            )
-                        } else {
-                            continue;
-                        };
+                    let (event_addr, event_type) = if let Content::Struct(inner) =
+                        event.r#type.as_ref().unwrap().content.as_ref().unwrap()
+                    {
+                        (
+                            inner.address.to_string(),
+                            format!("{}::{}", inner.module, inner.name),
+                        )
+                    } else {
+                        continue;
+                    };
                     if event_addr != addr {
                         continue;
                     }
@@ -106,10 +107,8 @@ impl CurrentAnsLookup {
                             serde_json::from_str(event.data.as_str())
                                 .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner)))
                         },
-                        "domains::RegisterNameEventV1" => {
-                            serde_json::from_str(event.data.as_str())
-                                .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner)))
-                        },
+                        "domains::RegisterNameEventV1" => serde_json::from_str(event.data.as_str())
+                            .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner))),
                         _ => Ok(None),
                     }
                     .unwrap_or_else(|e| {

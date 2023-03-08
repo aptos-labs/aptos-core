@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::token_models::{
         ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
@@ -19,7 +20,9 @@ use crate::{
         clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
     },
 };
-use aptos_api_types::Transaction;
+use anyhow::bail;
+use aptos_logger::error;
+use aptos_protos::transaction::testing1::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -464,7 +467,7 @@ fn insert_current_ans_lookups(
 }
 
 #[async_trait]
-impl TransactionProcessor for TokenTransactionProcessor {
+impl ProcessorTrait for TokenTransactionProcessor {
     fn name(&self) -> &'static str {
         NAME
     }
@@ -474,7 +477,7 @@ impl TransactionProcessor for TokenTransactionProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-    ) -> Result<ProcessingResult, TransactionProcessingError> {
+    ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
 
         // First get all token related table metadata from the batch of transactions. This is in case
@@ -604,17 +607,17 @@ impl TransactionProcessor for TokenTransactionProcessor {
             all_current_ans_lookups,
         );
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(
-                self.name(),
-                start_version,
-                end_version,
-            )),
-            Err(err) => Err(TransactionProcessingError::TransactionCommitError((
-                anyhow::Error::from(err),
-                start_version,
-                end_version,
-                self.name(),
-            ))),
+            Ok(_) => Ok((start_version, end_version)),
+            Err(e) => {
+                error!(
+                    start_version = start_version,
+                    end_version = end_version,
+                    processor_name = self.name(),
+                    error = ?e,
+                    "[Parser] Error inserting transactions to db",
+                );
+                bail!(e)
+            },
         }
     }
 

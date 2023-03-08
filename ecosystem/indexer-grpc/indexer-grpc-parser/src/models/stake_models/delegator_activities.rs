@@ -6,9 +6,9 @@
 use super::stake_utils::StakeEvent;
 use crate::{
     schema::delegated_staking_activities,
-    util::{standardize_address, u64_to_bigdecimal},
+    utils::util::{standardize_address, u64_to_bigdecimal},
 };
-use aptos_api_types::Transaction as APITransaction;
+use aptos_protos::transaction::testing1::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -27,20 +27,22 @@ pub struct DelegatedStakingActivity {
 
 impl DelegatedStakingActivity {
     /// Pretty straightforward parsing from known delegated staking events
-    pub fn from_transaction(transaction: &APITransaction) -> anyhow::Result<Vec<Self>> {
+    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut delegator_activities = vec![];
-        let (txn_version, events) = match transaction {
-            APITransaction::UserTransaction(txn) => (txn.info.version.0 as i64, &txn.events),
-            APITransaction::BlockMetadataTransaction(txn) => {
-                (txn.info.version.0 as i64, &txn.events)
-            },
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
+        let txn_version = transaction.version as i64;
+        let events = match txn_data {
+            TxnData::User(txn) => &txn.events,
+            TxnData::BlockMetadata(txn) => &txn.events,
             _ => return Ok(delegator_activities),
         };
         for (index, event) in events.iter().enumerate() {
-            let event_type = event.typ.to_string();
             let event_index = index as i64;
             if let Some(staking_event) =
-                StakeEvent::from_event(event_type.as_str(), &event.data, txn_version)?
+                StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
             {
                 let activity = match staking_event {
                     StakeEvent::AddStakeEvent(inner) => DelegatedStakingActivity {
@@ -48,7 +50,7 @@ impl DelegatedStakingActivity {
                         event_index,
                         delegator_address: standardize_address(&inner.delegator_address),
                         pool_address: standardize_address(&inner.pool_address),
-                        event_type: event_type.clone(),
+                        event_type: event.type_str.clone(),
                         amount: u64_to_bigdecimal(inner.amount_added),
                     },
                     StakeEvent::UnlockStakeEvent(inner) => DelegatedStakingActivity {
@@ -56,7 +58,7 @@ impl DelegatedStakingActivity {
                         event_index,
                         delegator_address: standardize_address(&inner.delegator_address),
                         pool_address: standardize_address(&inner.pool_address),
-                        event_type: event_type.clone(),
+                        event_type: event.type_str.clone(),
                         amount: u64_to_bigdecimal(inner.amount_unlocked),
                     },
                     StakeEvent::WithdrawStakeEvent(inner) => DelegatedStakingActivity {
@@ -64,7 +66,7 @@ impl DelegatedStakingActivity {
                         event_index,
                         delegator_address: standardize_address(&inner.delegator_address),
                         pool_address: standardize_address(&inner.pool_address),
-                        event_type: event_type.clone(),
+                        event_type: event.type_str.clone(),
                         amount: u64_to_bigdecimal(inner.amount_withdrawn),
                     },
                     StakeEvent::ReactivateStakeEvent(inner) => DelegatedStakingActivity {
@@ -72,7 +74,7 @@ impl DelegatedStakingActivity {
                         event_index,
                         delegator_address: standardize_address(&inner.delegator_address),
                         pool_address: standardize_address(&inner.pool_address),
-                        event_type: event_type.clone(),
+                        event_type: event.type_str.clone(),
                         amount: u64_to_bigdecimal(inner.amount_reactivated),
                     },
                     StakeEvent::DistributeRewardsEvent(inner) => DelegatedStakingActivity {
@@ -80,7 +82,7 @@ impl DelegatedStakingActivity {
                         event_index,
                         delegator_address: "".to_string(),
                         pool_address: standardize_address(&inner.pool_address),
-                        event_type: event_type.clone(),
+                        event_type: event.type_str.clone(),
                         amount: u64_to_bigdecimal(inner.rewards_amount),
                     },
                     _ => continue,

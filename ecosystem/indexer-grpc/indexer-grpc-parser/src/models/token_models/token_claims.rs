@@ -6,8 +6,8 @@
 #![allow(clippy::unused_unit)]
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
-use crate::{schema::current_token_pending_claims, util::standardize_address};
-use aptos_api_types::{DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem};
+use crate::{schema::current_token_pending_claims, utils::util::standardize_address};
+use aptos_protos::transaction::testing1::v1::{WriteTableItem, DeleteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ impl CurrentTokenPendingClaim {
     /// Token claim is stored in a table in the offerer's account. The key is token_offer_id (token_id + to address)
     /// and value is token (token_id + amount)
     pub fn from_write_table_item(
-        table_item: &APIWriteTableItem,
+        table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
@@ -106,7 +106,7 @@ impl CurrentTokenPendingClaim {
     }
 
     pub fn from_delete_table_item(
-        table_item: &APIDeleteTableItem,
+        table_item: &DeleteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,

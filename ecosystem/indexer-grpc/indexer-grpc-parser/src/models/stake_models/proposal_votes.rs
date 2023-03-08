@@ -7,9 +7,9 @@
 use super::stake_utils::StakeEvent;
 use crate::{
     schema::proposal_votes,
-    util::{parse_timestamp, standardize_address},
+    utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::Transaction as APITransaction;
+use aptos_protos::transaction::testing1::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -28,14 +28,18 @@ pub struct ProposalVote {
 }
 
 impl ProposalVote {
-    pub fn from_transaction(transaction: &APITransaction) -> anyhow::Result<Vec<Self>> {
+    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut proposal_votes = vec![];
-        if let APITransaction::UserTransaction(user_txn) = transaction {
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
+        let txn_version = transaction.version as i64;
+
+        if let TxnData::User(user_txn) = txn_data {
             for event in &user_txn.events {
-                let txn_version = user_txn.info.version.0 as i64;
-                let event_type = event.typ.to_string();
                 if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
-                    StakeEvent::from_event(event_type.as_str(), &event.data, txn_version)?
+                    StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
                 {
                     proposal_votes.push(Self {
                         transaction_version: txn_version,
@@ -44,7 +48,10 @@ impl ProposalVote {
                         staking_pool_address: standardize_address(&ev.stake_pool),
                         num_votes: ev.num_votes.clone(),
                         should_pass: ev.should_pass,
-                        transaction_timestamp: parse_timestamp(user_txn.timestamp.0, txn_version),
+                        transaction_timestamp: parse_timestamp(
+                            transaction.timestamp.as_ref().unwrap(),
+                            txn_version,
+                        ),
                     });
                 }
             }

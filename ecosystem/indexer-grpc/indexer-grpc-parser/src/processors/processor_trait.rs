@@ -4,10 +4,7 @@
 use crate::{
     models::processor_status::ProcessorStatus,
     schema::processor_status,
-    utils::counters::{
-        GOT_CONNECTION, LATEST_PROCESSED_VERSION, PROCESSOR_ERRORS, PROCESSOR_INVOCATIONS,
-        PROCESSOR_SUCCESSES, UNABLE_TO_GET_CONNECTION,
-    },
+    utils::counters::{GOT_CONNECTION, UNABLE_TO_GET_CONNECTION},
     utils::database::{execute_with_better_error, PgDbPool, PgPoolConnection},
 };
 use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;

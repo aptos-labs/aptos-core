@@ -10,9 +10,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_logger::error;
-use aptos_protos::transaction::testing1::v1::{
-    move_type::Content, MoveStructTag, MoveType, WriteResource,
-};
+use aptos_protos::transaction::testing1::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
@@ -226,15 +224,7 @@ impl CoinResource {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> Result<Option<CoinResource>> {
-        let move_struct_tag =
-            MoveResource::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
-
-        let type_str = format!(
-            "{}::{}::{}",
-            standardize_address(move_struct_tag.address.as_str()),
-            move_struct_tag.module.clone(),
-            move_struct_tag.name.clone(),
-        );
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !CoinResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -261,14 +251,10 @@ pub enum CoinEvent {
 impl CoinEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<CoinEvent>> {
         match data_type {
-            x if x == format!("{}::coin::WithdrawEvent", COIN_ADDR) => {
-                serde_json::from_str(data.clone())
-                    .map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner)))
-            },
-            x if x == format!("{}::coin::DepositEvent", COIN_ADDR) => {
-                serde_json::from_str(data.clone())
-                    .map(|inner| Some(CoinEvent::DepositCoinEvent(inner)))
-            },
+            "0x1::coin::WithdrawEvent" => serde_json::from_str(data.clone())
+                .map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner))),
+            "0x1::coin::DepositEvent" => serde_json::from_str(data.clone())
+                .map(|inner| Some(CoinEvent::DepositCoinEvent(inner))),
             _ => Ok(None),
         }
         .context(format!(
