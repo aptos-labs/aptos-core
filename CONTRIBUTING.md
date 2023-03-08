@@ -5,7 +5,7 @@ title: Contributing to Aptos Core
 
 # Contributing
 
-Our goal is to make contributing to Aptos Core easy and transparent. See [Contribute to Aptos](./developer-docs-site/docs/contribute/index.md) for full details. This page described [our development process](#our-development-process).
+Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos Community](https://aptos.dev/community/help-index) for full details. This page describes [our development process](#our-development-process).
 
 ## Aptos Core
 
