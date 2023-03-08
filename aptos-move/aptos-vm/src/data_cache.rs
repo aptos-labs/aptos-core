@@ -139,7 +139,9 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        let ap = create_access_path(*address, struct_tag.clone());
+        let ap = create_access_path(*address, struct_tag.clone()).map_err(|_| {
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+        })?;
         self.get(&ap).map_err(|e| e.finish(Location::Undefined))
     }
 }

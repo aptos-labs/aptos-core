@@ -11,6 +11,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    on_chain_config::TimedFeatures,
     transaction::{ChangeSet, Transaction, TransactionOutput, Version},
 };
 use aptos_validator_interface::{
@@ -160,11 +161,14 @@ impl AptosDebugger {
             LATEST_GAS_FEATURE_VERSION,
             true,
             true,
+            // FIXME: fetch chain id & timestamp from the state.
             ChainId::test().id(),
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let state_view_storage = StorageAdapter::new(&state_view);
+
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         session

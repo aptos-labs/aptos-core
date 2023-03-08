@@ -298,12 +298,14 @@ impl Context {
             .by_ref()
             .take(limit as usize)
             .collect::<Result<_>>()?;
-        let next_key = resource_iter.next().transpose()?.map(|(struct_tag, _v)| {
-            StateKey::AccessPath(AccessPath::new(
+        let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
+            Some(StateKey::AccessPath(AccessPath::new(
                 address,
-                AccessPath::resource_path_vec(struct_tag),
-            ))
-        });
+                AccessPath::resource_path_vec(struct_tag)?,
+            )))
+        } else {
+            None
+        };
         Ok((kvs, next_key))
     }
 

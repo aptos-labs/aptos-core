@@ -248,7 +248,9 @@ impl StateApi {
             })?;
         let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
         let resource_key = ResourceKey::new(address.into(), resource_type.clone());
-        let access_path = AccessPath::resource_access_path(resource_key);
+        let access_path = AccessPath::resource_access_path(resource_key).map_err(|e| {
+            BasicErrorWith404::internal_with_code(e, AptosErrorCode::InternalError, &ledger_info)
+        })?;
         let state_key = StateKey::AccessPath(access_path);
         let bytes = state_view
             .get_state_value(&state_key)

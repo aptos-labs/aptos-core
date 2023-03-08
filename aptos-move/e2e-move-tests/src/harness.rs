@@ -358,7 +358,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path = AccessPath::resource_access_path(ResourceKey::new(*addr, struct_tag));
+        let path = AccessPath::resource_access_path(ResourceKey::new(*addr, struct_tag))
+            .expect("access path in test");
         self.read_state_value(&StateKey::AccessPath(path))
     }
 
@@ -387,7 +388,8 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag));
+        let path = AccessPath::resource_access_path(ResourceKey::new(addr, struct_tag))
+            .expect("access path in test");
         let state_key = StateKey::AccessPath(path);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());

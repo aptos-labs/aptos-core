@@ -8,7 +8,7 @@ use aptos_gas::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_state_view::StateView;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -116,6 +116,7 @@ where
         Features::default().is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
         Features::default().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6),
         chain_id,
+        TimedFeatures::enable_all(),
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
