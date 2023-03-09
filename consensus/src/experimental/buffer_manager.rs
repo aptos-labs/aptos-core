@@ -39,7 +39,7 @@ use std::{sync::{
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 10000;
 pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
@@ -300,6 +300,10 @@ impl BufferManager {
                     if item.is_ordered() {
                         // the aggregated share is 96 bytes
                         if let Some(idx) = item.update_block_rand(target_block_id, rand_decision.rand().clone()) {
+                            debug!(
+                                "updated rand by receiving rand for block {}",
+                                target_block_id,
+                            );
                             // randomness is updated successfully
                             // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
                             if item.unwrap_ordered_ref().ordered_blocks[idx].block().author() == Some(self.author) {
@@ -310,6 +314,7 @@ impl BufferManager {
                         }
 
                         if item.is_rand_ready() {
+                            debug!("updated block {} to execution ready by receiving rand decision", target_block_id);
                             self.buffer.set(&cursor, item.try_advance_to_execution_ready());
                             return Some(target_block_id)
                         }

@@ -328,10 +328,11 @@ fn buffer_manager_happy_path_test() {
                 .ok();
         }
 
-        // commit decision will be sent too, so 3 * 2
-        for _ in 0..12*2 {
-            loopback_rand_share_or_commit_vote(&mut self_loop_rx, &rand_msg_tx, &commit_msg_tx, &verifier).await;
-        }
+        tokio::spawn(async move {
+            loop {
+                loopback_rand_share_or_commit_vote(&mut self_loop_rx, &rand_msg_tx, &commit_msg_tx, &verifier).await;
+            }
+        });
 
         // make sure the order is correct
         assert_results(batches, &mut result_rx).await;
