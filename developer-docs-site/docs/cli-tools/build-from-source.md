@@ -10,7 +10,7 @@ If you are an advanced user and would like to build the CLI binary by downloadin
 **Building the Aptos CLI is not recommended** unless you are on a platform unsupported by the prebuilt binaries. Otherwise, [install the prebuilt CLI binaries](aptos-cli-tool/install-aptos-cli.md) to ease ramp up and reduce variables in your environment.
 
 :::tip Configure your development environment first
-See [Setup build dependencies](../getting-started.md#set-up-build-dependencies) to install the necessary dependencies for your development environment.
+See [Setup build dependencies](../guides/getting-started.md#set-up-build-dependencies) to install the necessary dependencies for your development environment.
 :::
 
 <details>
