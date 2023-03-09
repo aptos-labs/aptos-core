@@ -213,8 +213,6 @@ async fn test_remote_batch_reads() {
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
-
-    panic!("save logs")
 }
 
 async fn test_batch_id_on_restart(do_wipe_db: bool) {
