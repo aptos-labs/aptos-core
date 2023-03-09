@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "../hex_string";
-import { Deserializer, Serializer } from "../bcs";
-import { ScriptABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI, ArgumentABI } from "./abi";
-import { TypeTagAddress, TypeTagU64 } from "./type_tag";
-import { ModuleId } from "./transaction";
+import { HexString } from "../../utils";
+import { Deserializer, Serializer } from "../../bcs";
+import { ScriptABI, EntryFunctionABI, TransactionScriptABI, ArgumentABI } from "../../aptos_types/abi";
+import { TypeTagAddress, TypeTagU64 } from "../../aptos_types";
+import { ModuleId } from "../../aptos_types";
 
 // eslint-disable-next-line operator-linebreak
 const SCRIPT_FUNCTION_ABI =

@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount, getAddressFromAccountOrAddress } from "./aptos_account";
-import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
-import { MaybeHexString } from "./hex_string";
-import { TransactionBuilderRemoteABI } from "./transaction_builder";
-import { APTOS_COIN } from "./utils";
+import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
+import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
+import { MaybeHexString, APTOS_COIN } from "../utils";
+import { TransactionBuilderRemoteABI } from "../transaction_builder";
 
 /**
  * Class for working with the coin module, such as transferring coins and
