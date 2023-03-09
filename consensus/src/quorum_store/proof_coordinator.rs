@@ -212,7 +212,7 @@ impl ProofCoordinator {
                             match self.add_signature(signed_digest, &validator_verifier) {
                                 Ok(result) => {
                                     if let Some(proof) = result {
-                                        trace!("QS: added signature to proof, digest {}", digest);
+                                        debug!("QS: received quorum of signatures, digest {}", digest);
                                         tx.send(ProofManagerCommand::LocalProof(proof)).await.unwrap();
                                     }
                                 },

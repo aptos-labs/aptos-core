@@ -77,7 +77,7 @@ impl BatchGenerator {
         } else {
             BatchId::new(thread_rng().next_u64())
         };
-        trace!("Initialized with batch_id of {}", batch_id);
+        debug!("Initialized with batch_id of {}", batch_id);
         let mut incremented_batch_id = batch_id;
         incremented_batch_id.increment();
         db.save_batch_id(epoch, incremented_batch_id)

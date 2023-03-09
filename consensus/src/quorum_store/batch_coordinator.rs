@@ -188,7 +188,7 @@ impl BatchCoordinator {
             // Malformed request with an inconsistent expiry epoch.
             else {
                 trace!(
-                    "QS: got end batch message epoch {} {}",
+                    "QS: got end batch message from different epoch {} != {}",
                     expiration.epoch(),
                     self.epoch
                 );
@@ -242,7 +242,7 @@ impl BatchCoordinator {
                     logical_time,
                     proof_tx,
                 ) => {
-                    trace!("QS: end batch cmd received, batch id = {}", batch_id);
+                    debug!("QS: end batch cmd received, batch id = {}", batch_id);
                     let (persist_request, fragment) = self
                         .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
                         .await;
