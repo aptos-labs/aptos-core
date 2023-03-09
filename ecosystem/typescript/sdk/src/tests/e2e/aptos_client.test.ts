@@ -630,7 +630,7 @@ test.only("submit batch transactions", async () => {
     ),
   );
 
-  const transactions = await client.generateBatchTransactions(account1, [entryFunctionPayload, entryFunctionPayload1]);
-  await client.submitBatchTransactions(transactions);
-  console.log(transactions);
+  // const transactions = await client.batchTransactionsFromDifferentSenders(account1, [entryFunctionPayload, entryFunctionPayload1]);
+  // await client.submitBatchTransactions(transactions);
+  // console.log(transactions);
 });
