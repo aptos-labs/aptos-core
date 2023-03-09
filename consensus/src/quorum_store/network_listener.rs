@@ -9,7 +9,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
@@ -37,23 +37,21 @@ impl NetworkListener {
     }
 
     pub async fn start(mut self) {
-        debug!("QS: starting networking");
+        info!("QS: starting networking");
         //batch fragment -> batch_aggregator, persist it, and prapre signedDigests
         //Keep in memory caching in side the DB wrapper.
         //chack id -> self, call PoQSB.
         while let Some(msg) = self.network_msg_rx.next().await {
-            // debug!("QS: network_listener msg {:?}", msg);
             match msg {
                 // TODO: does the assumption have to be that network listener is shutdown first?
                 VerifiedEvent::Shutdown(ack_tx) => {
-                    debug!("QS: shutdown network listener received");
+                    info!("QS: shutdown network listener received");
                     ack_tx
                         .send(())
                         .expect("Failed to send shutdown ack to QuorumStore");
                     break;
                 },
                 VerifiedEvent::SignedDigestMsg(signed_digest) => {
-                    // debug!("QS: got SignedDigest from network");
                     let cmd = ProofCoordinatorCommand::AppendSignature(*signed_digest);
                     self.proof_coordinator_tx
                         .send(cmd)
@@ -64,7 +62,7 @@ impl NetworkListener {
                     counters::DELIVERED_FRAGMENTS_COUNT.inc();
                     let idx = fragment.source().to_vec()[0] as usize
                         % self.remote_batch_coordinator_tx.len();
-                    debug!(
+                    trace!(
                         "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
                         fragment.source(),
                         self.remote_batch_coordinator_tx.len(),

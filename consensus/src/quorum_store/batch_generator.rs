@@ -77,7 +77,7 @@ impl BatchGenerator {
         } else {
             BatchId::new(thread_rng().next_u64())
         };
-        info!("Initialized with batch_id of {}", batch_id);
+        debug!("Initialized with batch_id of {}", batch_id);
         let mut incremented_batch_id = batch_id;
         incremented_batch_id.increment();
         db.save_batch_id(epoch, incremented_batch_id)
@@ -115,7 +115,7 @@ impl BatchGenerator {
             .collect();
         exclude_txns.extend(self.batch_builder.summaries().clone());
 
-        debug!("QS: excluding txs len: {:?}", exclude_txns.len());
+        trace!("QS: excluding txs len: {:?}", exclude_txns.len());
         let mut end_batch = false;
         // TODO: size and unwrap or not?
         let pulled_txns = self
@@ -131,7 +131,7 @@ impl BatchGenerator {
             .await
             .unwrap();
 
-        debug!("QS: pulled_txns len: {:?}", pulled_txns.len());
+        trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
         if pulled_txns.is_empty() {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
         } else {
@@ -226,7 +226,7 @@ impl BatchGenerator {
     ) {
         match msg {
             Ok((proof, batch_id)) => {
-                debug!(
+                trace!(
                     "QS: received proof of store for batch id {}, digest {}",
                     batch_id,
                     proof.digest(),
@@ -287,7 +287,7 @@ impl BatchGenerator {
                                 (dynamic_pull_txn_per_s as f64 * self.config.back_pressure.decrease_fraction) as u64,
                                 self.config.back_pressure.dynamic_min_txn_per_s,
                             );
-                            debug!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
+                            trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
                         counters::QS_BACKPRESSURE_TXN_COUNT.observe(1);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
@@ -299,7 +299,7 @@ impl BatchGenerator {
                                 dynamic_pull_txn_per_s + self.config.back_pressure.dynamic_min_txn_per_s,
                                 self.config.back_pressure.dynamic_max_txn_per_s,
                             );
-                            debug!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
+                            trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
                         counters::QS_BACKPRESSURE_TXN_COUNT.observe(0);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s);
@@ -333,7 +333,11 @@ impl BatchGenerator {
                 Some(cmd) = cmd_rx.recv() => {
                     match cmd {
                         BatchGeneratorCommand::CommitNotification(logical_time) => {
-                            debug!("QS: got clean request from execution");
+                            trace!(
+                                "QS: got clean request from execution, epoch {}, round {}",
+                                logical_time.epoch(),
+                                logical_time.round()
+                            );
                             assert_eq!(
                                 self.latest_logical_time.epoch(),
                                 logical_time.epoch(),

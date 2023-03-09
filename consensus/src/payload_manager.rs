@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, warn};
+use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
@@ -40,7 +40,7 @@ impl PayloadManager {
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
-            debug!(
+            trace!(
                 "QSE: requesting pos {:?}, digest {}, time = {:?}",
                 pos,
                 pos.digest(),
@@ -49,7 +49,7 @@ impl PayloadManager {
             if logical_time <= pos.expiration() {
                 receivers.push((*pos.digest(), batch_store.get_batch(pos)));
             } else {
-                debug!("QS: skipped expired pos");
+                debug!("QSE: skipped expired pos {}", pos.digest());
             }
         }
         receivers
@@ -147,7 +147,13 @@ impl PayloadManager {
                     },
                     DataStatus::Requested(receivers) => {
                         let mut vec_ret = Vec::new();
-                        debug!("QSE: waiting for data on {} receivers", receivers.len());
+                        if !receivers.is_empty() {
+                            debug!(
+                                "QSE: waiting for data on {} receivers, block_round {}",
+                                receivers.len(),
+                                block.round()
+                            );
+                        }
                         for (digest, rx) in receivers {
                             match rx.await {
                                 Err(e) => {
