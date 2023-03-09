@@ -3,24 +3,24 @@
 
 /* eslint-disable max-len */
 
-import { AptosAccount } from "./aptos_account";
-import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
-import * as TokenTypes from "./token_types";
-import * as Gen from "./generated/index";
-import { HexString, MaybeHexString } from "./hex_string";
-import { TransactionBuilder, TransactionBuilderRemoteABI, TxnBuilderTypes } from "./transaction_builder";
-import { MAX_U64_BIG_INT } from "./bcs/consts";
-import { TOKEN_TRANSFER_OPT_IN } from "./abis";
-import { AnyNumber, bcsToBytes, Bytes } from "./bcs";
-import { getPropertyValueRaw, PropertyMap } from "./utils/property_map_serde";
+import { AptosAccount } from "../account/aptos_account";
+import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
+import * as TokenTypes from "../aptos_types/token_types";
+import * as Gen from "../generated/index";
+import { HexString, MaybeHexString } from "../utils";
+import { TransactionBuilder, TransactionBuilderRemoteABI, TxnBuilderTypes } from "../transaction_builder";
+import { MAX_U64_BIG_INT } from "../bcs/consts";
+import { TOKEN_TRANSFER_OPT_IN } from "../abis";
+import { AnyNumber, bcsToBytes, Bytes } from "../bcs";
+import { getPropertyValueRaw, PropertyMap } from "../utils/property_map_serde";
 import {
   Script,
   TransactionArgumentAddress,
   TransactionArgumentU64,
   TransactionArgumentU8Vector,
   TransactionPayloadScript,
-} from "./aptos_types";
-import { Token, TokenData } from "./token_types";
+} from "../aptos_types";
+import { Token, TokenData } from "../aptos_types/token_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import { AnyNumber } from "../bcs/types";
-import { MaybeHexString } from "../hex_string";
+import { MaybeHexString } from "../utils";
 import { GetAccountCurrentTokensQuery, GetTokenActivitiesQuery } from "../indexer/generated/operations";
 import { GetAccountCurrentTokens, GetTokenActivities } from "../indexer/generated/queries";
 

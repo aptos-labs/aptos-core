@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString } from "../hex_string";
+import { HexString } from "../../utils";
 import {
   AccountAddress,
   Identifier,
@@ -22,8 +22,8 @@ import {
   TypeTagU64,
   TypeTagU8,
   TypeTagVector,
-} from "../aptos_types";
-import { Serializer } from "../bcs";
+} from "../../aptos_types";
+import { Serializer } from "../../bcs";
 import {
   argToTransactionArgument,
   TypeTagParser,
@@ -31,7 +31,7 @@ import {
   ensureBoolean,
   ensureNumber,
   ensureBigInt,
-} from "./builder_utils";
+} from "../../transaction_builder/builder_utils";
 
 describe("BuilderUtils", () => {
   it("parses a bool TypeTag", async () => {
