@@ -84,7 +84,7 @@ impl QuorumStoreCoordinator {
                         self.my_peer_id,
                         VerifiedEvent::Shutdown(network_listener_shutdown_tx),
                     ) {
-                        Ok(()) => debug!("QS: shutdown network listener sent"),
+                        Ok(()) => info!("QS: shutdown network listener sent"),
                         Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
                     };
                     network_listener_shutdown_rx

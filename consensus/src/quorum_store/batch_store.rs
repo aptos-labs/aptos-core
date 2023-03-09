@@ -15,7 +15,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use aptos_types::{
     transaction::SignedTransaction, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
@@ -169,7 +169,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             .get_all_batches()
             .expect("failed to read data from db");
         let mut expired_keys = Vec::new();
-        debug!(
+        trace!(
             "QS: Batchreader {} {} {}",
             db_content.len(),
             epoch,
@@ -178,9 +178,10 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         for (digest, value) in db_content {
             let expiration = value.expiration;
 
-            debug!(
+            trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
-                expiration, digest
+                expiration,
+                digest
             );
             assert!(epoch >= expiration.epoch());
 
@@ -194,7 +195,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
-        debug!(
+        trace!(
             "QS: Batchreader recovery expired keys len {}",
             expired_keys.len()
         );
@@ -267,7 +268,10 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
                 if let Some(entry) = self.db_cache.get(&digest) {
                     if entry.expiration.round() >= value.expiration.round() {
-                        debug!("QS: already have the digest with higher expiration");
+                        debug!(
+                            "QS: already have the digest with higher expiration {}",
+                            digest
+                        );
                         return Ok(false);
                     }
                 }
@@ -336,7 +340,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
                 let num_bytes = persist_request.value.num_bytes as u64;
                 let batch_author = persist_request.value.author;
-                debug!("QS: sign digest");
+                trace!("QS: sign digest {}", persist_request.digest);
                 if needs_db {
                     self.db
                         .save_batch(persist_request.digest, persist_request.value)
@@ -370,7 +374,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     // expiry grace rounds just keeps the batches around for a little longer
     // for lagging nodes to be able to catch up (without state-sync).
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
-        debug!("QS: batch reader updating time {:?}", certified_time);
+        trace!("QS: batch reader updating time {:?}", certified_time);
         assert_eq!(
             self.epoch(),
             certified_time.epoch(),
