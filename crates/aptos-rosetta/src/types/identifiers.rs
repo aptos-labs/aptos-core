@@ -50,6 +50,34 @@ impl AccountIdentifier {
         }
     }
 
+    pub fn pending_active_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_pending_active_stake()),
+        }
+    }
+
+    pub fn active_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_active_stake()),
+        }
+    }
+
+    pub fn pending_inactive_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_pending_inactive_stake()),
+        }
+    }
+
+    pub fn inactive_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_inactive_stake()),
+        }
+    }
+
     pub fn operator_stake_account(
         address: AccountAddress,
         operator_address: AccountAddress,
@@ -67,6 +95,38 @@ impl AccountIdentifier {
     pub fn is_total_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
             inner.is_total_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_pending_active_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_pending_inactive_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_active_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_active_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_pending_inactive_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_pending_inactive_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_inactive_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_inactive_stake()
         } else {
             false
         }
@@ -106,12 +166,40 @@ pub struct SubAccountIdentifier {
 }
 
 const STAKE: &str = "stake";
+const PENDING_ACTIVE_STAKE: &str = "pending_active_stake";
+const ACTIVE_STAKE: &str = "active_stake";
+const PENDING_INACTIVE_STAKE: &str = "pending_inactive_stake";
+const INACTIVE_STAKE: &str = "inactive_stake";
 const ACCOUNT_SEPARATOR: char = '-';
 
 impl SubAccountIdentifier {
     pub fn new_total_stake() -> SubAccountIdentifier {
         SubAccountIdentifier {
             address: STAKE.to_string(),
+        }
+    }
+
+    pub fn new_pending_active_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: PENDING_ACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_active_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: ACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_pending_inactive_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: PENDING_INACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_inactive_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: INACTIVE_STAKE.to_string(),
         }
     }
 
@@ -123,6 +211,22 @@ impl SubAccountIdentifier {
 
     pub fn is_total_stake(&self) -> bool {
         self.address.as_str() == STAKE
+    }
+
+    pub fn is_pending_active_stake(&self) -> bool {
+        self.address.as_str() == PENDING_ACTIVE_STAKE
+    }
+
+    pub fn is_active_stake(&self) -> bool {
+        self.address.as_str() == ACTIVE_STAKE
+    }
+
+    pub fn is_pending_inactive_stake(&self) -> bool {
+        self.address.as_str() == PENDING_INACTIVE_STAKE
+    }
+
+    pub fn is_inactive_stake(&self) -> bool {
+        self.address.as_str() == INACTIVE_STAKE
     }
 
     pub fn operator_address(&self) -> ApiResult<AccountAddress> {

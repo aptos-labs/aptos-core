@@ -80,6 +80,15 @@ pub struct Version {
     pub middleware_version: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct StakeBalances {
+    pub active: ApiResult<Amount>,
+    pub inactive: ApiResult<Amount>,
+    pub pending_active: ApiResult<Amount>,
+    pub pending_inactive: ApiResult<Amount>,
+    pub total_stake_amount: ApiResult<Amount>,
+}
+
 /// An internal enum to support Operation typing
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum OperationType {
@@ -232,12 +241,12 @@ impl Display for OperationStatusType {
     }
 }
 
-pub async fn get_total_stake(
+pub async fn get_stake_balances(
     rest_client: &aptos_rest_client::Client,
     owner_account: &AccountIdentifier,
     pool_address: AccountAddress,
     version: u64,
-) -> ApiResult<Option<Amount>> {
+) -> ApiResult<Option<StakeBalances>> {
     const STAKE_POOL: &str = "0x1::stake::StakePool";
     if let Ok(response) = rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
@@ -246,8 +255,8 @@ pub async fn get_total_stake(
         let stake_pool = response.into_inner();
 
         // Any stake pools that match, retrieve that.  Then update the total
-        let balance = get_stake_balance_from_stake_pool(&stake_pool, owner_account)?;
-        Ok(Some(balance))
+        let balances = get_stake_balance_from_stake_pool(&stake_pool, owner_account)?;
+        Ok(Some(balances))
     } else {
         Ok(None)
     }
@@ -257,7 +266,7 @@ pub async fn get_total_stake(
 fn get_stake_balance_from_stake_pool(
     stake_pool: &StakePool,
     account: &AccountIdentifier,
-) -> ApiResult<Amount> {
+) -> ApiResult<StakeBalances> {
     // Stake isn't allowed for base accounts
     if account.is_base_account() {
         return Err(ApiError::InvalidInput(Some(
@@ -272,9 +281,28 @@ fn get_stake_balance_from_stake_pool(
         )));
     }
 
-    // TODO: Represent inactive, and pending as separate?
-    Ok(Amount {
-        value: stake_pool.get_total_staked_amount().to_string(),
-        currency: native_coin(),
-    })
+    Ok(
+        StakeBalances {
+            active: Ok(Amount {
+                value: stake_pool.active.to_string(),
+                currency: native_coin(),
+            }),
+            inactive: Ok(Amount {
+                value: stake_pool.inactive.to_string(),
+                currency: native_coin(),
+            }),
+            pending_active: Ok(Amount {
+                value: stake_pool.pending_active.to_string(),
+                currency: native_coin(),
+            }),
+            pending_inactive: Ok(Amount {
+                value: stake_pool.pending_inactive.to_string(),
+                currency: native_coin(),
+            }),
+            total_stake_amount: Ok(Amount {
+                value: stake_pool.get_total_staked_amount().to_string(),
+                currency: native_coin(),
+            }),
+        },
+    )
 }
