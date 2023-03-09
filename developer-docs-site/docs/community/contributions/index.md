@@ -14,3 +14,4 @@ The source materials for both code and docs live in GitHub. See [Contribute](../
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
 | [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process. | [alnoki](https://github.com/alnoki) | 2022-10-06 |
+| [Use Remix IDE Plugin](./remix-ide-plugin.md) | This tutorial details how to deploy and run Move modules on Remix IDE. It is a no-setup tool with a GUI for developing Move modules. | [0xhsy](https://github.com/0xhsy) | 2023-03-08 |
