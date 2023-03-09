@@ -19,6 +19,7 @@ use aptos_logger::debug;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use aptos_types::write_set::WriteOp;
+use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
@@ -176,6 +177,9 @@ where
 
         if aborted {
             counters::SPECULATIVE_ABORT_COUNT.inc();
+
+            // Any logs from the aborted execution should be cleared and not reported.
+            clear_speculative_txn_logs(idx_to_validate);
 
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
             for k in last_input_output.modified_keys(idx_to_validate) {
@@ -404,6 +408,10 @@ where
 
         if matches!(ret, Err(Error::ModulePathReadWrite)) {
             debug!("[Execution]: Module read & written, sequential fallback");
+
+            // All logs from the parallel execution should be cleared and not reported.
+            // Clear by re-initializing the speculative logs.
+            init_speculative_logs(signature_verified_block.len());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,

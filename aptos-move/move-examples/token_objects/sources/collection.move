@@ -13,29 +13,32 @@
 /// * Events on mint or burn -- that's left to the collection creator.
 ///
 /// TODO:
-/// * Add Royalty reading and consider mutation
 /// * Consider supporting changing the name of the collection.
 /// * Consider supporting changing the aspects of supply
 /// * Add aggregator support when added to framework
-/// * Update ObjectId to be an acceptable param to move
+/// * Provide a Ref/Capability for mutability, relying on the creator is something for the top-level.
+/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
 
+    use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
+
+    use token_objects::royalty::{Self, Royalty};
 
     friend token_objects::token;
 
     /// The collections supply is at its maximum amount
-    const EEXCEEDS_MAX_SUPPLY: u64 = 0;
+    const EEXCEEDS_MAX_SUPPLY: u64 = 1;
     /// The collection does not exist
-    const ECOLLECTION_DOES_NOT_EXIST: u64 = 1;
+    const ECOLLECTION_DOES_NOT_EXIST: u64 = 2;
     /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 2;
+    const ENOT_CREATOR: u64 = 3;
     /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 3;
+    const EFIELD_NOT_MUTABLE: u64 = 4;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields for a collection.
@@ -51,6 +54,14 @@ module token_objects::collection {
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Emitted upon any mutation of the collection.
+        mutation_events: event::EventHandle<MutationEvent>,
+    }
+
+    /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
+    /// directly understand the behavior in a writeset.
+    struct MutationEvent has drop, store {
+        mutated_field_name: String,
     }
 
     /// This config specifies which fields in the TokenData are mutable
@@ -60,26 +71,11 @@ module token_objects::collection {
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// The royalty of a token within this collection -- this optional
-    struct Royalty has drop, key {
-        numerator: u64,
-        denominator: u64,
-        /// The recipient of royalty payments. See the `shared_account` for how to handle multiple
-        /// creators.
-        payee_address: address,
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Aggregable supply tracker, this is can be used for maximum parallel minting but only for
-    /// for uncapped mints. Currently disabled until this library is in the framework.
-    struct AggregableSupply has key {
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
     struct FixedSupply has key {
         current_supply: u64,
         max_supply: u64,
+        total_minted: u64,
     }
 
     public fun create_fixed_collection(
@@ -91,33 +87,24 @@ module token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
-
-        let collection = Collection {
-            creator: signer::address_of(creator),
-            description,
-            mutability_config,
-            name,
-            uri,
-        };
-        move_to(&object_signer, collection);
-
         let supply = FixedSupply {
             current_supply: 0,
             max_supply,
-        };
-        move_to(&object_signer, supply);
-
-        if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
+            total_minted: 0,
         };
 
-        creator_ref
+        create_collection_internal(
+            creator,
+            description,
+            mutability_config,
+            name,
+            royalty,
+            uri,
+            option::some(supply),
+        )
     }
 
-    public fun create_aggregable_collection(
+    public fun create_untracked_collection(
         creator: &signer,
         description: String,
         mutability_config: MutabilityConfig,
@@ -125,9 +112,29 @@ module token_objects::collection {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
+        create_collection_internal<FixedSupply>(
+            creator,
+            description,
+            mutability_config,
+            name,
+            royalty,
+            uri,
+            option::none(),
+        )
+    }
+
+    inline fun create_collection_internal<Supply: key>(
+        creator: &signer,
+        description: String,
+        mutability_config: MutabilityConfig,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+        supply: Option<Supply>,
+    ): ConstructorRef {
         let collection_seed = create_collection_seed(&name);
-        let creator_ref = object::create_named_object(creator, collection_seed);
-        let object_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = object::create_named_object(creator, collection_seed);
+        let object_signer = object::generate_signer(&constructor_ref);
 
         let collection = Collection {
             creator: signer::address_of(creator),
@@ -135,21 +142,21 @@ module token_objects::collection {
             mutability_config,
             name,
             uri,
+            mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, collection);
 
-        let supply = AggregableSupply { };
-        move_to(&object_signer, supply);
-
-        if (option::is_some(&royalty)) {
-            move_to(&object_signer, option::extract(&mut royalty))
+        if (option::is_some(&supply)) {
+            move_to(&object_signer, option::destroy_some(supply))
+        } else {
+            option::destroy_none(supply)
         };
 
-        creator_ref
-    }
+        if (option::is_some(&royalty)) {
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
+        };
 
-    public fun init_royalty(object_signer: &signer, royalty: Royalty) {
-        move_to(object_signer, royalty);
+        constructor_ref
     }
 
     public fun create_collection_address(creator: &address, name: &String): address {
@@ -164,19 +171,27 @@ module token_objects::collection {
         MutabilityConfig { description, uri }
     }
 
-    public fun create_royalty(numerator: u64, denominator: u64, payee_address: address): Royalty {
-        Royalty { numerator, denominator, payee_address }
-    }
-
-    public(friend) fun increment_supply(creator: &address, name: &String) acquires FixedSupply {
+    public(friend) fun increment_supply(
+        creator: &address,
+        name: &String,
+    ): Option<u64> acquires FixedSupply {
         let collection_addr = create_collection_address(creator, name);
+        assert!(
+            exists<Collection>(collection_addr),
+            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
+        );
+
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
             assert!(
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(EEXCEEDS_MAX_SUPPLY),
             );
+            option::some(supply.total_minted)
+        } else {
+            option::none()
         }
     }
 
@@ -204,7 +219,7 @@ module token_objects::collection {
     ) {
         let mutability_config = create_mutability_config(mutable_description, mutable_uri);
         let royalty = if (enable_royalty) {
-            option::some(create_royalty(
+            option::some(royalty::create(
                 royalty_numerator,
                 royalty_denominator,
                 royalty_payee_address,
@@ -214,7 +229,7 @@ module token_objects::collection {
         };
 
         if (max_supply == 0) {
-            create_aggregable_collection(
+            create_untracked_collection(
                 creator,
                 description,
                 mutability_config,
@@ -295,6 +310,10 @@ module token_objects::collection {
         );
 
         collection.description = description;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"description") },
+        );
     }
 
     public fun set_uri<T: key>(
@@ -315,6 +334,10 @@ module token_objects::collection {
         );
 
         collection.uri = uri;
+        event::emit_event(
+            &mut collection.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+        );
     }
 
     // Tests
@@ -342,7 +365,7 @@ module token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     entry fun test_immutable_set_description(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);
@@ -353,7 +376,7 @@ module token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x50003, location = Self)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
     entry fun test_immutable_set_uri(creator: &signer) acquires Collection {
         let collection_name = string::utf8(b"collection name");
         create_immutable_collection_helper(creator, *&collection_name);

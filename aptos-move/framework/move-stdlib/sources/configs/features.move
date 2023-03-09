@@ -130,13 +130,23 @@ module std::features {
         is_enabled(MULTISIG_ACCOUNTS)
     }
 
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
+    public fun delegation_pools_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOLS)
+    }
+
     /// Whether the basic operations over some BLS12381 structures are enabled in the algebra module.
     ///
     /// Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting, etc.
     /// BLS12381 structures controlled by this flag includes `Fq12`, `G1`, `G2`, `Gt`, `Fr`.
     ///
     /// Lifetime: transient
-    const BLS12381_BASIC_OPERATIONS: u64 = 11;
+    const BLS12381_BASIC_OPERATIONS: u64 = 12;
     public fun get_bls12381_basic_operations_feature(): u64 { BLS12381_BASIC_OPERATIONS }
     public fun bls12381_basic_operations_enabled(): bool acquires Features {
         is_enabled(BLS12381_BASIC_OPERATIONS)

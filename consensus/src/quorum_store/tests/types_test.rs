@@ -29,7 +29,7 @@ fn test_batch() {
 
     let batch = Batch::new(source, epoch, digest, signed_txns.clone());
 
-    assert!(batch.verify(source).is_ok());
+    assert!(batch.verify().is_ok());
     assert_eq!(batch.into_payload(), signed_txns);
 }
 
