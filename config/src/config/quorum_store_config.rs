@@ -77,8 +77,8 @@ impl Default for QuorumStoreConfig {
             batch_expiry_round_gap_behind_latest_certified: 500,
             batch_expiry_round_gap_beyond_latest_certified: 500,
             batch_expiry_grace_rounds: 5,
-            memory_quota: 100000000,
-            db_quota: 10000000000,
+            memory_quota: 120_000_000,
+            db_quota: 300_000_000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
