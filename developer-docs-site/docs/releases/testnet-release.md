@@ -26,4 +26,4 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node v1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.0)| `aptos-node-v1.3.0` | `?` | [aptos-node-v1.2.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.3.0)| `?` |
+|[Aptos Node v1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.0)| `aptos-node-v1.3.0` | `?` | [aptos-node-v1.2.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.3.0)| `3fc3d42b6cfe27460004f9a0326451bcda840a60` |
