@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::CRITICAL_ERRORS;
 use aptos_crypto::HashValue;
 use aptos_logger::Schema;
 use aptos_state_view::StateViewId;
@@ -27,46 +26,45 @@ pub struct AdapterLogSchema {
 
     // transaction position in the list of transactions in the block,
     // 0 if the transaction is not part of a block (i.e. validation).
-    txn_id: usize,
+    txn_idx: usize,
 }
 
 impl AdapterLogSchema {
-    pub fn new(view_id: StateViewId, txn_id: usize) -> Self {
+    pub fn new(view_id: StateViewId, txn_idx: usize) -> Self {
         match view_id {
             StateViewId::BlockExecution { block_id } => Self {
                 name: LogEntry::Execution,
                 block_id: Some(block_id),
                 first_version: None,
                 base_version: None,
-                txn_id,
+                txn_idx,
             },
             StateViewId::ChunkExecution { first_version } => Self {
                 name: LogEntry::Execution,
                 block_id: None,
                 first_version: Some(first_version),
                 base_version: None,
-                txn_id,
+                txn_idx,
             },
             StateViewId::TransactionValidation { base_version } => Self {
                 name: LogEntry::Validation,
                 block_id: None,
                 first_version: None,
                 base_version: Some(base_version),
-                txn_id,
+                txn_idx,
             },
             StateViewId::Miscellaneous => Self {
                 name: LogEntry::Miscellaneous,
                 block_id: None,
                 first_version: None,
                 base_version: None,
-                txn_id,
+                txn_idx,
             },
         }
     }
 
-    // Increment the `CRITICAL_ERRORS` monitor event that will fire an alert
-    pub fn alert(&self) {
-        CRITICAL_ERRORS.inc();
+    pub(crate) fn get_txn_idx(&self) -> usize {
+        self.txn_idx
     }
 }
 

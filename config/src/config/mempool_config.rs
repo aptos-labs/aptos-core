@@ -27,6 +27,8 @@ pub struct MempoolConfig {
     pub system_transaction_timeout_secs: u64,
     pub system_transaction_gc_interval_ms: u64,
     pub broadcast_buckets: Vec<u64>,
+    pub eager_expire_threshold_ms: Option<u64>,
+    pub eager_expire_time_ms: u64,
 }
 
 impl Default for MempoolConfig {
@@ -47,6 +49,8 @@ impl Default for MempoolConfig {
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BROADCAST_BUCKETS.to_vec(),
+            eager_expire_threshold_ms: Some(10_000),
+            eager_expire_time_ms: 3_000,
         }
     }
 }

@@ -29,13 +29,17 @@ use crate::{
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
+    network::{
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
+        NetworkReceivers, NetworkSender,
+    },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
+        quorum_store_db::QuorumStoreStorage,
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -80,7 +84,6 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     mem::{discriminant, Discriminant},
-    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -124,13 +127,15 @@ pub struct EpochManager {
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
-    quorum_store_storage_path: PathBuf,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
+    quorum_store_storage: Arc<dyn QuorumStoreStorage>,
+    batch_retrieval_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
 }
 
 impl EpochManager {
-    pub fn new(
+    pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
         self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
@@ -139,6 +144,7 @@ impl EpochManager {
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
+        quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
@@ -165,9 +171,10 @@ impl EpochManager {
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
-            quorum_store_storage_path: node_config.storage.dir(),
             quorum_store_msg_tx: None,
             quorum_store_coordinator_tx: None,
+            quorum_store_storage,
+            batch_retrieval_tx: None,
         }
     }
 
@@ -538,6 +545,7 @@ impl EpochManager {
 
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
+        self.batch_retrieval_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -644,7 +652,7 @@ impl EpochManager {
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
-                self.quorum_store_storage_path.clone(),
+                self.quorum_store_storage.clone(),
             ))
         } else {
             info!("Building DirectMempool");
@@ -664,6 +672,8 @@ impl EpochManager {
             consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
+            self.config.wait_for_full_blocks_above_recent_fill_threshold,
+            self.config.wait_for_full_blocks_above_pending_blocks,
         );
         self.commit_state_computer.new_epoch(
             &epoch_state,
@@ -690,7 +700,12 @@ impl EpochManager {
             payload_manager.clone(),
         ));
 
-        self.quorum_store_coordinator_tx = quorum_store_builder.start();
+        if let Some((quorum_store_coordinator_tx, batch_retrieval_rx)) =
+            quorum_store_builder.start()
+        {
+            self.quorum_store_coordinator_tx = Some(quorum_store_coordinator_tx);
+            self.batch_retrieval_tx = Some(batch_retrieval_rx);
+        }
 
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
@@ -909,8 +924,6 @@ impl EpochManager {
     ) -> anyhow::Result<()> {
         match event {
             UnverifiedEvent::FragmentMsg(_)
-            | UnverifiedEvent::BatchRequestMsg(_)
-            | UnverifiedEvent::BatchMsg(_)
             | UnverifiedEvent::SignedDigestMsg(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
                 if self.quorum_store_enabled {
@@ -938,9 +951,7 @@ impl EpochManager {
             );
         }
         match event {
-            quorum_store_event @ (VerifiedEvent::BatchRequestMsg(_)
-            | VerifiedEvent::UnverifiedBatchMsg(_)
-            | VerifiedEvent::SignedDigestMsg(_)
+            quorum_store_event @ (VerifiedEvent::SignedDigestMsg(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::FragmentMsg(_)) => {
                 if let Some(sender) = &mut self.quorum_store_msg_tx {
@@ -972,18 +983,29 @@ impl EpochManager {
         }
     }
 
-    fn process_block_retrieval(
+    fn process_rpc_request(
         &self,
         peer_id: Author,
-        request: IncomingBlockRetrievalRequest,
+        request: IncomingRpcRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process::any", |_| {
-            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
+            Err(anyhow::anyhow!("Injected error in process_rpc_request"))
         });
-        if let Some(tx) = &self.block_retrieval_tx {
-            tx.push(peer_id, request)
-        } else {
-            Err(anyhow::anyhow!("Round manager not started"))
+        match request {
+            IncomingRpcRequest::BlockRetrieval(request) => {
+                if let Some(tx) = &self.block_retrieval_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    Err(anyhow::anyhow!("Round manager not started"))
+                }
+            },
+            IncomingRpcRequest::BatchRetrieval(request) => {
+                if let Some(tx) = &self.batch_retrieval_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    Err(anyhow::anyhow!("Quorum store not started"))
+                }
+            },
         }
     }
 
@@ -1020,8 +1042,8 @@ impl EpochManager {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 },
-                (peer, request) = network_receivers.block_retrieval.select_next_some() => {
-                    if let Err(e) = self.process_block_retrieval(peer, request) {
+                (peer, request) = network_receivers.rpc_rx.select_next_some() => {
+                    if let Err(e) = self.process_rpc_request(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }
                 },

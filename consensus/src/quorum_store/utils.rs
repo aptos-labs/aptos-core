@@ -13,7 +13,7 @@ use aptos_consensus_types::{
     proof_of_store::{LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
@@ -122,7 +122,7 @@ impl DigestTimeouts {
 
     pub(crate) fn expire(&mut self) -> Vec<HashValue> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
-        debug!(
+        trace!(
             "QS: expire cur time {} timeouts len {}",
             cur_time,
             self.timeouts.len()
@@ -187,10 +187,17 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
+        return_non_full: bool,
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(
+            max_items,
+            max_bytes,
+            return_non_full,
+            exclude_txns,
+            callback,
+        );
         self.mempool_tx
             .clone()
             .try_send(msg)
@@ -266,6 +273,7 @@ impl ProofQueue {
         current_time: LogicalTime,
         max_txns: u64,
         max_bytes: u64,
+        return_non_full: bool,
     ) -> Vec<ProofOfStore> {
         let num_expired = self
             .digest_queue
@@ -294,6 +302,9 @@ impl ProofQueue {
         let mut ret = Vec::new();
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
+        let initial_size = self.digest_queue.len();
+        let mut size = self.digest_queue.len();
+        let mut full = false;
 
         for (digest, expiration) in self
             .digest_queue
@@ -311,6 +322,7 @@ impl ProofQueue {
                     cur_txns += proof.info().num_txns;
                     if cur_bytes > max_bytes || cur_txns > max_txns {
                         // Exceeded the limit for requested bytes or number of transactions.
+                        full = true;
                         break;
                     }
                     ret.push(proof.clone());
@@ -326,17 +338,34 @@ impl ProofQueue {
                     }
                 }
             }
+            size -= 1;
         }
-        counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
-        counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
-        counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
-        counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
+        info!(
+            // before non full check
+            byte_size = cur_bytes,
+            block_size = cur_txns,
+            batch_count = ret,
+            remaining_proof_num = size,
+            initial_remaining_proof_num = initial_size,
+            full = full,
+            return_non_full = return_non_full,
+            "Pull payloads from QuorumStore: internal"
+        );
 
-        ret
+        if full || return_non_full {
+            counters::EXPIRED_PROOFS_WHEN_PULL.observe(num_expired_but_not_committed as f64);
+            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
+            counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
+            counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
+            ret
+        } else {
+            Vec::new()
+        }
     }
 
-    pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
+    pub(crate) fn num_total_txns_and_proofs(&mut self, current_time: LogicalTime) -> (u64, u64) {
         let mut remaining_txns = 0;
+        let mut remaining_proofs = 0;
         // TODO: if the digest_queue is large, this may be too inefficient
         for (digest, expiration) in self.digest_queue.iter() {
             // Not expired
@@ -344,11 +373,14 @@ impl ProofQueue {
                 // Not committed
                 if let Some(Some(proof)) = self.digest_proof.get(digest) {
                     remaining_txns += proof.info().num_txns;
+                    remaining_proofs += 1;
                 }
             }
         }
         counters::NUM_TOTAL_TXNS_LEFT_ON_COMMIT.observe(remaining_txns as f64);
-        remaining_txns
+        counters::NUM_TOTAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_proofs as f64);
+
+        (remaining_txns, remaining_proofs)
     }
 
     // returns the number of unexpired local proofs

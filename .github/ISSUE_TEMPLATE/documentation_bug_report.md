@@ -2,7 +2,7 @@
 name: "\U0001F41B Documentation/aptos.dev Bug report"
 about: Create a bug report to help improve the Aptos Developers' Website
 title: "[Docs]"
-labels: ["bug", "documentation"]
+labels: ["documentation"]
 assignees: 'clay-aptos'
 
 ---

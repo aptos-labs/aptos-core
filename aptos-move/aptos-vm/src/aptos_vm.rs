@@ -12,7 +12,6 @@ use crate::{
     data_cache::{AsMoveResolver, IntoMoveResolver},
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
-    logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -42,6 +41,7 @@ use aptos_types::{
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
