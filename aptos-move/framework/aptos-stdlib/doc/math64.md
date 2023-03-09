@@ -474,7 +474,8 @@ to the most correct value up to last digit
 
 
 
-<pre><code><b>aborts_if</b> x == 0;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> x == 0;
 <b>ensures</b> (x &gt;&gt; result) == 1;
 </code></pre>
 

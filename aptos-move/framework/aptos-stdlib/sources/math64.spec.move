@@ -35,6 +35,7 @@ spec aptos_std::math64 {
     }
 
     spec floor_log2(x: u64): u8 {
+        pragma opaque;
         aborts_if x == 0;
         ensures (x >> result) == 1;
     }
