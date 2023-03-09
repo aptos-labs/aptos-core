@@ -147,7 +147,7 @@ impl PayloadManager {
                     },
                     DataStatus::Requested(receivers) => {
                         let mut vec_ret = Vec::new();
-                        if receivers.len() > 0 {
+                        if !receivers.is_empty() {
                             debug!(
                                 "QSE: waiting for data on {} receivers, block_round {}",
                                 receivers.len(),
