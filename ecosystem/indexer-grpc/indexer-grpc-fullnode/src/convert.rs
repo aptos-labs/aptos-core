@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, ScriptPayload,
-    Transaction, TransactionInfo, TransactionPayload, TransactionSignature, WriteSet,
-    WriteSetChange,
+    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId,
+    EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
+    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
+    MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
+    MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload, ScriptPayload, Transaction,
+    TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
-use aptos_protos::{transaction::v1 as transaction, util::timestamp};
+use aptos_protos::{transaction::testing1::v1 as transaction, util::timestamp};
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -147,15 +147,7 @@ pub fn convert_transaction_payload(
             r#type: transaction::transaction_payload::Type::EntryFunctionPayload as i32,
             payload: Some(
                 transaction::transaction_payload::Payload::EntryFunctionPayload(
-                    transaction::EntryFunctionPayload {
-                        function: Some(convert_entry_function_id(&sfp.function)),
-                        type_arguments: sfp.type_arguments.iter().map(convert_move_type).collect(),
-                        arguments: sfp
-                            .arguments
-                            .iter()
-                            .map(|move_value| move_value.to_string())
-                            .collect(),
-                    },
+                    convert_entry_function_payload(sfp),
                 ),
             ),
         },
@@ -165,6 +157,14 @@ pub fn convert_transaction_payload(
                 convert_script_payload(sp),
             )),
         },
+        TransactionPayload::MultisigPayload(mp) => transaction::TransactionPayload {
+            r#type: transaction::transaction_payload::Type::MultisigPayload as i32,
+            payload: Some(transaction::transaction_payload::Payload::MultisigPayload(
+                convert_multisig_payload(mp),
+            )),
+        },
+
+        // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundlePayload(mbp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::ModuleBundlePayload as i32,
             payload: Some(
@@ -376,7 +376,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> transaction::WriteSe
                     state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
                     r#type: Some(convert_move_struct_tag(&write_resource.data.typ)),
                     type_str: write_resource.data.typ.to_string(),
-                    data: serde_json::to_string(&write_resource.data).unwrap_or_else(|_| {
+                    data: serde_json::to_string(&write_resource.data.data).unwrap_or_else(|_| {
                         panic!(
                             "Could not convert move_resource data to json '{:?}'",
                             write_resource.data
@@ -427,6 +427,24 @@ pub fn convert_move_script_bytecode(msb: &MoveScriptBytecode) -> transaction::Mo
     }
 }
 
+pub fn convert_entry_function_payload(
+    entry_function_payload: &EntryFunctionPayload,
+) -> transaction::EntryFunctionPayload {
+    transaction::EntryFunctionPayload {
+        function: Some(convert_entry_function_id(&entry_function_payload.function)),
+        type_arguments: entry_function_payload
+            .type_arguments
+            .iter()
+            .map(convert_move_type)
+            .collect(),
+        arguments: entry_function_payload
+            .arguments
+            .iter()
+            .map(|move_value| move_value.to_string())
+            .collect(),
+    }
+}
+
 pub fn convert_script_payload(script_payload: &ScriptPayload) -> transaction::ScriptPayload {
     transaction::ScriptPayload {
         code: Some(convert_move_script_bytecode(&script_payload.code)),
@@ -440,6 +458,31 @@ pub fn convert_script_payload(script_payload: &ScriptPayload) -> transaction::Sc
             .iter()
             .map(|move_value| move_value.to_string())
             .collect(),
+    }
+}
+
+pub fn convert_multisig_payload(
+    multisig_payload: &MultisigPayload,
+) -> transaction::MultisigPayload {
+    let transaction_payload = multisig_payload
+        .transaction_payload
+        .as_ref()
+        .map(|p| match p {
+            MultisigTransactionPayload::EntryFunctionPayload(entry_function_payload) => {
+                transaction::MultisigTransactionPayload {
+                    r#type: transaction::multisig_transaction_payload::Type::EntryFunctionPayload
+                        as i32,
+                    payload: Some(
+                        transaction::multisig_transaction_payload::Payload::EntryFunctionPayload(
+                            convert_entry_function_payload(entry_function_payload),
+                        ),
+                    ),
+                }
+            },
+        });
+    transaction::MultisigPayload {
+        multisig_address: multisig_payload.multisig_address.to_string(),
+        transaction_payload,
     }
 }
 

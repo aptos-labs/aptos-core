@@ -8,7 +8,7 @@ slug: "run-validator-node-using-gcp"
 This is a step-by-step guide to install an Aptos node on Google GCP. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
 :::caution Did you set up your GCP account and create a project?
-This guide assumes you already have a Google Cloud Platform (GCP) account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), checkout this [Prerequisites section](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
+This guide assumes you already have a Google Cloud Platform (GCP) account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), review the [Prerequisites](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) section for GCP account setup.
 :::
 
 :::danger Do you have stale volumes after bumping your deployment's era?
@@ -85,7 +85,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
   }
   ```
 
-  For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/gcp/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+  For the full customization options, see the variables file [`variables.tf`](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/gcp/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file
   ```bash
@@ -154,7 +154,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+12. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 

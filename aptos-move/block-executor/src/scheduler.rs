@@ -1,11 +1,13 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
-    cmp::max,
+    cmp::{max, min},
     hint,
     ops::DerefMut,
     sync::{
@@ -27,6 +29,7 @@ type DependencyCondvar = Arc<(Mutex<bool>, Condvar)>;
 /// each contain a version of transaction that must be executed or validated, respectively.
 /// NoTask holds no task (similar None if we wrapped tasks in Option), and Done implies that
 /// there are no more tasks and the scheduler is done.
+#[derive(Debug)]
 pub enum SchedulerTask {
     ExecutionTask(Version, Option<DependencyCondvar>),
     ValidationTask(Version, Wave),
@@ -290,17 +293,21 @@ impl Scheduler {
 
     /// Return the next task for the thread.
     pub fn next_task(&self, committing: bool) -> SchedulerTask {
+        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
                 // No more tasks.
                 return SchedulerTask::Done;
             }
 
-            let (idx_to_validate, _) =
+            let (idx_to_validate, wave) =
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
-            if idx_to_execute >= self.num_txns && idx_to_validate >= self.num_txns {
+            let prefer_validate = idx_to_validate < min(idx_to_execute, self.num_txns)
+                && !self.never_executed(idx_to_validate);
+
+            if !prefer_validate && idx_to_execute >= self.num_txns {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
@@ -317,8 +324,10 @@ impl Scheduler {
                 };
             }
 
-            if idx_to_validate < idx_to_execute {
-                if let Some((version_to_validate, wave)) = self.try_validate_next_version() {
+            if prefer_validate {
+                if let Some((version_to_validate, wave)) =
+                    self.try_validate_next_version(idx_to_validate, wave)
+                {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
             } else if let Some((version_to_execute, maybe_condvar)) =
@@ -459,10 +468,9 @@ impl Scheduler {
         let mut validation_status = self.txn_status[txn_idx].1.write();
         self.set_aborted_status(txn_idx, incarnation);
 
-        // Schedule higher txns for validation, could skip txn_idx itself (needs to be
-        // re-executed first), but used to couple with the locked validation status -
-        // should never attempt to commit until validation status is updated.
-        if let Some(wave) = self.decrease_validation_idx(txn_idx) {
+        // Schedule higher txns for validation, skipping txn_idx itself (needs to be
+        // re-executed first).
+        if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
             // Under lock, current wave monotonically increasing, can simply write.
             validation_status.max_triggered_wave = wave;
         }
@@ -548,10 +556,6 @@ impl Scheduler {
     /// and a committed (in between) txn does not need to be scheduled for validation -
     /// so can return None.
     fn is_executed(&self, txn_idx: TxnIndex, include_committed: bool) -> Option<Incarnation> {
-        if txn_idx >= self.txn_status.len() {
-            return None;
-        }
-
         let status = self.txn_status[txn_idx].0.read();
         match *status {
             ExecutionStatus::Executed(incarnation) => Some(incarnation),
@@ -568,24 +572,50 @@ impl Scheduler {
         }
     }
 
+    /// Returns true iff no incarnation (even the 0-th one) has set the executed status, i.e.
+    /// iff the execution status is READY_TO_EXECUTE/EXECUTING/SUSPENDED for incarnation 0.
+    fn never_executed(&self, txn_idx: TxnIndex) -> bool {
+        let status = self.txn_status[txn_idx].0.read();
+        matches!(
+            *status,
+            ExecutionStatus::ReadyToExecute(0, _)
+                | ExecutionStatus::Executing(0)
+                | ExecutionStatus::Suspended(0, _)
+        )
+    }
+
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whethre
     /// all txns can be committed).
     /// - If the transaction is ready for validation (EXECUTED state), return the version
     /// to the caller.
     /// - Otherwise, return None.
-    fn try_validate_next_version(&self) -> Option<(Version, Wave)> {
-        let (idx_to_validate, wave) =
-            Self::unpack_validation_idx(self.validation_idx.fetch_add(1, Ordering::SeqCst));
-
-        if idx_to_validate >= self.num_txns {
-            return None;
+    fn try_validate_next_version(
+        &self,
+        idx_to_validate: TxnIndex,
+        wave: Wave,
+    ) -> Option<(Version, Wave)> {
+        let validation_idx = (idx_to_validate as u64) | ((wave as u64) << 32);
+        let new_validation_idx = ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
+        if self
+            .validation_idx
+            .compare_exchange(
+                validation_idx,
+                new_validation_idx,
+                Ordering::Acquire,
+                Ordering::SeqCst,
+            )
+            .is_ok()
+        {
+            // Successfully claimed idx_to_validate to attempt validation.
+            // If incarnation was last executed, and thus ready for validation,
+            // return version and wave for validation task, otherwise None.
+            return self
+                .is_executed(idx_to_validate, false)
+                .map(|incarnation| ((idx_to_validate, incarnation), wave));
         }
 
-        // If incarnation was last executed, and thus ready for validation,
-        // return version and wave for validation task, otherwise None.
-        self.is_executed(idx_to_validate, false)
-            .map(|incarnation| ((idx_to_validate, incarnation), wave))
+        None
     }
 
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).

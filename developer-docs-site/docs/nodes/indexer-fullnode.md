@@ -16,7 +16,7 @@ The below installation steps are verified only on macOS with Apple silicon. They
 To run an indexer fullnode, these are the steps in summary:
 
 1. Make sure that you have all the required tools and packages described below in this document.
-1. Follow the instructions to [set up a public fullnode](full-node/fullnode-source-code-or-docker/) but do not start the fullnode yet. 
+1. Follow the instructions to [set up a public fullnode](./full-node/fullnode-source-code-or-docker.md) but do not start the fullnode yet. 
 1. Edit the `fullnode.yaml` as described below in this document.
 1. Run the indexer fullnode per the instructions below.
 
@@ -58,7 +58,7 @@ For an Aptos indexer fullnode, install these packages:
 
 ## Start the fullnode indexer
 
-1. Follow the instructions to set up a [public fullnode](full-node/fullnode-source-code-or-docker/) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
+1. Follow the instructions to set up a [public fullnode](./full-node/fullnode-source-code-or-docker.md) and prepare the setup, but **do not** yet start the indexer (with `cargo run` or `docker run`).
 1. Pull the latest indexer Docker image with:
     ```bash
     docker pull aptoslabs/validator:nightly_indexer
@@ -80,7 +80,19 @@ For an Aptos indexer fullnode, install these packages:
         emit_every: 500
     ```
 
-1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node.
+1. Run the indexer fullnode with either `cargo run` or `docker run` depending upon your setup. Remember to supply the arguments you need for your specific node:
+    ```bash
+    docker run -p 8080:8080 \
+      -p 9101:9101 -p 6180:6180 \
+      -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data \
+      --workdir /opt/aptos/etc \
+      --name=aptos-fullnode aptoslabs/validator:nightly_indexer aptos-node \
+      -f /opt/aptos/etc/fullnode.yaml
+    ```
+    or:
+    ```bash
+    cargo run -p aptos-node --features "indexer" --release -- -f ./fullnode.yaml
+    ```
 
 ## Restart the indexer
 

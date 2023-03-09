@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -243,7 +244,7 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
-        // Confirm retrival ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
+        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
         assert_eq!(
             blocks.last().expect("blocks are empty").id(),
             highest_commit_cert.commit_info().id()

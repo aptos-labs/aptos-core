@@ -3,9 +3,8 @@
 
 import { AptosAccount, getAddressFromAccountOrAddress } from "./aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "./providers/aptos_client";
-import { HexString, MaybeHexString } from "./hex_string";
-import { TransactionBuilderABI } from "./transaction_builder";
-import { COIN_ABIS } from "./abis";
+import { MaybeHexString } from "./hex_string";
+import { TransactionBuilderRemoteABI } from "./transaction_builder";
 import { APTOS_COIN } from "./utils";
 
 /**
@@ -15,15 +14,12 @@ import { APTOS_COIN } from "./utils";
 export class CoinClient {
   aptosClient: AptosClient;
 
-  transactionBuilder: TransactionBuilderABI;
-
   /**
    * Creates new CoinClient instance
    * @param aptosClient AptosClient instance
    */
   constructor(aptosClient: AptosClient) {
     this.aptosClient = aptosClient;
-    this.transactionBuilder = new TransactionBuilderABI(COIN_ABIS.map((abi) => new HexString(abi).toUint8Array()));
   }
 
   /**
@@ -73,9 +69,12 @@ export class CoinClient {
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
 
-    const payload = this.transactionBuilder.buildTransactionPayload(func, typeArgs, [toAddress, amount]);
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: from.address(), ...extraArgs });
+    const rawTxn = await builder.build(func, typeArgs, [toAddress, amount]);
 
-    return this.aptosClient.generateSignSubmitTransaction(from, payload, extraArgs);
+    const bcsTxn = AptosClient.generateBCSTransaction(from, rawTxn);
+    const pendingTransaction = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   } // <:!:transfer
 
   /**

@@ -43,20 +43,19 @@ def query_backup_latest_version(backup_config_template_path: str) -> int:
     """query latest version in backup, at the same time, pre-heat metadata cache"""
     db_backup_result = subprocess.Popen(
         [
-            "target/release/db-backup",
-            "one-shot",
+            "target/release/aptos-db-tool",
+            "backup",
             "query",
             "backup-storage-state",
             "--metadata-cache-dir",
             "./metadata-cache",
-            "command-adapter",
-            "--config",
+            "--command-adapter-config",
             backup_config_template_path,
         ],
         stdout=subprocess.PIPE,
     )
     if db_backup_result.stdout is None:
-        raise Exception("Failed to run db-backup. Cannot get stdout.")
+        raise Exception("Failed to run aptos db tool backup. Cannot get stdout.")
     latest_version = find_latest_version_from_db_backup_output(db_backup_result.stdout)
     if latest_version < 0:
         raise Exception("Failed to find latest version")

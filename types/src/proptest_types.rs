@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -381,6 +382,15 @@ fn new_raw_transaction(
             sender,
             sequence_number,
             script_fn,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_time_secs,
+            chain_id,
+        ),
+        TransactionPayload::Multisig(multisig) => RawTransaction::new_multisig(
+            sender,
+            sequence_number,
+            multisig,
             max_gas_amount,
             gas_unit_price,
             expiration_time_secs,
@@ -788,7 +798,10 @@ impl TransactionToCommitGen {
                     .map(move |(key, value)| {
                         let state_key = StateKey::access_path(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), Some(StateValue::from(value.clone()))),
+                            (
+                                state_key.clone(),
+                                Some(StateValue::new_legacy(value.clone())),
+                            ),
                             (state_key, WriteOp::Modification(value)),
                         )
                     })

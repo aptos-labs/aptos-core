@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -20,12 +21,21 @@ use crate::{
     transport::ConnectionMetadata,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_config::{
+    config::{Peer, PeerRole},
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_types::PeerId;
 use futures::channel::oneshot;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::time::timeout;
 
 // Useful test constants for timeouts
@@ -60,6 +70,7 @@ fn test_peers_and_metadata_simple_interface() {
 
     // Verify the registered networks and that there are no available peers
     check_registered_networks(&peers_and_metadata, network_ids);
+    check_all_peers(&peers_and_metadata, vec![]);
     check_connected_peers_and_metadata(&peers_and_metadata, vec![]);
 
     // Create two peers and initialize the connection metadata
@@ -74,17 +85,19 @@ fn test_peers_and_metadata_simple_interface() {
         peers_and_metadata.clone(),
     );
 
+    // Verify all peers
+    let all_peers = vec![peer_network_id_1, peer_network_id_2];
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
     // Verify the number of connected peers
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_peers_and_metadata(&peers_and_metadata, all_peers.clone());
 
     // Verify the supported peers by protocol type
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        all_peers.clone(),
+    );
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::StorageServiceRpc], vec![
         peer_network_id_1,
     ]);
@@ -97,8 +110,13 @@ fn test_peers_and_metadata_simple_interface() {
         vec![],
     );
 
-    // Mark peer 1 as disconnected and verify it is no longer included
+    // Mark peer 1 as disconnected
     mark_peer_disconnecting(&peers_and_metadata, peer_network_id_1);
+
+    // Verify all peers
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
+    // Verify peer 1 is no longer connected or supported
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_2]);
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
         peer_network_id_2,
@@ -109,8 +127,13 @@ fn test_peers_and_metadata_simple_interface() {
         vec![],
     );
 
-    // Mark peer 2 as disconnected and verify it is no longer included
+    // Mark peer 2 as disconnected
     mark_peer_disconnecting(&peers_and_metadata, peer_network_id_2);
+
+    // Verify all peers
+    check_all_peers(&peers_and_metadata, all_peers.clone());
+
+    // Verify peer 2 is no longer connected or supported
     check_connected_peers_and_metadata(&peers_and_metadata, vec![]);
     check_connected_supported_peers(
         &peers_and_metadata,
@@ -121,6 +144,7 @@ fn test_peers_and_metadata_simple_interface() {
     // Reconnect both peers
     connect_peer(&peers_and_metadata, peer_network_id_1);
     connect_peer(&peers_and_metadata, peer_network_id_2);
+    check_all_peers(&peers_and_metadata, all_peers.clone());
 
     // Verify that removing a connection with a different connection id doesn't remove the peer
     remove_peer_metadata(
@@ -129,14 +153,12 @@ fn test_peers_and_metadata_simple_interface() {
         connection_1.connection_id.get_inner() + 9879,
     )
     .unwrap_err();
-    check_connected_peers_and_metadata(&peers_and_metadata, vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
-    check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
-        peer_network_id_1,
-        peer_network_id_2,
-    ]);
+    check_connected_peers_and_metadata(&peers_and_metadata, all_peers.clone());
+    check_connected_supported_peers(
+        &peers_and_metadata,
+        &[ProtocolId::MempoolDirectSend],
+        all_peers,
+    );
 
     // Verify that removing a connection with the same connection id works
     remove_peer_metadata(
@@ -145,6 +167,7 @@ fn test_peers_and_metadata_simple_interface() {
         connection_2.connection_id.get_inner(),
     )
     .unwrap();
+    check_all_peers(&peers_and_metadata, vec![peer_network_id_1]);
     check_connected_peers_and_metadata(&peers_and_metadata, vec![peer_network_id_1]);
     check_connected_supported_peers(&peers_and_metadata, &[ProtocolId::MempoolDirectSend], vec![
         peer_network_id_1,
@@ -189,6 +212,71 @@ fn test_peers_and_metadata_simple_errors() {
     peers_and_metadata
         .get_metadata_for_peer(invalid_peer_network)
         .unwrap_err();
+}
+
+#[test]
+fn test_peers_and_metadata_trusted_peers() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    // Verify that an error is returned for trusted peers in a non-existent network
+    peers_and_metadata
+        .get_trusted_peers(&NetworkId::Public)
+        .unwrap_err();
+
+    // Verify that we get an empty trusted peer set for the validator and VFN network
+    for network_id in network_ids {
+        let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+        assert!(trusted_peers.read().is_empty());
+    }
+
+    // Update the trusted peer set for the validator network
+    let peer_id_1 = PeerId::random();
+    let peer_id_2 = PeerId::random();
+    let peer_1 = Peer::new(vec![], HashSet::new(), PeerRole::Validator);
+    let peer_2 = Peer::new(vec![], HashSet::new(), PeerRole::Unknown);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_1, peer_1);
+    trusted_peers.write().insert(peer_id_2, peer_2);
+
+    // Verify the validator network contains the expected trusted peers
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    assert!(trusted_peers.read().contains_key(&peer_id_1));
+    assert!(trusted_peers.read().contains_key(&peer_id_2));
+    assert!(!trusted_peers.read().contains_key(&PeerId::random()));
+
+    // Update the trusted peer set for the VFN network
+    let peer_id_3 = PeerId::random();
+    let peer_3 = Peer::new(vec![], HashSet::new(), PeerRole::ValidatorFullNode);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Vfn)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_3, peer_3.clone());
+
+    // Verify the VFN network contains the expected trusted peers
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Vfn)
+        .unwrap();
+    let trusted_peers = trusted_peers.read();
+    let vfn_peer = trusted_peers.get(&peer_id_3).unwrap();
+    assert_eq!(vfn_peer, &peer_3);
+
+    // Clear the validator network trusted peer set
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    trusted_peers.write().clear();
+
+    // Verify that we get an empty trusted peer set for the validator network
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    assert!(trusted_peers.read().is_empty());
 }
 
 #[test]
@@ -606,6 +694,12 @@ fn check_registered_networks(
     // Get the registered networks
     let registered_networks = peers_and_metadata.get_registered_networks().collect();
     compare_vectors_ignore_order(registered_networks, expected_networks);
+}
+
+/// Verifies that all returned peers are correct
+fn check_all_peers(peers_and_metadata: &Arc<PeersAndMetadata>, expected_peers: Vec<PeerNetworkId>) {
+    let all_peers = peers_and_metadata.get_all_peers().unwrap();
+    compare_vectors_ignore_order(all_peers, expected_peers);
 }
 
 /// Verifies that the connected peers and metadata are correct

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::access_path::AccessPath;
@@ -25,6 +26,7 @@ impl AccessPathCache for () {
 
     fn get_resource_path(&mut self, address: AccountAddress, struct_tag: StructTag) -> AccessPath {
         AccessPath::resource_access_path(address, struct_tag)
+            .unwrap_or_else(|_| AccessPath::undefined())
     }
 
     fn get_resource_group_path(
@@ -60,7 +62,7 @@ impl AccessPathCache for BTreeAccessPathCache {
             btree_map::Entry::Vacant(entry) => {
                 let struct_tag = entry.key().clone();
                 entry
-                    .insert(AccessPath::resource_path_vec(struct_tag))
+                    .insert(AccessPath::resource_path_vec(struct_tag).unwrap_or_default())
                     .clone()
             },
             btree_map::Entry::Occupied(entry) => entry.get().clone(),

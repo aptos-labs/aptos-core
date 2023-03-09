@@ -232,8 +232,8 @@ module aptos_framework::voting {
     /// @param voting_forum_address The forum's address where the proposal will be stored.
     /// @param execution_content The execution content that will be given back at resolution time. This can contain
     /// data such as a capability resource used to scope the execution.
-    /// @param execution_hash The hash for the execution script module. Only the same exact script module can resolve
-    /// this proposal.
+    /// @param execution_hash The sha-256 hash for the execution script module. Only the same exact script module can
+    /// resolve this proposal.
     /// @param min_vote_threshold The minimum number of votes needed to consider this proposal successful.
     /// @param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.
     /// @param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.
@@ -487,6 +487,7 @@ module aptos_framework::voting {
         );
     }
 
+    #[view]
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow(&voting_forum.proposals, proposal_id);
@@ -504,6 +505,7 @@ module aptos_framework::voting {
         false
     }
 
+    #[view]
     /// Return the state of the proposal with given id.
     ///
     /// @param voting_forum_address The address of the forum where the proposals are stored.
@@ -529,6 +531,7 @@ module aptos_framework::voting {
         }
     }
 
+    #[view]
     /// Return the proposal's expiration time.
     public fun get_proposal_expiration_secs<ProposalType: store>(
         voting_forum_address: address,
@@ -539,6 +542,7 @@ module aptos_framework::voting {
         proposal.expiration_secs
     }
 
+    #[view]
     /// Return the proposal's execution hash.
     public fun get_execution_hash<ProposalType: store>(
         voting_forum_address: address,
@@ -549,6 +553,7 @@ module aptos_framework::voting {
         proposal.execution_hash
     }
 
+    #[view]
     /// Return true if the governance proposal has already been resolved.
     public fun is_resolved<ProposalType: store>(
         voting_forum_address: address,
@@ -559,6 +564,7 @@ module aptos_framework::voting {
         proposal.is_resolved
     }
 
+    #[view]
     /// Return true if the multi-step governance proposal is in execution.
     public fun is_multi_step_proposal_in_execution<ProposalType: store>(
         voting_forum_address: address,

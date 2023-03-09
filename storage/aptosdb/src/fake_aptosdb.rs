@@ -711,7 +711,7 @@ impl DbReader for FakeAptosDB {
                 EventHandle::new(EventKey::new(1, account_address), 0),
             );
             let bytes = bcs::to_bytes(&account)?;
-            Ok(Some(StateValue::new(bytes)))
+            Ok(Some(StateValue::new_legacy(bytes)))
         } else {
             self.inner.get_state_value_by_version(state_key, version)
         }
@@ -811,8 +811,8 @@ impl DbReader for FakeAptosDB {
             .get_state_value_chunk_with_proof(version, start_idx, chunk_size)
     }
 
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
-        self.inner.is_state_pruner_enabled()
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
+        self.inner.is_state_merkle_pruner_enabled()
     }
 
     fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {

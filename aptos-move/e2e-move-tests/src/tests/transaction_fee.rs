@@ -11,11 +11,45 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{SignedTransaction, TransactionArgument, TransactionStatus},
 };
+use once_cell::sync::Lazy;
 use rand::{
     distributions::Uniform,
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
+use std::collections::BTreeMap;
+
+pub static PROPOSAL_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
+
+fn build_scripts() -> BTreeMap<String, Vec<u8>> {
+    let mut scripts = BTreeMap::new();
+    let package_names = [
+        "initialize_collection",
+        "enable_collection",
+        "disable_collection",
+        "upgrade_burn_percentage",
+        "remove_validator",
+    ];
+    for package_name in package_names {
+        let script = aptos_framework::BuiltPackage::build(
+            common::test_dir_path(format!("transaction_fee.data/{}", package_name).as_str()),
+            aptos_framework::BuildOptions::default(),
+        )
+        .expect("building packages with scripts must succeed")
+        .extract_script_code()[0]
+            .clone();
+        scripts.insert(package_name.to_string(), script);
+    }
+    scripts
+}
+
+// Constants for calculating rewards for validators at the end of each epoch.
+const INITIAL_STAKE_AMOUNT: u64 = 25_000_000;
+const REWARDS_RATE_DENOMINATOR: u64 = 1_000_000_000;
+
+// Each epoch takes 1 hour in genesis config for tests.
+const NUM_EPOCHS_IN_A_YEAR: u64 = 365 * 24;
+const REWARDS_RATE: u64 = (10 * REWARDS_RATE_DENOMINATOR / 100) / NUM_EPOCHS_IN_A_YEAR;
 
 /// Holds all information about the current state of the chain, including
 /// accounts of users, validators, etc.
@@ -26,10 +60,14 @@ struct TestUniverse {
     users: Vec<Account>,
 }
 
+// Make sure the number of users in this test universe is large enough.
+const NUM_USERS: usize = 200;
+
 impl TestUniverse {
     /// Creates a new testing universe with all necessary accounts created.
-    pub fn new(num_validators: usize, num_users: usize) -> Self {
+    pub fn new(num_validators: usize) -> Self {
         let mut harness = MoveHarness::new();
+        harness.set_default_gas_unit_price(1);
         let core_resources =
             harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
         let validators: Vec<Account> = (0..num_validators)
@@ -39,7 +77,7 @@ impl TestUniverse {
                 )
             })
             .collect();
-        let users: Vec<Account> = (0..num_users)
+        let users: Vec<Account> = (0..NUM_USERS)
             .map(|idx| {
                 harness.new_account_at(
                     AccountAddress::from_hex_literal(format!("0xb{}", idx).as_str()).unwrap(),
@@ -89,17 +127,13 @@ impl TestUniverse {
         package_name: &str,
         args: Vec<TransactionArgument>,
     ) {
-        let script_code = aptos_framework::BuiltPackage::build(
-            common::test_dir_path(format!("transaction_fee.data/{}", package_name).as_str()),
-            aptos_framework::BuildOptions::default(),
-        )
-        .expect("building packages with scripts must succeed")
-        .extract_script_code()[0]
-            .clone();
+        let script_code = PROPOSAL_SCRIPTS
+            .get(package_name)
+            .expect("proposal script should be built");
         let sender = &self.core_resources;
         let txn = self
             .harness
-            .create_script(sender, script_code, vec![], args);
+            .create_script(sender, script_code.clone(), vec![], args);
 
         debug_assert!(proposal_idx <= block.len());
         block.insert(proposal_idx, txn);
@@ -144,9 +178,7 @@ fn calculate_gas_used(outputs: Vec<(TransactionStatus, u64)>) -> (u64, u64) {
 /// Tests a standard flow of collecting fees without any edge cases.
 fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     let num_validators = 1;
-    let num_users = 20;
-
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let mut universe = TestUniverse::new(num_validators);
     transaction_fee::initialize_fee_collection_and_distribution(
         &mut universe.harness,
         burn_percentage,
@@ -155,9 +187,10 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
         .harness
         .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
-    let rewards_per_epoch = 285;
-    let mut stake_amount = 25_000_000;
+    let mut stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Run a single block and record how much gas it costs. Since fee collection
     // is enabled, this amount is stored in aggregatable coin.
@@ -197,12 +230,12 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
 /// fees are collected on the block boundary.
 fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u8) {
     let num_validators = 1;
-    let num_users = 10;
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let mut universe = TestUniverse::new(num_validators);
 
-    let rewards_per_epoch = 285;
-    let mut stake_amount = 25_000_000;
+    let mut stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
@@ -254,9 +287,7 @@ fn test_initialize_and_enable_fee_collection_and_distribution(burn_percentage: u
 /// the flag, we cannot distribute fees anymore unless it is done beforehand.
 fn test_disable_fee_collection(burn_percentage: u8) {
     let num_validators = 1;
-    let num_users = 10;
-
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let mut universe = TestUniverse::new(num_validators);
     transaction_fee::initialize_fee_collection_and_distribution(
         &mut universe.harness,
         burn_percentage,
@@ -265,9 +296,10 @@ fn test_disable_fee_collection(burn_percentage: u8) {
         .harness
         .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
-    let rewards_per_epoch = 285;
-    let mut stake_amount = 25_000_000;
+    let mut stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
@@ -310,10 +342,8 @@ fn test_disable_fee_collection(burn_percentage: u8) {
 /// Tests that the fees collected prior to the upgrade use the right burn
 /// percentage for calculations.
 fn test_upgrade_burn_percentage(burn_percentage: u8) {
-    let num_validators = 1;
-    let num_users = 10;
-
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let num_validators = 2;
+    let mut universe = TestUniverse::new(num_validators);
     transaction_fee::initialize_fee_collection_and_distribution(
         &mut universe.harness,
         burn_percentage,
@@ -322,8 +352,7 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
         .harness
         .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
-    let rewards_per_epoch = 285;
-    let mut stake_amount = 25_000_000;
+    let mut stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
 
     // Upgrade to the opposite value.
@@ -348,6 +377,10 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
 
     let burnt_amount = (burn_percentage as u64) * p2p_gas / 100;
     let collected_amount = p2p_gas - burnt_amount;
+
+    // Compute rewards for this epoch.
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Reconfiguration triggers distribution of rewards and fees.
     stake_amount += rewards_per_epoch + collected_amount;
@@ -384,8 +417,12 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
     total_supply -= burnt_amount as u128;
     assert_eq!(universe.read_total_supply(), total_supply);
 
-    // Check fees are distributed during the next epoch.
+    // Check fees are distributed during the next epoch. Make sure to
+    // recalculate the rewards as well.
     universe.harness.new_epoch();
+
+    // Compute rewards for this epoch.
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
     stake_amount += rewards_per_epoch + collected_amount;
     assert_eq!(
         get_stake_pool(&universe.harness, &validator_addr).active,
@@ -397,9 +434,7 @@ fn test_upgrade_burn_percentage(burn_percentage: u8) {
 /// previously collected fees.
 fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
     let num_validators = 2;
-    let num_users = 10;
-
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let mut universe = TestUniverse::new(num_validators);
     transaction_fee::initialize_fee_collection_and_distribution(
         &mut universe.harness,
         burn_percentage,
@@ -408,9 +443,10 @@ fn test_leaving_validator_is_rewarded(burn_percentage: u8) {
         .harness
         .enable_features(vec![FeatureFlag::COLLECT_AND_DISTRIBUTE_GAS_FEES], vec![]);
 
-    let rewards_per_epoch = 285;
-    let mut stake_amount = 25_000_000;
+    let mut stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Create a block of transactions such that:
     //   1. First 10 transactions are p2p.
@@ -467,13 +503,13 @@ fn test_fee_collection_and_distribution_for_burn_percentages() {
 /// always burnt.
 fn test_block_single_proposal() {
     let num_validators = 1;
-    let num_users = 5;
-    let mut universe = TestUniverse::new(num_validators, num_users);
+    let mut universe = TestUniverse::new(num_validators);
     transaction_fee::initialize_fee_collection_and_distribution(&mut universe.harness, 100);
 
-    let rewards_per_epoch = 285;
-    let stake_amount = 25_000_000;
+    let stake_amount = INITIAL_STAKE_AMOUNT;
     universe.set_up_validators(stake_amount);
+    let rewards_per_epoch = stake_amount * REWARDS_RATE / REWARDS_RATE_DENOMINATOR;
+    assert_eq!(rewards_per_epoch, 285);
 
     // Create block with a single transaction: governance proposal to enable
     // fee collection. This proposal ends the epoch.
@@ -490,7 +526,7 @@ fn test_block_single_proposal() {
     // After reconfiguration rewards will be distributed. Because there are no
     // other transactions, there is nothing to drain. However, this still should
     // unset the proposer so that the next block burns the proposal fee.
-    total_supply += rewards_per_epoch;
+    total_supply += rewards_per_epoch as u128;
     assert_eq!(universe.read_total_supply(), total_supply);
 
     // Ensure the fees are not leaked to the next block. This block must burn

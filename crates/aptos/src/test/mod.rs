@@ -826,6 +826,7 @@ impl CliTestFramework {
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
             ignore_compile_warnings: false,
+            compute_coverage: false,
         }
         .execute()
         .await
@@ -901,10 +902,40 @@ impl CliTestFramework {
         .await
     }
 
+    /// Runs the given script contents using the local aptos_framework directory.
     pub async fn run_script(
         &self,
         index: usize,
         script_contents: &str,
+    ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
+            framework_git_rev: None,
+            framework_local_dir: Some(Self::aptos_framework_dir()),
+            skip_fetch_latest_git_deps: false,
+        })
+        .await
+    }
+
+    /// Runs the given script contents using the aptos_framework from aptos-core git repository.
+    pub async fn run_script_with_default_framework(
+        &self,
+        index: usize,
+        script_contents: &str,
+    ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package(index, script_contents, FrameworkPackageArgs {
+            framework_git_rev: None,
+            framework_local_dir: None,
+            skip_fetch_latest_git_deps: false,
+        })
+        .await
+    }
+
+    /// Runs the given script with the provided framework package arguments
+    pub async fn run_script_with_framework_package(
+        &self,
+        index: usize,
+        script_contents: &str,
+        framework_package_args: FrameworkPackageArgs,
     ) -> CliTypedResult<TransactionSummary> {
         // Make a temporary directory for compilation
         let temp_dir = TempDir::new().map_err(|err| {
@@ -924,11 +955,7 @@ impl CliTestFramework {
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(source_path),
                 compiled_script_path: None,
-                framework_package_args: FrameworkPackageArgs {
-                    framework_git_rev: None,
-                    framework_local_dir: Some(Self::aptos_framework_dir()),
-                    skip_fetch_latest_git_deps: false,
-                },
+                framework_package_args,
                 bytecode_version: None,
             },
             args: Vec::new(),

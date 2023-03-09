@@ -70,13 +70,13 @@ which produces an output like below (example output for mainnet):
 
 **Find it in your stake pool information output**
 
-You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](/nodes/validator-node/operator/staking-pool-operations/#checking-your-stake-pool-information).
+You can see when the next epoch starts in the output of the command `aptos node get-stake-pool`. See [Checking your stake pool information](nodes/validator-node/operator/staking-pool-operations.md#checking-your-stake-pool-information).
 
 Finally, you can use Aptos Explorer and an online epoch converter to find out when the next epoch starts. See below:
 
 **You can use the Aptos Explorer and epoch converter**
 
-1. Go to account `0x1` page on the Aptos Explorer by [clicking here](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
+1. Go to the [account `0x1` page on the Aptos Explorer](https://explorer.aptoslabs.com/account/0x1). Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
 2. Switch to **RESOURCES** tab.
 3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `last_reconfiguration_time`. You will find the last epoch transition timestamp in microseconds. The text display looks like this:
   ```json
@@ -121,7 +121,7 @@ Follow these steps on the Aptos Explorer:
 
 ### How to find stake pool address
 
-To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
+To find out which stake pool address to use (for example, to bootstrap your node), run the below command. This example is for mainnet. See the `--url` value for testnet or devnet in [Aptos Blockchain Deployments](nodes/aptos-deployments.md). Also see [Bootstrapping validator node](nodes/validator-node/operator/connect-to-aptos-network.md#bootstrapping-validator-node):
 
 ```bash
 aptos node get-stake-pool \
@@ -133,7 +133,7 @@ aptos node get-stake-pool \
 
 Follow these steps on the Aptos Explorer:
 
-1. Go to account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
+1. Go to the account [`0x1`](https://explorer.aptoslabs.com/account/0x1) page on the Aptos Explorer.
 1.  Make sure the correct network (mainnet or testnet or devnet) is selected at the top right.
 2. Switch to **RESOURCES** tab.
 3. Using the browser search (Ctrl-f, do not use the **Search transactions** field), search for `StakePool`. The address with the `StakePool` resource is the correct stake pool address.
@@ -183,7 +183,7 @@ If your node cannot state sync, and the logs are showing "NoAvailablePeers", it'
 
 #### Workaround
 
-You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
+You can try add some extra upstream peers for your fullnode to state sync from. See the section [Connecting your fullnode to seed peers](nodes/full-node/fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers).
 
 ### Starting a node throws a YAML-parsing error
 
@@ -210,7 +210,7 @@ The devnet validator fullnodes will accept only a maximum of connections. If Apt
 You can workaround this by:
 
 1. Checking your network configuration.
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See [Connecting your fullnode to seed peers](nodes/full-node/fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 

@@ -442,7 +442,12 @@ def get_humio_logs_link(
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the node logs in humio for a given test run in a given namespace"""
-    query = f'$forgeLogs(validator_instance=*) | "k8s.namespace" = "{forge_namespace}"'
+    query = (
+        f"$forgeLogs(validator_instance=*) |\n"
+        f'    "k8s.namespace" = "{forge_namespace}" // filters on namespace which contains validator logs\n'
+        f"   OR  // remove either side of the OR operator to only display validator or forge-runner logs\n"
+        f'    "k8s.labels.forge-namespace" = "{forge_namespace}" // filters on specific forge-runner pod in default namespace\n'
+    )
     columns = [
         {
             "type": "field",
@@ -955,7 +960,7 @@ def sanitize_forge_resource_name(forge_resource: str) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 64
+    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -1526,7 +1531,7 @@ def list_jobs(
     phase: List[str],
     regex: str,
 ) -> None:
-    """List all available clusters"""
+    """List all running forge jobs"""
     shell = LocalShell()
     filesystem = LocalFilesystem()
     processes = SystemProcesses()
@@ -1553,7 +1558,10 @@ def list_jobs(
         else:
             fg = "white"
 
-        click.secho(f"{job.cluster.name} {job.name} {job.phase}", fg=fg)
+        click.secho(
+            f"{job.cluster.name} {job.name} {job.phase}: (num_fullnodes: {job.num_fullnodes}, num_validators: {job.num_validators})",
+            fg=fg,
+        )
 
 
 @main.command()

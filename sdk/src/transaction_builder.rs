@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
     },
 };
 pub use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
 use aptos_types::transaction::{
     authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
@@ -165,6 +166,63 @@ impl TransactionFactory {
 
     pub fn account_transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
         self.payload(aptos_stdlib::aptos_account_transfer(to, amount))
+    }
+
+    pub fn create_multisig_account(
+        &self,
+        additional_owners: Vec<AccountAddress>,
+        signatures_required: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_with_owners(
+            additional_owners,
+            signatures_required,
+            vec![],
+            vec![],
+        ))
+    }
+
+    pub fn create_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_transaction(
+            multisig_account,
+            payload,
+        ))
+    }
+
+    pub fn approve_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_approve_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
+    pub fn reject_multisig_transaction(
+        &self,
+        multisig_account: AccountAddress,
+        transaction_id: u64,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_reject_transaction(
+            multisig_account,
+            transaction_id,
+        ))
+    }
+
+    pub fn create_multisig_transaction_with_payload_hash(
+        &self,
+        multisig_account: AccountAddress,
+        payload: Vec<u8>,
+    ) -> TransactionBuilder {
+        self.payload(aptos_stdlib::multisig_account_create_transaction_with_hash(
+            multisig_account,
+            HashValue::sha3_256_of(&payload).to_vec(),
+        ))
     }
 
     pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {

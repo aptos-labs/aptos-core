@@ -61,7 +61,7 @@ module token_objects::hero {
 
     fun init_module(account: &signer) {
         let collection = string::utf8(b"Hero Quest!");
-        collection::create_aggregable_collection(
+        collection::create_untracked_collection(
             account,
             string::utf8(b"collection description"),
             collection::create_mutability_config(false, false),

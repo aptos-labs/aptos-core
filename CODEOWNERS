@@ -59,6 +59,9 @@
 /crates/aptos-rosetta @gregnazario
 /crates/aptos-rosetta-cli @gregnazario
 
+# Owners for the aptos-speculative-state-helper crate
+/crates/aptos-speculative-state-helper @gelash
+
 # Owners for the `telemetry` related crates.
 /crates/aptos-telemetry @ibalajiarun @geekflyer
 /crates/aptos-telemetry-service @ibalajiarun @geekflyer
@@ -67,10 +70,10 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @clay-aptos @gregnazario @christian-aptos
+/developer-docs-site/ @davidiw @clay-aptos @gregnazario @saharct
 
 # Auto-reviewers for all Markdown changes including READMEs
-*.md @clay-aptos @christian-aptos
+*.md @clay-aptos @saharct
 
 # Owner for docs tutorials for the token_standard and related tutorials.
 /developer-docs-site/docs/tutorials @areshand @gregnazario

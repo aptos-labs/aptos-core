@@ -1,0 +1,77 @@
+name: "Run Aptos CLI E2E tests"
+on:
+  # This is called from within the docker-build-test.yaml workflow since we depend
+  # on the build of the image of the CLI we're testing having been built before this
+  # workflow runs. You can see in the invocation of the test suite that we pass in
+  # the image repo we just built and pushed the tools image to and the git SHA1 of
+  # the commit / PR that triggered this workflow.
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description: Use this to override the git SHA1, branch name (e.g. devnet) or tag
+
+jobs:
+  # Run the Aptos CLI examples. We run the CLI on this commit / PR against a
+  # local testnet using the devnet, testnet, and mainnet branches. This way
+  # we ensure that the Aptos CLI works with all 3 prod networks, at least
+  # based on the tests in the test suite.
+  run-cli-tests:
+    runs-on: high-perf-docker
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Install Poetry.
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.2.2
+
+      # Install the dependencies for the CLI testing framework.
+      - name: Install CLI testing framework dependencies
+        run: |
+          cd ./crates/aptos/e2e
+          poetry install
+
+      # Run CLI tests against local testnet built from devnet branch.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: devnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
+
+      # Run CLI tests against local testnet built from testnet branch.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: testnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
+
+      # Run CLI tests against local testnet built from mainnet branch.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: mainnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag ${{ inputs.GIT_SHA }} --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
+
+      - name: Print local testnet logs on failure
+        if: ${{ failure() }}
+        working-directory: docker/compose/validator-testnet
+        run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet

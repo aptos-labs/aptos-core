@@ -17,7 +17,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{Transaction, Version},
-    write_set::{WriteOp, WriteSet},
+    write_set::{TransactionWrite, WriteOp, WriteSet},
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -287,14 +287,10 @@ fn process_state_key_write_op(
     write_op: WriteOp,
 ) -> Result<(StateKey, Option<StateValue>)> {
     let key_size = state_key.size();
-    let state_value = match write_op {
-        WriteOp::Modification(new_value) | WriteOp::Creation(new_value) => {
-            let value = StateValue::from(new_value);
-            usage.add_item(key_size + value.size());
-            Some(value)
-        },
-        WriteOp::Deletion => None,
-    };
+    let state_value = write_op.as_state_value();
+    if let Some(ref value) = state_value {
+        usage.add_item(key_size + value.size())
+    }
     let cached = state_cache.insert(state_key.clone(), state_value.clone());
     if let Some(old_value_opt) = cached {
         if let Some(old_value) = old_value_opt {

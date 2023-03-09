@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
+    create_emitter_and_request, three_region_simulation_test::ThreeRegionSimulationTest,
+    traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
-use anyhow::bail;
+use anyhow::{bail, Ok};
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
     EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test,
@@ -31,10 +32,6 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::AllFullnodes)
-    }
-
     fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",
@@ -99,6 +96,46 @@ impl NetworkLoadTest for TwoTrafficsTest {
 }
 
 impl NetworkTest for TwoTrafficsTest {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx)
+    }
+}
+
+pub struct ThreeRegionSimulationTwoTrafficsTest {
+    pub traffic_test: TwoTrafficsTest,
+    pub three_region_simulation_test: ThreeRegionSimulationTest,
+}
+
+impl Test for ThreeRegionSimulationTwoTrafficsTest {
+    fn name(&self) -> &'static str {
+        "three region simulation two traffics test"
+    }
+}
+
+impl NetworkLoadTest for ThreeRegionSimulationTwoTrafficsTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
+        self.traffic_test.setup(ctx)?;
+        self.three_region_simulation_test.setup(ctx)?;
+
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
+    }
+
+    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+        info!(
+            "Running ThreeRegionSimulationTwoTrafficsTest test for duration {}s",
+            duration.as_secs_f32()
+        );
+        self.traffic_test.test(swarm, duration)
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> Result<()> {
+        self.traffic_test.finish(swarm)?;
+        self.three_region_simulation_test.finish(swarm)?;
+        Ok(())
+    }
+}
+
+impl NetworkTest for ThreeRegionSimulationTwoTrafficsTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }

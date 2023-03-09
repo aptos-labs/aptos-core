@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Test module.
@@ -12,6 +13,7 @@
 //! Set env REGENERATE_GOLDENFILES to update the golden files when running tests..
 
 mod account_universe;
+mod back_edges;
 mod create_account;
 mod data_store;
 mod execution_strategies;

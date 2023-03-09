@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters,
-    counters::{TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS},
+    counters::{
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+    },
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
     scheduler::{Scheduler, SchedulerTask, Version, Wave},
@@ -15,6 +19,7 @@ use aptos_logger::debug;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::TStateView;
 use aptos_types::write_set::WriteOp;
+use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
@@ -173,6 +178,9 @@ where
         if aborted {
             counters::SPECULATIVE_ABORT_COUNT.inc();
 
+            // Any logs from the aborted execution should be cleared and not reported.
+            clear_speculative_txn_logs(idx_to_validate);
+
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
             for k in last_input_output.modified_keys(idx_to_validate) {
                 versioned_data_cache.mark_estimate(&k, idx_to_validate);
@@ -200,6 +208,7 @@ where
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             // Only one thread try_commit to avoid contention.
@@ -251,6 +260,7 @@ where
         signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
@@ -264,6 +274,7 @@ where
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
 
+        let timer = RAYON_EXECUTION_SECONDS.start_timer();
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
@@ -279,6 +290,7 @@ where
                 });
             }
         });
+        drop(timer);
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
@@ -396,6 +408,10 @@ where
 
         if matches!(ret, Err(Error::ModulePathReadWrite)) {
             debug!("[Execution]: Module read & written, sequential fallback");
+
+            // All logs from the parallel execution should be cleared and not reported.
+            // Clear by re-initializing the speculative logs.
+            init_speculative_logs(signature_verified_block.len());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,

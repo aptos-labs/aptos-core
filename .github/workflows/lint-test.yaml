@@ -8,6 +8,7 @@ on:
       - testnet
       - mainnet
       - aptos-node-v*
+      - aptos-release-v*
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -144,6 +145,8 @@ jobs:
         with:
           tool: nextest
       - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
+        env:
+          RUST_MIN_STACK: 4297152
 
   rust-smoke-test:
     runs-on: high-perf-docker
@@ -177,6 +180,7 @@ jobs:
 
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
+    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }} 
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

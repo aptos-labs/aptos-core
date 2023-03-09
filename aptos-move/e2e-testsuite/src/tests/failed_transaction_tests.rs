@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{
@@ -10,10 +11,8 @@ use aptos_types::{
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver, logging::AdapterLogSchema,
-    transaction_metadata::TransactionMetadata, AptosVM,
-};
+use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]

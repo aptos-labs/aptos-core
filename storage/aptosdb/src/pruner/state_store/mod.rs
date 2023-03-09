@@ -147,7 +147,7 @@ where
             Ok(target_version)
         } else {
             let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_pruner_commit"])
+                .with_label_values(&["state_merkle_pruner_commit"])
                 .start_timer();
             let new_min_readable_version =
                 indices.last().expect("Should exist.").stale_since_version;
@@ -226,13 +226,14 @@ impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 
-        let state_pruner =
-            pruner_utils::create_state_pruner::<StaleNodeIndexCrossEpochSchema>(state_merkle_db);
-        state_pruner.set_target_version(target_version);
+        let state_merkle_pruner = pruner_utils::create_state_merkle_pruner::<
+            StaleNodeIndexCrossEpochSchema,
+        >(state_merkle_db);
+        state_merkle_pruner.set_target_version(target_version);
 
-        let min_readable_version = state_pruner.min_readable_version();
-        let target_version = state_pruner.target_version();
-        state_pruner.prune_state_merkle(
+        let min_readable_version = state_merkle_pruner.min_readable_version();
+        let target_version = state_merkle_pruner.target_version();
+        state_merkle_pruner.prune_state_merkle(
             min_readable_version,
             target_version,
             max_version,

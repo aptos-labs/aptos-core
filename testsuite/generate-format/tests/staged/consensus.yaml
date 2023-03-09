@@ -349,6 +349,19 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Multisig:
+  STRUCT:
+    - multisig_address:
+        TYPENAME: AccountAddress
+    - transaction_payload:
+        OPTION:
+          TYPENAME: MultisigTransactionPayload
+MultisigTransactionPayload:
+  ENUM:
+    0:
+      EntryFunction:
+        NEWTYPE:
+          TYPENAME: EntryFunction
 Payload:
   ENUM:
     0:
@@ -414,7 +427,7 @@ Signature:
 SignedDigest:
   STRUCT:
     - epoch: U64
-    - peer_id:
+    - signer:
         TYPENAME: AccountAddress
     - info:
         TYPENAME: SignedDigestInfo
@@ -422,6 +435,8 @@ SignedDigest:
         TYPENAME: Signature
 SignedDigestInfo:
   STRUCT:
+    - batch_author:
+        TYPENAME: AccountAddress
     - digest:
         TYPENAME: HashValue
     - expiration:
@@ -449,6 +464,15 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+StateValueMetadata:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - payer:
+              TYPENAME: AccountAddress
+          - deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -567,6 +591,10 @@ TransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    3:
+      Multisig:
+        NEWTYPE:
+          TYPENAME: Multisig
 TwoChainTimeout:
   STRUCT:
     - epoch: U64
@@ -656,6 +684,23 @@ WriteOp:
         NEWTYPE: BYTES
     2:
       Deletion: UNIT
+    3:
+      CreationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    4:
+      ModificationWithMetadata:
+        STRUCT:
+          - data: BYTES
+          - metadata:
+              TYPENAME: StateValueMetadata
+    5:
+      DeletionWithMetadata:
+        STRUCT:
+          - metadata:
+              TYPENAME: StateValueMetadata
 WriteSet:
   ENUM:
     0:

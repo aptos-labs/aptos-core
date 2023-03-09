@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Support for running the VM to execute and verify transactions.
@@ -28,7 +29,9 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, ValidatorSet, Version},
+    on_chain_config::{
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+    },
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -288,10 +291,12 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap = AccessPath::resource_access_path(*addr, T::struct_tag());
-        let data_blob = TStateView::get_state_value(&self.data_store, &StateKey::access_path(ap))
-            .expect("account must exist in data store")
-            .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
+        let ap =
+            AccessPath::resource_access_path(*addr, T::struct_tag()).expect("access path in test");
+        let data_blob =
+            TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
+                .expect("account must exist in data store")
+                .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
@@ -465,7 +470,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+        TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath
@@ -573,6 +578,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -580,6 +588,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
+                timed_features,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -600,15 +609,13 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let session_out = session.finish().expect("Failed to generate txn effects");
-            // TODO: Support deltas in fake executor.
-            let (_, change_set) = session_out
-                .into_change_set(
+            let change_set_ext = session
+                .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
-                .expect("Failed to generate writeset")
-                .into_inner();
+                .expect("Failed to generate txn effects");
+            let (_delta_change_set, change_set) = change_set_ext.into_inner();
             let (write_set, _events) = change_set.into_inner();
             write_set
         };
@@ -629,6 +636,8 @@ impl FakeExecutor {
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
+            // FIXME: should probably read the timestamp from storage.
+            TimedFeatures::enable_all(),
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
@@ -642,15 +651,15 @@ impl FakeExecutor {
                 &mut UnmeteredGasMeter,
             )
             .map_err(|e| e.into_vm_status())?;
-        let session_out = session.finish().expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
-        let (_, change_set) = session_out
-            .into_change_set(
+
+        let change_set_ext = session
+            .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
-            .expect("Failed to generate writeset")
-            .into_inner();
+            .expect("Failed to generate txn effects");
+        // TODO: Support deltas in fake executor.
+        let (_delta_change_set, change_set) = change_set_ext.into_inner();
         let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }

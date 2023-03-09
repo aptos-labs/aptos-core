@@ -6,12 +6,22 @@
       "username": "lukeyang"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "David Wolinsky",
       "email": "isaac.wolinsky@gmail.com",
       "username": "davidiw"
     }
   ],
   "/aptos-white-paper/aptos-white-paper-index": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
     {
       "name": "David Wolinsky",
       "email": "isaac.wolinsky@gmail.com",
@@ -79,14 +89,14 @@
       "username": "gregnazario"
     },
     {
-      "name": "Daniel Porteous (dport)",
-      "email": "danielporteous1@gmail.com",
-      "username": "banool"
-    },
-    {
       "name": "David Wolinsky",
       "email": "isaac.wolinsky@gmail.com",
       "username": "davidiw"
+    },
+    {
+      "name": "Daniel Porteous (dport)",
+      "email": "danielporteous1@gmail.com",
+      "username": "banool"
     },
     {
       "name": "Junkil Park",
@@ -96,19 +106,14 @@
   ],
   "/cli-tools/aptos-cli-tool/use-aptos-cli": [
     {
-      "name": "Raj Karamchedu",
-      "email": "raj@aptoslabs.com",
-      "username": "rajkaramchedu"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
     },
     {
-      "name": "0xbe1",
-      "email": "101405096+0xbe1@users.noreply.github.com",
-      "username": "0xbe1"
+      "name": "Raj Karamchedu",
+      "email": "raj@aptoslabs.com",
+      "username": "rajkaramchedu"
     },
     {
       "name": "Junkil Park",
@@ -116,9 +121,14 @@
       "username": null
     },
     {
-      "name": "Greg Nazario",
-      "email": "greg@gnazar.io",
-      "username": "gregnazario"
+      "name": "0xbe1",
+      "email": "101405096+0xbe1@users.noreply.github.com",
+      "username": "0xbe1"
+    },
+    {
+      "name": "Jiege",
+      "email": "stevekeol.x@gmail.com",
+      "username": null
     },
     {
       "name": "Kevin",
@@ -149,6 +159,16 @@
       "name": "铁哥",
       "email": "guotie.9@gmail.com",
       "username": null
+    },
+    {
+      "name": "David Wolinsky",
+      "email": "isaac.wolinsky@gmail.com",
+      "username": "davidiw"
+    },
+    {
+      "name": "Greg",
+      "email": "greg@gnazar.io",
+      "username": "gregnazario"
     }
   ],
   "/cli-tools/build-from-brew": [
@@ -378,6 +398,11 @@
   ],
   "/concepts/fullnodes": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Kevin",
       "email": "105028215+movekevin@users.noreply.github.com",
       "username": "movekevin"
@@ -429,14 +454,14 @@
       "username": "rajkaramchedu"
     },
     {
-      "name": "Kevin",
-      "email": "kevin@aptoslabs.com",
-      "username": "movekevin"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Kevin",
+      "email": "kevin@aptoslabs.com",
+      "username": "movekevin"
     },
     {
       "name": "David Wolinsky",
@@ -507,14 +532,14 @@
   ],
   "/concepts/txns-states": [
     {
-      "name": "David Wolinsky",
-      "email": "isaac.wolinsky@gmail.com",
-      "username": "davidiw"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "David Wolinsky",
+      "email": "isaac.wolinsky@gmail.com",
+      "username": "davidiw"
     },
     {
       "name": "Kevin",
@@ -529,6 +554,11 @@
   ],
   "/concepts/validator-nodes": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Kevin",
       "email": "105028215+movekevin@users.noreply.github.com",
       "username": "movekevin"
@@ -536,14 +566,14 @@
   ],
   "/concepts/wallet-adapter-concept": [
     {
-      "name": "Greg Nazario",
-      "email": "greg@gnazar.io",
-      "username": "gregnazario"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Greg Nazario",
+      "email": "greg@gnazar.io",
+      "username": "gregnazario"
     },
     {
       "name": "Maayan",
@@ -591,7 +621,7 @@
     },
     {
       "name": "Clay Murphy",
-      "email": "claymurphy@Clays-Air.localdomain",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
     },
     {
@@ -608,9 +638,19 @@
       "name": "Kevin",
       "email": "105028215+movekevin@users.noreply.github.com",
       "username": "movekevin"
+    },
+    {
+      "name": "nk_ysg",
+      "email": "nk_ysg@163.com",
+      "username": null
     }
   ],
   "/guides/data-pruning": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
     {
       "name": "Josh Lind",
       "email": "josh.lind@hotmail.com",
@@ -698,14 +738,14 @@
       "username": "0xbe1"
     },
     {
-      "name": "Daniel Porteous",
-      "email": "danielporteous1@gmail.com",
-      "username": "banool"
-    },
-    {
       "name": "Greg Nazario",
       "email": "greg@gnazar.io",
       "username": "gregnazario"
+    },
+    {
+      "name": "Daniel Porteous",
+      "email": "danielporteous1@gmail.com",
+      "username": "banool"
     }
   ],
   "/guides/aptos-guides": [
@@ -747,14 +787,14 @@
       "username": "clay-aptos"
     },
     {
-      "name": "bowenyang007",
-      "email": "carlyang007@gmail.com",
-      "username": null
-    },
-    {
       "name": "Christian Theilemann",
       "email": "christian@aptoslabs.com",
       "username": "geekflyer"
+    },
+    {
+      "name": "bowenyang007",
+      "email": "carlyang007@gmail.com",
+      "username": null
     }
   ],
   "/guides/install-petra-wallet-extension": [
@@ -831,6 +871,209 @@
       "name": "Jacob Barrett",
       "email": "jsbarrett88@gmail.com",
       "username": null
+    }
+  ],
+  "/guides/move-guides/book/SUMMARY": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/abilities": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/abort-and-assert": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/address": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/bool": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/coding-conventions": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/conditionals": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/constants": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/creating-coins": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/equality": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/friends": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/functions": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/generics": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/global-storage-operators": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/global-storage-structure": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/integers": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/introduction": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/loops": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/modules-and-scripts": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/packages": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/references": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/signer": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/standard-library": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/structs-and-resources": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/tuples": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/unit-testing": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/uses": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/variables": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    }
+  ],
+  "/guides/move-guides/book/vector": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
     }
   ],
   "/guides/move-guides/guide-move-transactional-testing": [
@@ -1023,14 +1266,14 @@
   ],
   "/guides/state-sync": [
     {
-      "name": "Josh Lind",
-      "email": "josh.lind@hotmail.com",
-      "username": "joshlind"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Josh Lind",
+      "email": "josh.lind@hotmail.com",
+      "username": "joshlind"
     },
     {
       "name": "Raj Karamchedu",
@@ -1216,6 +1459,11 @@
       "username": "rajkaramchedu"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Daniel Porteous (dport)",
       "email": "danielporteous1@gmail.com",
       "username": "banool"
@@ -1260,6 +1508,11 @@
   ],
   "/nodes/full-node/fullnode-network-connections": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Josh Lind",
       "email": "josh.lind@hotmail.com",
       "username": "joshlind"
@@ -1277,6 +1530,11 @@
       "username": "rajkaramchedu"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Christian Theilemann",
       "email": "christian@aptoslabs.com",
       "username": "geekflyer"
@@ -1285,11 +1543,6 @@
       "name": "Greg Nazario",
       "email": "greg@gnazar.io",
       "username": "gregnazario"
-    },
-    {
-      "name": "Clay Murphy",
-      "email": "114445310+clay-aptos@users.noreply.github.com",
-      "username": "clay-aptos"
     },
     {
       "name": "Josh Lind",
@@ -1351,6 +1604,11 @@
       "username": "rajkaramchedu"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Greg Nazario",
       "email": "greg@gnazar.io",
       "username": "gregnazario"
@@ -1391,6 +1649,11 @@
       "name": "Sherry Xiao",
       "email": "sherryxiao.py@gmail.com",
       "username": "sherry-x"
+    },
+    {
+      "name": "0xHiro / ヒロひろ",
+      "email": "90010840+0xhiro@users.noreply.github.com",
+      "username": "0xhiro"
     }
   ],
   "/nodes/full-node/update-fullnode-with-new-devnet-releases": [
@@ -1400,14 +1663,14 @@
       "username": "rajkaramchedu"
     },
     {
-      "name": "Christian Theilemann",
-      "email": "christian@aptoslabs.com",
-      "username": "geekflyer"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Christian Theilemann",
+      "email": "christian@aptoslabs.com",
+      "username": "geekflyer"
     },
     {
       "name": "Sherry Xiao",
@@ -1466,6 +1729,11 @@
       "username": "rajkaramchedu"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "michelle-aptos",
       "email": "120680608+michelle-aptos@users.noreply.github.com",
       "username": "michelle-aptos"
@@ -1502,14 +1770,14 @@
   ],
   "/nodes/local-testnet/using-cli-to-run-a-local-testnet": [
     {
-      "name": "Raj Karamchedu",
-      "email": "raj@aptoslabs.com",
-      "username": "rajkaramchedu"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Raj Karamchedu",
+      "email": "raj@aptoslabs.com",
+      "username": "rajkaramchedu"
     },
     {
       "name": "Daniel Porteous (dport)",
@@ -1531,12 +1799,22 @@
   ],
   "/nodes/measure/node-health-checker-faq": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Josh Lind",
       "email": "josh.lind@hotmail.com",
       "username": "joshlind"
     }
   ],
   "/nodes/measure/node-health-checker": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
     {
       "name": "Josh Lind",
       "email": "josh.lind@hotmail.com",
@@ -1557,6 +1835,11 @@
   ],
   "/nodes/node-files-all-networks/node-files-devnet": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
       "username": "rajkaramchedu"
@@ -1564,12 +1847,27 @@
   ],
   "/nodes/node-files-all-networks/node-files-testnet": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
       "username": "rajkaramchedu"
     }
   ],
   "/nodes/node-files-all-networks/node-files": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
+      "name": "David Conroy",
+      "email": "dconroy@gmail.com",
+      "username": null
+    },
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -1695,14 +1993,14 @@
   ],
   "/nodes/validator-node/operator/running-validator-node/running-validator-node": [
     {
-      "name": "Raj Karamchedu",
-      "email": "raj@aptoslabs.com",
-      "username": "rajkaramchedu"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Raj Karamchedu",
+      "email": "raj@aptoslabs.com",
+      "username": "rajkaramchedu"
     }
   ],
   "/nodes/validator-node/operator/running-validator-node/run-validator-node-using-aws": [
@@ -1878,6 +2176,18 @@
   ],
   "/nodes/validator-node/owner/index": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
+      "name": "Raj Karamchedu",
+      "email": "raj@aptoslabs.com",
+      "username": "rajkaramchedu"
+    }
+  ],
+  "/nodes/validator-node/voter/index": [
+    {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
       "username": "rajkaramchedu"
@@ -1886,13 +2196,6 @@
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
-    }
-  ],
-  "/nodes/validator-node/voter/index": [
-    {
-      "name": "Raj Karamchedu",
-      "email": "raj@aptoslabs.com",
-      "username": "rajkaramchedu"
     },
     {
       "name": "Maayan Savir",
@@ -1906,6 +2209,11 @@
     }
   ],
   "/nodes/whats-new-in-ait3": [
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
     {
       "name": "Raj Karamchedu",
       "email": "raj@aptoslabs.com",
@@ -2025,8 +2333,8 @@
     },
     {
       "name": "Clay Murphy",
-      "email": "claymurphy@Clays-Air.localdomain",
-      "username": null
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
     },
     {
       "name": "David",
@@ -2047,8 +2355,8 @@
   "/sdks/rust-sdk": [
     {
       "name": "Clay Murphy",
-      "email": "claymurphy@MacBook-Air.localdomain",
-      "username": null
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
     },
     {
       "name": "Daniel Porteous (dport)",
@@ -2080,6 +2388,11 @@
   ],
   "/sdks/ts-sdk/typescript-sdk-overview": [
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Greg Nazario",
       "email": "greg@gnazar.io",
       "username": "gregnazario"
@@ -2090,12 +2403,7 @@
       "username": "areshand"
     },
     {
-      "name": "Clay Murphy",
-      "email": "claymurphy@MacBook-Air.localdomain",
-      "username": null
-    },
-    {
-      "name": "Maayan Savir",
+      "name": "Maayan",
       "email": "maayan@aptoslabs.com",
       "username": null
     },
@@ -2201,6 +2509,11 @@
       "username": "rajkaramchedu"
     },
     {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
+    },
+    {
       "name": "Jijun Leng",
       "email": "jijunleng@gmail.com",
       "username": "jjleng"
@@ -2219,11 +2532,6 @@
       "name": "Jacob Devore",
       "email": "jacob@blient.com",
       "username": "jacobadevore"
-    },
-    {
-      "name": "Clay Murphy",
-      "email": "114445310+clay-aptos@users.noreply.github.com",
-      "username": "clay-aptos"
     },
     {
       "name": "Wolfgang Grieskamp",
@@ -2268,14 +2576,14 @@
       "username": "rajkaramchedu"
     },
     {
-      "name": "Greg Nazario",
-      "email": "greg@gnazar.io",
-      "username": "gregnazario"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Greg Nazario",
+      "email": "greg@gnazar.io",
+      "username": "gregnazario"
     },
     {
       "name": "Wolfgang Grieskamp",
@@ -2375,19 +2683,19 @@
       "username": "areshand"
     },
     {
-      "name": "Wolfgang Grieskamp",
-      "email": "wgrieskamp@gmail.com",
-      "username": "wrwg"
-    },
-    {
       "name": "CapCap",
       "email": "max@aptoslabs.com",
       "username": "capcap"
     },
     {
-      "name": "Kevin",
-      "email": "105028215+movekevin@users.noreply.github.com",
-      "username": "movekevin"
+      "name": "Wolfgang Grieskamp",
+      "email": "wgrieskamp@gmail.com",
+      "username": "wrwg"
+    },
+    {
+      "name": "Clay Murphy",
+      "email": "114445310+clay-aptos@users.noreply.github.com",
+      "username": "clay-aptos"
     },
     {
       "name": "Paul",
@@ -2415,11 +2723,6 @@
       "username": null
     },
     {
-      "name": "Clay Murphy",
-      "email": "114445310+clay-aptos@users.noreply.github.com",
-      "username": "clay-aptos"
-    },
-    {
       "name": "Greg Nazario",
       "email": "greg@gnazar.io",
       "username": "gregnazario"
@@ -2438,6 +2741,11 @@
       "name": "Joshua Lind",
       "email": "josh.lind@hotmail.com",
       "username": "joshlind"
+    },
+    {
+      "name": "Kevin",
+      "email": "105028215+movekevin@users.noreply.github.com",
+      "username": "movekevin"
     }
   ],
   "/tutorials/your-first-transaction": [
@@ -2509,14 +2817,14 @@
   ],
   "/tutorials/aptos-quickstarts": [
     {
-      "name": "Raj Karamchedu",
-      "email": "raj@aptoslabs.com",
-      "username": "rajkaramchedu"
-    },
-    {
       "name": "Clay Murphy",
       "email": "114445310+clay-aptos@users.noreply.github.com",
       "username": "clay-aptos"
+    },
+    {
+      "name": "Raj Karamchedu",
+      "email": "raj@aptoslabs.com",
+      "username": "rajkaramchedu"
     },
     {
       "name": "David Wolinsky",

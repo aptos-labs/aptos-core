@@ -9,7 +9,7 @@ use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
 };
 use aptos_crypto::{bls12381, HashValue};
-use aptos_logger::{debug, info};
+use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -59,13 +59,13 @@ impl IncrementalProofState {
 
         if self
             .aggregated_signature
-            .contains_key(&signed_digest.peer_id())
+            .contains_key(&signed_digest.signer())
         {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
         self.aggregated_signature
-            .insert(signed_digest.peer_id(), signed_digest.signature());
+            .insert(signed_digest.signer(), signed_digest.signature());
         Ok(())
     }
 
@@ -204,14 +204,16 @@ impl ProofCoordinator {
                             break;
                         },
                         ProofCoordinatorCommand::InitProof(info, batch_id, tx) => {
+                            debug!("QS: init proof, batch_id {}, digest {}", batch_id, info.digest);
                             self.init_proof(info, batch_id, tx);
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_digest) => {
-                            let peer_id = signed_digest.peer_id();
+                            let peer_id = signed_digest.signer();
+                            let digest = signed_digest.digest();
                             match self.add_signature(signed_digest, &validator_verifier) {
                                 Ok(result) => {
                                     if let Some(proof) = result {
-                                        debug!("QS: added signature to proof");
+                                        debug!("QS: received quorum of signatures, digest {}", digest);
                                         tx.send(ProofManagerCommand::LocalProof(proof)).await.unwrap();
                                     }
                                 },
@@ -219,7 +221,7 @@ impl ProofCoordinator {
                                     // TODO: better error messages
                                     // Can happen if we already garbage collected
                                     if peer_id == self.peer_id {
-                                        info!("QS: could not add signature from self, err = {:?}", e);
+                                        debug!("QS: could not add signature from self, err = {:?}", e);
                                     }
                                 },
                             }

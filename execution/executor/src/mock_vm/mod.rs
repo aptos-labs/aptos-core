@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
@@ -110,7 +111,8 @@ impl VMExecutor for MockVM {
             if matches!(txn, Transaction::GenesisTransaction(_)) {
                 read_state_value_from_storage(
                     state_view,
-                    &access_path_for_config(ValidatorSet::CONFIG_ID),
+                    &access_path_for_config(ValidatorSet::CONFIG_ID)
+                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES))?,
                 );
                 read_state_value_from_storage(
                     state_view,
@@ -233,7 +235,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_state_value(&StateKey::access_path(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -243,7 +245,7 @@ fn read_state_value_from_storage(
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
     state_view
-        .get_state_value(&StateKey::access_path(access_path.clone()))
+        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 
@@ -263,7 +265,8 @@ fn seqnum_ap(account: AccountAddress) -> AccessPath {
 
 fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
-    let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
+    let validator_set_ap =
+        access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test");
     write_set.insert((
         StateKey::access_path(validator_set_ap),
         WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
@@ -400,6 +403,11 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
             // TODO: we need to migrate Script to EntryFunction later
             unimplemented!("MockVM does not support entry function transaction payload.")
         },
+        TransactionPayload::Multisig(_) => {
+            unimplemented!("MockVM does not support multisig transaction payload.")
+        },
+
+        // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
         },

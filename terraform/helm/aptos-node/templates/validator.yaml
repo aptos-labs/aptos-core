@@ -46,7 +46,7 @@ spec:
   {{- end }}
 
 ---
-
+{{ $validator_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (printf "%s-%d-validator" (include "aptos-validator.fullname" $) $i) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -79,7 +79,11 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: validator
+        {{- if and $validator_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $validator_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+        {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
         {{- if not $.Values.pyroscope.enabled }}

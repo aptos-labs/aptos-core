@@ -51,27 +51,27 @@ spec aptos_framework::coin {
         pragma verify = false;
     }
 
-    spec schema ExistCoinInfo<CoinType> {
+    spec schema AbortsIfNotExistCoinInfo<CoinType> {
         let addr = type_info::type_of<CoinType>().account_address;
         aborts_if !exists<CoinInfo<CoinType>>(addr);
     }
 
     spec name<CoinType>(): string::String {
-        include ExistCoinInfo<CoinType>;
+        include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
     spec symbol<CoinType>(): string::String {
-        include ExistCoinInfo<CoinType>;
+        include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
     spec decimals<CoinType>(): u8 {
-        include ExistCoinInfo<CoinType>;
+        include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
     spec supply<CoinType>(): Option<u128> {
         // TODO: complex aborts conditions.
         pragma aborts_if_is_partial;
-        include ExistCoinInfo<CoinType>;
+        include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
     spec burn<CoinType>(
@@ -82,7 +82,7 @@ spec aptos_framework::coin {
         pragma aborts_if_is_partial;
         let addr =  type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
-        include ExistCoinInfo<CoinType>;
+        include AbortsIfNotExistCoinInfo<CoinType>;
         aborts_if coin.value == 0;
     }
 
@@ -165,7 +165,11 @@ spec aptos_framework::coin {
     }
 
     spec initialize {
-        pragma verify = false;
+        let account_addr = signer::address_of(account);
+        aborts_if type_info::type_of<CoinType>().account_address != account_addr;
+        aborts_if exists<CoinInfo<CoinType>>(account_addr);
+        aborts_if string::length(name) > MAX_COIN_NAME_LENGTH;
+        aborts_if string::length(symbol) > MAX_COIN_SYMBOL_LENGTH;
     }
 
     // `account` must be `@aptos_framework`.
@@ -224,6 +228,7 @@ spec aptos_framework::coin {
     spec register<CoinType>(account: &signer) {
         let account_addr = signer::address_of(account);
         let acc = global<account::Account>(account_addr);
+        aborts_if !exists<CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
         aborts_if !exists<CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 > MAX_U64;
         aborts_if !exists<CoinStore<CoinType>>(account_addr) && !exists<account::Account>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
@@ -282,11 +287,13 @@ spec aptos_framework::coin {
     }
 
     spec initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
-        // TODO: specify this.
+        include system_addresses::AbortsIfNotAptosFramework{account: aptos_framework};
+        include aggregator_factory::CreateAggregatorInternalAbortsIf;
     }
 
     spec is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
-        // TODO: specify this.
+        aborts_if false;
+        ensures result == (aggregator::spec_read(coin.value) == 0);
     }
 
     spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
@@ -294,10 +301,12 @@ spec aptos_framework::coin {
     }
 
     spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
-        // TODO: specify this.
+        aborts_if false;
     }
 
     spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
-        // TODO: specify this.
+        let coin_store = global<CoinStore<CoinType>>(account_addr);
+        aborts_if amount > 0 && !exists<CoinStore<CoinType>>(account_addr);
+        aborts_if amount > 0 && coin_store.coin.value < amount;
     }
 }

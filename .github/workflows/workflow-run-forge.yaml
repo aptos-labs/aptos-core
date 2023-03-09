@@ -12,6 +12,10 @@ on:
         required: false
         type: string
         description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
+      FORGE_IMAGE_TAG:
+        required: false
+        type: string
+        description: The docker image tag to use for forge runner. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_NAMESPACE:
         required: false
         type: string
@@ -70,6 +74,7 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+  FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
@@ -92,9 +97,6 @@ jobs:
   forge:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
-    permissions:
-      issues: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:

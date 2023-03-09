@@ -30,6 +30,8 @@ pub enum Commands {
         test_dir: PathBuf,
         #[clap(short, long)]
         endpoint: url::Url,
+        #[clap(long)]
+        framework_git_rev: Option<String>,
     },
 }
 
@@ -51,14 +53,17 @@ async fn main() -> Result<()> {
             release_config,
             test_dir,
             endpoint,
+            framework_git_rev,
         } => {
             let config =
                 aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())?;
 
-            let network_config = aptos_release_builder::validate::NetworkConfig::new_from_dir(
+            let mut network_config = aptos_release_builder::validate::NetworkConfig::new_from_dir(
                 endpoint,
                 test_dir.as_path(),
             )?;
+
+            network_config.framework_git_rev = framework_git_rev;
 
             aptos_release_builder::validate::validate_config(config, network_config).await
         },

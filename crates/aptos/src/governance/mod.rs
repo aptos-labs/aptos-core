@@ -58,6 +58,7 @@ pub enum GovernanceTool {
     VerifyProposal(VerifyProposal),
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
+    ApproveExecutionHash(ApproveExecutionHash),
 }
 
 impl GovernanceTool {
@@ -71,6 +72,7 @@ impl GovernanceTool {
             ShowProposal(tool) => tool.execute_serialized().await,
             ListProposals(tool) => tool.execute_serialized().await,
             VerifyProposal(tool) => tool.execute_serialized().await,
+            ApproveExecutionHash(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -174,9 +176,16 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
             .into_inner();
         let mut proposals = vec![];
 
-        for event in events {
-            let event = bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data())?;
-            proposals.push(event.into());
+        for event in &events {
+            match bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data()) {
+                Ok(valid_event) => proposals.push(valid_event.into()),
+                Err(err) => {
+                    eprintln!(
+                        "Event: {:?} cannot be parsed as a proposal: {:?}",
+                        event, err
+                    )
+                },
+            }
         }
 
         // TODO: Show more information about proposal?
@@ -546,6 +555,35 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
     }
 }
 
+/// Submit a transaction to approve a proposal's script hash to bypass the transaction size limit.
+/// This is needed for upgrading large packages such as aptos-framework.
+#[derive(Parser)]
+pub struct ApproveExecutionHash {
+    /// Id of the proposal to vote on
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ApproveExecutionHash {
+    fn command_name(&self) -> &'static str {
+        "ApproveExecutionHash"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        Ok(self
+            .txn_options
+            .submit_transaction(
+                aptos_stdlib::aptos_governance_add_approved_script_hash_script(self.proposal_id),
+            )
+            .await
+            .map(TransactionSummary::from)?)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VotingRecord {
     proposal_id: String,
@@ -575,7 +613,7 @@ fn compile_in_temp_dir(
     script_path: &Path,
     framework_package_args: &FrameworkPackageArgs,
     prompt_options: PromptOptions,
-    bytecode_version: u32,
+    bytecode_version: Option<u32>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
     let temp_dir = TempDir::new().map_err(|err| {
@@ -621,7 +659,7 @@ fn compile_in_temp_dir(
 fn compile_script(
     skip_fetch_latest_git_deps: bool,
     package_dir: &Path,
-    bytecode_version: u32,
+    bytecode_version: Option<u32>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
@@ -629,7 +667,7 @@ fn compile_script(
         with_source_maps: false,
         with_error_map: false,
         skip_fetch_latest_git_deps,
-        bytecode_version: Some(bytecode_version),
+        bytecode_version,
         ..BuildOptions::default()
     };
 
@@ -746,7 +784,7 @@ impl CompileScriptFunction {
             script_path,
             &self.framework_package_args,
             prompt_options,
-            self.bytecode_version.unwrap_or(5),
+            self.bytecode_version,
         )
     }
 }
@@ -802,7 +840,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         let options = included_artifacts.build_options(
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.bytecode_version_or_detault(),
+            move_options.bytecode_version,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
@@ -840,14 +878,21 @@ impl GenerateExecutionHash {
             compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
-                framework_local_dir: Option::from(
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("..")
-                        .join("..")
-                        .join("aptos-move")
+                framework_local_dir: Option::from({
+                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    path.pop();
+                    path.pop();
+                    path.join("aptos-move")
                         .join("framework")
-                        .join("aptos-framework"),
-                ),
+                        .join("aptos-framework")
+                        .canonicalize()
+                        .map_err(|err| {
+                            CliError::IO(
+                                format!("Failed to canonicalize aptos framework path: {:?}", path),
+                                err,
+                            )
+                        })?
+                }),
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,
@@ -915,7 +960,7 @@ struct CreateProposalFullEvent {
     stake_pool: AccountAddress,
     proposal_id: u64,
     execution_hash: Vec<u8>,
-    proposal_metadata: BTreeMap<String, Vec<u8>>,
+    proposal_metadata: Vec<(String, Vec<u8>)>,
 }
 
 /// A proposal and the verified information about it

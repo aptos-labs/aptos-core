@@ -188,3 +188,8 @@ variable "gke_autoscaling_max_node_count" {
   description = "Maximum number of nodes for GKE nodepool autoscaling"
   default     = 10
 }
+
+variable "manage_via_tf" {
+  description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  default     = true
+}

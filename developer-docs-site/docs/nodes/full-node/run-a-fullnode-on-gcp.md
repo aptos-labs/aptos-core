@@ -8,7 +8,7 @@ slug: "run-a-fullnode-on-gcp"
 This tutorial explains how to configure and deploy a public fullnode to connect to the Aptos devnet using Google Cloud (GCP). Running a public fullnode in the cloud usually provides better stability and availability compared to running it on your laptop. **If you are looking to deploy a production grade public fullnode, we recommend you to deploy it on the cloud.**
 
 :::tip Alternative methods for running a public fullnode
-Read [Public Fullnode](/nodes/full-node/public-fullnode) if you want other alternatives for deployment. Using cloud comes with a cost, and it varies depending on how you configure it.
+Read [Public Fullnode](./index.md) if you want other options for deployment. Using cloud comes with a cost, and it varies depending on how you configure it.
 :::
 
 ## Prerequisites
@@ -194,7 +194,7 @@ devnet0-aptos-fullnode-0   1/1     Running   0          56s
   {"chain_id":25,"epoch":"22","ledger_version":"9019844","oldest_ledger_version":"0","ledger_timestamp":"1661620200131348","node_role":"full_node","oldest_block_height":"0","block_height":"1825467"}
 ```
 
-5. To verify the correctness of your public fullnode, as outlined in the section [Verify the correctness of your FullNode](/nodes/full-node/fullnode-source-code-or-docker#verify-the-correctness-of-your-public-fullnode), you will need to:
+5. To verify the correctness of your public fullnode, as outlined in the section [Verify the correctness of your FullNode](./fullnode-source-code-or-docker.md#verify-the-correctness-of-your-public-fullnode), you will need to:
    - Set up a port-forwarding mechanism directly to the aptos pod in one ssh terminal, and
    - Test it in another ssh terminal. 
    
@@ -222,14 +222,14 @@ devnet0-aptos-fullnode-0   1/1     Running   0          56s
 ## Configure identity and seed peers
 
 :::tip Errors? 
-See [Issues and Workarounds](/issues-and-workarounds.md) if you get any errors.
+See [Issues and Workarounds](../../issues-and-workarounds.md) if you get any errors.
 :::
 
 ### Static identity
 
-If you want to configure your node with a static identity, first see the [Network Identity For Fullnode](/nodes/full-node/network-identity-fullnode) for how to generate the keys, and then follow the below instructions to configure your Terraform file.
+If you want to configure your node with a static identity, first see the [Network Identity For Fullnode](./network-identity-fullnode.md) for how to generate the keys, and then follow the below instructions to configure your Terraform file.
 
-1. Generate your own private key, and extract peer id, following the guide [Creating a static identity for a fullnode](/nodes/full-node/network-identity-fullnode#creating-a-static-identity-for-a-fullnode).
+1. Generate your own private key, and extract peer id, following the guide [Creating a static identity for a fullnode](./network-identity-fullnode.md#creating-a-static-identity-for-a-fullnode).
 
 2. Modify the `main.tf` to add `fullnode_identity` in `fullnode_helm_values`. This will configure the keys for public fullnode, for example:
 
@@ -267,7 +267,7 @@ If you want to configure your node with a static identity, first see the [Networ
 
 You can add upstream seed peers to allow your node state sync from a specific . This is helpful when the public fullnode is not able to connect to the network due to congestion.
 
-1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](/nodes/full-node/fullnode-network-connections#connecting-your-fullnode-to-seed-peers), or grab one from [Aptos Discord](http://discord.gg/aptoslabs), `#advertise-full-node` channel, which are the nodes hosted by our community.
+1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](./fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers), or grab one from the [Aptos Discord](http://discord.gg/aptoslabs) [#advertise-full-node](https://discord.com/channels/945856774056083548/956342147546746901) channel; these are the nodes hosted by our community.
 
 2. Modify the `main.tf` to add seeds for devnet in `fullnode_helm_values`. This will configure the upstream seeds for public fullnode. For example:
 

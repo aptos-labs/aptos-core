@@ -10,29 +10,38 @@ use aptos_crypto::HashValue;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
 
-pub enum BlockProposalCommand {
+pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
-    GetBlockRequest(
+    GetPayloadRequest(
         Round,
         // max block size
         u64,
         // max byte size
         u64,
+        // return non full
+        bool,
         // block payloads to exclude from the requested block
         PayloadFilter,
         // callback to respond to
-        oneshot::Sender<Result<ConsensusResponse>>,
+        oneshot::Sender<Result<GetPayloadResponse>>,
     ),
 }
 
-impl fmt::Display for BlockProposalCommand {
+impl fmt::Display for GetPayloadCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            BlockProposalCommand::GetBlockRequest(round, max_txns, max_bytes, excluded, _) => {
+            GetPayloadCommand::GetPayloadRequest(
+                round,
+                max_txns,
+                max_bytes,
+                return_non_full,
+                excluded,
+                _,
+            ) => {
                 write!(
                     f,
-                    "GetBlockRequest [round: {}, max_txns: {}, max_bytes: {} excluded: {}]",
-                    round, max_txns, max_bytes, excluded
+                    "GetPayloadRequest [round: {}, max_txns: {}, max_bytes: {}, return_non_full: {},  excluded: {}]",
+                    round, max_txns, max_bytes, return_non_full, excluded
                 )
             },
         }
@@ -60,6 +69,6 @@ impl fmt::Display for CleanCommand {
 }
 
 #[derive(Debug)]
-pub enum ConsensusResponse {
-    GetBlockResponse(Payload),
+pub enum GetPayloadResponse {
+    GetPayloadResponse(Payload),
 }

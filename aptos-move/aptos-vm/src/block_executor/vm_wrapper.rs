@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,12 +7,12 @@ use crate::{
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
-    logging::AdapterLogSchema,
 };
 use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
-use aptos_logger::prelude::*;
+use aptos_logger::{enabled, Level};
 use aptos_state_view::StateView;
+use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -78,19 +79,26 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
                 if output_ext.txn_output().status().is_discarded() {
                     match sender {
-                        Some(s) => trace!(
-                            log_context,
-                            "Transaction discarded, sender: {}, error: {:?}",
-                            s,
-                            vm_status,
+                        Some(s) => speculative_trace!(
+                            &log_context,
+                            format!(
+                                "Transaction discarded, sender: {}, error: {:?}",
+                                s, vm_status
+                            ),
                         ),
                         None => {
-                            trace!(log_context, "Transaction malformed, error: {:?}", vm_status,)
+                            speculative_trace!(
+                                &log_context,
+                                format!("Transaction malformed, error: {:?}", vm_status),
+                            )
                         },
                     };
                 }
                 if AptosVM::should_restart_execution(output_ext.txn_output()) {
-                    info!(log_context, "Reconfiguration occurred: restart required",);
+                    speculative_info!(
+                        &log_context,
+                        "Reconfiguration occurred: restart required".into()
+                    );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
                 } else {
                     ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))

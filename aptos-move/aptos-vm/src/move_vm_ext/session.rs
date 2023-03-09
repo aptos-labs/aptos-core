@@ -33,7 +33,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
-use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
+use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -100,7 +100,7 @@ pub struct SessionExt<'r, 'l, S> {
 
 impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
-    S: MoveResolverExt,
+    S: MoveResolverExt + 'r,
 {
     pub fn new(inner: Session<'r, 'l, S>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
         Self {
@@ -109,7 +109,11 @@ where
         }
     }
 
-    pub fn finish(self) -> VMResult<SessionOutput> {
+    pub fn finish<C: AccessPathCache>(
+        self,
+        ap_cache: &mut C,
+        configs: &ChangeSetConfigs,
+    ) -> VMResult<ChangeSetExt> {
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(&self.remote, change_set)?;
@@ -122,13 +126,16 @@ where
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
 
-        Ok(SessionOutput {
+        Self::convert_change_set(
             change_set,
             resource_group_change_set,
             events,
             table_change_set,
             aggregator_change_set,
-        })
+            ap_cache,
+            configs,
+        )
+        .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -245,130 +252,53 @@ where
 
         Ok((change_set_filtered, resource_group_change_set))
     }
-}
 
-impl<'r, 'l, S> Deref for SessionExt<'r, 'l, S> {
-    type Target = Session<'r, 'l, S>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-pub struct SessionOutput {
-    pub change_set: MoveChangeSet,
-    pub resource_group_change_set: MoveChangeSet,
-    pub events: Vec<MoveEvent>,
-    pub table_change_set: TableChangeSet,
-    pub aggregator_change_set: AggregatorChangeSet,
-}
-
-// TODO: Move this into the Move repo.
-fn squash_table_change_sets(
-    base: &mut TableChangeSet,
-    other: TableChangeSet,
-) -> Result<(), VMStatus> {
-    base.new_tables.extend(other.new_tables);
-    for removed_table in &base.removed_tables {
-        base.new_tables.remove(removed_table);
-    }
-    // There's chance that a table is added in `self`, and an item is added to that table in
-    // `self`, and later the item is deleted in `other`, netting to a NOOP for that item,
-    // but this is an tricky edge case that we don't expect to happen too much, it doesn't hurt
-    // too much to just keep the deletion. It's safe as long as we do it that way consistently.
-    base.removed_tables.extend(other.removed_tables.into_iter());
-    for (handle, changes) in other.changes.into_iter() {
-        let my_changes = base.changes.entry(handle).or_insert(TableChange {
-            entries: Default::default(),
-        });
-        my_changes.entries.extend(changes.entries.into_iter());
-    }
-    Ok(())
-}
-
-impl SessionOutput {
-    pub fn into_change_set<C: AccessPathCache>(
-        self,
+    pub fn convert_change_set<C: AccessPathCache>(
+        change_set: MoveChangeSet,
+        resource_group_change_set: MoveChangeSet,
+        events: Vec<MoveEvent>,
+        table_change_set: TableChangeSet,
+        aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<ChangeSetExt, VMStatus> {
-        use MoveStorageOp::*;
-        let Self {
-            change_set,
-            resource_group_change_set,
-            events,
-            table_change_set,
-            aggregator_change_set,
-        } = self;
-
         let mut write_set_mut = WriteSetMut::new(Vec::new());
         let mut delta_change_set = DeltaChangeSet::empty();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
-                let ap = ap_cache.get_resource_path(addr, struct_tag);
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => {
-                        if configs.creation_as_modification() {
-                            WriteOp::Modification(blob)
-                        } else {
-                            WriteOp::Creation(blob)
-                        }
-                    },
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
-                write_set_mut.insert((StateKey::access_path(ap), op))
+                let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
+                let op = Self::convert_write_op(
+                    blob_op,
+                    configs.legacy_resource_creation_as_modification(),
+                );
+                write_set_mut.insert((state_key, op))
             }
 
             for (name, blob_op) in modules {
-                let ap = ap_cache.get_module_path(ModuleId::new(addr, name));
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => WriteOp::Creation(blob),
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
-
-                write_set_mut.insert((StateKey::access_path(ap), op))
+                let state_key =
+                    StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
+                let op = Self::convert_write_op(blob_op, false);
+                write_set_mut.insert((state_key, op))
             }
         }
 
         for (addr, account_changeset) in resource_group_change_set.into_inner() {
             let (_, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
-                let ap = ap_cache.get_resource_group_path(addr, struct_tag);
-                let op = match blob_op {
-                    Delete => WriteOp::Deletion,
-                    New(blob) => {
-                        if configs.creation_as_modification() {
-                            WriteOp::Modification(blob)
-                        } else {
-                            WriteOp::Creation(blob)
-                        }
-                    },
-                    Modify(blob) => WriteOp::Modification(blob),
-                };
-                write_set_mut.insert((StateKey::access_path(ap), op))
+                let state_key =
+                    StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
+                let op = Self::convert_write_op(blob_op, false);
+                write_set_mut.insert((state_key, op))
             }
         }
 
         for (handle, change) in table_change_set.changes {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
-                match value_op {
-                    Delete => write_set_mut.insert((state_key, WriteOp::Deletion)),
-                    New(bytes) => write_set_mut.insert((state_key, WriteOp::Creation(bytes))),
-                    Modify(bytes) => {
-                        write_set_mut.insert((state_key, WriteOp::Modification(bytes)))
-                    },
-                }
+                let op = Self::convert_write_op(value_op, false);
+                write_set_mut.insert((state_key, op))
             }
         }
 
@@ -411,23 +341,37 @@ impl SessionOutput {
         ))
     }
 
-    pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
-        self.change_set
-            .squash(other.change_set)
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
-        self.events.extend(other.events.into_iter());
+    fn convert_write_op(
+        move_storage_op: MoveStorageOp<Vec<u8>>,
+        creation_as_modification: bool,
+    ) -> WriteOp {
+        use MoveStorageOp::*;
+        use WriteOp::*;
 
-        // Squash the table changes.
-        squash_table_change_sets(&mut self.table_change_set, other.table_change_set)?;
+        match move_storage_op {
+            Delete => Deletion,
+            New(blob) => {
+                if creation_as_modification {
+                    Modification(blob)
+                } else {
+                    Creation(blob)
+                }
+            },
+            Modify(blob) => Modification(blob),
+        }
+    }
+}
 
-        // Squash aggregator changes.
-        self.aggregator_change_set
-            .squash(other.aggregator_change_set)?;
+impl<'r, 'l, S> Deref for SessionExt<'r, 'l, S> {
+    type Target = Session<'r, 'l, S>;
 
-        self.resource_group_change_set
-            .squash(other.resource_group_change_set)
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 
-        Ok(())
+impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

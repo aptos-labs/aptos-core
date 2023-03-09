@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::{Batch, BatchRequest, Fragment},
+    quorum_store::types::Fragment,
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -68,8 +69,6 @@ pub enum UnverifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    BatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
 }
@@ -107,15 +106,6 @@ impl UnverifiedEvent {
                 f.verify(peer_id)?;
                 VerifiedEvent::FragmentMsg(f)
             },
-            UnverifiedEvent::BatchRequestMsg(br) => {
-                br.verify(peer_id)?;
-                VerifiedEvent::BatchRequestMsg(br)
-            },
-            // Only sender is verified. Remaining verification is on-demand (when it's used).
-            UnverifiedEvent::BatchMsg(b) => {
-                b.verify(peer_id)?;
-                VerifiedEvent::UnverifiedBatchMsg(b)
-            },
             UnverifiedEvent::SignedDigestMsg(sd) => {
                 sd.verify(validator)?;
                 VerifiedEvent::SignedDigestMsg(sd)
@@ -135,8 +125,6 @@ impl UnverifiedEvent {
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
             UnverifiedEvent::FragmentMsg(f) => f.epoch(),
-            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
-            UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
@@ -152,8 +140,6 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
             ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
-            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
-            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
@@ -171,8 +157,6 @@ pub enum VerifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    UnverifiedBatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages
@@ -690,7 +674,18 @@ impl RoundManager {
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
-            // same proposal to self after some time.
+            // same proposal to self after some time. Even if processing proposal is delayed, we add
+            // the block to the block store so that we don't need to fetch it from remote once we
+            // are out of the backpressure. Please note that delayed processing of proposal is not
+            // guaranteed to add the block to the block store if we don't get out of the backpressure
+            // before the timeout, so this is needed to ensure that the proposed block is added to
+            // the block store irrespective. Also, it is possible that delayed processing of proposal
+            // tries to add the same block again, which is okay as `execute_and_insert_block` call
+            // is idempotent.
+            self.block_store
+                .execute_and_insert_block(proposal.clone())
+                .await
+                .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
                 proposal,
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
@@ -923,7 +918,7 @@ impl RoundManager {
             self.round_state.record_vote(vote);
         }
         if let Err(e) = self.process_new_round_event(new_round_event).await {
-            error!(error = ?e, "[RoundManager] Error during start");
+            warn!(error = ?e, "[RoundManager] Error during start");
         }
     }
 

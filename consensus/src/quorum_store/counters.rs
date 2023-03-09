@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_gauge, Histogram, HistogramVec, IntCounter, IntGauge,
+    exponential_buckets, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, AverageIntCounter,
+    Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -16,6 +17,13 @@ pub const REQUEST_SUCCESS_LABEL: &str = "success";
 
 pub const CALLBACK_FAIL_LABEL: &str = "callback_fail";
 pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
+
+static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 /// Counter for tracking latency of quorum store processing requests from consensus
 /// A 'fail' result means the quorum store's callback response to consensus failed.
@@ -166,22 +174,50 @@ pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy
     .unwrap()
     });
 
-// /// Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.
-// pub static NUM_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-//     register_histogram!(
-//         "quorum_store_num_batch_left_when_pull_for_block",
-//         "Histogram for the number of batches/PoS left when forming a block proposal, due to reaching maximum bytes limit.",
-//         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
-//     )
-//     .unwrap()
-// });
-
-/// Histogram for the number of local batches/PoS left when forming a block proposal.
-pub static NUM_LOCAL_BATCH_LEFT_WHEN_PULL_FOR_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+pub static POS_TO_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_num_local_batch_left_when_pull_for_block",
-        "Histogram for the number of locally created batches/PoS left when forming a block proposal.",
-        // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
+        "quorum_store_pos_to_pull",
+        "Histogram for how long it took a PoS to go from inserted to pulled into a proposed block",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static POS_TO_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pos_to_commit",
+        "Histogram for how long it took a PoS to go from inserted to commit notified",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of total txns left after cleaning up commit notifications.
+pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_total_txns_left_on_commit",
+        "Histogram for the number of total txns left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of total batches/PoS left after cleaning up commit notifications.
+pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_total_proofs_left_on_commit",
+        "Histogram for the number of total batches/PoS left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+        .unwrap()
+});
+
+/// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
+pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_local_proofs_left_on_commit",
+        "Histogram for the number of locally created batches/PoS left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -347,6 +383,16 @@ pub static SENT_BATCH_REQUEST_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to batch retrieval per epoch task
+pub static BATCH_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_batch_retrieval_task_msgs_count",
+        "Counters(queued,dequeued,dropped) related to batch retrieval task",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Count of the number of batch request received from other nodes.
 pub static RECEIVED_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -374,12 +420,25 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_backpressure",
-        "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
+pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_txn_count",
+        "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
     )
-    .unwrap()
+});
+
+pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_proof_count",
+        "Indicator of whether Quorum Store is backpressured due to proof count exceeding threshold."
+    )
+});
+
+pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_dynamic_max",
+        "What the dynamic max is set to",
+    )
 });
 
 /// Latencies

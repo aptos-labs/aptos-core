@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -1657,7 +1658,7 @@ async fn test_get_storage_server_summary() {
         .times(1)
         .returning(move || Ok(state_prune_window));
     db_reader
-        .expect_is_state_pruner_enabled()
+        .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
 
     // Create the storage client and server
@@ -3132,7 +3133,7 @@ fn create_mock_db_for_subscription(
         .expect_get_epoch_snapshot_prune_window()
         .returning(move || Ok(100));
     db_reader
-        .expect_is_state_pruner_enabled()
+        .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
     db_reader
 }
@@ -3296,7 +3297,7 @@ fn create_state_keys_and_values(
     // Create the requested keys and values
     (0..num_keys_and_values)
         .map(|_| {
-            let state_value = StateValue::new(random_bytes.clone());
+            let state_value = StateValue::new_legacy(random_bytes.clone());
             (StateKey::raw(vec![]), state_value)
         })
         .collect()
@@ -3774,6 +3775,6 @@ mock! {
 
         fn get_epoch_snapshot_prune_window(&self) -> Result<usize>;
 
-        fn is_state_pruner_enabled(&self) -> Result<bool>;
+        fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
     }
 }

@@ -11,7 +11,6 @@ use aptos_types::{
 };
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -37,6 +36,7 @@ impl LogicalTime {
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedDigestInfo {
+    pub batch_author: PeerId,
     pub digest: HashValue,
     pub expiration: LogicalTime,
     pub num_txns: u64,
@@ -44,8 +44,15 @@ pub struct SignedDigestInfo {
 }
 
 impl SignedDigestInfo {
-    pub fn new(digest: HashValue, expiration: LogicalTime, num_txns: u64, num_bytes: u64) -> Self {
+    pub fn new(
+        batch_author: PeerId,
+        digest: HashValue,
+        expiration: LogicalTime,
+        num_txns: u64,
+        num_bytes: u64,
+    ) -> Self {
         Self {
+            batch_author,
             digest,
             expiration,
             num_txns,
@@ -57,33 +64,34 @@ impl SignedDigestInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
     epoch: u64,
-    peer_id: PeerId,
+    signer: PeerId,
     info: SignedDigestInfo,
     signature: bls12381::Signature,
 }
 
 impl SignedDigest {
     pub fn new(
+        batch_author: PeerId,
         epoch: u64,
         digest: HashValue,
         expiration: LogicalTime,
         num_txns: u64,
         num_bytes: u64,
-        validator_signer: Arc<ValidatorSigner>,
+        validator_signer: &ValidatorSigner,
     ) -> Result<Self, CryptoMaterialError> {
-        let info = SignedDigestInfo::new(digest, expiration, num_txns, num_bytes);
+        let info = SignedDigestInfo::new(batch_author, digest, expiration, num_txns, num_bytes);
         let signature = validator_signer.sign(&info)?;
 
         Ok(Self {
             epoch,
-            peer_id: validator_signer.author(),
+            signer: validator_signer.author(),
             info,
             signature,
         })
     }
 
-    pub fn peer_id(&self) -> PeerId {
-        self.peer_id
+    pub fn signer(&self) -> PeerId {
+        self.signer
     }
 
     pub fn epoch(&self) -> u64 {
@@ -91,7 +99,7 @@ impl SignedDigest {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
+        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn info(&self) -> &SignedDigestInfo {

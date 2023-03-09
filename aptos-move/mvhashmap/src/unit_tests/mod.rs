@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
@@ -6,6 +7,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
     transaction::AggregatorValue,
 };
+use aptos_types::state_store::state_value::StateValue;
 
 mod proptest_types;
 
@@ -22,6 +24,10 @@ impl TransactionWrite for Value {
             .collect();
         v.resize(16, 0);
         Some(v)
+    }
+
+    fn as_state_value(&self) -> Option<StateValue> {
+        unimplemented!()
     }
 }
 

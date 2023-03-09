@@ -254,6 +254,16 @@ spec aptos_framework::account {
         modifies global<Account>(source_address);
     }
 
+    spec is_signer_capability_offered(account_addr: address): bool {
+        aborts_if !exists<Account>(account_addr);
+    }
+
+    spec get_signer_capability_offer_for(account_addr: address): address {
+        aborts_if !exists<Account>(account_addr);
+        let account_resource = global<Account>(account_addr);
+        aborts_if len(account_resource.signer_capability_offer.for.vec) == 0;
+    }
+
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
     spec revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
@@ -359,9 +369,9 @@ spec aptos_framework::account {
     /// The guid_creation_num of the ccount resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
-        let account = global<Account>(addr);
-        aborts_if !exists<Account>(addr);
-        aborts_if account.guid_creation_num + 1 > MAX_U64;
+        include NewEventHandleAbortsIf {
+            account: account_signer,
+        };
         modifies global<Account>(addr);
     }
 
@@ -376,6 +386,7 @@ spec aptos_framework::account {
         let account = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if account.guid_creation_num + 1 > MAX_U64;
+        aborts_if account.guid_creation_num + 1 >= MAX_GUID_CREATION_NUM;
     }
 
     spec register_coin<CoinType>(account_addr: address) {
@@ -417,5 +428,16 @@ spec aptos_framework::account {
             table::spec_get(address_map, curr_auth_key) != originating_addr;
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+    }
+
+    spec verify_signed_message<T: drop>(
+        account: address,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        signed_message_bytes: vector<u8>,
+        message: T,
+    ) {
+        pragma verify = false;
+        modifies global<Account>(account);
     }
 }
