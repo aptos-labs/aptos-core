@@ -1012,7 +1012,7 @@ module aptos_framework::delegation_pool {
     const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
 
     #[test_only]
-    const DELEGATION_POOLS: u64 = 10;
+    const DELEGATION_POOLS: u64 = 11;
 
     #[test_only]
     public fun end_aptos_epoch() {

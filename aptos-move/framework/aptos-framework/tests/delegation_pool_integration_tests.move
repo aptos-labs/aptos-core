@@ -30,7 +30,7 @@ module aptos_framework::delegation_pool_integration_tests {
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
     #[test_only]
-    const DELEGATION_POOLS: u64 = 10;
+    const DELEGATION_POOLS: u64 = 11;
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
