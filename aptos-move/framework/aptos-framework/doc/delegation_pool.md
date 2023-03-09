@@ -137,6 +137,7 @@
 -  [Function `synchronize_delegation_pool`](#0x1_delegation_pool_synchronize_delegation_pool)
 -  [Function `multiply_then_divide`](#0x1_delegation_pool_multiply_then_divide)
 -  [Function `to_u128`](#0x1_delegation_pool_to_u128)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -2253,6 +2254,15 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
