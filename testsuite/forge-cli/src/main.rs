@@ -488,7 +488,27 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
                     inject_delay_max_transaction_percentage: 40,
                     inject_delay_per_transaction_ms: 2,
                 }),
-            }]),
+            }])
+            .with_node_helm_config_fn(Arc::new(move |helm_values| {
+                helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
+                //     4000.into();
+                // helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                //     1000000.into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+                helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
+                    ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            }))
+            .with_success_criteria(
+                SuccessCriteria::new(1000)
+                    .add_no_restarts()
+                    .add_wait_for_catchup_s(240)
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 20.0,
+                        max_round_gap: 6,
+                    }),
+            ),
         "network_bandwidth" => config
             .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
             .with_network_tests(vec![&NetworkBandwidthTest]),

@@ -310,14 +310,13 @@ where
 /// Perfoms VM validation on the transactions and inserts those that passes
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
-fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+fn validate_and_add_transactions<V>(
     transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
-    smp: &SharedMempool<NetworkClient, TransactionValidator>,
+    smp: &SharedMempool<V>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
-    TransactionValidator: TransactionValidation,
+    V: TransactionValidation,
 {
     // Track latency: VM validation
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
@@ -374,14 +373,13 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// this because validation has some overhead and the validator bounds the number of
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
-fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
+fn validate_and_add_transactions<V>(
     transactions: Vec<(SignedTransaction, AccountSequenceInfo)>,
-    smp: &SharedMempool<NetworkClient, TransactionValidator>,
+    smp: &SharedMempool<V>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
-    TransactionValidator: TransactionValidation,
+    V: TransactionValidation,
 {
     let mut mempool = smp.mempool.lock();
     for (transaction, sequence_info) in transactions.into_iter() {

@@ -115,7 +115,7 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
-        use aptos_state_view::{StateViewId, TStateView};
+        use aptos_state_view::{StateView, StateViewId};
         use aptos_types::write_set::WriteSet;
 
         let transaction_outputs = match state_view.id() {
