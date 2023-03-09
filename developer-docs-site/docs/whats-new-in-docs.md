@@ -7,6 +7,12 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 08 March 2023
+
+- Added a [Latest Releases](releases/index.md) section to the *Start* menu showing the newest, recommended version of each Aptos component (CLI, framework, and node) by network.
+
+- Released Aptos Node version [1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.0) to [testnet](releases/testnet-release.md) and a new version to [devnet](releases/devnet-release.md).
+
 ## 14 February 2023
 
 - Added instructions for [working with `PropertyMap` off-chain](concepts/coin-and-token/propertymap-offchain) via the Aptos TypeScript SDK, enabling reading and writing of Binary Canonical Serialization (BCS) data in your app.
