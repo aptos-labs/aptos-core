@@ -212,6 +212,10 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
             Ok(())
         }
     }
+
+    pub fn get_timed_features(&self) -> &'c TimedFeatures {
+        self.timed_features
+    }
 }
 
 #[allow(unused)]
