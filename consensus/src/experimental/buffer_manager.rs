@@ -38,11 +38,11 @@ use std::{sync::{
 }, collections::{HashMap, HashSet}};
 use tokio::time::{Duration, Instant};
 
-pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 10000;
-pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1000;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 1000;
+pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1000;
 
-pub const LOOP_INTERVAL_MS: u64 = 1500;
+pub const LOOP_INTERVAL_MS: u64 = 1000;
 
 #[derive(Debug, Default)]
 pub struct ResetAck {}
@@ -244,7 +244,7 @@ impl BufferManager {
                 let author = rand_share.author();
                 let block_info = rand_share.block_info().clone();
                 let target_block_id = rand_share.block_info().id();
-                debug!("Receive random share from author {:?} for block {:?}", author, block_info);
+                debug!("Receive random share from author {:?} for block {:?}", author, target_block_id);
 
                 // todo: ignore the rand message if the round is execution already or beyond
 
@@ -261,10 +261,15 @@ impl BufferManager {
 
                     let current_cursor = self.get_cursor_for_block(target_block_id);
                     if current_cursor.is_some() {
+                        println!("got cursor rand share for block {}", target_block_id);
                         let mut item = self.buffer.take(&current_cursor);
                         if item.is_ordered() {
                             // the aggregated share is 96 bytes
                             if let Some(idx) = item.update_block_rand(target_block_id, vec![u8::MAX; 96]) {
+                                debug!(
+                                    "updated rand by receiving rand share for block {}",
+                                    target_block_id,
+                                );
                                 // randomness is updated successfully
                                 // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
                                 if item.unwrap_ordered_ref().ordered_blocks[idx].block().author() == Some(self.author) {
@@ -286,22 +291,19 @@ impl BufferManager {
             },
             VerifiedEvent::RandDecisionMsg(rand_decision) => {
                 // add the randomness to block
-                debug!(
-                    "Receive randomness decision {:?} for block_info {}",
-                    rand_decision.rand(),
-                    rand_decision.block_info(),
-                );
                 let target_block_id = rand_decision.block_info().id();
                 self.block_to_rand_decision_map.insert(target_block_id, *rand_decision.clone());
+                debug!("Receive random decision for block {:?}", target_block_id);
 
                 let cursor = self.get_cursor_for_block(target_block_id);
                 if cursor.is_some() {
+                    println!("got cursor rand decision for block {}", target_block_id);
                     let mut item = self.buffer.take(&cursor);
                     if item.is_ordered() {
                         // the aggregated share is 96 bytes
                         if let Some(idx) = item.update_block_rand(target_block_id, rand_decision.rand().clone()) {
                             debug!(
-                                "updated rand by receiving rand for block {}",
+                                "updated rand by receiving rand decision for block {}",
                                 target_block_id,
                             );
                             // randomness is updated successfully
@@ -339,17 +341,24 @@ impl BufferManager {
         None
     }
 
+    fn print_blocks(&mut self, blocks: Vec<ExecutedBlock>) {
+        for block in blocks {
+            print!(" {} ", block.id());
+        }
+        println!();
+    }
+
     // helper function to prints the buffer_manager
     fn print_buffer(&mut self) {
         let mut current = *self.buffer.head_cursor();
         println!("================= start printing current buffer =================");
         while current.is_some() {
             match self.buffer.get(&current) {
-                BufferItem::Ordered(_) => { println!("Ordered "); }
-                BufferItem::ExecutionReady(_) => { println!("ExecutionReady "); }
-                BufferItem::Executed(_) => { println!("Executed "); }
-                BufferItem::Signed(_) => { println!("Signed "); }
-                BufferItem::Aggregated(_) => { println!("Aggregated "); }
+                BufferItem::Ordered(item) => { print!("Ordered "); self.print_blocks(item.ordered_blocks.clone()); }
+                BufferItem::ExecutionReady(item) => { print!("ExecutionReady "); self.print_blocks(item.ordered_blocks.clone()); }
+                BufferItem::Executed(item) => { print!("Executed "); self.print_blocks(item.executed_blocks.clone()); }
+                BufferItem::Signed(item) => { print!("Signed "); self.print_blocks(item.executed_blocks.clone()); }
+                BufferItem::Aggregated(item) => { print!("Aggregated "); self.print_blocks(item.executed_blocks.clone()); }
             }
             current = self.buffer.get_next(&current);
         }
@@ -709,14 +718,13 @@ impl BufferManager {
         {
             return;
         }
-        let mut cursor = self.execution_root;
-        cursor = self
-            .buffer
-            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
-                item.is_ordered()
-            });
+        let mut cursor = *self.buffer.head_cursor();
+        // cursor = self
+        //     .buffer
+        //     .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+        //         item.is_ordered()
+        //     });
         let mut count = 0;
-        println!("rebroadcast_rand_share_if_needed");
 
         while cursor.is_some() {
             let item = self.buffer.get(&cursor);
@@ -725,9 +733,8 @@ impl BufferManager {
                 continue;
             }
             let blocks = item.get_blocks();
-            println!("rebroadcast_rand_share_if_needed count {} blocks {}", count, blocks.len());
             for (idx, block) in blocks.iter().enumerate() {
-                println!("rebroadcast_rand_share_if_needed for block {}", idx);
+                println!("rebroadcast_rand_share_if_needed for block {}", block.id());
                 let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
                 self.rand_msg_tx
                 .broadcast_rand_share(rand_share)
@@ -747,7 +754,6 @@ impl BufferManager {
         {
             return;
         }
-        println!("rebroadcast_rand_decision_if_needed");
 
         // Need to rebroadcast randomness decisions for any non-committed execution ready block
         let mut cursor = *self.buffer.head_cursor();
@@ -759,9 +765,8 @@ impl BufferManager {
                 continue;
             }
             let blocks = item.get_blocks();
-            println!("rebroadcast_rand_decision_if_needed count {} blocks {}", count, blocks.len());
             for idx in 0..blocks.len() {
-                println!("rebroadcast_rand_decision_if_needed for block {}", idx);
+                println!("rebroadcast_rand_decision_if_needed for block {}", blocks[idx].id());
                 let rand = item.get_rand(idx);
                 if !rand.is_empty() {
                     let rand_decision = RandDecision::new(item.get_blocks()[idx].block_info(), rand);
@@ -869,8 +874,8 @@ impl BufferManager {
                     self.update_buffer_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await;
                     // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
-                    self.rebroadcast_rand_share_if_needed().await;
-                    self.rebroadcast_rand_decision_if_needed().await;
+                    // self.rebroadcast_rand_share_if_needed().await;
+                    // self.rebroadcast_rand_decision_if_needed().await;
                 },
                 // no else branch here because interval.tick will always be available
             }
