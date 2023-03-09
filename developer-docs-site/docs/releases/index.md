@@ -11,7 +11,7 @@ This section contains details for the latest [Aptos releases](https://github.com
 * [Latest Testnet Release](./testnet-release.md)
 * [Latest Devnet Release](./devnet-release.md)
 
-Typically, there will be multiple devnet releases for each testnet and mainnet release. Hence, devnet releases using commit hashes for tracking rather than version numbers. Testnet and mainnet releases usually have a one-to-one correlation, meaning each testnet release rolls into mainnet.
+Typically, there will be multiple devnet releases for each testnet and mainnet release. Hence, devnet releases use commit hashes for tracking rather than version numbers. Testnet and mainnet releases usually have a one-to-one correlation, meaning each testnet release rolls into mainnet.
 
 Hotfixes are exceptions that may occur in mainnet to address urgent issues in production. See the [Aptos Release Process](https://github.com/aptos-labs/aptos-core/blob/main/RELEASE.md) for more details.
 
