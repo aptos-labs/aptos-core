@@ -29,11 +29,7 @@ const sidebars = {
       collapsible: true,
       collapsed: false,
       link: { type: "doc", id: "releases/index" },
-      items: [
-        "releases/mainnet-release",
-        "releases/testnet-release",
-        "releases/devnet-release",
-      ],
+      items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
     },
     {
       type: "category",
