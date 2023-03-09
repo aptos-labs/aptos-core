@@ -11,6 +11,8 @@ pub struct VMConfig {
     // When this flag is set to true, MoveVM will perform type check at every instruction
     // execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
+    // When this flag is set to true, MoveVM will check invariant violation in swap_loc
+    pub enable_invariant_violation_check_in_swap_loc: bool,
 }
 
 impl Default for VMConfig {
@@ -19,6 +21,7 @@ impl Default for VMConfig {
             verifier: VerifierConfig::default(),
             max_binary_format_version: VERSION_MAX,
             paranoid_type_checks: false,
+            enable_invariant_violation_check_in_swap_loc: true,
         }
     }
 }
