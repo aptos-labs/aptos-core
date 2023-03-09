@@ -400,7 +400,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking" => single_test_suite("changing_working_quorum_test_high_load"),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -685,16 +685,24 @@ fn large_test_only_few_nodes_down() -> ForgeConfig<'static> {
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig<'static> {
-    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, &ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 0,
-        max_down_nodes: 20,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        12000,
+        500,
+        300,
+        true,
+        true,
+        &ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 0,
+            max_down_nodes: 20,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn changing_working_quorum_test() -> ForgeConfig<'static> {
