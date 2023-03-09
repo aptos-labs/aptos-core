@@ -204,6 +204,7 @@ impl ProofCoordinator {
                             break;
                         },
                         ProofCoordinatorCommand::InitProof(info, batch_id, tx) => {
+                            debug!("QS: init proof, batch_id {}, digest {}", batch_id, info.digest);
                             self.init_proof(info, batch_id, tx);
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_digest) => {
