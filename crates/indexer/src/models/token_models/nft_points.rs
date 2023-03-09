@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 pub struct NftPoints {
     pub transaction_version: i64,
     pub owner_address: String,
+    pub token_name: String,
+    pub point_type: String,
     pub amount: BigDecimal,
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
@@ -53,6 +55,14 @@ impl NftPoints {
                         return Some(Self {
                             transaction_version,
                             owner_address,
+                            token_name: entry_function_payload.arguments[1]
+                                .as_str()
+                                .unwrap()
+                                .to_string(),
+                            point_type: entry_function_payload.arguments[3]
+                                .as_str()
+                                .unwrap()
+                                .to_string(),
                             amount,
                             transaction_timestamp,
                         });

@@ -314,6 +314,8 @@ diesel::table! {
     nft_points (transaction_version) {
         transaction_version -> Int8,
         owner_address -> Varchar,
+        token_name -> Text,
+        point_type -> Text,
         amount -> Numeric,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
