@@ -3,7 +3,7 @@ title: "Help the Aptos Ecosystem"
 slug: "help-index"
 ---
 
-# Help the Aptos Ecosystem
+# Contribute to the Aptos Ecosystem
 
 We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! Aptos exists to foster an inclusive ecosystem. This page describes ways you can help, while the other pages in this section highlight our community's contributions.
 
@@ -15,7 +15,7 @@ Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and 
 
 For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location. To offer your own advice and find tips from others, post to and use the [Aptos Forum](https://forum.aptoslabs.com/).
 
-Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
+Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Report issues, request enhancements
 
@@ -45,7 +45,7 @@ We at Aptos love direct contributions in the form of [pull requests](https://git
 * [Move](../guides/move-guides/book/coding-conventions.md)
 * [Rust](./rust-coding-guidelines.md)
 
-For larger changes, [report the issue](#report-issues-request-enhancements) for discussion with the Aptos Labs team before beginning your coding work. And when done, add your enhancement to the [Community Highlights](./contributions/index.md) list.
+For larger changes, [report the issue](#report-issues-request-enhancements) for discussion with the Aptos team before beginning your coding work. And when done, add your enhancement to the [Community Highlights](./contributions/index.md) list.
 
 ## Update the documentation
 
