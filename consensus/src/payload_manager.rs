@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand,
+use crate::{
+    network::NetworkSender,
+    quorum_store::{batch_store::BatchStore, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
     block::Block,
@@ -12,7 +13,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, warn};
+use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
@@ -22,30 +23,33 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<BatchReader>, Mutex<Sender<CoordinatorCommand>>),
+    InQuorumStore(
+        Arc<BatchStore<NetworkSender>>,
+        Mutex<Sender<CoordinatorCommand>>,
+    ),
 }
 
 impl PayloadManager {
     async fn request_transactions(
         proofs: Vec<ProofOfStore>,
         logical_time: LogicalTime,
-        batch_reader: &BatchReader,
+        batch_store: &BatchStore<NetworkSender>,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
-            debug!(
+            trace!(
                 "QSE: requesting pos {:?}, digest {}, time = {:?}",
                 pos,
                 pos.digest(),
                 logical_time
             );
             if logical_time <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_reader.get_batch(pos).await));
+                receivers.push((*pos.digest(), batch_store.get_batch(pos)));
             } else {
-                debug!("QS: skipped expired pos");
+                debug!("QSE: skipped expired pos {}", pos.digest());
             }
         }
         receivers
@@ -55,8 +59,8 @@ impl PayloadManager {
     pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
-                batch_reader.update_certified_round(logical_time).await;
+            PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
+                batch_store.update_certified_round(logical_time).await;
 
                 let digests: Vec<HashValue> = payloads
                     .into_iter()
@@ -96,13 +100,13 @@ impl PayloadManager {
         };
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
+            PayloadManager::InQuorumStore(batch_store, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
                             LogicalTime::new(block.epoch(), block.round()),
-                            batch_reader,
+                            batch_store,
                         )
                         .await;
                         proof_with_status
@@ -129,7 +133,7 @@ impl PayloadManager {
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_store, _),
                 Payload::InQuorumStore(proof_with_data),
             ) => {
                 let status = proof_with_data.status.lock().take();
@@ -143,7 +147,13 @@ impl PayloadManager {
                     },
                     DataStatus::Requested(receivers) => {
                         let mut vec_ret = Vec::new();
-                        debug!("QSE: waiting for data on {} receivers", receivers.len());
+                        if !receivers.is_empty() {
+                            debug!(
+                                "QSE: waiting for data on {} receivers, block_round {}",
+                                receivers.len(),
+                                block.round()
+                            );
+                        }
                         for (digest, rx) in receivers {
                             match rx.await {
                                 Err(e) => {
@@ -152,7 +162,7 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again
@@ -169,7 +179,7 @@ impl PayloadManager {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
                                         LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again

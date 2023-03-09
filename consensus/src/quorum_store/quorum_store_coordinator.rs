@@ -4,8 +4,7 @@
 use crate::{
     quorum_store::{
         batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGeneratorCommand,
-        batch_store::BatchStoreCommand, proof_coordinator::ProofCoordinatorCommand,
-        proof_manager::ProofManagerCommand,
+        proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
     },
     round_manager::VerifiedEvent,
 };
@@ -29,7 +28,6 @@ pub struct QuorumStoreCoordinator {
     remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
-    batch_store_cmd_tx: mpsc::Sender<BatchStoreCommand>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
 }
 
@@ -41,7 +39,6 @@ impl QuorumStoreCoordinator {
         remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
-        batch_store_cmd_tx: mpsc::Sender<BatchStoreCommand>,
         quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     ) -> Self {
         Self {
@@ -51,7 +48,6 @@ impl QuorumStoreCoordinator {
             remote_batch_coordinator_cmd_tx,
             proof_coordinator_cmd_tx,
             proof_manager_cmd_tx,
-            batch_store_cmd_tx,
             quorum_store_msg_tx,
         }
     }
@@ -88,7 +84,7 @@ impl QuorumStoreCoordinator {
                         self.my_peer_id,
                         VerifiedEvent::Shutdown(network_listener_shutdown_tx),
                     ) {
-                        Ok(()) => debug!("QS: shutdown network listener sent"),
+                        Ok(()) => info!("QS: shutdown network listener sent"),
                         Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),
                     };
                     network_listener_shutdown_rx
@@ -132,15 +128,6 @@ impl QuorumStoreCoordinator {
                             .await
                             .expect("Failed to stop Remote BatchCoordinator");
                     }
-
-                    let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
-                    self.batch_store_cmd_tx
-                        .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
-                        .await
-                        .expect("Failed to send to BatchStore");
-                    batch_store_shutdown_rx
-                        .await
-                        .expect("Failed to stop BatchStore");
 
                     let (proof_coordinator_shutdown_tx, proof_coordinator_shutdown_rx) =
                         oneshot::channel();
