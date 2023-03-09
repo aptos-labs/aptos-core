@@ -27,10 +27,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
 -  [Function `get_multisig_accounts_feature`](#0x1_features_get_multisig_accounts_feature)
 -  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
--  [Function `get_generic_agebraic_structures_basic_operations_feature`](#0x1_features_get_generic_agebraic_structures_basic_operations_feature)
--  [Function `generic_algebraic_structures_basic_operations_enabled`](#0x1_features_generic_algebraic_structures_basic_operations_enabled)
--  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
--  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
+-  [Function `get_bls12381_basic_operations_feature`](#0x1_features_get_bls12381_basic_operations_feature)
+-  [Function `bls12381_basic_operations_enabled`](#0x1_features_bls12381_basic_operations_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -106,12 +104,17 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_BLS12_381_STRUCTURES"></a>
+<a name="0x1_features_BLS12381_BASIC_OPERATIONS"></a>
 
-Whether BLS12_381 structures <code>G1</code>, <code>G2</code>, <code>Gt</code>, <code>Fq12</code>, <code>Fr</code> are enabled in the algebra module.
+Whether the basic operations over some BLS12381 structures are enabled in the algebra module.
+
+Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting, etc.
+BLS12381 structures controlled by this flag includes <code>Fq12</code>, <code>G1</code>, <code>G2</code>, <code>Gt</code>, <code>Fr</code>.
+
+Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 12;
+<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a>: u64 = 11;
 </code></pre>
 
 
@@ -145,19 +148,6 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS"></a>
-
-Whether the basic operations are enabled in the algebra module.
-Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>: u64 = 11;
 </code></pre>
 
 
@@ -646,13 +636,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_generic_agebraic_structures_basic_operations_feature"></a>
+<a name="0x1_features_get_bls12381_basic_operations_feature"></a>
 
-## Function `get_generic_agebraic_structures_basic_operations_feature`
+## Function `get_bls12381_basic_operations_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12381_basic_operations_feature">get_bls12381_basic_operations_feature</a>(): u64
 </code></pre>
 
 
@@ -661,20 +651,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12381_basic_operations_feature">get_bls12381_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_generic_algebraic_structures_basic_operations_enabled"></a>
+<a name="0x1_features_bls12381_basic_operations_enabled"></a>
 
-## Function `generic_algebraic_structures_basic_operations_enabled`
+## Function `bls12381_basic_operations_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12381_basic_operations_enabled">bls12381_basic_operations_enabled</a>(): bool
 </code></pre>
 
 
@@ -683,54 +673,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_get_bls12_381_strutures_feature"></a>
-
-## Function `get_bls12_381_strutures_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_bls12_381_structures_enabled"></a>
-
-## Function `bls12_381_structures_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12381_basic_operations_enabled">bls12381_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a>)
 }
 </code></pre>
 

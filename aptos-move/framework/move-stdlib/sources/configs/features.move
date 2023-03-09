@@ -130,22 +130,18 @@ module std::features {
         is_enabled(MULTISIG_ACCOUNTS)
     }
 
-    /// Whether the basic operations are enabled in the algebra module.
-    /// Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting.
+    /// Whether the basic operations over some BLS12381 structures are enabled in the algebra module.
+    ///
+    /// Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting, etc.
+    /// BLS12381 structures controlled by this flag includes `Fq12`, `G1`, `G2`, `Gt`, `Fr`.
     ///
     /// Lifetime: transient
-    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 11;
-    public fun get_generic_agebraic_structures_basic_operations_feature(): u64 { GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS }
-    public fun generic_algebraic_structures_basic_operations_enabled(): bool acquires Features {
-        is_enabled(GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS)
+    const BLS12381_BASIC_OPERATIONS: u64 = 11;
+    public fun get_bls12381_basic_operations_feature(): u64 { BLS12381_BASIC_OPERATIONS }
+    public fun bls12381_basic_operations_enabled(): bool acquires Features {
+        is_enabled(BLS12381_BASIC_OPERATIONS)
     }
 
-    /// Whether BLS12_381 structures `G1`, `G2`, `Gt`, `Fq12`, `Fr` are enabled in the algebra module.
-    const BLS12_381_STRUCTURES: u64 = 12;
-    public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
-    public fun bls12_381_structures_enabled(): bool acquires Features {
-        is_enabled(BLS12_381_STRUCTURES)
-    }
     // ============================================================================================
     // Feature Flag Implementation
 
