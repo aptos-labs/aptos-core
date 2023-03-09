@@ -15,6 +15,7 @@ feature_flags:
     - blake2b256_native
     - resource_groups
     - multisig_accounts
+    - bls12381_basic_operations
   disabled: []
 is_multi_step: true
 framework_release_at_end: true
