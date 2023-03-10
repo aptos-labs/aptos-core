@@ -39,13 +39,13 @@ import {
   TransactionArgumentAddress,
   TransactionArgumentU8Vector,
   TransactionArgumentU128,
-} from "../aptos_types";
-import { HexString } from "../hex_string";
-import { TransactionBuilderEd25519 } from "./builder";
+} from "../../aptos_types";
+import { HexString } from "../../utils";
+import { TransactionBuilderEd25519 } from "../../transaction_builder/builder";
 
 // eslint-disable-next-line operator-linebreak
 const VECTOR_FILES_ROOT_DIR =
-  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens");
+  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "..", "api", "goldens");
 
 const ENTRY_FUNCTION_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,

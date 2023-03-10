@@ -1,19 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { HexString, MaybeHexString } from "../hex_string";
 import {
   clear,
   DEFAULT_TXN_EXP_SEC_FROM_NOW,
   DEFAULT_MAX_GAS_AMOUNT,
   DEFAULT_TXN_TIMEOUT_SEC,
   fixNodeUrl,
+  HexString,
   paginateWithCursor,
+  MaybeHexString,
   Memoize,
   sleep,
   APTOS_COIN,
 } from "../utils";
-import { AptosAccount } from "../aptos_account";
+import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
 import {
   TxnBuilderTypes,

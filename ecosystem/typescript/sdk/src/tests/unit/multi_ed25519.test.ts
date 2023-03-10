@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /* eslint-disable max-len */
-import { HexString } from "../hex_string";
-import { bcsToBytes, Deserializer } from "../bcs";
-import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
-import { MultiEd25519PublicKey, MultiEd25519Signature } from "./multi_ed25519";
+import { HexString } from "../../utils";
+import { bcsToBytes, Deserializer } from "../../bcs";
+import { Ed25519PublicKey, Ed25519Signature } from "../../aptos_types/ed25519";
+import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../aptos_types/multi_ed25519";
 
 describe("MultiEd25519", () => {
   it("public key serializes to bytes correctly", async () => {
