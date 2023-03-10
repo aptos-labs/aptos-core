@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
-use aptos_types::on_chain_config::{TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatures, FeatureFlag};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
@@ -59,9 +59,9 @@ fn native_public_key_validate(
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
-            if context
-                .get_timed_features()
-                .is_enabled(TimedFeatureFlag::Ed25519PkValidateNoAbortOnWrongLength)
+            if Features::default().is_enabled(FeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH)//context
+               // .get_timed_features()
+               // .is_enabled(TimedFeatureFlag::Ed25519PkValidateNoAbortOnWrongLength)
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {
