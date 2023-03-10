@@ -29,6 +29,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
 -  [Function `get_delegation_pools_feature`](#0x1_features_get_delegation_pools_feature)
 -  [Function `delegation_pools_enabled`](#0x1_features_delegation_pools_enabled)
+-  [Function `get_pubkey_validate_aborts_wrong_length`](#0x1_features_get_pubkey_validate_aborts_wrong_length)
+-  [Function `pubkey_validate_aborts_wrong_length_enabled`](#0x1_features_pubkey_validate_aborts_wrong_length_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -134,6 +136,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a>: u64 = 11;
+</code></pre>
+
+
+
+<a name="0x1_features_ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH"></a>
+
+Whether native_public_key_validate aborts when a public key of the wrong length is given
+Lifetime: ephemeral
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH">ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH</a>: u64 = 12;
 </code></pre>
 
 
@@ -671,6 +684,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pools_enabled">delegation_pools_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_pubkey_validate_aborts_wrong_length"></a>
+
+## Function `get_pubkey_validate_aborts_wrong_length`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_pubkey_validate_aborts_wrong_length">get_pubkey_validate_aborts_wrong_length</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_pubkey_validate_aborts_wrong_length">get_pubkey_validate_aborts_wrong_length</a>(): u64 { <a href="features.md#0x1_features_ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH">ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_pubkey_validate_aborts_wrong_length_enabled"></a>
+
+## Function `pubkey_validate_aborts_wrong_length_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_pubkey_validate_aborts_wrong_length_enabled">pubkey_validate_aborts_wrong_length_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_pubkey_validate_aborts_wrong_length_enabled">pubkey_validate_aborts_wrong_length_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+	<a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH">ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH</a>)
 }
 </code></pre>
 

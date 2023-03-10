@@ -61,7 +61,7 @@ fn native_public_key_validate(
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
-            if context.get_feature_flags().is_enabled(FeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH)
+            if context.get_feature_flags().is_enabled(FeatureFlag::ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {
