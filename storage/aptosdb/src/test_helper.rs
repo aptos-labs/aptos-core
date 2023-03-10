@@ -659,7 +659,7 @@ fn group_txns_by_account(
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
-        if let Ok(signed_txn) = txn.transaction().as_signed_user_txn() {
+        if let Some(signed_txn) = txn.transaction().as_signed_user_txn() {
             let account = signed_txn.sender();
             account_to_txns
                 .entry(account)

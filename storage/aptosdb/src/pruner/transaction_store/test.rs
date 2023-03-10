@@ -162,7 +162,7 @@ fn verify_txn_not_in_store(
     // Ensure that all transaction from transaction schema store has been pruned
     assert!(transaction_store.get_transaction(index).is_err());
     // Ensure that transaction by account store has been pruned
-    if let Transaction::UserTransaction(txn) = txns.get(index as usize).unwrap() {
+    if let Some(txn) = txns.get(index as usize).unwrap().as_signed_user_txn() {
         assert!(transaction_store
             .get_account_transaction_version(txn.sender(), txn.sequence_number(), ledger_version,)
             .unwrap()
@@ -182,7 +182,7 @@ fn verify_txn_in_store(
         txns.get(index as usize).unwrap(),
         index,
     );
-    if let Transaction::UserTransaction(txn) = txns.get(index as usize).unwrap() {
+    if let Some(txn) = txns.get(index as usize).unwrap().as_signed_user_txn() {
         verify_transaction_in_account_txn_by_version_index(
             transaction_store,
             index,
