@@ -29,11 +29,8 @@ use move_vm_types::{natives::function::NativeResult, pop_arg};
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
-<<<<<<< HEAD
-use crate::natives::feature_flags_extension::NativeFeatureFlagsExtension;
-=======
 use std::sync::Arc;
->>>>>>> alin/native-feature-flag-context
+use aptos_types::on_chain_config::FeatureFlag;
 
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
@@ -64,7 +61,7 @@ fn native_public_key_validate(
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
-            if context.extensions().get::<NativeFeatureFlagsExtension>().get_features().is_enabled(FeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH) 
+            if context.get_feature_flags().is_enabled(FeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH)
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {

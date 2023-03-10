@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 

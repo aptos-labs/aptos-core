@@ -96,7 +96,6 @@ pub fn configure_for_unit_test() {
 
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
-    exts.add(NativeFeatureFlagsExtension::default());
     exts.add(NativeCodeContext::default());
     exts.add(NativeTransactionContext::new(vec![1], ChainId::test().id())); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));

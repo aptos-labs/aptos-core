@@ -25,7 +25,6 @@ use std::sync::Arc;
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Features,
 }
 
 impl MoveVmExt {
@@ -68,7 +67,6 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
-            features,
         })
     }
 
@@ -84,7 +82,6 @@ impl MoveVmExt {
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
-        extensions.add(NativeFeatureFlagsExtension::new(self.features.clone()));
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));

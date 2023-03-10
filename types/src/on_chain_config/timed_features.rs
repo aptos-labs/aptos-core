@@ -14,7 +14,6 @@ pub enum TimedFeatureFlag {
     VerifierMetering,
     MultiEd25519NativePublicKeyValidateGasFix,
     Ristretto255NativeFloatingPointFix,
-    Ed25519PkValidateNoAbortOnWrongLength,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -44,8 +43,6 @@ impl TimedFeatureOverride {
                 // During replay we want to have metering on but none of the other new features
                 VerifierMetering => true,
                 VerifierLimitBackEdges => false,
-                // During replay this feature will be enabled
-                Ed25519PkValidateNoAbortOnWrongLength => true,
                 // Disable the early-abort on out-of-gas in the installed safe natives, so we can test historical TXNs replay the same way.
                 //NativesAbortEarlyIfOutOfGas => false,
                 // Do not install the new safe native for Ristretto255 MSM, since it returns a different gas cost and would abort the replay test.
@@ -86,9 +83,6 @@ impl TimedFeatureFlag {
 
             (Ristretto255NativeFloatingPointFix, TESTNET) => NOT_YET_SPECIFIED,
             (Ristretto255NativeFloatingPointFix, MAINNET) => NOT_YET_SPECIFIED,
-
-            (Ed25519PkValidateNoAbortOnWrongLength, TESTNET) => NOT_YET_SPECIFIED,
-            (Ed25519PkValidateNoAbortOnWrongLength, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
