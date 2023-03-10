@@ -45,6 +45,20 @@
 -  [Function `multiply_then_divide`](#0x1_pool_u64_unbound_multiply_then_divide)
 -  [Function `to_u128`](#0x1_pool_u64_unbound_to_u128)
 -  [Function `to_u256`](#0x1_pool_u64_unbound_to_u256)
+-  [Specification](#@Specification_1)
+    -  [Function `contains`](#@Specification_1_contains)
+    -  [Function `shares`](#@Specification_1_shares)
+    -  [Function `balance`](#@Specification_1_balance)
+    -  [Function `buy_in`](#@Specification_1_buy_in)
+    -  [Function `add_shares`](#@Specification_1_add_shares)
+    -  [Function `redeem_shares`](#@Specification_1_redeem_shares)
+    -  [Function `transfer_shares`](#@Specification_1_transfer_shares)
+    -  [Function `deduct_shares`](#@Specification_1_deduct_shares)
+    -  [Function `amount_to_shares_with_total_coins`](#@Specification_1_amount_to_shares_with_total_coins)
+    -  [Function `shares_to_amount_with_total_coins`](#@Specification_1_shares_to_amount_with_total_coins)
+    -  [Function `multiply_then_divide`](#@Specification_1_multiply_then_divide)
+    -  [Function `to_u128`](#@Specification_1_to_u128)
+    -  [Function `to_u256`](#@Specification_1_to_u256)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -866,6 +880,369 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+
+<a name="0x1_pool_u64_unbound_spec_contains"></a>
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>): bool {
+   <a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.shares, shareholder)
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_contains"></a>
+
+### Function `contains`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_contains">contains</a>(pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder);
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_spec_shares"></a>
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shareholder: <b>address</b>): u64 {
+   <b>if</b> (<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder)) {
+       <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder)
+   }
+   <b>else</b> {
+       0
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_shares"></a>
+
+### Function `shares`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares">shares</a>(pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder);
+</code></pre>
+
+
+
+<a name="@Specification_1_balance"></a>
+
+### Function `balance`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_balance">balance</a>(pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> shares = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder);
+<b>let</b> total_coins = pool.total_coins;
+<b>aborts_if</b> pool.total_coins &gt; 0 && pool.total_shares &gt; 0 && (shares * total_coins) / pool.total_shares &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U64">MAX_U64</a>;
+<b>ensures</b> result == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares_to_amount_with_total_coins">spec_shares_to_amount_with_total_coins</a>(pool, shares, total_coins);
+</code></pre>
+
+
+
+<a name="@Specification_1_buy_in"></a>
+
+### Function `buy_in`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_buy_in">buy_in</a>(pool: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, coins_amount: u64): u128
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> new_shares = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_amount_to_shares_with_total_coins">spec_amount_to_shares_with_total_coins</a>(pool, coins_amount, pool.total_coins);
+<b>aborts_if</b> pool.total_coins + coins_amount &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U64">MAX_U64</a>;
+<b>aborts_if</b> pool.total_shares + new_shares &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
+<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesAbortsIf">AddSharesAbortsIf</a> { new_shares: new_shares };
+<b>include</b> coins_amount &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesEnsures">AddSharesEnsures</a> { new_shares: new_shares };
+<b>ensures</b> pool.total_coins == <b>old</b>(pool.total_coins) + coins_amount;
+<b>ensures</b> pool.total_shares == <b>old</b>(pool.total_shares) + new_shares;
+<b>ensures</b> result == new_shares;
+</code></pre>
+
+
+
+<a name="@Specification_1_add_shares"></a>
+
+### Function `add_shares`
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_add_shares">add_shares</a>(pool: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, new_shares: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesAbortsIf">AddSharesAbortsIf</a>;
+<b>include</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesEnsures">AddSharesEnsures</a>;
+<b>let</b> key_exists = <a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.shares, shareholder);
+<b>ensures</b> result == <b>if</b> (key_exists) { <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder) }
+<b>else</b> { new_shares };
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_AddSharesAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesAbortsIf">AddSharesAbortsIf</a> {
+    pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>;
+    shareholder: <b>address</b>;
+    new_shares: u64;
+    <b>let</b> key_exists = <a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.shares, shareholder);
+    <b>let</b> current_shares = <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder);
+    <b>aborts_if</b> key_exists && current_shares + new_shares &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
+}
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_AddSharesEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_AddSharesEnsures">AddSharesEnsures</a> {
+    pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>;
+    shareholder: <b>address</b>;
+    new_shares: u64;
+    <b>let</b> key_exists = <a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.shares, shareholder);
+    <b>let</b> current_shares = <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder);
+    <b>ensures</b> key_exists ==&gt;
+        pool.shares == <a href="table.md#0x1_table_spec_set">table::spec_set</a>(<b>old</b>(pool.shares), shareholder, current_shares + new_shares);
+    <b>ensures</b> (!key_exists && new_shares &gt; 0) ==&gt;
+        pool.shares == <a href="table.md#0x1_table_spec_set">table::spec_set</a>(<b>old</b>(pool.shares), shareholder, new_shares);
+}
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_spec_amount_to_shares_with_total_coins"></a>
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_amount_to_shares_with_total_coins">spec_amount_to_shares_with_total_coins</a>(pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, coins_amount: u64, total_coins: u64): u128 {
+   <b>if</b> (pool.total_coins == 0 || pool.total_shares == 0) {
+       coins_amount * pool.scaling_factor
+   }
+   <b>else</b> {
+       (coins_amount * pool.total_shares) / total_coins
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_redeem_shares"></a>
+
+### Function `redeem_shares`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_redeem_shares">redeem_shares</a>(pool: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, shares_to_redeem: u128): u64
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> redeemed_coins = <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares_to_amount_with_total_coins">spec_shares_to_amount_with_total_coins</a>(pool, shares_to_redeem, pool.total_coins);
+<b>aborts_if</b> !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder);
+<b>aborts_if</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder) &lt; shares_to_redeem;
+<b>aborts_if</b> pool.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_total_coins">total_coins</a> &lt; redeemed_coins;
+<b>aborts_if</b> pool.<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_total_shares">total_shares</a> &lt; shares_to_redeem;
+<b>ensures</b> pool.total_coins == <b>old</b>(pool.total_coins) - redeemed_coins;
+<b>ensures</b> pool.total_shares == <b>old</b>(pool.total_shares) - shares_to_redeem;
+<b>include</b> shares_to_redeem &gt; 0 ==&gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_DeductSharesEnsures">DeductSharesEnsures</a> { num_shares: shares_to_redeem };
+<b>ensures</b> result == redeemed_coins;
+</code></pre>
+
+
+
+<a name="@Specification_1_transfer_shares"></a>
+
+### Function `transfer_shares`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_transfer_shares">transfer_shares</a>(pool: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder_1: <b>address</b>, shareholder_2: <b>address</b>, shares_to_transfer: u128)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder_1);
+<b>aborts_if</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder_1) &lt; shares_to_transfer;
+</code></pre>
+
+
+
+<a name="@Specification_1_deduct_shares"></a>
+
+### Function `deduct_shares`
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_deduct_shares">deduct_shares</a>(pool: &<b>mut</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shareholder: <b>address</b>, num_shares: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_contains">spec_contains</a>(pool, shareholder);
+<b>aborts_if</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares">spec_shares</a>(pool, shareholder) &lt; num_shares;
+<b>include</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_DeductSharesEnsures">DeductSharesEnsures</a>;
+<b>let</b> remaining_shares = <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder) - num_shares;
+<b>ensures</b> remaining_shares &gt; 0 ==&gt; result == <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder);
+<b>ensures</b> remaining_shares == 0 ==&gt; result == 0;
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_DeductSharesEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_DeductSharesEnsures">DeductSharesEnsures</a> {
+    pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>;
+    shareholder: <b>address</b>;
+    num_shares: u64;
+    <b>let</b> remaining_shares = <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder) - num_shares;
+    <b>ensures</b> remaining_shares &gt; 0 ==&gt; <a href="table.md#0x1_table_spec_get">table::spec_get</a>(pool.shares, shareholder) == remaining_shares;
+    <b>ensures</b> remaining_shares == 0 ==&gt; !<a href="table.md#0x1_table_spec_contains">table::spec_contains</a>(pool.shares, shareholder);
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_amount_to_shares_with_total_coins"></a>
+
+### Function `amount_to_shares_with_total_coins`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_amount_to_shares_with_total_coins">amount_to_shares_with_total_coins</a>(pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, coins_amount: u64, total_coins: u64): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> pool.total_coins &gt; 0 && pool.total_shares &gt; 0
+    && (coins_amount * pool.total_shares) / total_coins &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
+<b>aborts_if</b> (pool.total_coins == 0 || pool.total_shares == 0)
+    && coins_amount * pool.scaling_factor &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
+<b>aborts_if</b> pool.total_coins &gt; 0 && pool.total_shares &gt; 0 && total_coins == 0;
+<b>ensures</b> result == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_amount_to_shares_with_total_coins">spec_amount_to_shares_with_total_coins</a>(pool, coins_amount, total_coins);
+</code></pre>
+
+
+
+<a name="@Specification_1_shares_to_amount_with_total_coins"></a>
+
+### Function `shares_to_amount_with_total_coins`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_shares_to_amount_with_total_coins">shares_to_amount_with_total_coins</a>(pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, shares: u128, total_coins: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> pool.total_coins &gt; 0 && pool.total_shares &gt; 0
+    && (shares * total_coins) / pool.total_shares &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U64">MAX_U64</a>;
+<b>ensures</b> result == <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares_to_amount_with_total_coins">spec_shares_to_amount_with_total_coins</a>(pool, shares, total_coins);
+</code></pre>
+
+
+
+
+<a name="0x1_pool_u64_unbound_spec_shares_to_amount_with_total_coins"></a>
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_spec_shares_to_amount_with_total_coins">spec_shares_to_amount_with_total_coins</a>(pool: <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">Pool</a>, shares: u128, total_coins: u64): u64 {
+   <b>if</b> (pool.total_coins == 0 || pool.total_shares == 0) {
+       0
+   }
+   <b>else</b> {
+       (shares * total_coins) / pool.total_shares
+   }
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_multiply_then_divide"></a>
+
+### Function `multiply_then_divide`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_multiply_then_divide">multiply_then_divide</a>(_pool: &<a href="pool_u64_unbound.md#0x1_pool_u64_unbound_Pool">pool_u64_unbound::Pool</a>, x: u128, y: u128, z: u128): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> z == 0;
+<b>aborts_if</b> (x * y) / z &gt; <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_MAX_U128">MAX_U128</a>;
+<b>ensures</b> result == (x * y) / z;
+</code></pre>
+
+
+
+<a name="@Specification_1_to_u128"></a>
+
+### Function `to_u128`
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u128">to_u128</a>(num: u64): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == num;
+</code></pre>
+
+
+
+<a name="@Specification_1_to_u256"></a>
+
+### Function `to_u256`
+
+
+<pre><code><b>fun</b> <a href="pool_u64_unbound.md#0x1_pool_u64_unbound_to_u256">to_u256</a>(num: u128): u256
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == num;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html
