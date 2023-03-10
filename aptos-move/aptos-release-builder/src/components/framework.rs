@@ -58,7 +58,7 @@ pub fn generate_upgrade_proposals(
         package_path_list.reverse();
     }
 
-    let mut root_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
+    let mut root_path = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR")?).to_path_buf();
     root_path.pop();
     root_path.pop();
 

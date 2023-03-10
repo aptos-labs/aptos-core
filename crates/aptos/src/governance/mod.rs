@@ -879,7 +879,7 @@ impl GenerateExecutionHash {
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
                 framework_local_dir: Option::from({
-                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    let mut path = PathBuf::from(&std::env::var("CARGO_MANIFEST_DIR").unwrap());
                     path.pop();
                     path.pop();
                     path.join("aptos-move")
