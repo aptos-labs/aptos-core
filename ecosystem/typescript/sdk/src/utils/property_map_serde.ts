@@ -10,7 +10,7 @@ import {
   TypeTagU64,
   TypeTagU8,
 } from "../aptos_types";
-import { HexString } from "../hex_string";
+import { HexString } from "./hex_string";
 
 export class PropertyValue {
   type: string;

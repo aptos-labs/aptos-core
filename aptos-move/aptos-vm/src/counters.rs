@@ -105,9 +105,3 @@ pub static TXN_VALIDATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
 pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!("aptos_vm_txn_gas_usage", "Gas used per transaction").unwrap()
 });
-
-/// Count the number of critical errors. This is not intended for display
-/// on a dashboard but rather for triggering alerts.
-pub static CRITICAL_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_vm_critical_errors", "Number of critical errors").unwrap()
-});

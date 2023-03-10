@@ -8,8 +8,9 @@
 use crate::{
     common::{is_native_coin, native_coin, native_coin_tag},
     construction::{
-        parse_create_stake_pool_operation, parse_reset_lockup_operation,
-        parse_set_operator_operation, parse_set_voter_operation, parse_unlock_stake_operation,
+        parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
+        parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
+        parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -387,6 +388,25 @@ impl Operation {
             Some(OperationMetadata::unlock_stake(operator, amount)),
         )
     }
+
+    pub fn distribute_staking_rewards(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        account: AccountAddress,
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Operation {
+        Operation::new(
+            OperationType::DistributeStakingRewards,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(account),
+            None,
+            Some(OperationMetadata::distribute_staking_rewards(
+                operator, staker,
+            )),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -437,6 +457,8 @@ pub struct OperationMetadata {
     pub commission_percentage: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub staker: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -494,6 +516,17 @@ impl OperationMetadata {
         OperationMetadata {
             operator,
             amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn distribute_staking_rewards(
+        operator: AccountIdentifier,
+        staker: AccountIdentifier,
+    ) -> Self {
+        OperationMetadata {
+            operator: Some(operator),
+            staker: Some(staker),
             ..Default::default()
         }
     }
@@ -805,6 +838,19 @@ fn parse_failed_operations_from_txn_payload(
                     }
                 } else {
                     warn!("Failed to parse unlock stake {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, DISTRIBUTE_STAKING_REWARDS_FUNCTION) => {
+                if let Ok(mut ops) = parse_distribute_staking_rewards_operation(
+                    sender,
+                    inner.ty_args(),
+                    inner.args(),
+                ) {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse distribute staking rewards {:?}", inner);
                 }
             },
             _ => {
@@ -1298,6 +1344,34 @@ async fn parse_staking_contract_resource_changes(
             }
             operations.push(operation);
         }
+
+        // Handle distribute events, there are no events on the stake pool
+        let distribute_staking_rewards_events =
+            filter_events(events, store.distribute_events.key(), |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<DistributeEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse distribute event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            });
+
+        // For every distribute events, add staking reward operation
+        for event in distribute_staking_rewards_events {
+            operations.push(Operation::staking_reward(
+                operation_index,
+                Some(OperationStatusType::Success),
+                AccountIdentifier::base_account(event.recipient),
+                native_coin(),
+                event.amount,
+            ));
+            operation_index += 1;
+        }
     }
 
     Ok(operations)
@@ -1400,6 +1474,7 @@ pub enum InternalOperation {
     InitializeStakePool(InitializeStakePool),
     ResetLockup(ResetLockup),
     UnlockStake(UnlockStake),
+    DistributeStakingRewards(DistributeStakingRewards),
 }
 
 impl InternalOperation {
@@ -1544,6 +1619,25 @@ impl InternalOperation {
                                 }));
                             }
                         },
+                        Ok(OperationType::DistributeStakingRewards) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator: Some(operator),
+                                    staker: Some(staker),
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::DistributeStakingRewards(
+                                    DistributeStakingRewards {
+                                        sender: account.account_address()?,
+                                        operator: operator.account_address()?,
+                                        staker: staker.account_address()?,
+                                    },
+                                ));
+                            }
+                        },
                         _ => {},
                     }
                 }
@@ -1572,6 +1666,7 @@ impl InternalOperation {
             Self::InitializeStakePool(inner) => inner.owner,
             Self::ResetLockup(inner) => inner.owner,
             Self::UnlockStake(inner) => inner.owner,
+            Self::DistributeStakingRewards(inner) => inner.sender,
         }
     }
 
@@ -1638,6 +1733,13 @@ impl InternalOperation {
                     unlock_stake.amount,
                 ),
                 unlock_stake.owner,
+            ),
+            InternalOperation::DistributeStakingRewards(distribute_staking_rewards) => (
+                aptos_stdlib::staking_contract_distribute(
+                    distribute_staking_rewards.operator,
+                    distribute_staking_rewards.staker,
+                ),
+                distribute_staking_rewards.sender,
             ),
         })
     }
@@ -1803,4 +1905,11 @@ pub struct UnlockStake {
     pub owner: AccountAddress,
     pub operator: AccountAddress,
     pub amount: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DistributeStakingRewards {
+    pub sender: AccountAddress,
+    pub operator: AccountAddress,
+    pub staker: AccountAddress,
 }
