@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
@@ -28,7 +28,6 @@ use move_vm_types::{natives::function::NativeResult, pop_arg};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use aptos_types::on_chain_config::FeatureFlag;
 use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 
 pub mod abort_codes {
@@ -60,7 +59,9 @@ fn native_public_key_validate(
     let key_bytes_slice = match <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
-            if context.get_feature_flags().is_enabled(FeatureFlag::ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
+            if context
+                .get_feature_flags()
+                .is_enabled(FeatureFlag::ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {

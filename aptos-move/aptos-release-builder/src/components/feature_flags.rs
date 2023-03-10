@@ -129,7 +129,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
-            FeatureFlag::Ed25519PkValidateNoAbortOnWrongLength => AptosFeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH,
+            FeatureFlag::Ed25519PkValidateNoAbortOnWrongLength => {
+                AptosFeatureFlag::ED25519PKVALIDATENOABORTONWRONGLENGTH
+            },
         }
     }
 }
