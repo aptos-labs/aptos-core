@@ -399,7 +399,10 @@ async fn test_bcs() {
         .unwrap()
         .into_inner();
     let txn_version = txn.version;
-    assert_eq!(txn.transaction.as_signed_user_txn().unwrap(), &transfer_txn);
+    assert_eq!(
+        txn.transaction.try_as_signed_user_txn().unwrap(),
+        &transfer_txn
+    );
 
     // Check blocks
     let json_block = client
