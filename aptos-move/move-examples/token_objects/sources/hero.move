@@ -64,7 +64,6 @@ module token_objects::hero {
         collection::create_untracked_collection(
             account,
             string::utf8(b"collection description"),
-            collection::create_mutability_config(false, false),
             *&collection,
             option::none(),
             string::utf8(b"collection uri"),
@@ -77,14 +76,14 @@ module token_objects::hero {
         move_to(account, on_chain_config);
     }
 
-    fun create_token(
+    fun create(
         creator: &signer,
         description: String,
         name: String,
         uri: String,
     ): ConstructorRef acquires OnChainConfig {
         let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
-        token::create_token(
+        token::create(
             creator,
             *&on_chain_config.collection,
             description,
@@ -105,7 +104,7 @@ module token_objects::hero {
         race: String,
         uri: String,
     ): Object<Hero> acquires OnChainConfig {
-        let creator_ref = create_token(creator, description, name, uri);
+        let creator_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&creator_ref);
 
         let hero = Hero {
@@ -129,7 +128,7 @@ module token_objects::hero {
         weapon_type: String,
         weight: u64,
     ): Object<Weapon> acquires OnChainConfig {
-        let creator_ref = create_token(creator, description, name, uri);
+        let creator_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&creator_ref);
 
         let weapon = Weapon {
@@ -152,7 +151,7 @@ module token_objects::hero {
         name: String,
         uri: String,
     ): Object<Gem> acquires OnChainConfig {
-        let creator_ref = create_token(creator, description, name, uri);
+        let creator_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&creator_ref);
 
         let gem = Gem {

@@ -66,7 +66,7 @@ module token_objects::token {
         uri: bool,
     }
 
-    public fun create_token(
+    public fun create(
         creator: &signer,
         collection: String,
         description: String,
@@ -146,7 +146,7 @@ module token_objects::token {
             option::none()
         };
 
-        create_token(
+        create(
             creator,
             collection,
             description,
@@ -345,8 +345,6 @@ module token_objects::token {
             string::utf8(b"collection description"),
             collection_name,
             string::utf8(b"collection uri"),
-            false,
-            false,
             5,
             true,
             10,
@@ -354,7 +352,7 @@ module token_objects::token {
             signer::address_of(creator),
         );
 
-        create_token(
+        create(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -379,13 +377,12 @@ module token_objects::token {
         collection::create_untracked_collection(
             creator,
             string::utf8(b"collection description"),
-            collection::create_mutability_config(false, false),
             collection_name,
             option::none(),
             string::utf8(b"collection uri"),
         );
 
-        create_token(
+        create(
             creator,
             collection_name,
             string::utf8(b"token description"),
@@ -432,8 +429,6 @@ module token_objects::token {
             string::utf8(b"collection description"),
             collection_name,
             string::utf8(b"collection uri"),
-            false,
-            false,
             max_supply,
             false,
             0,
