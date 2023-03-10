@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
+use aptos_logger::error;
 use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -16,6 +17,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
+use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_binary_format::errors::Location;
 use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
 
@@ -177,6 +179,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             txn_idx,
         }
     }
+
+    fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
+        let ret = self.base_view.get_state_value(state_key);
+
+        if ret.is_err() {
+            // Even speculatively, reading from base view should not return an error.
+            // Thus, this critical error log and count does not need to be buffered.
+            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx);
+            alert!(
+                log_context,
+                "[VM, StateView] Error getting data from storage for {:?}",
+                state_key
+            );
+        }
+        ret
+    }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
@@ -199,25 +217,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;
                     Ok(Some(StateValue::new_legacy(serialize(&result))))
                 },
-                ReadResult::None => self.base_view.get_state_value(state_key),
+                ReadResult::None => self.get_base_value(state_key),
             },
             ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
-                || {
-                    // let ret =
-                    self.base_view.get_state_value(state_key)
-
-                    // TODO: common treatment with the above case.
-                    // TODO: enable below when logging isn't a circular dependency.
-                    // Even speculatively, reading from base view should not return an error.
-                    // let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx);
-                    // error!(
-                    //     log_context,
-                    //     "[VM, StateView] Error getting data from storage for {:?}", state_key
-                    // );
-                    // Alert (increase critical error count).
-                    // log_context.alert();
-                    // ret
-                },
+                || self.get_base_value(state_key),
                 |v| Ok(v.as_state_value()),
             ),
         }

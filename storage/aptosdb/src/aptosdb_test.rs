@@ -4,7 +4,8 @@
 use crate::{
     get_first_seq_num_and_limit,
     pruner::{
-        ledger_pruner_manager::LedgerPrunerManager, state_pruner_manager::StatePrunerManager,
+        ledger_pruner_manager::LedgerPrunerManager,
+        state_merkle_pruner_manager::StateMerklePrunerManager,
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
@@ -12,7 +13,7 @@ use crate::{
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateMerklePrunerConfig, BUFFERED_STATE_TARGET_ITEMS,
+    StateKvPrunerConfig, StateMerklePrunerConfig, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -91,7 +92,7 @@ fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
-        let state_pruner = StatePrunerManager::<StaleNodeIndexSchema>::new(
+        let state_merkle_pruner = StateMerklePrunerManager::<StaleNodeIndexSchema>::new(
             Arc::clone(&aptos_db.state_merkle_db),
             StateMerklePrunerConfig {
                 enable,
@@ -99,19 +100,16 @@ fn test_pruner_config() {
                 batch_size: 1,
             },
         );
-        assert_eq!(state_pruner.is_pruner_enabled(), enable);
-        assert_eq!(state_pruner.get_prune_window(), 20);
+        assert_eq!(state_merkle_pruner.is_pruner_enabled(), enable);
+        assert_eq!(state_merkle_pruner.get_prune_window(), 20);
 
-        let ledger_pruner = LedgerPrunerManager::new(
-            Arc::clone(&aptos_db.ledger_db),
-            Arc::clone(&aptos_db.state_store),
-            LedgerPrunerConfig {
+        let ledger_pruner =
+            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
                 enable,
                 prune_window: 100,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            },
-        );
+            });
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
         assert_eq!(ledger_pruner.get_prune_window(), 100);
     }
@@ -123,7 +121,7 @@ fn test_error_if_version_pruned() {
     let db = AptosDB::new_for_test(&tmp_dir);
     db.state_store
         .state_db
-        .state_pruner
+        .state_merkle_pruner
         .testonly_update_min_version(5);
     db.ledger_pruner.testonly_update_min_version(10);
     assert_eq!(
@@ -202,6 +200,11 @@ pub fn test_state_merkle_pruning_impl(
                 prune_window: 10,
                 batch_size: 1,
             },
+            state_kv_pruner_config: StateKvPrunerConfig {
+                enable: true,
+                prune_window: 10,
+                batch_size: 1,
+            },
         },
         RocksdbConfigs::default(),
         false, /* enable_indexer */
@@ -252,7 +255,7 @@ pub fn test_state_merkle_pruning_impl(
             .collect();
 
         // Prune till the oldest snapshot readable.
-        let pruner = &db.state_store.state_db.state_pruner;
+        let pruner = &db.state_store.state_db.state_merkle_pruner;
         let epoch_snapshot_pruner = &db.state_store.state_db.epoch_snapshot_pruner;
         pruner
             .pruner_worker

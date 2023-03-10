@@ -115,7 +115,6 @@ mod aptos_vm_impl;
 pub mod block_executor;
 mod delta_state_view;
 mod errors;
-pub mod logging;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod read_write_set_analysis;

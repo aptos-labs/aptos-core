@@ -34,6 +34,7 @@ pub async fn generate_traffic(
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
         .gas_price(gas_price)
+        .coordination_delay_between_instances(Duration::from_secs(1))
         .transaction_mix_per_phase(transaction_mix_per_phase)
         .mode(EmitJobMode::ConstTps { tps: 20 });
     emitter

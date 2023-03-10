@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_gauge, Histogram, HistogramVec,
-    IntCounter, IntGauge,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, AverageIntCounter,
+    Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -202,6 +202,16 @@ pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of total batches/PoS left after cleaning up commit notifications.
+pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_total_proofs_left_on_commit",
+        "Histogram for the number of total batches/PoS left after cleaning up commit notifications.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+        .unwrap()
+});
+
 /// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
 pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -373,6 +383,16 @@ pub static SENT_BATCH_REQUEST_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to batch retrieval per epoch task
+pub static BATCH_RETRIEVAL_TASK_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_quorum_store_batch_retrieval_task_msgs_count",
+        "Counters(queued,dequeued,dropped) related to batch retrieval task",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Count of the number of batch request received from other nodes.
 pub static RECEIVED_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -400,20 +420,25 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static QS_BACKPRESSURE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_backpressure",
-        "Indicator of whether Quorum Store is backpressured. QS should be backpressured when (1) number of batches exceeds the threshold, or (2) consensus is backpressured."
+pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_txn_count",
+        "Indicator of whether Quorum Store is backpressured due to txn count exceeding threshold.",
     )
-    .unwrap()
 });
 
-pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_backpressure_dynamic_max",
-        "What the dynamic max is set to"
+pub static QS_BACKPRESSURE_PROOF_COUNT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_proof_count",
+        "Indicator of whether Quorum Store is backpressured due to proof count exceeding threshold."
     )
-    .unwrap()
+});
+
+pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_backpressure_dynamic_max",
+        "What the dynamic max is set to",
+    )
 });
 
 /// Latencies

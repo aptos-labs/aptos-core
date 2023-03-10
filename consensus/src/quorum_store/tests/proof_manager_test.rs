@@ -14,7 +14,7 @@ use std::collections::HashSet;
 
 #[tokio::test]
 async fn test_block_request() {
-    let mut proof_manager = ProofManager::new(0, 10);
+    let mut proof_manager = ProofManager::new(0, 10, 10);
 
     let digest = HashValue::random();
     let proof = ProofOfStore::new(
@@ -28,6 +28,7 @@ async fn test_block_request() {
         1,
         100,
         1000000,
+        true,
         PayloadFilter::InQuorumStore(HashSet::new()),
         callback_tx,
     );

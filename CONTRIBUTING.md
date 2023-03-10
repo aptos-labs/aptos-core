@@ -5,7 +5,7 @@ title: Contributing to Aptos Core
 
 # Contributing
 
-Our goal is to make contributing to Aptos Core easy and transparent.
+Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos Community](https://aptos.dev/community/help-index) for full details. This page describes [our development process](#our-development-process).
 
 ## Aptos Core
 
@@ -13,8 +13,11 @@ To contribute to the Aptos Core implementation, first start with the proper deve
 
 To get the development installation with all the necessary dependencies for linting, testing, and building the documentation, run the following:
 ```bash
-git clone https://github.com/aptos-labs/aptos-core.git
+# fork https://github.com/aptos-labs/aptos-core.git via the github UI
+# repace <your-github> below to clone your (origin) remote fork
+git clone https://github.com/<your-github>/aptos-core.git
 cd aptos-core
+git remote add upstream https://github.com/aptos-labs/aptos-core.git
 ./scripts/dev_setup.sh
 cargo build
 cargo test
@@ -24,24 +27,22 @@ cargo test
 
 ### Code Style, Hints, and Testing
 
-Refer to our [Coding Guidelines](https://github.com/aptos-labs/aptos-core/blob/main/documentation/coding_guidelines.md) for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/guides/move-guides/book/coding-conventions.md) and [Rust](./developer-docs-site/docs/contribute/rust-coding-guidelines.md) programming languages for detailed guidance about how to contribute to the project.
 
 ### Documentation
 
 Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
 
-If you know Markdown, you can already contribute! How to contribute can be found in the [website repo](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md).
+If you know Markdown, you can already contribute!
 
 ## Developer Workflow
 
 Changes to the project are proposed through pull requests. The general pull request workflow is as follows:
 
-1. Fork the repo and create a topic branch off of `main`.
-2. Locally run `./scripts/dev_setup.sh` to ensure you have all development dependencies required for our workflows.
-3. If you have added code that should be tested, add unit tests.
-4. If you have changed APIs, update the documentation. Make sure the documentation builds.
-5. Ensure all tests and lints pass on each and every commit that is part of your pull request using `./scripts/rust_lint.sh`
-6. Submit your pull request.
+* If you have added code that should be tested, add unit tests.
+* If you have changed APIs, update the documentation. Make sure the documentation builds.
+* Ensure all tests and lints pass on each and every commit that is part of your pull request using `./scripts/rust_lint.sh`.
+* Submit your pull request.
 
 ## Authoring Clean Commits
 
@@ -110,6 +111,6 @@ You *should not* update your branch by merging the latest main into your branch.
 
 It is important that the project history is bisect-able so that when regressions are identified we can easily use `git bisect` to be able to pin-point the exact commit which introduced the regression. This requires that every commit is able to be built and passes all lints and tests. So if your pull request includes multiple commits be sure that each and every commit is able to be built and passes all checks performed by CI.
 
-# Issues
+## Issues
 
 Aptos Core uses [GitHub issues](https://github.com/aptos-labs/aptos-core/issues) to track bugs. Please include necessary information and instructions to reproduce your issue.

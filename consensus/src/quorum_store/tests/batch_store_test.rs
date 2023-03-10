@@ -2,189 +2,159 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network_interface::ConsensusMsg,
     quorum_store::{
-        batch_reader::{BatchReader, BatchReaderCommand},
-        batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
-        proof_coordinator::ProofCoordinatorCommand,
-        quorum_store_db::QuorumStoreDB,
-        tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
-        types::SerializedTransaction,
+        batch_requester::BatchRequester, batch_store::BatchStore, quorum_store_db::QuorumStoreDB,
+        types::PersistedValue,
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::Author, proof_of_store::LogicalTime};
+use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
-use aptos_logger::spawn_named;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    transaction::SignedTransaction,
-    validator_signer::ValidatorSigner,
-    validator_verifier::{random_validator_verifier, ValidatorVerifier},
-    PeerId,
+use aptos_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
+use futures::executor::block_on;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
-use std::sync::Arc;
+use tokio::{sync::mpsc::channel, task::spawn_blocking};
 
-struct TestBatchStore<T> {
-    pub batch_store: BatchStore<T>,
-    pub _batch_reader: Arc<BatchReader>,
-    pub network_rx: tokio::sync::mpsc::Receiver<(ConsensusMsg, Vec<Author>)>,
-    pub batch_store_cmd_tx: tokio::sync::mpsc::Sender<BatchStoreCommand>,
-    pub batch_store_cmd_rx: tokio::sync::mpsc::Receiver<BatchStoreCommand>,
-    pub batch_reader_cmd_tx: tokio::sync::mpsc::Sender<BatchReaderCommand>,
-}
-
-fn start_batch_store(
-    signer: ValidatorSigner,
-    db_path: &TempPath,
-    validator_verifier: &ValidatorVerifier,
-) -> TestBatchStore<MockQuorumStoreSender> {
-    let config = QuorumStoreConfig::default();
-    let (network_tx, network_rx) = tokio::sync::mpsc::channel(100);
-    let network_sender = MockQuorumStoreSender::new(network_tx);
-
-    let (batch_store_cmd_tx, batch_store_cmd_rx) = tokio::sync::mpsc::channel(100);
-    let (batch_reader_cmd_tx, batch_reader_cmd_rx) = tokio::sync::mpsc::channel(100);
-    let (batch_store, _batch_reader) = BatchStore::new(
-        0,
-        0,
-        signer.author(),
-        network_sender,
-        batch_store_cmd_tx.clone(),
-        batch_reader_cmd_tx.clone(),
-        batch_reader_cmd_rx,
-        Arc::new(QuorumStoreDB::new(db_path)),
-        validator_verifier.clone(),
-        Arc::new(signer),
-        config.batch_expiry_round_gap_when_init,
-        config.batch_expiry_round_gap_behind_latest_certified,
-        config.batch_expiry_round_gap_beyond_latest_certified,
-        config.batch_expiry_grace_rounds,
-        config.batch_request_num_peers,
-        config.batch_request_timeout_ms,
-        config.memory_quota,
-        config.db_quota,
-    );
-    TestBatchStore {
-        batch_store,
-        _batch_reader,
-        network_rx,
-        batch_store_cmd_tx,
-        batch_store_cmd_rx,
-        batch_reader_cmd_tx,
-    }
-}
-
-async fn get_batch_for_peer_and_check(
-    network_rx: &mut tokio::sync::mpsc::Receiver<(ConsensusMsg, Vec<Author>)>,
-    batch_reader_cmd_tx: tokio::sync::mpsc::Sender<BatchReaderCommand>,
-    digest_hash: HashValue,
-    remote_peer_id: PeerId,
-    expected_txns: &[SignedTransaction],
-) {
-    let cmd = BatchReaderCommand::GetBatchForPeer(digest_hash, remote_peer_id);
-    batch_reader_cmd_tx.send(cmd).await.expect("Could not send");
-    let (msg, peer_ids) = network_rx.recv().await.expect("Could not recv");
-    assert_eq!(peer_ids.len(), 1);
-    assert_eq!(peer_ids[0], remote_peer_id);
-    match msg {
-        ConsensusMsg::BatchMsg(batch) => {
-            let txns = batch.into_payload();
-            assert_eq!(txns.len(), expected_txns.len());
-            for (txn, expected_txn) in txns.iter().zip(expected_txns) {
-                assert_eq!(txn, expected_txn);
-            }
-        },
-        _ => panic!("Unexpected msg {:?}", msg),
-    }
-}
-
-async fn shutdown(batch_store_cmd_tx: tokio::sync::mpsc::Sender<BatchStoreCommand>) {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let cmd = BatchStoreCommand::Shutdown(tx);
-    batch_store_cmd_tx.send(cmd).await.expect("Could not send");
-    rx.await.expect("Could not shutdown");
-}
-
-#[ignore] // TODO: debug and re-enable before deploying quorum store
 #[tokio::test(flavor = "multi_thread")]
-async fn test_batch_store_recovery() {
+async fn test_extend_expiration_vs_save() {
+    let num_experiments = 2000;
     let tmp_dir = TempPath::new();
-    let txns = create_vec_signed_transactions(100);
-    let digest_hash = compute_digest_from_signed_transaction(txns.clone());
-    let num_bytes = txns
-        .iter()
-        .map(SerializedTransaction::from_signed_txn)
-        .map(|t| t.len())
-        .sum();
+    let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
+    let (tx, _rx) = channel(10);
+    let requester = BatchRequester::new(
+        10,
+        AccountAddress::random(),
+        1,
+        1,
+        MockQuorumStoreSender::new(tx),
+    );
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let peer_id = signers[0].author();
-    let remote_peer_id = signers[1].author();
 
-    {
-        let test_batch_store = start_batch_store(signers[0].clone(), &tmp_dir, &validator_verifier);
-        let (proof_coordinator_tx, mut proof_coordinator_rx) = tokio::sync::mpsc::channel(100);
-        spawn_named!(
-            "batch store",
-            test_batch_store
-                .batch_store
-                .start(test_batch_store.batch_store_cmd_rx, proof_coordinator_tx)
-        );
+    let batch_store = Arc::new(BatchStore::new(
+        10, // epoch
+        10, // last committed round
+        db,
+        0,
+        0,
+        2100,
+        0,    // grace period rounds
+        0,    // memory_quota
+        1000, // db quota
+        requester,
+        signers[0].clone(),
+        validator_verifier,
+    ));
 
-        // Persist batch and wait
-        let cmd = BatchStoreCommand::Persist(PersistRequest::new(
-            peer_id,
-            txns.clone(),
-            digest_hash,
-            num_bytes,
-            LogicalTime::new(0, 100),
-        ));
-        test_batch_store
-            .batch_store_cmd_tx
-            .clone()
-            .send(cmd)
-            .await
-            .expect("Could not send");
-        let msg = proof_coordinator_rx.recv().await.expect("Could not recv");
-        match msg {
-            ProofCoordinatorCommand::AppendSignature(digest) => {
-                assert_eq!(digest.digest(), digest_hash);
-            },
-            _ => panic!("Unexpected msg {:?}", msg),
+    let batch_store_clone1 = batch_store.clone();
+    let batch_store_clone2 = batch_store.clone();
+
+    let digests: Vec<HashValue> = (0..num_experiments).map(|_| HashValue::random()).collect();
+    let later_exp_values: Vec<(HashValue, PersistedValue)> = (0..num_experiments)
+        .map(|i| {
+            // Pre-insert some of them.
+            if i % 2 == 0 {
+                batch_store
+                    .save(
+                        digests[i],
+                        PersistedValue::new(
+                            Some(Vec::new()),
+                            LogicalTime::new(10, i as u64 + 30),
+                            AccountAddress::random(),
+                            10,
+                        ),
+                    )
+                    .unwrap();
+            }
+
+            (
+                digests[i],
+                PersistedValue::new(
+                    Some(Vec::new()),
+                    LogicalTime::new(10, i as u64 + 40),
+                    AccountAddress::random(),
+                    10,
+                ),
+            )
+        })
+        .collect();
+
+    // Marshal threads to start at the same time.
+    let start_flag = Arc::new(AtomicUsize::new(0));
+    let start_clone1 = start_flag.clone();
+    let start_clone2 = start_flag.clone();
+
+    // Thread that extends expiration by saving.
+    spawn_blocking(move || {
+        for (i, (digest, later_exp_value)) in later_exp_values.into_iter().enumerate() {
+            // Wait until both threads are ready for next experiment.
+            loop {
+                let flag_val = start_clone1.load(Ordering::Acquire);
+                if flag_val == 3 * i + 1 || flag_val == 3 * i + 2 {
+                    break;
+                }
+            }
+
+            batch_store_clone1.save(digest, later_exp_value).unwrap();
+            start_clone1.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+
+    // Thread that expires.
+    spawn_blocking(move || {
+        for i in 0..num_experiments {
+            // Wait until both threads are ready for next experiment.
+            loop {
+                let flag_val = start_clone2.load(Ordering::Acquire);
+                if flag_val == 3 * i + 1 || flag_val == 3 * i + 2 {
+                    break;
+                }
+            }
+
+            block_on(
+                batch_store_clone2.update_certified_round(LogicalTime::new(10, i as u64 + 30)),
+            );
+            start_clone2.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+
+    for (i, &digest) in digests.iter().enumerate().take(num_experiments) {
+        // Set the conditions for experiment (both threads waiting).
+        while start_flag.load(Ordering::Acquire) % 3 != 0 {}
+
+        if i % 2 == 1 {
+            batch_store
+                .save(
+                    digest,
+                    PersistedValue::new(
+                        Some(Vec::new()),
+                        LogicalTime::new(10, i as u64 + 30),
+                        AccountAddress::random(),
+                        10,
+                    ),
+                )
+                .unwrap();
         }
 
-        let mut network_rx = test_batch_store.network_rx;
-        get_batch_for_peer_and_check(
-            &mut network_rx,
-            test_batch_store.batch_reader_cmd_tx.clone(),
-            digest_hash,
-            remote_peer_id,
-            &txns,
-        )
-        .await;
-        shutdown(test_batch_store.batch_store_cmd_tx.clone()).await;
+        // Unleash the threads.
+        start_flag.fetch_add(1, Ordering::Relaxed);
     }
+    // Finish the experiment
+    while start_flag.load(Ordering::Acquire) % 3 != 0 {}
 
-    {
-        let test_batch_store = start_batch_store(signers[0].clone(), &tmp_dir, &validator_verifier);
-        let (proof_coordinator_tx, _proof_coordinator_rx) = tokio::sync::mpsc::channel(100);
-        spawn_named!(
-            "batch store restart",
-            test_batch_store
-                .batch_store
-                .start(test_batch_store.batch_store_cmd_rx, proof_coordinator_tx)
-        );
-
-        let mut network_rx = test_batch_store.network_rx;
-        get_batch_for_peer_and_check(
-            &mut network_rx,
-            test_batch_store.batch_reader_cmd_tx.clone(),
-            digest_hash,
-            remote_peer_id,
-            &txns,
-        )
-        .await;
-        shutdown(test_batch_store.batch_store_cmd_tx.clone()).await;
+    // Expire everything, call for higher times as well.
+    for i in 35..50 {
+        batch_store
+            .update_certified_round(LogicalTime::new(10, (i + num_experiments) as u64))
+            .await;
     }
 }
+
+// TODO: last certified round.
+// TODO: check correct digests are returned.
+// TODO: check grace period.
+// TODO: check quota.
+// TODO: check the channels.

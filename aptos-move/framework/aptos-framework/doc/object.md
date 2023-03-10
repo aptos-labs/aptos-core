@@ -50,6 +50,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `object_from_delete_ref`](#0x1_object_object_from_delete_ref)
 -  [Function `delete`](#0x1_object_delete)
 -  [Function `generate_signer_for_extending`](#0x1_object_generate_signer_for_extending)
+-  [Function `address_from_extend_ref`](#0x1_object_address_from_extend_ref)
 -  [Function `disable_ungated_transfer`](#0x1_object_disable_ungated_transfer)
 -  [Function `enable_ungated_transfer`](#0x1_object_enable_ungated_transfer)
 -  [Function `generate_linear_transfer_ref`](#0x1_object_generate_linear_transfer_ref)
@@ -944,7 +945,7 @@ Generate a new event handle.
 
 ## Function `object_from_delete_ref`
 
-Returns the address of within a DeleteRef.
+Returns an Object<T> from within a DeleteRef.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
@@ -1015,6 +1016,31 @@ Create a signer for the ExtendRef
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_signer_for_extending">generate_signer_for_extending</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <a href="create_signer.md#0x1_create_signer">create_signer</a>(ref.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_extend_ref"></a>
+
+## Function `address_from_extend_ref`
+
+Returns an address from within a ExtendRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_extend_ref">address_from_extend_ref</a>(ref: &<a href="object.md#0x1_object_ExtendRef">ExtendRef</a>): <b>address</b> {
+    ref.self
 }
 </code></pre>
 

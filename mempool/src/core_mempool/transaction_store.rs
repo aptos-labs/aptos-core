@@ -56,6 +56,7 @@ pub struct TransactionStore {
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
+    // Broadcast-ready transactions, with a timeline per bucket.
     timeline_index: MultiBucketTimelineIndex,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
@@ -75,6 +76,10 @@ pub struct TransactionStore {
     capacity_bytes: usize,
     capacity_per_user: usize,
     max_batch_bytes: u64,
+
+    // eager expiration
+    eager_expire_threshold: Option<Duration>,
+    eager_expire_time: Duration,
 }
 
 impl TransactionStore {
@@ -103,6 +108,10 @@ impl TransactionStore {
             capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
             max_batch_bytes: config.shared_mempool_max_batch_bytes,
+
+            // eager expiration
+            eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
+            eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
         }
     }
 
@@ -443,6 +452,7 @@ impl TransactionStore {
                     TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
+                        txn.was_parked = true;
                         parking_lot_txns += 1;
                     },
                 }
@@ -623,6 +633,37 @@ impl TransactionStore {
             .collect()
     }
 
+    /// If the oldest transaction (that never entered parking lot) is larger than
+    /// eager_expire_threshold, there is significant backlog so add eager_expire_time
+    fn eager_expire_time(&self, gc_time: Duration) -> Duration {
+        let eager_expire_threshold = match self.eager_expire_threshold {
+            None => {
+                return gc_time;
+            },
+            Some(v) => v,
+        };
+
+        let mut oldest_insertion_time = None;
+        // Limit the worst-case linear search to 20.
+        for key in self.system_ttl_index.iter().take(20) {
+            if let Some(txn) = self.get_mempool_txn(&key.address, key.sequence_number) {
+                if !txn.was_parked {
+                    oldest_insertion_time = Some(txn.insertion_time);
+                    break;
+                }
+            }
+        }
+        if let Some(insertion_time) = oldest_insertion_time {
+            if let Ok(age) = SystemTime::now().duration_since(insertion_time) {
+                if age > eager_expire_threshold {
+                    counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT.inc();
+                    return gc_time.saturating_add(self.eager_expire_time);
+                }
+            }
+        }
+        gc_time
+    }
+
     /// Garbage collect old transactions.
     pub(crate) fn gc_by_system_ttl(&mut self, gc_time: Duration) {
         self.gc(gc_time, true);
@@ -630,7 +671,7 @@ impl TransactionStore {
 
     /// Garbage collect old transactions based on client-specified expiration time.
     pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.gc(block_time, false);
+        self.gc(self.eager_expire_time(block_time), false);
     }
 
     fn gc(&mut self, now: Duration, by_system_ttl: bool) {
@@ -672,6 +713,7 @@ impl TransactionStore {
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
+                    t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {

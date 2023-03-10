@@ -90,6 +90,8 @@ pub enum CliError {
     UnexpectedError(String),
     #[error("Simulation failed with status: {0}")]
     SimulationError(String),
+    #[error("Coverage failed with status: {0}")]
+    CoverageError(String),
 }
 
 impl CliError {
@@ -109,6 +111,7 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
+            CliError::CoverageError(_) => "CoverageError",
         }
     }
 }

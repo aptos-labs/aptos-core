@@ -95,6 +95,7 @@ pub fn build_model(
     package_path: &Path,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,
+    bytecode_version: Option<u32>,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = BuildConfig {
         dev_mode: false,
@@ -107,6 +108,7 @@ pub fn build_model(
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
+        bytecode_version,
     };
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
@@ -120,6 +122,7 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
+        let bytecode_version = options.bytecode_version;
         let build_config = BuildConfig {
             dev_mode: false,
             additional_named_addresses: options.named_addresses.clone(),
@@ -131,6 +134,7 @@ impl BuiltPackage {
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            bytecode_version,
         };
         eprintln!("Compiling, may take a little while to download git dependencies...");
         let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
@@ -141,6 +145,7 @@ impl BuiltPackage {
             package_path.as_path(),
             options.named_addresses.clone(),
             None,
+            bytecode_version,
         )?;
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -156,7 +161,7 @@ impl BuiltPackage {
                 .join(package.compiled_package_info.package_name.as_str()),
             &mut package,
             runtime_metadata,
-            options.bytecode_version,
+            bytecode_version,
         )?;
 
         // If enabled generate docs.
