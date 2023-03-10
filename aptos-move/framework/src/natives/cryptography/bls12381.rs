@@ -14,7 +14,7 @@ use aptos_crypto::{
     test_utils::KeyPair,
     SigningKey, Uniform,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
@@ -36,6 +36,7 @@ use move_vm_types::{
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
+use std::sync::Arc;
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
 /// field of `T`, which is a `Vec<u8>` field named `bytes`.
@@ -685,6 +686,7 @@ pub fn native_generate_proof_of_possession(
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
     natives.append(&mut vec![
@@ -694,6 +696,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_aggregate_pubkeys,
             ),
         ),
@@ -702,6 +705,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_aggregate_signatures,
             ),
         ),
@@ -710,6 +714,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_signature_subgroup_check,
             ),
         ),
@@ -718,6 +723,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_validate_pubkey,
             ),
         ),
@@ -726,6 +732,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_verify_aggregate_signature,
             ),
         ),
@@ -734,6 +741,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_verify_multisignature,
             ),
         ),
@@ -742,6 +750,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_verify_normal_signature,
             ),
         ),
@@ -750,6 +759,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_bls12381_verify_proof_of_possession,
             ),
         ),
@@ -758,6 +768,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params,
                 timed_features,
+                features.clone(),
                 native_bls12381_verify_signature_share,
             ),
         ),

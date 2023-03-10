@@ -20,11 +20,11 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
+use std::sync::Arc;
 
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Features,
 }
 
 impl MoveVmExt {
@@ -46,6 +46,8 @@ impl MoveVmExt {
                 5
             };
 
+        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -53,10 +55,11 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                     timed_features.clone(),
+                    Arc::new(features),
                 ),
                 VMConfig {
                     verifier: verifier_config(
-                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                        treat_friend_as_private,
                         &timed_features,
                     ),
                     max_binary_format_version,
@@ -64,7 +67,6 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
-            features,
         })
     }
 
