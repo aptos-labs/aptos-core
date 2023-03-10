@@ -145,8 +145,8 @@ impl BatchAggregator {
                 if Self::is_new_batch(batch_id, self_batch_id) {
                     self.batch_state.is_some() || fragment_id > 0
                 } else {
-                    assert!(
-                        batch_id == self_batch_id,
+                    assert_eq!(
+                        batch_id, self_batch_id,
                         "Missed fragment called with an outdated fragment"
                     );
                     fragment_id > self.next_fragment_id()
@@ -207,11 +207,8 @@ impl BatchAggregator {
             self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
         }
 
-        if self.batch_state.is_some() {
-            self.batch_state
-                .as_mut()
-                .unwrap()
-                .append_transactions(transactions)?
+        if let Some(batch_state) = &mut self.batch_state {
+            batch_state.append_transactions(transactions)?
         }
         Ok(())
     }

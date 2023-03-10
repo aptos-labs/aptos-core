@@ -373,18 +373,16 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         .save_batch(persist_request.digest, persist_request.value)
                         .expect("Could not write to DB");
                 }
-                Some(
-                    SignedDigest::new(
-                        batch_author,
-                        self.epoch(),
-                        persist_request.digest,
-                        expiration,
-                        num_txns,
-                        num_bytes,
-                        &self.validator_signer,
-                    )
-                    .unwrap(),
+                SignedDigest::new(
+                    batch_author,
+                    self.epoch(),
+                    persist_request.digest,
+                    expiration,
+                    num_txns,
+                    num_bytes,
+                    &self.validator_signer,
                 )
+                .ok()
             },
 
             Err(e) => {

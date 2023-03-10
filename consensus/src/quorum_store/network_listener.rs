@@ -71,13 +71,12 @@ impl NetworkListener {
                             idx
                         );
                         self.remote_batch_coordinator_tx[idx]
-                            .send(BatchCoordinatorCommand::RemoteFragment(fragment))
+                            .send(BatchCoordinatorCommand::AppendFragment(fragment))
                             .await
                             .expect("Could not send remote fragment");
                     },
                     VerifiedEvent::ProofOfStoreMsg(proof) => {
-                        counters::REMOTE_POS_COUNT.inc();
-                        let cmd = ProofManagerCommand::RemoteProof(*proof);
+                        let cmd = ProofManagerCommand::ReceiveProof(*proof);
                         self.proof_manager_tx
                             .send(cmd)
                             .await
@@ -87,7 +86,7 @@ impl NetworkListener {
                         unreachable!()
                     },
                 };
-            })
+            });
         }
     }
 }

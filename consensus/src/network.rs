@@ -362,13 +362,13 @@ impl QuorumStoreSender for NetworkSender {
     async fn broadcast_fragment(&mut self, fragment: Fragment) {
         fail_point!("consensus::send::broadcast_fragment", |_| ());
         let msg = ConsensusMsg::FragmentMsg(Box::new(fragment));
-        self.broadcast_without_self(msg).await
+        self.broadcast(msg).await
     }
 
     async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
-        self.broadcast_without_self(msg).await
+        self.broadcast(msg).await
     }
 }
 

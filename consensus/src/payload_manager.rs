@@ -12,7 +12,6 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
-use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
@@ -23,10 +22,7 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(
-        Arc<BatchStore<NetworkSender>>,
-        Mutex<Sender<CoordinatorCommand>>,
-    ),
+    InQuorumStore(Arc<BatchStore<NetworkSender>>, Sender<CoordinatorCommand>),
 }
 
 impl PayloadManager {
@@ -73,7 +69,7 @@ impl PayloadManager {
                     .map(|proof| *proof.digest())
                     .collect();
 
-                let mut tx = coordinator_tx.lock().clone();
+                let mut tx = coordinator_tx.clone();
 
                 // TODO: don't even need to warn on fail?
                 if let Err(e) = tx

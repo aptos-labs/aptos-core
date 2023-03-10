@@ -26,6 +26,7 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
 
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError>;
+
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError>;
 }
 
