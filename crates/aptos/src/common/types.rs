@@ -48,6 +48,7 @@ use std::{
 };
 use thiserror::Error;
 
+pub const USER_AGENT: &str = concat!("aptos-cli / ", env!("CARGO_PKG_VERSION"));
 const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
@@ -895,9 +896,10 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        Ok(Client::new_with_timeout(
+        Ok(Client::new_with_timeout_and_user_agent(
             self.url(profile)?,
             Duration::from_secs(self.connection_timeout_secs),
+            USER_AGENT,
         ))
     }
 }
