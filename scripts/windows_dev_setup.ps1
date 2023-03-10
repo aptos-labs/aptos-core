@@ -31,13 +31,66 @@ function check_os {
 		$global:os = "Windows 11"
 	}
 	elseif ($osName.Contains("Windows Server 2022")) {
-		Write-Host "Supported Windows OS"
-		$global:os = "Windows Server 2022 detected"
+		Write-Host "Supported Windows OS detected"
+		$global:os = "Windows Server 2022"
+		check_for_winget
 	}
 	else {
 		Write-Host "Unsupported Windows OS detected. Stopping script..."
 		Exit
 	}
+}
+
+function install_winget {
+    # Download and extract XAML dependency
+     Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.2" -OutFile "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
+     Expand-Archive "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
+     while ((Get-Item "Microsoft.UI.Xaml.2.8.2.nupkg.zip").Length -lt 19MB) {
+         Start-Sleep -Seconds 1
+     }
+
+    if ($global:architecture -eq "64") {
+        # Install x64 dependencies (VCLibs and XAML)
+        Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+        while ((Get-Item "Microsoft.VCLibs.x64.14.00.Desktop.appx").Length -lt 6MB) {
+            Start-Sleep -Seconds 1
+     }
+     Add-AppxPackage "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+     Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+    }
+    elseif ($global:architecture -eq "86") {
+        # Install x86 dependencies (VCLibs and XAML)
+        Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x86.14.00.Desktop.appx" -OutFile "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+        while ((Get-Item "Microsoft.VCLibs.x86.14.00.Desktop.appx").Length -lt 5.5MB) {
+            Start-Sleep -Seconds 1
+        }
+     Add-AppxPackage "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+     Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+    }
+
+    # Install WinGet
+    Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -OutFile "msftwinget.msixbundle" -ErrorAction SilentlyContinue
+    while ((Get-Item "msftwinget.msixbundle").Length -lt 13.5MB) {
+        Start-Sleep -Seconds 1
+    }
+    Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/3463fe9ad25e44f28630526aa9ad5648_License1.xml" -OutFile "license.xml" -ErrorAction SilentlyContinue
+    while ((Get-Item "license.xml").Length -lt 1KB) {
+        Start-Sleep -Seconds 1
+    }
+    Add-AppxProvisionedPackage -Online -PackagePath "msftwinget.msixbundle" -LicensePath "license.xml" -ErrorAction SilentlyContinue
+
+    # Add WinGet directory to the user's PATH environment variable
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;%LOCALAPPDATA%\Microsoft\WindowsApps", "User")
+}
+
+function check_for_winget {
+    if (Get-Command "winget" -ErrorAction SilentlyContinue) {
+    Write-Host "WinGet is already installed."
+    } 
+    else {
+    Write-Host "Installing WinGet..."
+    install_winget
+    }
 }
 
 function check_package {
@@ -178,8 +231,8 @@ function existing_package {
 	Write-Host "This package is already installed."
 }
 
-check_os
 verify_architecture
+check_os
 install_msvc_build_tools
 install_llvm
 install_openssl
