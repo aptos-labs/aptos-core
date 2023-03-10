@@ -44,12 +44,16 @@ function check_package {
   param(
     [string]$package
   )
-  if ($(winget list --name $package --accept-source-agreements) -match 'No installed package found matching input criteria.') {
+  if ((winget list --name $package --accept-source-agreements) -match 'No installed package found matching input criteria.') {
     Write-Host "Installing $package..."
     return $true
   }   
+  elseif ((winget upgrade | Out-String).Contains($package)) {
+    Write-Host "$package is already installed, but an update is available."
+	return $false
+  }
   else {
-    Write-Host "$package is already installed."
+	Write-Host "$package is already installed and up-to-date."
   }
 }
 
@@ -59,6 +63,10 @@ function install_msvc_build_tools {  # Installs C++ build tools, CMake, and Wind
 	select_msvc_variant
     set_msvc_env_variables
 	}
+  else {
+	Write-Host "Installing update..."
+	winget upgrade --id Microsoft.VisualStudio.2022.BuildTools
+  }
 }
 
 function select_msvc_variant {  # Decides between the Windows 10 SDK and Windows 11 SDK based on your OS
@@ -105,6 +113,9 @@ function install_rustup {
 	winget install Rustlang.Rustup --silent
 	Exit
 	}
+  else {
+	winget upgrade --id Rustlang.Rustup
+  }
   Write-Host "Configuring Rustup..."
   rustup update
   rustup component add rustfmt
@@ -118,6 +129,9 @@ function install_llvm {
   if ($result) {
 	winget install LLVM.LLVM --silent
 	}
+  else {
+	winget upgrade --id LLVM.LLVM
+  }
 }
 
 function install_openssl {
@@ -125,6 +139,9 @@ function install_openssl {
   if ($result) {
 	winget install ShiningLight.OpenSSL --silent
 	}
+  else {
+	winget upgrade --id ShiningLight.OpenSSL --silent
+  }
 }
 
 function install_nodejs {
@@ -132,6 +149,9 @@ function install_nodejs {
   if ($result) {
 	winget install OpenJS.NodeJS --silent
 	}
+  else {
+	winget upgrade --id OpenJS.NodeJS -silent
+  }
 }
 
 function install_pnpm {
@@ -139,6 +159,9 @@ function install_pnpm {
   if ($result) {
 	winget install pnpm.pnpm --silent
 	}
+  else {
+    winget upgrade --id LLVM.LLVM
+  }
 }
 
 function install_postgresql {
@@ -146,6 +169,9 @@ function install_postgresql {
   if ($result) {
 	winget install PostgreSQL.PostgreSQL --silent
 	}
+  else {
+	winget upgrade --id LLVM.LLVM
+   }
 }
 
 function existing_package {
