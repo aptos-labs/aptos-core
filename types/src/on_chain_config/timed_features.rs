@@ -14,6 +14,7 @@ pub enum TimedFeatureFlag {
     VerifierMetering,
     MultiEd25519NativePublicKeyValidateGasFix,
     Ristretto255NativeFloatingPointFix,
+    DisableInvariantViolationCheckInSwapLoc,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -43,12 +44,14 @@ impl TimedFeatureOverride {
                 // During replay we want to have metering on but none of the other new features
                 VerifierMetering => true,
                 VerifierLimitBackEdges => false,
-                // Disable the early-abort on out-of-gas in the installed safe natives, so we can test historical TXNs replay the same way.
-                //NativesAbortEarlyIfOutOfGas => false,
-                // Do not install the new safe native for Ristretto255 MSM, since it returns a different gas cost and would abort the replay test.
-                //Ristretto255NativeFloatingPointFix => false,
-                // Do not install the new safe native for MultiEd25519 PK validation, since it returns a different gas cost and would abort the replay test.
-                //MultiEd25519NativePublicKeyValidateGasFix => false,
+                // Enable the early-abort on out-of-gas in the installed safe natives, so we can test historical TXNs replay the same way.
+                NativesAbortEarlyIfOutOfGas => true,
+                // Install the new safe native for Ristretto255 MSM, since it returns a different gas cost and could abort the replay test.
+                Ristretto255NativeFloatingPointFix => true,
+                // Install the new safe native for MultiEd25519 PK validation, since it returns a different gas cost and could abort the replay test.
+                MultiEd25519NativePublicKeyValidateGasFix => true,
+                // Disable invariant violation check in swap_loc
+                DisableInvariantViolationCheckInSwapLoc => true,
                 // Add overrides for replay here.
                 _ => return None,
             },
@@ -83,6 +86,9 @@ impl TimedFeatureFlag {
 
             (Ristretto255NativeFloatingPointFix, TESTNET) => NOT_YET_SPECIFIED,
             (Ristretto255NativeFloatingPointFix, MAINNET) => NOT_YET_SPECIFIED,
+
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,

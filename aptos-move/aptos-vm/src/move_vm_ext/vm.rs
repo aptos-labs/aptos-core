@@ -44,6 +44,8 @@ impl MoveVmExt {
                 5
             };
 
+        let disable_invariant_violation_check =
+            timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -59,6 +61,8 @@ impl MoveVmExt {
                     ),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc:
+                        !disable_invariant_violation_check,
                 },
             )?,
             chain_id,
