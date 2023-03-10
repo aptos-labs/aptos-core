@@ -641,7 +641,7 @@ impl SignedTransaction {
     }
 
     /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
+    pub fn lookup_hash(self) -> HashValue {
         Transaction::UserTransaction(self).hash()
     }
 }

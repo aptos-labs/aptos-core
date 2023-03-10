@@ -262,7 +262,7 @@ impl TransactionStore {
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
             self.hash_index
-                .insert(txn.get_committed_hash(), (sender, txn_seq_num));
+                .insert(txn.get_lookup_hash(), (sender, txn_seq_num));
             let txn_size_bytes = txn.get_estimated_bytes();
             txns.insert(txn_seq_num, txn);
             self.sequence_numbers.insert(sender, acc_seq_num);
@@ -537,7 +537,7 @@ impl TransactionStore {
         self.priority_index.remove(txn);
         self.timeline_index.remove(txn);
         self.parking_lot_index.remove(txn);
-        self.hash_index.remove(&txn.get_committed_hash());
+        self.hash_index.remove(&txn.get_lookup_hash());
         self.size_bytes -= txn.get_estimated_bytes();
 
         // Remove account datastructures if there are no more transactions for the account.

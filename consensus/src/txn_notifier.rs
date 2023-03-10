@@ -74,7 +74,7 @@ impl TxnNotifier for MempoolNotifier {
                 rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
-                    hash: txn.clone().committed_hash(),
+                    hash: txn.clone().lookup_hash(),
                 });
             }
         }

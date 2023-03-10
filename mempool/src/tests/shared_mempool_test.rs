@@ -36,7 +36,7 @@ fn test_consensus_events_rejected_txns() {
     let transactions = vec![RejectedTransactionSummary {
         sender: rejected_txn.sender(),
         sequence_number: rejected_txn.sequence_number(),
-        hash: rejected_txn.committed_hash(),
+        hash: rejected_txn.lookup_hash(),
     }];
     let (callback, callback_rcv) = oneshot::channel();
     let req = QuorumStoreRequest::RejectNotification(transactions, callback);

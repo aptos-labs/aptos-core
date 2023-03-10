@@ -207,7 +207,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     if params.return_txns.unwrap_or(false) {
         Ok(Response::SubmittedTxns(vec![txn]))
     } else {
-        Ok(Response::SubmittedTxnsHashes(vec![txn.committed_hash()]))
+        Ok(Response::SubmittedTxnsHashes(vec![txn.lookup_hash()]))
     }
 }
 

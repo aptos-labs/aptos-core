@@ -836,7 +836,7 @@ async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
         .get(
             format!(
                 "/transactions/by_hash/{}",
-                txn.committed_hash().to_hex_literal()
+                txn.lookup_hash().to_hex_literal()
             )
             .as_str(),
         )
@@ -955,7 +955,7 @@ async fn test_transaction_vm_status(
         .get(
             format!(
                 "/transactions/by_hash/{}",
-                txn.committed_hash().to_hex_literal()
+                txn.lookup_hash().to_hex_literal()
             )
             .as_str(),
         )

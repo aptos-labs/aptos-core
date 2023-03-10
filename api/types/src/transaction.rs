@@ -236,7 +236,7 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
             request: (&txn, payload).into(),
-            hash: txn.committed_hash().into(),
+            hash: txn.lookup_hash().into(),
         })
     }
 }
@@ -347,7 +347,7 @@ impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         PendingTransaction {
             request: (&txn, payload).into(),
-            hash: txn.committed_hash().into(),
+            hash: txn.lookup_hash().into(),
         }
     }
 }

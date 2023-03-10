@@ -93,7 +93,7 @@ async fn submit_and_check(
     }
     if let Err(err) = rest_client
         .wait_for_transaction_by_hash(
-            txn.clone().committed_hash(),
+            txn.clone().lookup_hash(),
             txn.expiration_timestamp_secs(),
             None,
             Some(Duration::from_secs(10)),

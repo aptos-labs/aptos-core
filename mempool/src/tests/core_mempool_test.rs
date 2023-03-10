@@ -196,7 +196,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[1].clone().committed_hash(), // hash of other txn
+        &txns[1].clone().lookup_hash(), // hash of other txn
     );
     assert!(pool
         .get_transaction_store()
@@ -205,7 +205,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[0].clone().committed_hash(), // hash of other txn
+        &txns[0].clone().lookup_hash(), // hash of other txn
     );
     assert!(pool
         .get_transaction_store()
@@ -216,7 +216,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[0].clone().committed_hash(),
+        &txns[0].clone().lookup_hash(),
     );
     assert!(pool
         .get_transaction_store()
@@ -225,7 +225,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[1].clone().committed_hash(),
+        &txns[1].clone().lookup_hash(),
     );
     assert!(pool
         .get_transaction_store()
@@ -277,7 +277,7 @@ fn test_reset_sequence_number_on_failure() {
     let hashes: Vec<_> = txns
         .iter()
         .cloned()
-        .map(|txn| txn.make_signed_transaction().committed_hash())
+        .map(|txn| txn.make_signed_transaction().lookup_hash())
         .collect();
     // Add two transactions for account.
     add_txns_to_mempool(&mut pool, vec![
@@ -657,7 +657,7 @@ fn test_get_transaction_by_hash() {
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
-    let hash = txn.clone().committed_hash();
+    let hash = txn.clone().lookup_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
 
@@ -671,7 +671,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let db_sequence_number = 10;
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(txn.clone(), 1, db_sequence_number, TimelineState::NotReady);
-    let hash = txn.committed_hash();
+    let hash = txn.lookup_hash();
 
     // new txn with higher gas price
     let new_txn = TestTransaction::new(0, db_sequence_number, 100).make_signed_transaction();
@@ -681,7 +681,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         db_sequence_number,
         TimelineState::NotReady,
     );
-    let new_txn_hash = new_txn.clone().committed_hash();
+    let new_txn_hash = new_txn.clone().lookup_hash();
 
     let txn_by_old_hash = pool.get_by_hash(hash);
     assert!(txn_by_old_hash.is_none());
@@ -726,7 +726,7 @@ fn test_transaction_store_remove_account_if_empty() {
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 
     let txn = TestTransaction::new(2, 2, 1).make_signed_transaction();
-    let hash = txn.clone().committed_hash();
+    let hash = txn.clone().lookup_hash();
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
