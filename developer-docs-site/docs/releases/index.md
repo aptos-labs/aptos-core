@@ -5,7 +5,7 @@ slug: "aptos-releases"
 
 # Latest Aptos Releases
 
-This section contains details for the latest [Aptos releases](https://github.com/aptos-labs/aptos-core/releases). See the subpages for the latest release for each network:
+This section contains details for the latest [Aptos releases](https://github.com/aptos-labs/aptos-core/releases). See the sub-pages for the latest release for each network:
 
 * [Latest Mainnet Release](./mainnet-release.md)
 * [Latest Testnet Release](./testnet-release.md)
