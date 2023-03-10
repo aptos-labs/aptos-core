@@ -150,7 +150,7 @@ impl ProofManager {
     pub async fn start(
         mut self,
         mut network_sender: NetworkSender,
-        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+        back_pressure_tx: tokio::sync::mpsc::Sender<(BackPressure, u64)>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
@@ -158,6 +158,7 @@ impl ProofManager {
             txn_count: false,
             proof_count: false,
         };
+        let mut i = 0;
 
         loop {
             // TODO: additional main loop counter
@@ -170,7 +171,9 @@ impl ProofManager {
                     let updated_back_pressure = self.qs_back_pressure();
                     if updated_back_pressure != back_pressure {
                         back_pressure = updated_back_pressure;
-                        if back_pressure_tx.send(back_pressure).await.is_err() {
+                        debug!("tx back_pressure: {} {} {}", i, updated_back_pressure.txn_count, updated_back_pressure.proof_count);
+                        i += 1;
+                        if back_pressure_tx.send((back_pressure, i)).await.is_err() {
                             debug!("Failed to send back_pressure for proposal");
                         }
                     }
@@ -195,12 +198,15 @@ impl ProofManager {
                             // update the backpressure upon new commit round
                             (self.remaining_total_txn_num, self.remaining_total_proof_num) =
                                 self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
+                            debug!("remaining back_pressure: {} {} {}", i, self.remaining_total_txn_num, self.remaining_total_proof_num);
                             // TODO: keeping here for metrics, might be part of the backpressure in the future?
                             self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;
-                                if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("tx back_pressure: {} {} {}", i, updated_back_pressure.txn_count, updated_back_pressure.proof_count);
+                                i += 1;
+                                if back_pressure_tx.send((back_pressure, i)).await.is_err() {
                                     debug!("Failed to send back_pressure for commit notification");
                                 }
                             }

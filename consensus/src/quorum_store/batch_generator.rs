@@ -251,7 +251,7 @@ impl BatchGenerator {
     pub async fn start(
         mut self,
         mut cmd_rx: tokio::sync::mpsc::Receiver<BatchGeneratorCommand>,
-        mut back_pressure_rx: tokio::sync::mpsc::Receiver<BackPressure>,
+        mut back_pressure_rx: tokio::sync::mpsc::Receiver<(BackPressure, u64)>,
         mut interval: Interval,
     ) {
         let start = Instant::now();
@@ -273,7 +273,8 @@ impl BatchGenerator {
 
             tokio::select! {
                 biased;
-                Some(updated_back_pressure) = back_pressure_rx.recv() => {
+                Some((updated_back_pressure, i)) = back_pressure_rx.recv() => {
+                    debug!("rx back_pressure: {} {} {}", i, updated_back_pressure.txn_count, updated_back_pressure.proof_count);
                     self.back_pressure = updated_back_pressure;
                 },
                 _ = interval.tick() => {
