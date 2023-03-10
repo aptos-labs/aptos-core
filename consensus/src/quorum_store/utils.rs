@@ -13,7 +13,7 @@ use aptos_consensus_types::{
     proof_of_store::{LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info};
+use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
@@ -122,7 +122,7 @@ impl DigestTimeouts {
 
     pub(crate) fn expire(&mut self) -> Vec<HashValue> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
-        debug!(
+        trace!(
             "QS: expire cur time {} timeouts len {}",
             cur_time,
             self.timeouts.len()
@@ -363,8 +363,9 @@ impl ProofQueue {
         }
     }
 
-    pub(crate) fn num_total_txns(&mut self, current_time: LogicalTime) -> u64 {
+    pub(crate) fn num_total_txns_and_proofs(&mut self, current_time: LogicalTime) -> (u64, u64) {
         let mut remaining_txns = 0;
+        let mut remaining_proofs = 0;
         // TODO: if the digest_queue is large, this may be too inefficient
         for (digest, expiration) in self.digest_queue.iter() {
             // Not expired
@@ -372,11 +373,14 @@ impl ProofQueue {
                 // Not committed
                 if let Some(Some(proof)) = self.digest_proof.get(digest) {
                     remaining_txns += proof.info().num_txns;
+                    remaining_proofs += 1;
                 }
             }
         }
         counters::NUM_TOTAL_TXNS_LEFT_ON_COMMIT.observe(remaining_txns as f64);
-        remaining_txns
+        counters::NUM_TOTAL_PROOFS_LEFT_ON_COMMIT.observe(remaining_proofs as f64);
+
+        (remaining_txns, remaining_proofs)
     }
 
     // returns the number of unexpired local proofs

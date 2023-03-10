@@ -236,18 +236,33 @@ impl Mempool {
             }
         }
 
-        debug!(
-            LogSchema::new(LogEntry::GetBlock),
-            seen_consensus = seen_size,
-            walked = txn_walked,
-            seen_after = seen.len(),
-            // before size and non full check
-            result_size = result_size,
-            // before non full check
-            byte_size = total_bytes,
-            block_size = block.len(),
-            return_non_full = return_non_full,
-        );
+        if result_size > 0 {
+            debug!(
+                LogSchema::new(LogEntry::GetBlock),
+                seen_consensus = seen_size,
+                walked = txn_walked,
+                seen_after = seen.len(),
+                // before size and non full check
+                result_size = result_size,
+                // before non full check
+                byte_size = total_bytes,
+                block_size = block.len(),
+                return_non_full = return_non_full,
+            );
+        } else {
+            trace!(
+                LogSchema::new(LogEntry::GetBlock),
+                seen_consensus = seen_size,
+                walked = txn_walked,
+                seen_after = seen.len(),
+                // before size and non full check
+                result_size = result_size,
+                // before non full check
+                byte_size = total_bytes,
+                block_size = block.len(),
+                return_non_full = return_non_full,
+            );
+        }
 
         if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
             block.clear();

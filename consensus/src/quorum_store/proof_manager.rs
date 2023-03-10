@@ -3,7 +3,7 @@
 
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
-    quorum_store::{counters, utils::ProofQueue},
+    quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
@@ -29,15 +29,23 @@ pub struct ProofManager {
     latest_logical_time: LogicalTime,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
+    back_pressure_total_proof_limit: u64,
+    remaining_total_proof_num: u64,
 }
 
 impl ProofManager {
-    pub fn new(epoch: u64, back_pressure_total_txn_limit: u64) -> Self {
+    pub fn new(
+        epoch: u64,
+        back_pressure_total_txn_limit: u64,
+        back_pressure_total_proof_limit: u64,
+    ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
+            back_pressure_total_proof_limit,
+            remaining_total_proof_num: 0,
         }
     }
 
@@ -59,7 +67,11 @@ impl ProofManager {
         logical_time: LogicalTime,
         digests: Vec<HashValue>,
     ) {
-        debug!("QS: got clean request from execution");
+        trace!(
+            "QS: got clean request from execution at epoch {}, round {}",
+            logical_time.epoch(),
+            logical_time.round()
+        );
         assert_eq!(
             self.latest_logical_time.epoch(),
             logical_time.epoch(),
@@ -100,15 +112,18 @@ impl ProofManager {
                     max_bytes,
                     return_non_full,
                 );
-                self.remaining_total_txn_num = self
+                (self.remaining_total_txn_num, self.remaining_total_proof_num) = self
                     .proofs_for_consensus
-                    .num_total_txns(LogicalTime::new(self.latest_logical_time.epoch(), round));
+                    .num_total_txns_and_proofs(LogicalTime::new(
+                        self.latest_logical_time.epoch(),
+                        round,
+                    ));
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {
                         Payload::empty(true)
                     } else {
-                        debug!(
+                        trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",
                             excluded_proofs.len(),
                             proof_block.len()
@@ -125,18 +140,24 @@ impl ProofManager {
     }
 
     /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure(&self) -> bool {
-        self.remaining_total_txn_num > self.back_pressure_total_txn_limit
+    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+        BackPressure {
+            txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
+            proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,
+        }
     }
 
     pub async fn start(
         mut self,
         mut network_sender: NetworkSender,
-        back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
+        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
-        let mut back_pressure = false;
+        let mut back_pressure = BackPressure {
+            txn_count: false,
+            proof_count: false,
+        };
 
         loop {
             // TODO: additional main loop counter
@@ -172,14 +193,15 @@ impl ProofManager {
                             self.handle_commit_notification(logical_time, digests);
 
                             // update the backpressure upon new commit round
-                            self.remaining_total_txn_num = self.proofs_for_consensus.num_total_txns(logical_time);
+                            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+                                self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
                             // TODO: keeping here for metrics, might be part of the backpressure in the future?
                             self.proofs_for_consensus.clean_local_proofs(logical_time);
                             let updated_back_pressure = self.qs_back_pressure();
                             if updated_back_pressure != back_pressure {
                                 back_pressure = updated_back_pressure;
                                 if back_pressure_tx.send(back_pressure).await.is_err() {
-                                    debug!("Failed to send back_pressure for proposal");
+                                    debug!("Failed to send back_pressure for commit notification");
                                 }
                             }
                         },
