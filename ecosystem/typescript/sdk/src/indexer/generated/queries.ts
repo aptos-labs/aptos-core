@@ -45,6 +45,13 @@ export const GetAccountCurrentTokens = `
 }
     ${TokenDataFieldsFragmentDoc}
 ${CollectionDataFieldsFragmentDoc}`;
+export const GetIndexerLedgerInfo = `
+    query getIndexerLedgerInfo {
+  ledger_infos {
+    chain_id
+  }
+}
+    `;
 export const GetTokenActivities = `
     query getTokenActivities($idHash: String!) {
   token_activities(where: {token_data_id_hash: {_eq: $idHash}}) {
@@ -74,6 +81,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
   return {
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
+    },
+    getIndexerLedgerInfo(variables?: Types.GetIndexerLedgerInfoQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetIndexerLedgerInfoQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetIndexerLedgerInfoQuery>(GetIndexerLedgerInfo, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getIndexerLedgerInfo', 'query');
     },
     getTokenActivities(variables: Types.GetTokenActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivities', 'query');
