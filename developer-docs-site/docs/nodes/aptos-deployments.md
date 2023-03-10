@@ -6,6 +6,8 @@ hide_table_of_contents: true
 
 # Aptos Blockchain Deployments
 
+Ensure your nodes are running the [latest releases](../releases/index.md) of Aptos.
+
 You can connect to the Aptos blockchain by [choosing a network](../guides/system-integrators-guide.md#choose-a-network). See [Check out release branch](../guides/getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
 
 See the table below for details on each Aptos network:
