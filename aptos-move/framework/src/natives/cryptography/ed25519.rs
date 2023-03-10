@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
-use aptos_types::on_chain_config::{Features, TimedFeatures, FeatureFlag};
+use aptos_types::on_chain_config::{TimedFeatures, FeatureFlag};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
