@@ -26,16 +26,24 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `swap`](#0x1_vector_swap)
 -  [Function `singleton`](#0x1_vector_singleton)
 -  [Function `reverse`](#0x1_vector_reverse)
+-  [Function `reverse_slice`](#0x1_vector_reverse_slice)
 -  [Function `append`](#0x1_vector_append)
+-  [Function `reverse_append`](#0x1_vector_reverse_append)
+-  [Function `trim`](#0x1_vector_trim)
+-  [Function `trim_reverse`](#0x1_vector_trim_reverse)
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
+-  [Function `insert`](#0x1_vector_insert)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
+-  [Function `rotate`](#0x1_vector_rotate)
+-  [Function `rotate_slice`](#0x1_vector_rotate_slice)
 -  [Specification](#@Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
+    -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
     -  [Function `append`](#@Specification_1_append)
     -  [Function `is_empty`](#@Specification_1_is_empty)
     -  [Function `contains`](#@Specification_1_contains)
@@ -59,6 +67,16 @@ The index into the vector is out of bounds
 
 
 <pre><code><b>const</b> <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>: u64 = 131072;
+</code></pre>
+
+
+
+<a name="0x1_vector_EINVALID_RANGE"></a>
+
+The index into the vector is out of bounds
+
+
+<pre><code><b>const</b> <a href="vector.md#0x1_vector_EINVALID_RANGE">EINVALID_RANGE</a>: u64 = 131073;
 </code></pre>
 
 
@@ -297,14 +315,38 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
-    <b>if</b> (len == 0) <b>return</b> ();
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, 0, len);
+}
+</code></pre>
 
-    <b>let</b> front_index = 0;
-    <b>let</b> back_index = len -1;
-    <b>while</b> (front_index &lt; back_index) {
-        <a href="vector.md#0x1_vector_swap">swap</a>(v, front_index, back_index);
-        front_index = front_index + 1;
-        back_index = back_index - 1;
+
+
+</details>
+
+<a name="0x1_vector_reverse_slice"></a>
+
+## Function `reverse_slice`
+
+Reverses the order of the elements [left, right) in the vector <code>v</code> in place.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64) {
+    <b>assert</b>!(left &lt;= right, <a href="vector.md#0x1_vector_EINVALID_RANGE">EINVALID_RANGE</a>);
+    <b>if</b> (left == right) <b>return</b>;
+    right = right - 1;
+    <b>while</b> (left &lt; right) {
+        <a href="vector.md#0x1_vector_swap">swap</a>(v, left, right);
+        left = left + 1;
+        right = right - 1;
     }
 }
 </code></pre>
@@ -331,8 +373,96 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_append">append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> other);
-    <b>while</b> (!<a href="vector.md#0x1_vector_is_empty">is_empty</a>(&other)) <a href="vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
+    <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>(lhs, other);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_reverse_append"></a>
+
+## Function `reverse_append`
+
+Pushes all of the elements of the <code>other</code> vector into the <code>lhs</code> vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>&lt;Element&gt;(lhs: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&other);
+    <b>while</b> (len &gt; 0) {
+        <a href="vector.md#0x1_vector_push_back">push_back</a>(lhs, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> other));
+        len = len - 1;
+    };
     <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(other);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_trim"></a>
+
+## Function `trim`
+
+Trim a vector to a smaller size, returning the evicted elements in order
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim">trim</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> res = <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>(v, new_len);
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> res);
+    res
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_trim_reverse"></a>
+
+## Function `trim_reverse`
+
+Trim a vector to a smaller size, returning the evicted elements in reverse order
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>assert</b>!(new_len &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+    <b>let</b> result = <a href="vector.md#0x1_vector_empty">empty</a>();
+    <b>while</b> (new_len &lt; len) {
+        <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v));
+        len = len - 1;
+    };
+    result
 }
 </code></pre>
 
@@ -428,6 +558,38 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 </details>
 
+<a name="0x1_vector_insert"></a>
+
+## Function `insert`
+
+Insert a new element at position 0 <= i <= length, using O(length - i) time.
+Aborts if out of bounds.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_insert">insert</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, e: Element) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>assert</b>!(i &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
+    <a href="vector.md#0x1_vector_push_back">push_back</a>(v, e);
+    <b>while</b> (i &lt; len) {
+        <a href="vector.md#0x1_vector_swap">swap</a>(v, i, len);
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_remove"></a>
 
 ## Function `remove`
@@ -484,6 +646,70 @@ Aborts if <code>i</code> is out of bounds.
     <b>let</b> last_idx = <a href="vector.md#0x1_vector_length">length</a>(v) - 1;
     <a href="vector.md#0x1_vector_swap">swap</a>(v, i, last_idx);
     <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_rotate"></a>
+
+## Function `rotate`
+
+rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
+ie. 3 in the example above
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, rot: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate">rotate</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    rot: u64
+): u64 {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>(v, 0, rot, len)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_rotate_slice"></a>
+
+## Function `rotate_slice`
+
+Same as above but on a sub-slice of an array [left, right) with left <= rot <= right
+returns the
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, rot: u64, right: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_rotate_slice">rotate_slice</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    left: u64,
+    rot: u64,
+    right: u64
+): u64 {
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, rot);
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, rot, right);
+    <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, right);
+    left + (right - rot)
 }
 </code></pre>
 
@@ -593,6 +819,22 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_reverse_slice"></a>
+
+### Function `reverse_slice`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, left: u64, right: u64)
 </code></pre>
 
 

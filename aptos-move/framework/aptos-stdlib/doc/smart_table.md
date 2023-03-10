@@ -424,32 +424,18 @@ Decide which is the next bucket to split and split it into two with the elements
     <b>let</b> new_bucket_index = <a href="table.md#0x1_table">table</a>.num_buckets;
     // the next bucket <b>to</b> split is num_bucket without the most significant bit.
     <b>let</b> to_split = new_bucket_index ^ (1 &lt;&lt; <a href="table.md#0x1_table">table</a>.level);
-    <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <a href="table.md#0x1_table">table</a>.num_buckets = new_bucket_index + 1;
     // <b>if</b> the whole level is splitted once, bump the level.
     <b>if</b> (to_split + 1 == 1 &lt;&lt; <a href="table.md#0x1_table">table</a>.level) {
         <a href="table.md#0x1_table">table</a>.level = <a href="table.md#0x1_table">table</a>.level + 1;
     };
     <b>let</b> old_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, to_split);
-    // partition the bucket. after the <b>loop</b>, i == j and [0..i) stays in <b>old</b> bucket, [j..len) goes <b>to</b> new bucket
-    <b>let</b> i = 0;
-    <b>let</b> j = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(old_bucket);
-    <b>let</b> len = j;
-    <b>while</b> (i &lt; j) {
-        <b>let</b> entry = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(old_bucket, i);
-        <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>);
-        <b>if</b> (index == new_bucket_index) {
-            j = j - 1;
-            <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap">vector::swap</a>(old_bucket, i, j);
-        } <b>else</b> {
-            i = i + 1;
-        };
-    };
-    <b>while</b> (j &lt; len) {
-        <b>let</b> entry = <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(old_bucket);
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> new_bucket, entry);
-        len = len - 1;
-    };
+    // partition the bucket, [0..p) stays in <b>old</b> bucket, [p..len) goes <b>to</b> new bucket
+    <b>let</b> p = vector::partition(old_bucket, |e| {
+        <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e; // Explicit type <b>to</b> satisfy compiler
+        <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
+    });
+    <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(old_bucket, p);
     <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, new_bucket_index, new_bucket);
 }
 </code></pre>
