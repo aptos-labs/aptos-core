@@ -38,8 +38,6 @@ module token_objects::token {
         creator: address,
         /// A brief description of the token.
         description: String,
-        /// Determines which fields are mutable.
-        mutability_config: MutabilityConfig,
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
         name: String,
@@ -59,18 +57,15 @@ module token_objects::token {
         mutated_field_name: String,
     }
 
-    /// This config specifies which fields in the TokenData are mutable.
-    struct MutabilityConfig has copy, drop, store {
-        description: bool,
-        name: bool,
-        uri: bool,
+    /// This enables mutating descritpion and URI by higher level services.
+    struct MutatorRef has drop, store {
+        self: address,
     }
 
     public fun create(
         creator: &signer,
         collection: String,
         description: String,
-        mutability_config: MutabilityConfig,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
@@ -86,7 +81,6 @@ module token_objects::token {
             collection_id: option::get_with_default(&mut id, 0),
             creator: creator_address,
             description,
-            mutability_config,
             name,
             creation_name: option::none(),
             uri,
@@ -98,10 +92,6 @@ module token_objects::token {
             royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
         constructor_ref
-    }
-
-    public fun create_mutability_config(description: bool, name: bool, uri: bool): MutabilityConfig {
-        MutabilityConfig { description, name, uri }
     }
 
     public fun create_token_address(creator: &address, collection: &String, name: &String): address {
@@ -116,26 +106,17 @@ module token_objects::token {
     }
 
     /// Simple token creation that generates a token and deposits it into the creators object store.
-    public entry fun mint_token(
+    public entry fun mint(
         creator: &signer,
         collection: String,
         description: String,
         name: String,
         uri: String,
-        mutable_description: bool,
-        mutable_name: bool,
-        mutable_uri: bool,
         enable_royalty: bool,
         royalty_numerator: u64,
         royalty_denominator: u64,
         royalty_payee_address: address,
     ) {
-        let mutability_config = create_mutability_config(
-            mutable_description,
-            mutable_name,
-            mutable_uri,
-        );
-
         let royalty = if (enable_royalty) {
             option::some(royalty::create(
                 royalty_numerator,
@@ -150,11 +131,15 @@ module token_objects::token {
             creator,
             collection,
             description,
-            mutability_config,
             name,
             royalty,
             uri,
         );
+    }
+
+    public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
+        let object = object::object_from_constructor_ref<Token>(ref);
+        MutatorRef { self: object::object_address(&object) }
     }
 
     // Accessors
@@ -192,21 +177,6 @@ module token_objects::token {
         borrow_global<Token>(token_address).description
     }
 
-    public fun is_description_mutable<T: key>(token: Object<T>): bool acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).mutability_config.description
-    }
-
-    public fun is_name_mutable<T: key>(token: Object<T>): bool acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).mutability_config.name
-    }
-
-    public fun is_uri_mutable<T: key>(token: Object<T>): bool acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).mutability_config.uri
-    }
-
     public fun name<T: key>(token: Object<T>): String acquires Token {
         let token_address = verify(&token);
         borrow_global<Token>(token_address).name
@@ -233,21 +203,21 @@ module token_objects::token {
 
     // Mutators
 
-    public fun set_description<T: key>(
-        creator: &signer,
-        token: Object<T>,
+    inline fun mutator_ref_to_address(mutator_ref: &MutatorRef): address {
+        assert!(
+            exists<Token>(mutator_ref.self),
+            error::not_found(ETOKEN_DOES_NOT_EXIST),
+        );
+        mutator_ref.self
+    }
+
+    public fun set_description(
+        mutator_ref: &MutatorRef,
         description: String,
     ) acquires Token {
-        let token_address = verify(&token);
+        let token_address = mutator_ref_to_address(mutator_ref);
         let token = borrow_global_mut<Token>(token_address);
-        assert!(
-            token.creator == signer::address_of(creator),
-            error::permission_denied(ENOT_CREATOR),
-        );
-        assert!(
-            token.mutability_config.description,
-            error::permission_denied(EFIELD_NOT_MUTABLE),
-        );
+
         token.description = description;
         event::emit_event(
             &mut token.mutation_events,
@@ -255,21 +225,12 @@ module token_objects::token {
         );
     }
 
-    public fun set_name<T: key>(
-        creator: &signer,
-        token: Object<T>,
+    public fun set_name(
+        mutator_ref: &MutatorRef,
         name: String,
     ) acquires Token {
-        let token_address = verify(&token);
+        let token_address = mutator_ref_to_address(mutator_ref);
         let token = borrow_global_mut<Token>(token_address);
-        assert!(
-            token.creator == signer::address_of(creator),
-            error::permission_denied(ENOT_CREATOR),
-        );
-        assert!(
-            token.mutability_config.name,
-            error::permission_denied(EFIELD_NOT_MUTABLE),
-        );
 
         if (option::is_none(&token.creation_name)) {
             option::fill(&mut token.creation_name, token.name)
@@ -281,39 +242,18 @@ module token_objects::token {
         );
     }
 
-    public fun set_uri<T: key>(
-        creator: &signer,
-        token: Object<T>,
+    public fun set_uri(
+        mutator_ref: &MutatorRef,
         uri: String,
     ) acquires Token {
-        let token_address = verify(&token);
+        let token_address = mutator_ref_to_address(mutator_ref);
         let token = borrow_global_mut<Token>(token_address);
-        assert!(
-            token.creator == signer::address_of(creator),
-            error::permission_denied(ENOT_CREATOR),
-        );
-        assert!(
-            token.mutability_config.uri,
-            error::permission_denied(EFIELD_NOT_MUTABLE),
-        );
+
         token.uri = uri;
         event::emit_event(
             &mut token.mutation_events,
             MutationEvent { mutated_field_name: string::utf8(b"uri") },
         );
-    }
-
-    // Entry functions
-
-    entry fun set_description_entry(
-        creator: &signer,
-        collection: String,
-        name: String,
-        description: String
-    )  acquires Token {
-        let token_addr = create_token_address(&signer::address_of(creator), &collection, &name);
-        let token = object::address_to_object<Token>(token_addr);
-        set_description(creator, token, description);
     }
 
     #[test(creator = @0x123, trader = @0x456)]
@@ -356,7 +296,6 @@ module token_objects::token {
             creator,
             collection_name,
             string::utf8(b"token description"),
-            create_mutability_config(false, false, false),
             token_name,
             option::none(),
             string::utf8(b"token uri"),
@@ -386,7 +325,6 @@ module token_objects::token {
             creator,
             collection_name,
             string::utf8(b"token description"),
-            create_mutability_config(false, false, false),
             token_name,
             option::none(),
             string::utf8(b"token uri"),
@@ -397,8 +335,6 @@ module token_objects::token {
         let token = object::address_to_object<Token>(token_addr);
         assert!(option::none() == royalty(token), 0);
     }
-
-
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
@@ -422,6 +358,62 @@ module token_objects::token {
         create_token_helper(creator, collection_name, token_name);
     }
 
+    #[test(creator = @0x123)]
+    entry fun test_set_description(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
+        let token = object::address_to_object<Token>(
+            create_token_address(&signer::address_of(creator), &collection_name, &token_name),
+        );
+
+        let description = string::utf8(b"no fail");
+        assert!(description != description(token), 0);
+        set_description(&mutator_ref, *&description);
+        assert!(description == description(token), 1);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_set_name(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
+        let token = object::address_to_object<Token>(
+            create_token_address(&signer::address_of(creator), &collection_name, &token_name),
+        );
+
+        let name = string::utf8(b"no fail");
+        assert!(name != name(token), 0);
+        {
+            let token = borrow_global<Token>(object::object_address(&token));
+            assert!(option::is_none(&token.creation_name), 1);
+        };
+        set_name(&mutator_ref, *&name);
+        assert!(name == name(token), 2);
+        assert!(token_name == creation_name(token), 3);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_set_uri(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        let mutator_ref = create_token_with_mutation_ref(creator, collection_name, token_name);
+        let token = object::address_to_object<Token>(
+            create_token_address(&signer::address_of(creator), &collection_name, &token_name),
+        );
+
+        let uri = string::utf8(b"no fail");
+        assert!(uri != uri(token), 0);
+        set_uri(&mutator_ref, *&uri);
+        assert!(uri == uri(token), 1);
+    }
+
     #[test_only]
     entry fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64) {
         collection::create_collection(
@@ -439,19 +431,33 @@ module token_objects::token {
 
     #[test_only]
     entry fun create_token_helper(creator: &signer, collection_name: String, token_name: String) {
-        mint_token(
+        mint(
             creator,
             collection_name,
             string::utf8(b"token description"),
             token_name,
             string::utf8(b"token uri"),
-            false,
-            false,
-            false,
             true,
             25,
             10000,
             signer::address_of(creator),
         );
+    }
+
+    #[test_only]
+    entry fun create_token_with_mutation_ref(
+        creator: &signer,
+        collection_name: String,
+        token_name: String,
+    ): MutatorRef {
+        let constructor_ref = create(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+        generate_mutator_ref(&constructor_ref)
     }
 }

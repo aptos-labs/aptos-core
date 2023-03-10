@@ -18,7 +18,6 @@ module token_objects::hero {
 
     struct OnChainConfig has key {
         collection: String,
-        mutability_config: token::MutabilityConfig,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -28,6 +27,7 @@ module token_objects::hero {
         race: String,
         shield: Option<Object<Shield>>,
         weapon: Option<Object<Weapon>>,
+        mutator_ref: token::MutatorRef,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -71,7 +71,6 @@ module token_objects::hero {
 
         let on_chain_config = OnChainConfig {
             collection: string::utf8(b"Hero Quest!"),
-            mutability_config: token::create_mutability_config(true, true, true),
         };
         move_to(account, on_chain_config);
     }
@@ -87,7 +86,6 @@ module token_objects::hero {
             creator,
             *&on_chain_config.collection,
             description,
-            *&on_chain_config.mutability_config,
             name,
             option::none(),
             uri,
@@ -104,8 +102,8 @@ module token_objects::hero {
         race: String,
         uri: String,
     ): Object<Hero> acquires OnChainConfig {
-        let creator_ref = create(creator, description, name, uri);
-        let token_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = create(creator, description, name, uri);
+        let token_signer = object::generate_signer(&constructor_ref);
 
         let hero = Hero {
             armor: option::none(),
@@ -113,6 +111,7 @@ module token_objects::hero {
             race,
             shield: option::none(),
             weapon: option::none(),
+            mutator_ref: token::generate_mutator_ref(&constructor_ref),
         };
         move_to(&token_signer, hero);
 
@@ -128,8 +127,8 @@ module token_objects::hero {
         weapon_type: String,
         weight: u64,
     ): Object<Weapon> acquires OnChainConfig {
-        let creator_ref = create(creator, description, name, uri);
-        let token_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = create(creator, description, name, uri);
+        let token_signer = object::generate_signer(&constructor_ref);
 
         let weapon = Weapon {
             attack,
@@ -151,8 +150,8 @@ module token_objects::hero {
         name: String,
         uri: String,
     ): Object<Gem> acquires OnChainConfig {
-        let creator_ref = create(creator, description, name, uri);
-        let token_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = create(creator, description, name, uri);
+        let token_signer = object::generate_signer(&constructor_ref);
 
         let gem = Gem {
             attack_modifier,
@@ -203,6 +202,24 @@ module token_objects::hero {
         uri: String,
     ) acquires OnChainConfig {
         create_hero(account, description, gender, name, race, uri);
+    }
+
+    entry fun set_hero_description(
+        creator: &signer,
+        collection: String,
+        name: String,
+        description: String,
+    ) acquires Hero {
+        let token_address = token::create_token_address(
+            &signer::address_of(creator),
+            &collection,
+            &name,
+        );
+        let hero_obj = object::address_to_object<Hero>(token_address);
+        let hero = borrow_global<Hero>(token_address);
+        let creator_addr = token::creator(hero_obj);
+        assert!(creator_addr == signer::address_of(creator), error::permission_denied(ENOT_CREATOR));
+        token::set_description(&hero.mutator_ref, description);
     }
 
     #[test(account = @0x3)]
