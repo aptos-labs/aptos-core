@@ -14,8 +14,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 // !!!! NOTE !!!!
 // This file is intended for natives from the util module in the framework.
@@ -83,7 +82,12 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "from_bytes",
-        make_safe_native(gas_params.from_bytes, timed_features, features.clone(),native_from_bytes),
+        make_safe_native(
+            gas_params.from_bytes,
+            timed_features,
+            features,
+            native_from_bytes,
+        ),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

@@ -240,17 +240,17 @@ pub fn make_safe_native<G>(
     timed_features: TimedFeatures,
     features: Arc<Features>,
     func: impl Fn(
-        &G,
-        &mut SafeNativeContext,
-        Vec<Type>,
-        VecDeque<Value>,
-    ) -> SafeNativeResult<SmallVec<[Value; 1]>>
-    + Sync
-    + Send
-    + 'static,
+            &G,
+            &mut SafeNativeContext,
+            Vec<Type>,
+            VecDeque<Value>,
+        ) -> SafeNativeResult<SmallVec<[Value; 1]>>
+        + Sync
+        + Send
+        + 'static,
 ) -> NativeFunction
-    where
-        G: Send + Sync + 'static,
+where
+    G: Send + Sync + 'static,
 {
     let closure = move |context: &mut NativeContext, ty_args, args| {
         use SafeNativeError::*;

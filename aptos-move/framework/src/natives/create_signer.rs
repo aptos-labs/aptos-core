@@ -10,8 +10,7 @@ use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas}
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun create_signer
@@ -50,7 +49,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "create_signer",
-        make_safe_native(gas_param, timed_features, features.clone(),native_create_signer),
+        make_safe_native(gas_param, timed_features, features, native_create_signer),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

@@ -12,8 +12,7 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, hash::Hasher};
-use std::sync::Arc;
+use std::{collections::VecDeque, hash::Hasher, sync::Arc};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 
 /***************************************************************************************************
@@ -207,7 +206,12 @@ pub fn make_all(
     let natives = [
         (
             "sip_hash",
-            make_safe_native(gas_params.sip_hash, timed_features.clone(), features.clone(),native_sip_hash),
+            make_safe_native(
+                gas_params.sip_hash,
+                timed_features.clone(),
+                features.clone(),
+                native_sip_hash,
+            ),
         ),
         (
             "keccak256",
@@ -220,11 +224,21 @@ pub fn make_all(
         ),
         (
             "sha2_512_internal",
-            make_safe_native(gas_params.sha2_512, timed_features.clone(), features.clone(),native_sha2_512),
+            make_safe_native(
+                gas_params.sha2_512,
+                timed_features.clone(),
+                features.clone(),
+                native_sha2_512,
+            ),
         ),
         (
             "sha3_512_internal",
-            make_safe_native(gas_params.sha3_512, timed_features.clone(), features.clone(),native_sha3_512),
+            make_safe_native(
+                gas_params.sha3_512,
+                timed_features.clone(),
+                features.clone(),
+                native_sha3_512,
+            ),
         ),
         (
             "ripemd160_internal",
@@ -237,7 +251,12 @@ pub fn make_all(
         ),
         (
             "blake2b_256_internal",
-            make_safe_native(gas_params.blake2b_256, timed_features, features.clone(), native_blake2b_256),
+            make_safe_native(
+                gas_params.blake2b_256,
+                timed_features,
+                features,
+                native_blake2b_256,
+            ),
         ),
     ];
 

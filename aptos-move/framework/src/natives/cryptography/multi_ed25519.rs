@@ -33,8 +33,7 @@ use move_vm_types::{
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom};
-use std::sync::Arc;
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 
 /// DEPRECATED: See `public_key_validate_internal` comments in `multi_ed25519.move`.
 ///
@@ -300,7 +299,12 @@ pub fn make_all(
         ),
         (
             "signature_verify_strict_internal",
-            make_safe_native(gas_params, timed_features, features.clone(),native_signature_verify_strict),
+            make_safe_native(
+                gas_params,
+                timed_features,
+                features,
+                native_signature_verify_strict,
+            ),
         ),
     ]);
     #[cfg(feature = "testing")]

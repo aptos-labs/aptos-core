@@ -16,8 +16,7 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Write};
-use std::sync::Arc;
+use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
 fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
     let mut name = struct_tag.name.to_string();
@@ -168,7 +167,12 @@ pub fn make_all(
     let natives = [
         (
             "type_of",
-            make_safe_native(gas_params.type_of, timed_features.clone(), features.clone(),native_type_of),
+            make_safe_native(
+                gas_params.type_of,
+                timed_features.clone(),
+                features.clone(),
+                native_type_of,
+            ),
         ),
         (
             "type_name",
@@ -181,7 +185,12 @@ pub fn make_all(
         ),
         (
             "chain_id_internal",
-            make_safe_native(gas_params.chain_id, timed_features, features.clone(),native_chain_id),
+            make_safe_native(
+                gas_params.chain_id,
+                timed_features,
+                features,
+                native_chain_id,
+            ),
         ),
     ];
 

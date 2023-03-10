@@ -28,9 +28,8 @@ use move_vm_types::{natives::function::NativeResult, pop_arg};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom};
-use std::sync::Arc;
 use aptos_types::on_chain_config::FeatureFlag;
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
@@ -179,7 +178,12 @@ pub fn make_all(
         ),
         (
             "signature_verify_strict_internal",
-            make_safe_native(gas_params, timed_features,features.clone(), native_signature_verify_strict),
+            make_safe_native(
+                gas_params,
+                timed_features,
+                features,
+                native_signature_verify_strict,
+            ),
         ),
     ]);
 
