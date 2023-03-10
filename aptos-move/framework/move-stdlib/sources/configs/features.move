@@ -130,6 +130,16 @@ module std::features {
         is_enabled(MULTISIG_ACCOUNTS)
     }
 
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
+    public fun delegation_pools_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOLS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

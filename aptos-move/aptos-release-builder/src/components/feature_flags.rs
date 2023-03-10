@@ -27,6 +27,7 @@ pub enum FeatureFlag {
     Blake2b256Native,
     ResourceGroups,
     MultisigAccounts,
+    DelegationPools,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -126,6 +127,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
+            FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
         }
     }
 }
@@ -150,6 +152,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
             AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
+            AptosFeatureFlag::DELEGATION_POOLS => FeatureFlag::DelegationPools,
         }
     }
 }
