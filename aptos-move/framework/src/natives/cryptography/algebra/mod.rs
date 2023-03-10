@@ -2033,6 +2033,35 @@ fn group_scalar_mul_typed_internal(
     }
 }
 
+macro_rules! ark_bls12_381_h2g_internal {
+    (
+        $gas_params:expr,
+        $context:expr,
+        $args:ident,
+        $h2s_suite:expr,
+        $target_type:ty,
+        $config_type:ty
+    ) => {{
+        let vector_ref = pop_arg!($args, VectorRef);
+        let bytes_ref = vector_ref.as_bytes_ref();
+        let msg = bytes_ref.as_slice();
+
+        let tag_ref = pop_arg!($args, VectorRef);
+        let bytes_ref = tag_ref.as_bytes_ref();
+        let dst = bytes_ref.as_slice();
+        let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
+            ark_ec::models::short_weierstrass::Projective<$config_type>,
+            ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
+            ark_ec::hashing::curve_maps::wb::WBMap<$config_type>>::new(dst).unwrap();
+        let new_element = <$target_type>::from(mapper.hash(msg).unwrap());
+        let new_handle = store_obj!($context, new_element);
+        Ok(NativeResult::ok(
+            $gas_params.hash_to_structure($h2s_suite, dst.len(), msg.len()),
+            smallvec![Value::u64(new_handle as u64)],
+        ))
+    }}
+}
+
 fn hash_to_group_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -2051,18 +2080,18 @@ fn hash_to_group_internal(
             let tag_ref = pop_arg!(args, VectorRef);
             let bytes_ref = tag_ref.as_bytes_ref();
             let dst = bytes_ref.as_slice();
-            let g1_mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
+            let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
                 ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                 ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>>::new(dst).unwrap();
-            let new_element = ark_bls12_381::G1Projective::from(g1_mapper.hash(msg).unwrap());
+            let new_element = ark_bls12_381::G1Projective::from(mapper.hash(msg).unwrap());
             let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.hash_to_structure(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_, dst.len(), msg.len()),
                 smallvec![Value::u64(new_handle as u64)],
             ))
-
         }
+        (Some(Structure::BLS12381G2), Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12_381_h2g_internal!(gas_params, context, args, HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
         _ => unreachable!(),
     }
 }

@@ -85,6 +85,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Struct `BLS12_381_Fr_Format_LEndian`](#0x1_algebra_BLS12_381_Fr_Format_LEndian)
 -  [Struct `BLS12_381_Fr_Format_BEndian`](#0x1_algebra_BLS12_381_Fr_Format_BEndian)
 -  [Struct `HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_`](#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_)
+-  [Struct `HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_`](#0x1_algebra_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_)
 -  [Struct `Element`](#0x1_algebra_Element)
 -  [Function `bls12_381_fq_format`](#0x1_algebra_bls12_381_fq_format)
 -  [Function `bls12_381_fq_bendian_format`](#0x1_algebra_bls12_381_fq_bendian_format)
@@ -1176,6 +1177,35 @@ Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_"></a>
+
+## Struct `HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_`
+
+A ciphersuite for hashing bytes to a <code><a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a></code> element.
+Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
+
+
+<pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_</a>
 </code></pre>
 
 
@@ -3469,6 +3499,7 @@ Hash some bytes with domain separation tag <code>dst</code> into group <code>G</
     <b>let</b> structure_type = type_of&lt;S&gt;();
     <b>let</b> hashsuite_type = type_of&lt;H&gt;();
     <b>if</b> (structure_type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G1">BLS12_381_G1</a>&gt;() && hashsuite_type == type_of&lt;<a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_</a>&gt;() && bls12_381_structures_enabled()) <b>return</b>;
+    <b>if</b> (structure_type == type_of&lt;<a href="algebra.md#0x1_algebra_BLS12_381_G2">BLS12_381_G2</a>&gt;() && hashsuite_type == type_of&lt;<a href="algebra.md#0x1_algebra_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_</a>&gt;() && bls12_381_structures_enabled()) <b>return</b>;
     <b>abort</b>(std::error::not_implemented(0))
 }
 </code></pre>
