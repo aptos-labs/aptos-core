@@ -136,213 +136,40 @@ async fn get_balances(
                     }
 
                     let store: Store = bcs::from_bytes(&bytes)?;
-                    if account.is_total_stake() {
-                        // For total stake, collect all underlying staking contracts and combine
-                        let mut total_stake: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_stake_balances(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            )
-                            .await
-                            {
-                                Ok(Some(stake_balances)) => {
-                                    if let Ok(balance) = stake_balances.total_stake_amount {
-                                        total_stake = Some(
-                                            total_stake.unwrap_or_default()
-                                                + u64::from_str(&balance.value).unwrap_or_default(),
-                                        );
-                                    } else {
-                                        warn!(
-                                            "Failed to retrieve stake for {}",
-                                            contract.pool_address
-                                        ) 
-                                    }
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve balances for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
-                        }
-
-                        if let Some(balance) = total_stake {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
-                        }
-                    } else if account.is_pending_active_stake() {
-                        // For total pending active stake, collect all underlying staking contracts and combine
-                        let mut total_pending_active: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_stake_balances(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            )
-                            .await
-                            {
-                                Ok(Some(stake_balances)) => {
-                                    if let Ok(balance) = stake_balances.pending_active {
-                                        total_pending_active = Some(
-                                            total_pending_active.unwrap_or_default()
-                                                + u64::from_str(&balance.value).unwrap_or_default(),
-                                        );
-                                    } else {
-                                        warn!(
-                                            "Failed to retrieve pending active stake for {}",
-                                            contract.pool_address
-                                        ) 
-                                    }
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve balances for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
-                        }
-
-                        if let Some(balance) = total_pending_active {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
-                        }
-                    } else if account.is_active_stake() {
-                        // For total active stake, collect all underlying staking contracts and combine
-                        let mut total_active: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_stake_balances(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            )
-                            .await
-                            {
-                                Ok(Some(stake_balances)) => {
-                                    if let Ok(balance) = stake_balances.active {
-                                        total_active = Some(
-                                            total_active.unwrap_or_default()
-                                                + u64::from_str(&balance.value).unwrap_or_default(),
-                                        );
-                                    } else {
-                                        warn!("Failed to retrieve active stake for {}", contract.pool_address) 
-                                    }
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve balances for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
-                        }
-
-                        if let Some(balance) = total_active {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
-                        }
-                    } else if account.is_pending_inactive_stake() {
-                        // For total pending inactive stake, collect all underlying staking contracts and combine
-                        let mut total_pending_inactive: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_stake_balances(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            )
-                            .await
-                            {
-                                Ok(Some(stake_balances)) => {
-                                    if let Ok(balance) = stake_balances.pending_inactive {
-                                        total_pending_inactive = Some(
-                                            total_pending_inactive.unwrap_or_default()
-                                                + u64::from_str(&balance.value).unwrap_or_default(),
-                                        );
-                                    } else {
-                                        warn!("Failed to retrieve pending inactive stake for {}", contract.pool_address) 
-                                    }
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve balances for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
-                        }
-
-                        if let Some(balance) = total_pending_inactive {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
-                        }
-                    } else if account.is_inactive_stake() {
-                        // For total inactive stake, collect all underlying staking contracts and combine
-                        let mut total_inactive: Option<u64> = None;
-                        maybe_operators = Some(vec![]);
-                        for (operator, contract) in store.staking_contracts {
-                            // Keep track of operators
-                            maybe_operators.as_mut().unwrap().push(operator);
-                            match get_stake_balances(
-                                rest_client,
-                                &account,
-                                contract.pool_address,
-                                version,
-                            )
-                            .await
-                            {
-                                Ok(Some(stake_balances)) => {
-                                    if let Ok(balance) = stake_balances.inactive {
-                                        total_inactive = Some(
-                                            total_inactive.unwrap_or_default()
-                                                + u64::from_str(&balance.value).unwrap_or_default(),
-                                        );
-                                    } else {
-                                        warn!("Failed to retrieve inactive stake for {}", contract.pool_address) 
-                                    }
-                                },
-                                result => {
-                                    warn!(
-                                        "Failed to retrieve balances for {}: {:?}",
-                                        contract.pool_address, result
-                                    )
-                                },
-                            }
-                        }
-
-                        if let Some(balance) = total_inactive {
-                            balances.push(Amount {
-                                value: balance.to_string(),
-                                currency: native_coin(),
-                            })
+                    let mut total_requested_balance: Option<u64> = None;
+                    maybe_operators = Some(vec![]);
+                    for (operator, contract) in store.staking_contracts {
+                        // Keep track of operators
+                        maybe_operators.as_mut().unwrap().push(operator);
+                        match get_stake_balances(
+                            rest_client,
+                            &account,
+                            contract.pool_address,
+                            version,
+                        )
+                        .await 
+                        {
+                            Ok(Some(balance)) => {
+                                total_requested_balance = Some(
+                                    total_requested_balance.unwrap_or_default()
+                                        + u64::from_str(&balance.value).unwrap_or_default(),
+                                );
+                            },
+                            result => {
+                                warn!(
+                                    "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
+                                    owner_address, contract.pool_address, result
+                                )
+                            },
                         }
                     }
+                    if let Some(balance) = total_requested_balance {
+                        balances.push(Amount {
+                            value: balance.to_string(),
+                            currency: native_coin(),
+                        })
+                    }
+
                     /* TODO: Right now operator stake is not supported
                       else if account.is_operator_stake() {
                           // For operator stake, filter on operator address
