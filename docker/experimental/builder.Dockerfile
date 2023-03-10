@@ -45,13 +45,15 @@ COPY --link . /aptos/
 FROM builder-base as aptos-node-builder
 
 RUN --mount=type=secret,id=git-credentials,target=/root/.git-credentials \
-    --mount=type=cache,target=/root/.cargo,id=node-cargo-cache \
+    --mount=type=cache,target=/usr/local/cargo/git,id=node-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=node-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=node-target-cache \
         docker/experimental/build-node.sh
 
 FROM builder-base as tools-builder
 
 RUN --mount=type=secret,id=git-credentials,target=/root/.git-credentials \
-    --mount=type=cache,target=/root/.cargo,id=tools-cargo-cache \
+    --mount=type=cache,target=/usr/local/cargo/git,id=tools-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=tools-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=tools-target-cache \
         docker/experimental/build-tools.sh
