@@ -5,7 +5,7 @@ use crate::natives::{
     helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
     transaction_context::NativeTransactionContext,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     language_storage::{StructTag, TypeTag},
@@ -17,6 +17,7 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write};
+use std::sync::Arc;
 
 fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
     let mut name = struct_tag.name.to_string();
@@ -162,23 +163,25 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
             "type_of",
-            make_safe_native(gas_params.type_of, timed_features.clone(), native_type_of),
+            make_safe_native(gas_params.type_of, timed_features.clone(), features.clone(),native_type_of),
         ),
         (
             "type_name",
             make_safe_native(
                 gas_params.type_name,
                 timed_features.clone(),
+                features.clone(),
                 native_type_name,
             ),
         ),
         (
             "chain_id_internal",
-            make_safe_native(gas_params.chain_id, timed_features, native_chain_id),
+            make_safe_native(gas_params.chain_id, timed_features, features.clone(),native_chain_id),
         ),
     ];
 

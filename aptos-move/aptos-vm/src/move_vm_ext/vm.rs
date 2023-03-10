@@ -8,7 +8,7 @@ use crate::{
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
-    feature_flags_extension::NativeFeatureFlagsExtension, state_storage::NativeStateStorageContext,
+    state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
@@ -20,6 +20,7 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::ops::Deref;
+use std::sync::Arc;
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -46,6 +47,8 @@ impl MoveVmExt {
                 5
             };
 
+        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -53,10 +56,11 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                     timed_features.clone(),
+                    Arc::new(features),
                 ),
                 VMConfig {
                     verifier: verifier_config(
-                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                        treat_friend_as_private,
                         &timed_features,
                     ),
                     max_binary_format_version,

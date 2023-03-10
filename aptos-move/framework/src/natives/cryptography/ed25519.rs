@@ -12,7 +12,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 #[cfg(feature = "testing")]
 use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
-use aptos_types::on_chain_config::{TimedFeatures, FeatureFlag};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
@@ -29,7 +29,11 @@ use move_vm_types::{natives::function::NativeResult, pop_arg};
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
+<<<<<<< HEAD
 use crate::natives::feature_flags_extension::NativeFeatureFlagsExtension;
+=======
+use std::sync::Arc;
+>>>>>>> alin/native-feature-flag-context
 
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
@@ -161,6 +165,7 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
 
@@ -171,12 +176,13 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_public_key_validate,
             ),
         ),
         (
             "signature_verify_strict_internal",
-            make_safe_native(gas_params, timed_features, native_signature_verify_strict),
+            make_safe_native(gas_params, timed_features,features.clone(), native_signature_verify_strict),
         ),
     ]);
 

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::natives::feature_flags_extension::NativeFeatureFlagsExtension;
+use std::sync::Arc;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
@@ -19,6 +19,7 @@ use {
     move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
+use aptos_types::on_chain_config::Features;
 
 #[cfg(feature = "testing")]
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
@@ -28,6 +29,7 @@ pub fn aptos_natives(
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
     gas_feature_version: u64,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
         .into_iter()
@@ -36,6 +38,7 @@ pub fn aptos_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
             timed_features,
+            features.clone(),
             move |val| abs_val_size_gas_params.abstract_value_size(val, gas_feature_version),
         ))
         .chain(move_table_extension::table_natives(
@@ -62,7 +65,8 @@ pub fn assert_no_test_natives(err_msg: &str) {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            TimedFeatures::enable_all()
+            TimedFeatures::enable_all(),
+            Arc::new(Features::default())
         )
         .into_iter()
         .all(|(_, module_name, func_name, _)| {

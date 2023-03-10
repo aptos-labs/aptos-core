@@ -19,6 +19,8 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+use std::sync::Arc;
+use aptos_types::on_chain_config::Features;
 
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
@@ -86,12 +88,14 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "new_aggregator",
         make_safe_native(
             gas_params.new_aggregator,
             timed_features,
+            features.clone(),
             native_new_aggregator,
         ),
     )];

@@ -5,7 +5,7 @@ use crate::{
     natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
     safely_assert_eq, safely_pop_arg,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, InternalGasPerByte},
@@ -17,6 +17,7 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 /***************************************************************************************************
  * native exists_at<T>
@@ -79,10 +80,11 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "exists_at",
-        make_safe_native(gas_params.exists_at, timed_features, native_exists_at),
+        make_safe_native(gas_params.exists_at, timed_features, features.clone(),native_exists_at),
     )];
 
     crate::natives::helpers::make_module_natives(natives)
