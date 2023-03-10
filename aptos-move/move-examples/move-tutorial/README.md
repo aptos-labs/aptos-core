@@ -3,9 +3,9 @@ title: "Aptos Move Tutorial"
 slug: "move-tutorial"
 ---
 
-# Aptos Move Tutorial
+# Move Tutorial
 
-Welcome to the Aptos Move Tutorial! In this tutorial, we are going to go through some steps of developing Move code including design, implementation, unit testing and formal verification of Move modules. This tutorial focuses on how you develop Move code, not on how you run the Move code on an Aptos Network. 
+Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular Network Move is running on, but adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move. This tutorial does not teach you how to use Move on Aptos, and how to use the existing Aptos Move frameworks. See the [Aptos developer documentation](https://aptos.dev/tutorials/aptos-quickstarts) for this.
 
 There are nine steps in total:
 
@@ -25,10 +25,11 @@ Now let's get started!
 
 ## Step 0: Preparation<span id="Step0"><span>
 
-To obtain a copy of the Move sources used in this tutorial so you can follow along, either download and unzip [move-tutorial-sources.zip](../move-tutorial-sources.zip), or clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`developer-docs-site/docs/tutorials/move-tutorials`] directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To double check that you have the right thing, the tutorial directory should contain (at least):
+You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`] directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right thing, the tutorial directory should contain (at least):
 
 ```shell
-> ls move-tutorial
+> cd move-tutorial
+> ls
 step_1 step_2 step_2_sol step_3 ...
 ```
 
@@ -290,7 +291,7 @@ method directly from a transaction, you'll want to change its signature to:
 ```
 public entry fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
 ```
-Read more on Move function visibilities [here](../../guides/move-guides/book/functions.md#visibility).
+Read more on Move function [visibilities](../../guides/move-guides/book/functions.md#visibility).
 </details>
 <details>
 <summary>Comparison with Ethereum/Solidity</summary>
