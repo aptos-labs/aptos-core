@@ -14,3 +14,5 @@ The source materials for both code and docs live in GitHub. See [Contribute](../
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
 | [How Base Gas Works](../../concepts/base-gas.md) | Aptos transactions by default charge a base gas fee, regardless of market conditions. This document explains that process. | [alnoki](https://github.com/alnoki) | 2022-10-06 |
+| [Aptos Staking Dashboard](https://dashboard.stakeaptos.com) · [Repo](https://github.com/pakaplace/swtb-frontend/) | A dashboard to monitor your Aptos validator performance, view network stats, or request delegation commissions. By [Paymagic Labs](https://paymagic.xyz/). | [pakaplace](https://github.com/pakaplace/) | 2023-03-10 |
+| [Aptos Validator/Staking Postman Collection](https://github.com/pakaplace/aptos-validator-staking-postman) | A Postman collection for querying staking pool, staking contract, and account resources/events. | [pakaplace](https://github.com/pakaplace/) | 2023-03-10 |
