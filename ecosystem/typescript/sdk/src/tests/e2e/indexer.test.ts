@@ -77,5 +77,10 @@ describe("Indexer", () => {
       },
       longTestTimeout,
     );
+
+    test("gets indexer ledger info", async () => {
+      const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
+      expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
+    });
   });
 });
