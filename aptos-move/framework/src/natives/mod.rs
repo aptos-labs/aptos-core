@@ -9,7 +9,6 @@ pub mod code;
 pub mod create_signer;
 pub mod cryptography;
 pub mod event;
-pub mod feature_flags_extension;
 pub mod hash;
 mod helpers;
 pub mod object;

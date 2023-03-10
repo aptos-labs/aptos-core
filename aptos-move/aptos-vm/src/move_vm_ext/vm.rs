@@ -8,7 +8,7 @@ use crate::{
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
-    feature_flags_extension::NativeFeatureFlagsExtension, state_storage::NativeStateStorageContext,
+    state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
@@ -80,7 +80,6 @@ impl MoveVmExt {
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
-        extensions.add(NativeFeatureFlagsExtension::new(self.features.clone()));
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
