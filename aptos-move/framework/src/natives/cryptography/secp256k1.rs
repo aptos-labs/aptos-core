@@ -16,8 +16,7 @@ use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Abort code when deserialization fails (0x01 == INVALID_ARGUMENT)
 /// NOTE: This must match the code in the Move implementation
@@ -102,7 +101,7 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "ecdsa_recover_internal",
-        make_safe_native(gas_params, timed_features,features.clone(),native_ecdsa_recover),
+        make_safe_native(gas_params, timed_features, features, native_ecdsa_recover),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

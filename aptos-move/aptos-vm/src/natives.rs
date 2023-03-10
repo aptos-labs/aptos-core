@@ -2,12 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
-use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::TimedFeatures};
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
+    on_chain_config::{Features, TimedFeatures},
+};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+use std::sync::Arc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -19,7 +22,6 @@ use {
     move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
-use aptos_types::on_chain_config::Features;
 
 #[cfg(feature = "testing")]
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
@@ -38,7 +40,7 @@ pub fn aptos_natives(
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
             timed_features,
-            features.clone(),
+            features,
             move |val| abs_val_size_gas_params.abstract_value_size(val, gas_feature_version),
         ))
         .chain(move_table_extension::table_natives(

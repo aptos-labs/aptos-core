@@ -3,7 +3,8 @@
 
 use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
 use aptos_types::{
-    on_chain_config::TimedFeatures, state_store::state_storage_usage::StateStorageUsage,
+    on_chain_config::{Features, TimedFeatures},
+    state_store::state_storage_usage::StateStorageUsage,
     vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
@@ -15,9 +16,7 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
-use aptos_types::on_chain_config::Features;
+use std::{collections::VecDeque, sync::Arc};
 
 /// Ability to reveal the state storage utilization info.
 pub trait StateStorageUsageResolver {
@@ -90,7 +89,12 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "get_state_storage_usage_only_at_epoch_beginning",
-        make_safe_native(gas_params.get_usage, timed_features, features.clone(),native_get_usage),
+        make_safe_native(
+            gas_params.get_usage,
+            timed_features,
+            features,
+            native_get_usage,
+        ),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

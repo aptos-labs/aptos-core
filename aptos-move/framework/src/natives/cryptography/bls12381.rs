@@ -35,8 +35,7 @@ use move_vm_types::{
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom};
-use std::sync::Arc;
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
 /// field of `T`, which is a `Vec<u8>` field named `bytes`.
@@ -768,7 +767,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params,
                 timed_features,
-                features.clone(),
+                features,
                 native_bls12381_verify_signature_share,
             ),
         ),

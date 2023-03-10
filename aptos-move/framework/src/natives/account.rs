@@ -14,8 +14,7 @@ use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas}
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun create_address
@@ -82,7 +81,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.create_signer,
                 timed_features,
-                features.clone(),
+                features,
                 create_signer::native_create_signer,
             ),
         ),

@@ -8,8 +8,7 @@ use crate::{
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     cryptography::ristretto255_point::NativeRistrettoPointContext,
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
@@ -19,8 +18,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::ops::Deref;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -58,10 +56,7 @@ impl MoveVmExt {
                     Arc::new(features),
                 ),
                 VMConfig {
-                    verifier: verifier_config(
-                        treat_friend_as_private,
-                        &timed_features,
-                    ),
+                    verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },

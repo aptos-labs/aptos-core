@@ -16,8 +16,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native exists_at<T>
@@ -84,7 +83,12 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "exists_at",
-        make_safe_native(gas_params.exists_at, timed_features, features.clone(),native_exists_at),
+        make_safe_native(
+            gas_params.exists_at,
+            timed_features,
+            features,
+            native_exists_at,
+        ),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

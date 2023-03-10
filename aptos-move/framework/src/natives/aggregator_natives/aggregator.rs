@@ -20,8 +20,7 @@ use move_vm_types::{
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun add(aggregator: &mut Aggregator, value: u128);
@@ -183,19 +182,34 @@ pub fn make_all(
     let natives = [
         (
             "add",
-            make_safe_native(gas_params.add, timed_features.clone(), features.clone(),native_add),
+            make_safe_native(
+                gas_params.add,
+                timed_features.clone(),
+                features.clone(),
+                native_add,
+            ),
         ),
         (
             "read",
-            make_safe_native(gas_params.read, timed_features.clone(), features.clone(),native_read),
+            make_safe_native(
+                gas_params.read,
+                timed_features.clone(),
+                features.clone(),
+                native_read,
+            ),
         ),
         (
             "sub",
-            make_safe_native(gas_params.sub, timed_features.clone(), features.clone(),native_sub),
+            make_safe_native(
+                gas_params.sub,
+                timed_features.clone(),
+                features.clone(),
+                native_sub,
+            ),
         ),
         (
             "destroy",
-            make_safe_native(gas_params.destroy, timed_features, features.clone(),native_destroy),
+            make_safe_native(gas_params.destroy, timed_features, features, native_destroy),
         ),
     ];
 

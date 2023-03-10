@@ -8,8 +8,7 @@ use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Debug};
-use std::sync::Arc;
+use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so its accessible from
@@ -80,7 +79,7 @@ pub fn make_all(
         make_safe_native(
             gas_params.get_script_hash,
             timed_features,
-            features.clone(),
+            features,
             native_get_script_hash,
         ),
     )];

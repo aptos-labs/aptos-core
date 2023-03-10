@@ -10,7 +10,10 @@ use crate::{
 };
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
 use aptos_crypto::hash::DefaultHasher;
-use aptos_types::{account_address::AccountAddress, on_chain_config::TimedFeatures};
+use aptos_types::{
+    account_address::AccountAddress,
+    on_chain_config::{Features, TimedFeatures},
+};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -18,9 +21,7 @@ use move_vm_types::{
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
-use aptos_types::on_chain_config::Features;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
@@ -95,7 +96,7 @@ pub fn make_all(
         make_safe_native(
             gas_params.new_aggregator,
             timed_features,
-            features.clone(),
+            features,
             native_new_aggregator,
         ),
     )];

@@ -9,7 +9,7 @@ use crate::{
     safely_assert_eq, safely_pop_arg,
 };
 use aptos_types::{
-    on_chain_config::{TimedFeatureFlag, TimedFeatures},
+    on_chain_config::{Features, TimedFeatureFlag, TimedFeatures},
     vm_status::StatusCode,
 };
 use curve25519_dalek::scalar::Scalar;
@@ -17,9 +17,7 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::values::{Reference, StructRef, Value};
-use std::collections::VecDeque;
-use std::sync::Arc;
-use aptos_types::on_chain_config::Features;
+use std::{collections::VecDeque, sync::Arc};
 
 /// The size of a serialized scalar, in bytes.
 pub(crate) const SCALAR_NUM_BYTES: usize = 32;
@@ -302,7 +300,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params,
                 timed_features,
-                features.clone(),
+                features,
                 ristretto255_scalar::native_scalar_uniform_from_64_bytes,
             ),
         ),
