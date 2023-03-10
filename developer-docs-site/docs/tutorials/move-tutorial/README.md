@@ -64,13 +64,13 @@ module 0xCAFE::basic_coin {
 ```
 
 This is defining a Move
-[module](https://move-language.github.io/move/modules-and-scripts.html). Modules are the
+[module](../../guides/move-guides/book/modules-and-scripts.md). Modules are the
 building blocks of Move code, and are defined with a specific address -- the
 address that the module can be published under. In this case, the `basic_coin`
 module can only be published under `0xCAFE`.
 
 Let's now take a look at the next part of this file where we define a
-[struct](https://move-language.github.io/move/structs-and-resources.html)
+[struct](../../guides/move-guides/book/structs-and-resources.html)
 to represent a `Coin` with a given `value`:
 
 ```
@@ -97,7 +97,7 @@ module 0xCAFE::basic_coin {
 ```
 
 Let's take a look at this function and what it's saying:
-* It takes a [`signer`](https://move-language.github.io/move/signer.html) -- an
+* It takes a [`signer`](../../guides/move-guides/book/signer.html) -- an
   unforgeable token that represents control over a particular address, and
   a `value` to mint.
 * It creates a `Coin` with the given value and stores it under the
@@ -118,10 +118,10 @@ aptos move compile
     ```
 * Move code can also live a number of other places.  More information on the
   Move package system can be found in the [Move
-  book](https://move-language.github.io/move/packages.html)
-* More information on the `Move.toml` file can be found in the [package section of the Move book](https://move-language.github.io/move/packages.html#movetoml).
+  book](../../guides/move-guides/book/packages.html)
+* More information on the `Move.toml` file can be found in the [package section of the Move book](../../guides/move-guides/book/packages.html#movetoml).
 * Move also supports the idea of [named
-  addresses](https://move-language.github.io/move/address.html#named-addresses), Named
+  addresses](../../guides/move-guides/book/address.html#named-addresses), Named
   addresses are a way to parametrize Move source code so that you can compile
   the module using different values for `named_addr` to get different bytecode
   that you can deploy, depending on what address(es) you control. They are used quite frequently, and can be defined in the `Move.toml` file in the `[addresses]` section, e.g.,
@@ -129,9 +129,9 @@ aptos move compile
     [addresses]
     Somenamed_address = "0xC0FFEE"
     ```
-* [Structures](https://move-language.github.io/move/structs-and-resources.html) in Move
+* [Structures](../../guides/move-guides/book/structs-and-resources.html) in Move
   can be given different
-  [abilities](https://move-language.github.io/move/abilities.html) that describe what
+  [abilities](../../guides/move-guides/book/abilities.html) that describe what
   can be done with that type. There are four different abilities:
     - `copy`: Allows values of types with this ability to be copied.
     - `drop`: Allows values of types with this ability to be popped/dropped.
@@ -142,14 +142,14 @@ aptos move compile
     in global storage and, because it has no other abilities, it cannot be
     copied, dropped, or stored as a non-key value in storage. So you can't copy
     coins, and you also can't lose coins by accident!
-* [Functions](https://move-language.github.io/move/functions.html) are default
+* [Functions](../../guides/move-guides/book/functions.html) are default
     private, and can also be `public`,
-    [`public(friend)`](https://move-language.github.io/move/friends.html), or
+    [`public(friend)`](../../guides/move-guides/book/friends.html), or
     `public(script)`. The last of these states that this function can be
     called from a transaction script. `public(script)` functions can also be
     called by other `public(script)` functions.
 * `move_to` is one of the [five different global storage
-  operators](https://move-language.github.io/move/global-storage-operators.html).
+  operators](../../guides/move-guides/book/global-storage-operators.html).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
@@ -290,7 +290,7 @@ method directly from a transaction, you'll want to change its signature to:
 ```
 public entry fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
 ```
-Read more on Move function visibilities [here](https://move-language.github.io/move/functions.html#visibility).
+Read more on Move function visibilities [here](../../guides/move-guides/book/functions.html#visibility).
 </details>
 <details>
 <summary>Comparison with Ethereum/Solidity</summary>
@@ -346,7 +346,7 @@ Assert statements in Move can be used in this way: `assert!(<predicate>, <abort_
 is false, then abort the transaction with `<abort_code>`. Here `MODULE_OWNER` and `ENOT_MODULE_OWNER` are both constants
 defined at the beginning of the module. The standard library's [`error` module] also defines common error categories we can use.
 It is important to note that Move is transactional in its execution -- so
-if an [abort](https://move-language.github.io/move/abort-and-assert.html) is raised no unwinding of state
+if an [abort](../../guides/move-guides/book/abort-and-assert.html) is raised no unwinding of state
 needs to be performed, as no changes from that transaction will be persisted to the blockchain.
 
 [`error` module]: https://github.com/move-language/move/blob/main/language/move-stdlib/docs/error.md
@@ -383,7 +383,7 @@ fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
 }
 ```
 At the beginning of the method, we assert that the withdrawing account has enough balance. We then use `borrow_global_mut`
-to get a mutable reference to the global storage, and `&mut` is used to create a [mutable reference](https://move-language.github.io/move/references.html) to a field of a
+to get a mutable reference to the global storage, and `&mut` is used to create a [mutable reference](../../guides/move-guides/book/references.html) to a field of a
 struct. We then modify the balance through this mutable reference and return a new coin with the withdrawn amount.
 </details>
 
@@ -488,7 +488,7 @@ In definitions of both `Coin` and `Balance`, we declare the type parameter `Coin
 to be phantom because `CoinType` is not used in the struct definition or is only used as a phantom type
 parameter.
 
-Read more about phantom type parameters <a href="https://move-language.github.io/move/generics.html#phantom-type-parameters">here</a>.
+Read more about <a href="../../guides/move-guides/book/">phantom type</a> parameters in the Aptos Move Book.
 </details>
 
 ## Advanced steps
