@@ -49,6 +49,12 @@ impl ProofManager {
         }
     }
 
+    #[inline]
+    fn increment_remaining_txns(&mut self, num_txns: u64) {
+        self.remaining_total_txn_num += num_txns;
+        self.remaining_total_proof_num += 1;
+    }
+
     pub(crate) async fn handle_local_proof(
         &mut self,
         proof: ProofOfStore,
@@ -56,16 +62,14 @@ impl ProofManager {
     ) {
         let num_txns = proof.info().num_txns;
         self.proofs_for_consensus.push(proof.clone(), true);
-        self.remaining_total_txn_num += num_txns;
-        self.remaining_total_proof_num += 1;
+        self.increment_remaining_txns(num_txns);
         network_sender.broadcast_proof_of_store(proof).await;
     }
 
     pub(crate) fn handle_remote_proof(&mut self, proof: ProofOfStore) {
         let num_txns = proof.info().num_txns;
         self.proofs_for_consensus.push(proof, false);
-        self.remaining_total_txn_num += num_txns;
-        self.remaining_total_proof_num += 1;
+        self.increment_remaining_txns(num_txns);
     }
 
     pub(crate) fn handle_commit_notification(
