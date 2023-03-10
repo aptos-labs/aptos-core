@@ -100,10 +100,16 @@ impl ProverOptions {
         self,
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
+        bytecode_version: Option<u32>,
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
-        let model = build_model(package_path, named_addresses, self.filter.clone())?;
+        let model = build_model(
+            package_path,
+            named_addresses,
+            self.filter.clone(),
+            bytecode_version,
+        )?;
         let mut options = self.convert_options();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
