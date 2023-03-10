@@ -81,6 +81,8 @@ function install_winget {
 
     # Add WinGet directory to the user's PATH environment variable
     [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;%LOCALAPPDATA%\Microsoft\WindowsApps", "User")
+    
+    Write-Host "Please restart your system to ensure WinGet is setup correctly. Afterward, re-run the script."
 }
 
 function check_for_winget {
@@ -204,6 +206,16 @@ function install_nodejs {
 	}
   else {
 	winget upgrade --id OpenJS.NodeJS -silent
+  }
+}
+
+function install_python {
+  $result = check_package "Python"
+  if ($result) {
+	winget install Python.Python.3.11 --silent
+	}
+  else {
+	winget upgrade --id Python.Python.3.11 -silent
   }
 }
 
