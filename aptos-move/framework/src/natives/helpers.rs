@@ -213,6 +213,10 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
             Ok(())
         }
     }
+
+    pub fn get_feature_flags(&self) -> &Features {
+        self.features.deref()
+    }
 }
 
 #[allow(unused)]
