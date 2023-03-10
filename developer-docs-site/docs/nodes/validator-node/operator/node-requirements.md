@@ -72,12 +72,10 @@ For the validator:
 - Open the TCP port 6180, to enable the validators to talk to each other.
 - Open the TCP port 6181, to enable validator fullnode to connect.
 - Open the TCP port 9101, to send the validator metrics to validate the health stats.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
 
 For the public fullnode:
 
 - Open the TCP port 6182, to enable the fullnodes to talk to each other.
 - Open the TCP port 9101, to send the fullnode metrics to validate the health stats (only needed during registration stage).
 - Open the TCP port 80/8080, for the REST API access.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
 
