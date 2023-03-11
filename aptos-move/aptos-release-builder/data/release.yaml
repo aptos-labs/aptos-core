@@ -16,7 +16,6 @@ feature_flags:
     - resource_groups
     - multisig_accounts
     - delegation_pools
-    - bls12381_basic_operations
   disabled: []
 is_multi_step: true
 framework_release_at_end: true
