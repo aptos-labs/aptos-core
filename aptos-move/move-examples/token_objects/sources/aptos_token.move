@@ -8,7 +8,6 @@
 ///
 /// TODO:
 /// * Fungible of tokens
-/// * Burnable tokens
 module token_objects::aptos_token {
     use std::error;
     use std::option::{Self, Option};
@@ -26,11 +25,15 @@ module token_objects::aptos_token {
     const ENOT_CREATOR: u64 = 2;
     /// Attempted to mutate an immutable field
     const EFIELD_NOT_MUTABLE: u64 = 3;
+    /// Attempted to burn a non-burnable token
+    const ETOKEN_NOT_BURNABLE: u64 = 4;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Storage state for managing the no-code Token.
     struct AptosToken has key {
-        /// Used to control freeze and burn.
+        /// Used to burn.
+        burn_ref: Option<token::BurnRef>,
+        /// Used to control freeze.
         transfer_ref: Option<object::TransferRef>,
         /// Used to mutate fields
         mutator_ref: Option<token::MutatorRef>,
@@ -53,6 +56,7 @@ module token_objects::aptos_token {
         mutable_description: bool,
         mutable_name: bool,
         mutable_uri: bool,
+        burnable_by_creator: bool,
         freezable_by_creator: bool,
     ) acquires AptosToken {
         let constructor_ref = mint_internal(
@@ -64,6 +68,7 @@ module token_objects::aptos_token {
             mutable_description,
             mutable_name,
             mutable_uri,
+            burnable_by_creator,
         );
 
         if (!freezable_by_creator) {
@@ -86,6 +91,7 @@ module token_objects::aptos_token {
         mutable_description: bool,
         mutable_name: bool,
         mutable_uri: bool,
+        burnable_by_creator: bool,
     ) {
         let constructor_ref = mint_internal(
             creator,
@@ -96,6 +102,7 @@ module token_objects::aptos_token {
             mutable_description,
             mutable_name,
             mutable_uri,
+            burnable_by_creator,
         );
 
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
@@ -111,6 +118,7 @@ module token_objects::aptos_token {
         mutable_description: bool,
         mutable_name: bool,
         mutable_uri: bool,
+        burnable_by_creator: bool,
     ): ConstructorRef {
         let constructor_ref = token::create(
             creator,
@@ -128,7 +136,14 @@ module token_objects::aptos_token {
             option::none()
         };
 
+        let burn_ref = if (burnable_by_creator) {
+            option::some(token::generate_burn_ref(&constructor_ref))
+        } else {
+            option::none()
+        };
+
         let aptos_token = AptosToken {
+            burn_ref,
             transfer_ref: option::none(),
             mutator_ref,
             mutable_description,
@@ -152,6 +167,11 @@ module token_objects::aptos_token {
         token_address
     }
 
+    public fun is_burnable_by_creator<T: key>(token: Object<T>): bool acquires AptosToken {
+        let token_address = verify(&token);
+        option::is_some(&borrow_global<AptosToken>(token_address).burn_ref)
+    }
+
     public fun is_freezable_by_creator<T: key>(token: Object<T>): bool acquires AptosToken {
         let token_address = verify(&token);
         borrow_global<AptosToken>(token_address).freezable_by_creator
@@ -173,6 +193,19 @@ module token_objects::aptos_token {
     }
 
     // Mutators
+
+    public fun burn<T: key>(creator: &signer, token: Object<T>) acquires AptosToken {
+        let token_address = verify(&token);
+        let aptos_token = borrow_global_mut<AptosToken>(token_address);
+        assert!(
+            token::creator(token) == signer::address_of(creator),
+            error::permission_denied(ENOT_CREATOR),
+        );
+        assert!(
+            option::is_some(&aptos_token.burn_ref),
+            error::permission_denied(ETOKEN_NOT_BURNABLE),
+        );
+    }
 
     public fun freeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosToken {
         let token_address = verify(&token);
@@ -258,6 +291,16 @@ module token_objects::aptos_token {
 
     // Entry functions
 
+    entry fun burn_call(
+        creator: &signer,
+        collection: String,
+        name: String,
+    ) acquires AptosToken {
+        let token_addr = token::create_token_address(&signer::address_of(creator), &collection, &name);
+        let token = object::address_to_object<AptosToken>(token_addr);
+        burn(creator, token);
+    }
+
     entry fun freeze_transfer_call(
         creator: &signer,
         collection: String,
@@ -339,6 +382,7 @@ module token_objects::aptos_token {
             string::utf8(b""),
             token_name,
             string::utf8(b""),
+            false,
             false,
             false,
             false,
@@ -526,6 +570,44 @@ module token_objects::aptos_token {
         set_uri(noncreator, token, uri);
     }
 
+    #[test(creator = @0x123)]
+    entry fun test_burnable(creator: &signer) acquires AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name);
+        let token = mint_helper(creator, collection_name, token_name, true);
+
+        burn(creator, token);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x50004, location = Self)]
+    entry fun test_not_burnable(creator: &signer) acquires AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name);
+        let token = mint_helper(creator, collection_name, token_name, false);
+
+        burn(creator, token);
+    }
+
+    #[test(creator = @0x123, noncreator = @0x456)]
+    #[expected_failure(abort_code = 0x50002, location = Self)]
+    entry fun test_burn_non_creator(
+        creator: &signer,
+        noncreator: &signer,
+    ) acquires AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name);
+        let token = mint_helper(creator, collection_name, token_name, true);
+
+        burn(noncreator, token);
+    }
+
     #[test_only]
     fun create_collection_helper(creator: &signer, collection_name: String) {
         collection::create_collection(
@@ -554,6 +636,7 @@ module token_objects::aptos_token {
             string::utf8(b"description"),
             token_name,
             string::utf8(b"uri"),
+            flag,
             flag,
             flag,
             flag,

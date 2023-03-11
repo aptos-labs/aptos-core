@@ -5,7 +5,6 @@
 /// * Extensible framework for tokens
 ///
 /// TODO:
-/// * Provide a Ref/Capability for mutability, relying on the creator is something for the top-level.
 /// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module token_objects::token {
     use std::error;
@@ -49,6 +48,14 @@ module token_objects::token {
         uri: String,
         /// Emitted upon any mutation of the token.
         mutation_events: event::EventHandle<MutationEvent>,
+    }
+
+    /// This enables burning an NFT, if possible, it will also delete the object. Note, the data
+    /// in inner and self occupies 32-bytes each, rather than have both, this data structure makes
+    /// a small optimization to support either and take a fixed amount of 34-bytes.
+    struct BurnRef has drop, store {
+        inner: Option<object::DeleteRef>,
+        self: Option<address>,
     }
 
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
@@ -142,6 +149,25 @@ module token_objects::token {
         MutatorRef { self: object::object_address(&object) }
     }
 
+    public fun generate_burn_ref(ref: &ConstructorRef): BurnRef {
+        let (inner, self) = if (object::can_generate_delete_ref(ref)) {
+            let delete_ref = object::generate_delete_ref(ref);
+            (option::some(delete_ref), option::none())
+        } else {
+            let addr = object::address_from_constructor_ref(ref);
+            (option::none(), option::some(addr))
+        };
+        BurnRef { self, inner }
+    }
+
+    public fun address_from_burn_ref(ref: &BurnRef): address {
+        if (option::is_some(&ref.inner)) {
+            object::address_from_delete_ref(option::borrow(&ref.inner))
+        } else {
+            *option::borrow(&ref.self)
+        }
+    }
+
     // Accessors
     inline fun verify<T: key>(token: &Object<T>): address {
         let token_address = object::object_address(token);
@@ -209,6 +235,33 @@ module token_objects::token {
             error::not_found(ETOKEN_DOES_NOT_EXIST),
         );
         mutator_ref.self
+    }
+
+    public fun burn(burn_ref: BurnRef) acquires Token {
+        let addr = if (option::is_some(&burn_ref.inner)) {
+            let delete_ref = option::extract(&mut burn_ref.inner);
+            let addr = object::address_from_delete_ref(&delete_ref);
+            object::delete(delete_ref);
+            addr
+        } else {
+            option::extract(&mut burn_ref.self)
+        };
+
+        if (royalty::exists_at(addr)) {
+            royalty::delete(addr)
+        };
+
+        let Token {
+            collection: _,
+            collection_id: _,
+            creator: _,
+            description: _,
+            name: _,
+            creation_name: _,
+            uri: _,
+            mutation_events,
+        } = move_from<Token>(addr);
+        event::destroy_handle(mutation_events);
     }
 
     public fun set_description(
@@ -412,6 +465,52 @@ module token_objects::token {
         assert!(uri != uri(token), 0);
         set_uri(&mutator_ref, *&uri);
         assert!(uri == uri(token), 1);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_burn_without_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        let constructor_ref = create(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+        let burn_ref = generate_burn_ref(&constructor_ref);
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(exists<Token>(token_addr), 0);
+        assert!(!royalty::exists_at(token_addr), 3);
+        burn(burn_ref);
+        assert!(!exists<Token>(token_addr), 2);
+        assert!(!royalty::exists_at(token_addr), 3);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_burn_with_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, *&collection_name, 1);
+        let constructor_ref = create(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::some(royalty::create(1, 1, signer::address_of(creator))),
+            string::utf8(b"token uri"),
+        );
+        let burn_ref = generate_burn_ref(&constructor_ref);
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(exists<Token>(token_addr), 0);
+        assert!(royalty::exists_at(token_addr), 1);
+        burn(burn_ref);
+        assert!(!exists<Token>(token_addr), 2);
+        assert!(!royalty::exists_at(token_addr), 3);
     }
 
     #[test_only]
