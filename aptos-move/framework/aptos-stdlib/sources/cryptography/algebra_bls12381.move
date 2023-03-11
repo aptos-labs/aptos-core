@@ -731,24 +731,27 @@ module aptos_std::algebra_bls12381 {
         enable_initial_generic_algebraic_operations(&fx);
         enable_bls12_381_structures(&fx);
 
-        let element_p0 = insecure_random_element<BLS12_381_G1>();
-        let element_p1 = insecure_random_element<BLS12_381_G1>();
-        let element_p2 = insecure_random_element<BLS12_381_G1>();
-        let element_q0 = insecure_random_element<BLS12_381_G2>();
-        let element_q1 = insecure_random_element<BLS12_381_G2>();
-        let element_q2 = insecure_random_element<BLS12_381_G2>();
+        // Will compute e(a0*P0,b0*Q0)+e(a1*P1,b1*Q1)+e(a2*P2,b2*Q2).
         let a0 = insecure_random_element<BLS12_381_Fr>();
         let a1 = insecure_random_element<BLS12_381_Fr>();
         let a2 = insecure_random_element<BLS12_381_Fr>();
-        let b0 = insecure_random_element<BLS12_381_Fr>();
-        let b1 = insecure_random_element<BLS12_381_Fr>();
-        let b2 = insecure_random_element<BLS12_381_Fr>();
+        let element_p0 = insecure_random_element<BLS12_381_G1>();
+        let element_p1 = insecure_random_element<BLS12_381_G1>();
+        let element_p2 = insecure_random_element<BLS12_381_G1>();
         let p0_a0 = group_scalar_mul_typed(&element_p0, &a0);
         let p1_a1 = group_scalar_mul_typed(&element_p1, &a1);
         let p2_a2 = group_scalar_mul_typed(&element_p2, &a2);
+        let b0 = insecure_random_element<BLS12_381_Fr>();
+        let b1 = insecure_random_element<BLS12_381_Fr>();
+        let b2 = insecure_random_element<BLS12_381_Fr>();
+        let element_q0 = insecure_random_element<BLS12_381_G2>();
+        let element_q1 = insecure_random_element<BLS12_381_G2>();
+        let element_q2 = insecure_random_element<BLS12_381_G2>();
         let q0_b0 = group_scalar_mul_typed(&element_q0, &b0);
         let q1_b1 = group_scalar_mul_typed(&element_q1, &b1);
         let q2_b2 = group_scalar_mul_typed(&element_q2, &b2);
+
+        // Naive method.
         let n0 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p0_a0, &q0_b0);
         let n1 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p1_a1, &q1_b1);
         let n2 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p2_a2, &q2_b2);
@@ -756,10 +759,11 @@ module aptos_std::algebra_bls12381 {
         n = group_add(&n, &n0);
         n = group_add(&n, &n1);
         n = group_add(&n, &n2);
+
+        // Efficient API.
         let m = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
         assert!(eq(&n, &m), 1);
     }
 
     // Tests end.
-
 }
