@@ -765,5 +765,14 @@ module aptos_std::algebra_bls12381 {
         assert!(eq(&n, &m), 1);
     }
 
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
+    fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+        let g1_elements = vector[insecure_random_element<BLS12_381_G1>()];
+        let g2_elements = vector[insecure_random_element<BLS12_381_G2>(), insecure_random_element<BLS12_381_G2>()];
+        multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&g1_elements, &g2_elements);
+    }
     // Tests end.
 }

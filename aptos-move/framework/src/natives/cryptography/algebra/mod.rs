@@ -40,8 +40,11 @@ use move_compiler::parser::lexer::Tok::Native;
 
 pub mod gas;
 
+/// Equivalent to `std::error::invalid_argument(0)` in Move.
+const MOVE_ABORT_CODE_INPUT_SIZE_MISMATCH: u64 = 0x010000;
+
 /// Equivalent to `std::error::not_implemented(0)` in Move.
-const ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c0000;
+const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c0000;
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
@@ -1430,7 +1433,7 @@ fn group_order_internal(
                 Value::vector_u8(BLS12381_R_LENDIAN.clone())
             ]))
         },
-        _ => Ok(NativeResult::err(InternalGas::zero(), ABORT_CODE_NOT_IMPLEMENTED)),
+        _ => Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
@@ -1943,7 +1946,7 @@ fn multi_pairing_internal(
             let g2_element_handles = pop_arg!(args, Vec<u64>);
             let g1_element_handles = pop_arg!(args, Vec<u64>);
             if g1_element_handles.len() != g2_element_handles.len() {
-                return Ok(NativeResult::err(InternalGas::zero(), ABORT_CODE_NOT_IMPLEMENTED));
+                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_SIZE_MISMATCH));
             }
 
             let g1_elements_affine = g1_element_handles.iter().map(|&handle|{
