@@ -640,7 +640,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_is_identity, group_scalar_mul_typed, group_scalar_mul, group_add, group_multi_scalar_mul, group_multi_scalar_mul_typed, group_double, group_neg, group_sub, hash_to_group, upcast, downcast, enable_initial_generic_algebraic_operations};
+    use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_is_identity, group_scalar_mul_typed, group_scalar_mul, group_add, group_multi_scalar_mul, group_multi_scalar_mul_typed, group_double, group_neg, group_sub, hash_to_group, upcast, downcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing};
 
     #[test_only]
     const BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
@@ -711,20 +711,54 @@ module aptos_std::algebra_bls12381 {
         assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
     }
 
-    // #[test(fx = @std)]
-    // fun test_bls12381_pairing(fx: signer) {
-    //     enable_initial_generic_algebraic_operations(&fx);
-    //     enable_bls12_381_structures(&fx);
-    //
-    //     // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
-    //     let element_p = insecure_random_element<BLS12_381_G1>();
-    //     let element_q = insecure_random_element<BLS12_381_G2>();
-    //     let a = insecure_random_element<BLS12_381_Fr>();
-    //     let b = insecure_random_element<BLS12_381_Fr>();
-    //     let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul_typed(&element_p, &a), &group_scalar_mul_typed(&element_q, &b));
-    //     let gt_element_another = group_scalar_mul_typed(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
-    //     assert!(eq(&gt_element, &gt_element_another), 1);
-    // }
+    #[test(fx = @std)]
+    fun test_bls12381_pairing(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+
+        // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
+        let element_p = insecure_random_element<BLS12_381_G1>();
+        let element_q = insecure_random_element<BLS12_381_G2>();
+        let a = insecure_random_element<BLS12_381_Fr>();
+        let b = insecure_random_element<BLS12_381_Fr>();
+        let gt_element = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&group_scalar_mul_typed(&element_p, &a), &group_scalar_mul_typed(&element_q, &b));
+        let gt_element_another = group_scalar_mul_typed(&pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&element_p, &element_q), &field_mul(&a, &b));
+        assert!(eq(&gt_element, &gt_element_another), 1);
+    }
+
+    #[test(fx = @std)]
+    fun test_bls12381_multi_pairing(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+
+        let element_p0 = insecure_random_element<BLS12_381_G1>();
+        let element_p1 = insecure_random_element<BLS12_381_G1>();
+        let element_p2 = insecure_random_element<BLS12_381_G1>();
+        let element_q0 = insecure_random_element<BLS12_381_G2>();
+        let element_q1 = insecure_random_element<BLS12_381_G2>();
+        let element_q2 = insecure_random_element<BLS12_381_G2>();
+        let a0 = insecure_random_element<BLS12_381_Fr>();
+        let a1 = insecure_random_element<BLS12_381_Fr>();
+        let a2 = insecure_random_element<BLS12_381_Fr>();
+        let b0 = insecure_random_element<BLS12_381_Fr>();
+        let b1 = insecure_random_element<BLS12_381_Fr>();
+        let b2 = insecure_random_element<BLS12_381_Fr>();
+        let p0_a0 = group_scalar_mul_typed(&element_p0, &a0);
+        let p1_a1 = group_scalar_mul_typed(&element_p1, &a1);
+        let p2_a2 = group_scalar_mul_typed(&element_p2, &a2);
+        let q0_b0 = group_scalar_mul_typed(&element_q0, &b0);
+        let q1_b1 = group_scalar_mul_typed(&element_q1, &b1);
+        let q2_b2 = group_scalar_mul_typed(&element_q2, &b2);
+        let n0 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p0_a0, &q0_b0);
+        let n1 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p1_a1, &q1_b1);
+        let n2 = pairing<BLS12_381_G1,BLS12_381_G2,BLS12_381_Gt>(&p2_a2, &q2_b2);
+        let n = group_identity<BLS12_381_Gt>();
+        n = group_add(&n, &n0);
+        n = group_add(&n, &n1);
+        n = group_add(&n, &n2);
+        let m = multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
+        assert!(eq(&n, &m), 1);
+    }
 
     // Tests end.
 

@@ -36,6 +36,7 @@ use std::{
 };
 use std::cmp::{max, min};
 use itertools::Itertools;
+use move_compiler::parser::lexer::Tok::Native;
 
 pub mod gas;
 
@@ -1927,6 +1928,58 @@ fn group_neg_internal(
     }
 }
 
+fn multi_pairing_internal(
+    gas_params: &GasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(3, ty_args.len());
+    let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
+    match (g1_opt, g2_opt, gt_opt) {
+        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
+            let g2_element_handles = pop_arg!(args, Vec<u64>);
+            let g1_element_handles = pop_arg!(args, Vec<u64>);
+            if g1_element_handles.len() != g2_element_handles.len() {
+                return Ok(NativeResult::err(InternalGas::zero(), ABORT_CODE_NOT_IMPLEMENTED));
+            }
+
+            let g1_elements_affine = g1_element_handles.iter().map(|&handle|{
+                let ptr = get_obj_pointer!(context, handle as usize);
+                let element = ptr
+                    .downcast_ref::<ark_bls12_381::G1Projective>()
+                    .unwrap();
+                element.into_affine()
+            }).collect::<Vec<_>>();
+
+            let g2_elements_affine = g2_element_handles.iter().map(|&handle|{
+                let ptr = get_obj_pointer!(context, handle as usize);
+                let element = ptr
+                    .downcast_ref::<ark_bls12_381::G2Projective>()
+                    .unwrap();
+                element.into_affine()
+            }).collect::<Vec<_>>();
+
+            let new_element =
+                ark_bls12_381::Bls12_381::multi_pairing(g1_elements_affine, g2_elements_affine).0;
+            let new_handle = store_obj!(context, new_element);
+
+            Ok(NativeResult::ok(
+                gas_params.multi_pairing(
+                    Structure::BLS12381G1,
+                    Structure::BLS12381G2,
+                    Structure::BLS12381Gt,
+                    g1_element_handles.len()
+                ),
+                smallvec![Value::u64(new_handle as u64)],
+            ))
+        },
+        _ => unreachable!(),
+    }
+}
+
 fn pairing_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
@@ -1952,7 +2005,7 @@ fn pairing_internal(
             let g1_element_affine = g1_element.into_affine();
             let g2_element_affine = g2_element.into_affine();
             let new_element =
-                ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine);
+                ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_obj!(context, new_element);
             Ok(NativeResult::ok(
                 gas_params.pairing(
@@ -2133,6 +2186,10 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "hash_to_group_internal",
             make_native_from_func(gas_params.clone(), hash_to_group_internal),
+        ),
+        (
+            "multi_pairing_internal",
+            make_native_from_func(gas_params.clone(), multi_pairing_internal),
         ),
         (
             "pairing_internal",

@@ -52,15 +52,6 @@ module aptos_std::algebra {
 
     // Public functions begin.
 
-    /// Compute a pre-compiled pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
-    /// Return an element in the target group `Gt`.
-    public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        Element<Gt> {
-            handle: pairing_internal<G1,G2,Gt>(element_1.handle, element_2.handle)
-        }
-    }
-
     /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
     public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -272,6 +263,30 @@ module aptos_std::algebra {
 
     }
 
+    /// Efficiently compute `e(P[0],Q[0])+...+e(P[n-1],Q[n-1])`,
+    /// where `e: (G1,G2) -> (Gt)` is a pre-compiled pairing function from groups `(G1,G2)` to group `Gt`,
+    /// `P[]` are `n` elements of `G1` taken from parameter `g1_elements`, and
+    /// `Q[]` are `n` elements of `G2` taken from parameter `g2_elements`.
+    ///
+    /// Abort if sizes of `g1_elements` and `g2_elements` do not match.
+    public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        let g1_handles = handles_from_elements(g1_elements);
+        let g2_handles = handles_from_elements(g2_elements);
+        Element<Gt> {
+            handle: multi_pairing_internal<G1,G2,Gt>(g1_handles, g2_handles)
+        }
+    }
+
+    /// Compute a pre-compiled pairing function (a.k.a., bilinear map) on `element_1` and `element_2`.
+    /// Return an element in the target group `Gt`.
+    public fun pairing<G1,G2,Gt>(element_1: &Element<G1>, element_2: &Element<G2>): Element<Gt> {
+        abort_unless_generic_algebraic_structures_basic_operations_enabled();
+        Element<Gt> {
+            handle: pairing_internal<G1,G2,Gt>(element_1.handle, element_2.handle)
+        }
+    }
+
     /// Try deserializing a byte array to an element of an algebraic structure `S` using a given `scheme`.
     /// Return none if the deserialization failed.
     public fun deserialize<S>(scheme: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
@@ -383,6 +398,7 @@ module aptos_std::algebra {
     native fun hash_to_group_internal<G,C>(dst: &vector<u8>, bytes: &vector<u8>): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
     native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
     native fun upcast_internal<S,L>(handle: u64): u64;

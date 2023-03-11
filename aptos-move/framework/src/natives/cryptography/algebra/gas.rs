@@ -355,6 +355,16 @@ impl GasParameters {
         InternalGas::zero()
     }
 
+    pub fn multi_pairing(&self, g1: Structure, g2: Structure, g3: Structure, input_size: usize) -> InternalGas {
+        match (g1, g2, g3) {
+            (Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt) => {
+                //TODO
+                InternalGas::zero()
+            },
+            _ => unreachable!(),
+        }
+    }
+
     pub fn pairing(&self, g1: Structure, g2: Structure, g3: Structure) -> InternalGas {
         match (g1, g2, g3) {
             (Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt) => {

@@ -49,7 +49,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 
 
 -  [Struct `Element`](#0x1_algebra_Element)
--  [Function `pairing`](#0x1_algebra_pairing)
 -  [Function `eq`](#0x1_algebra_eq)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
 -  [Function `field_zero`](#0x1_algebra_field_zero)
@@ -74,6 +73,8 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_scalar_mul_typed`](#0x1_algebra_group_scalar_mul_typed)
 -  [Function `group_scalar_mul`](#0x1_algebra_group_scalar_mul)
 -  [Function `group_sub`](#0x1_algebra_group_sub)
+-  [Function `multi_pairing`](#0x1_algebra_multi_pairing)
+-  [Function `pairing`](#0x1_algebra_pairing)
 -  [Function `deserialize`](#0x1_algebra_deserialize)
 -  [Function `serialize`](#0x1_algebra_serialize)
 -  [Function `group_order`](#0x1_algebra_group_order)
@@ -111,6 +112,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_sub_internal`](#0x1_algebra_group_sub_internal)
 -  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
 -  [Function `hash_to_group_internal`](#0x1_algebra_hash_to_group_internal)
+-  [Function `multi_pairing_internal`](#0x1_algebra_multi_pairing_internal)
 -  [Function `pairing_internal`](#0x1_algebra_pairing_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
 -  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
@@ -148,35 +150,6 @@ This struct represents an element of an algebraic structure <code>S</code>.
 
 </dd>
 </dl>
-
-
-</details>
-
-<a name="0x1_algebra_pairing"></a>
-
-## Function `pairing`
-
-Compute a pre-compiled pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
-Return an element in the target group <code>Gt</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1, G2, Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1,G2,Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
-        handle: <a href="algebra.md#0x1_algebra_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(element_1.handle, element_2.handle)
-    }
-}
-</code></pre>
-
 
 
 </details>
@@ -864,6 +837,70 @@ Compute <code>P - Q</code> for elements <code>P</code> and <code>Q</code> of a g
         handle: <a href="algebra.md#0x1_algebra_group_sub_internal">group_sub_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
     }
 
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_multi_pairing"></a>
+
+## Function `multi_pairing`
+
+Efficiently compute <code>e(P[0],Q[0])+...+e(P[n-1],Q[n-1])</code>,
+where <code>e: (G1,G2) -&gt; (Gt)</code> is a pre-compiled pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,
+<code>P[]</code> are <code>n</code> elements of <code>G1</code> taken from parameter <code>g1_elements</code>, and
+<code>Q[]</code> are <code>n</code> elements of <code>G2</code> taken from parameter <code>g2_elements</code>.
+
+Abort if sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1,G2,Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <b>let</b> g1_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(g1_elements);
+    <b>let</b> g2_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(g2_elements);
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
+        handle: <a href="algebra.md#0x1_algebra_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles, g2_handles)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_pairing"></a>
+
+## Function `pairing`
+
+Compute a pre-compiled pairing function (a.k.a., bilinear map) on <code>element_1</code> and <code>element_2</code>.
+Return an element in the target group <code>Gt</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1, G2, Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_pairing">pairing</a>&lt;G1,G2,Gt&gt;(element_1: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G1&gt;, element_2: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G2&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
+    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Gt&gt; {
+        handle: <a href="algebra.md#0x1_algebra_pairing_internal">pairing_internal</a>&lt;G1,G2,Gt&gt;(element_1.handle, element_2.handle)
+    }
 }
 </code></pre>
 
@@ -1730,6 +1767,28 @@ Hash some bytes with domain separation tag <code>dst</code> into group <code>G</
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_group_internal">hash_to_group_internal</a>&lt;G,C&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_multi_pairing_internal"></a>
+
+## Function `multi_pairing_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing_internal">multi_pairing_internal</a>&lt;G1, G2, Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 
