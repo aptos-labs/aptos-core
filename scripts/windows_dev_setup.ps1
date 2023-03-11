@@ -8,6 +8,39 @@ $global:os = $null
 $global:architecture = $null
 $global:msvcpath = $null
 
+function welcome_message {
+    $welcome_message = "`nWelcome to Aptos!
+
+    This script will download and install the necessary dependencies needed to build Aptos Core.
+
+    These tools will be installed if not found on your system:
+        
+        * Rust (and necessary components)
+            * rust-fmt
+            * clippy
+            * cargo-sort
+            * cargo-nextest
+        * MSVC Build Tools - Desktop development with C++ (and necessary components)
+            * MSVC C++ build tools
+            * Windows 10/11 SDK
+        * Protoc (and necessary components)
+            * protoc-gen-prost
+            * protoc-gen-prost-serde
+            * protoc-gen-prost-crate
+        * LLVM
+        * CMake
+        * OpenSSL
+        * NodeJS
+        * NPM
+        * PostgreSQL
+        * Grcov"
+
+
+    Write-Host $welcome_message
+    Write-Host "`nPress any key to begin installation..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
 function verify_architecture {  # Checks whether the Windows machine is 32-bit or 64-bit
 	$result = Get-WmiObject -Class Win32_Processor | Select-Object AddressWidth |ConvertTo-Json -Compress
 	if ($result.Contains("64")) {
@@ -243,6 +276,7 @@ function existing_package {
 	Write-Host "This package is already installed."
 }
 
+welcome_message
 verify_architecture
 check_os
 install_msvc_build_tools
