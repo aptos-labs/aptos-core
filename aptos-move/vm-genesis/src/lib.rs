@@ -419,7 +419,6 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
         FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::BLS12381_BASIC_OPERATIONS,
     ]
 }
 
