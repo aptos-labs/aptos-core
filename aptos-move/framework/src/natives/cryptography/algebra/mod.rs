@@ -39,6 +39,9 @@ use itertools::Itertools;
 
 pub mod gas;
 
+/// Equivalent to `std::error::not_implemented(0)` in Move.
+const ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c0000;
+
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12381Fq12,
@@ -51,11 +54,11 @@ pub enum Structure {
 impl Structure {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
         match type_tag.to_string().as_str() {
-            "0x1::algebra::BLS12_381_Fr" => Some(Structure::BLS12381Fr),
-            "0x1::algebra::BLS12_381_Fq12" => Some(Structure::BLS12381Fq12),
-            "0x1::algebra::BLS12_381_G1" => Some(Structure::BLS12381G1),
-            "0x1::algebra::BLS12_381_G2" => Some(Structure::BLS12381G2),
-            "0x1::algebra::BLS12_381_Gt" => Some(Structure::BLS12381Gt),
+            "0x1::algebra_bls12381::BLS12_381_Fr" => Some(Structure::BLS12381Fr),
+            "0x1::algebra_bls12381::BLS12_381_Fq12" => Some(Structure::BLS12381Fq12),
+            "0x1::algebra_bls12381::BLS12_381_G1" => Some(Structure::BLS12381G1),
+            "0x1::algebra_bls12381::BLS12_381_G2" => Some(Structure::BLS12381G2),
+            "0x1::algebra_bls12381::BLS12_381_Gt" => Some(Structure::BLS12381Gt),
             _ => None,
         }
     }
@@ -76,14 +79,14 @@ pub enum SerializationFormat {
 impl SerializationFormat {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<SerializationFormat> {
         match type_tag.to_string().as_str() {
-            "0x1::algebra::BLS12_381_Fq12_Format" => Some(SerializationFormat::BLS12381Fq12),
-            "0x1::algebra::BLS12_381_G1_Format_Compressed" => Some(SerializationFormat::BLS12381G1Compressed),
-            "0x1::algebra::BLS12_381_G1_Format_Uncompressed" => Some(SerializationFormat::BLS12381G1Uncompressed),
-            "0x1::algebra::BLS12_381_G2_Format_Compressed" => Some(SerializationFormat::BLS12381G2Compressed),
-            "0x1::algebra::BLS12_381_G2_Format_Uncompressed" => Some(SerializationFormat::BLS12381G2Unompressed),
-            "0x1::algebra::BLS12_381_Gt_Format" => Some(SerializationFormat::BLS12381Gt),
-            "0x1::algebra::BLS12_381_Fr_Format_LEndian" => Some(SerializationFormat::BLS12381FrLEndian),
-            "0x1::algebra::BLS12_381_Fr_Format_BEndian" => Some(SerializationFormat::BLS12381FrBEndian),
+            "0x1::algebra_bls12381::BLS12_381_Fq12_Format" => Some(SerializationFormat::BLS12381Fq12),
+            "0x1::algebra_bls12381::BLS12_381_G1_Format_Compressed" => Some(SerializationFormat::BLS12381G1Compressed),
+            "0x1::algebra_bls12381::BLS12_381_G1_Format_Uncompressed" => Some(SerializationFormat::BLS12381G1Uncompressed),
+            "0x1::algebra_bls12381::BLS12_381_G2_Format_Compressed" => Some(SerializationFormat::BLS12381G2Compressed),
+            "0x1::algebra_bls12381::BLS12_381_G2_Format_Uncompressed" => Some(SerializationFormat::BLS12381G2Unompressed),
+            "0x1::algebra_bls12381::BLS12_381_Gt_Format" => Some(SerializationFormat::BLS12381Gt),
+            "0x1::algebra_bls12381::BLS12_381_Fr_Format_LEndian" => Some(SerializationFormat::BLS12381FrLEndian),
+            "0x1::algebra_bls12381::BLS12_381_Fr_Format_BEndian" => Some(SerializationFormat::BLS12381FrBEndian),
             _ => None,
         }
     }
@@ -97,8 +100,8 @@ pub enum HashToStructureSuite {
 impl HashToStructureSuite {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<HashToStructureSuite> {
         match type_tag.to_string().as_str() {
-            "0x1::algebra::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_),
-            "0x1::algebra::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_),
+            "0x1::algebra_bls12381::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_),
+            "0x1::algebra_bls12381::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_),
             _ => None
         }
     }
@@ -1426,7 +1429,7 @@ fn group_order_internal(
                 Value::vector_u8(BLS12381_R_LENDIAN.clone())
             ]))
         },
-        _ => unreachable!(),
+        _ => Ok(NativeResult::err(InternalGas::zero(), ABORT_CODE_NOT_IMPLEMENTED)),
     }
 }
 
