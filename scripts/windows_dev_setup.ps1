@@ -7,6 +7,8 @@ Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path) | Out-Null; Set-L
 $global:os = $null
 $global:architecture = $null
 $global:msvcpath = $null
+$global:grcov_version = "0.8.2"
+$global:protoc_version = "21.4"
 
 function welcome_message {
     $welcome_message = "`nWelcome to Aptos!
@@ -76,20 +78,20 @@ function check_os {
 
 function install_winget {
     # Download and extract XAML dependency
-     Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.2" -OutFile "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
-     Expand-Archive "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
-     while ((Get-Item "Microsoft.UI.Xaml.2.8.2.nupkg.zip").Length -lt 19MB) {
-         Start-Sleep -Seconds 1
-     }
+    Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.2" -OutFile "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
+    while ((Get-Item "Microsoft.UI.Xaml.2.8.2.nupkg.zip").Length -lt 19MB) {
+        Start-Sleep -Seconds 1
+    }
+    Expand-Archive "Microsoft.UI.Xaml.2.8.2.nupkg.zip" -ErrorAction SilentlyContinue
 
     if ($global:architecture -eq "64") {
         # Install x64 dependencies (VCLibs and XAML)
         Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
         while ((Get-Item "Microsoft.VCLibs.x64.14.00.Desktop.appx").Length -lt 6MB) {
             Start-Sleep -Seconds 1
-     }
-     Add-AppxPackage "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-     Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+        }
+        Add-AppxPackage "Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+        Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
     }
     elseif ($global:architecture -eq "86") {
         # Install x86 dependencies (VCLibs and XAML)
@@ -97,8 +99,8 @@ function install_winget {
         while ((Get-Item "Microsoft.VCLibs.x86.14.00.Desktop.appx").Length -lt 5.5MB) {
             Start-Sleep -Seconds 1
         }
-     Add-AppxPackage "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
-     Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
+        Add-AppxPackage "Microsoft.VCLibs.x86.14.00.Desktop.appx" -ErrorAction SilentlyContinue
+        Add-AppxPackage "Microsoft.UI.Xaml.2.8.2.nupkg\tools\AppX\x86\Release\Microsoft.UI.Xaml.2.8.appx" -ErrorAction SilentlyContinue
     }
 
     # Install WinGet
@@ -212,6 +214,25 @@ function install_rustup {
   rustup component add rustfmt --toolchain nightly
 }
 
+function install_protoc {
+    # Download and extract the 64-bit version of Protoc
+    Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win64.zip" -OutFile "protoc-$global:protoc_version-win64.zip" -ErrorAction SilentlyContinue
+        while ((Get-Item "protoc-$global:protoc_version-win64.zip").Length -lt 2MB) {
+            Start-Sleep -Seconds 1
+        }
+    Expand-Archive -Path "protoc-$global:protoc_version-win64.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win64" -ErrorAction SilentlyContinue
+
+    # Download and extract the 32-bit version of Protoc
+    Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win32.zip" -OutFile "protoc-$global:protoc_version-win32.zip" -ErrorAction SilentlyContinue
+    while ((Get-Item "protoc-$global:protoc_version-win32.zip").Length -lt 2MB) {
+        Start-Sleep -Seconds 1
+    }
+    Expand-Archive -Path "protoc-$global:protoc_version-win32.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win32" -ErrorAction SilentlyContinue
+
+    # Add the Protoc installation directory to the user's PATH environment variable
+    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\protoc-$global:protoc_version-win64\bin", "User")
+}
+
 function install_llvm {
   $result = check_package "LLVM"
   if ($result) {
@@ -285,5 +306,6 @@ install_openssl
 install_nodejs
 install_pnpm
 install_postgresql
+install_protoc
 install_rustup
 Write-Host "Finished..."
