@@ -29,7 +29,10 @@ function welcome_message {
             * protoc-gen-prost
             * protoc-gen-prost-serde
             * protoc-gen-prost-crate
-        * LLVM
+        * Python (and necessary components)
+            * pip
+	    * schemathesis
+	* LLVM
         * CMake
         * OpenSSL
         * NodeJS
@@ -130,7 +133,7 @@ function check_for_winget {
     }
 }
 
-function check_package {
+function check_package { # Checks for packages installed with winget or typical installers
   param(
     [string]$package
   )
@@ -145,6 +148,25 @@ function check_package {
   else {
 	Write-Host "$package is already installed and up-to-date."
   }
+}
+
+function check_non_winget_or_installer_package {  # Checks for packages that were manually installed via an archive/zip file
+    param(
+      [string]$package
+    )
+
+    $env_var = [Environment]::GetEnvironmentVariable("PATH", "User").Split(";")
+
+    foreach ($dir in $env_var) {
+        if ($dir -like "*$package*") {
+            Write-Host "$package is already installed"
+            return $true
+        }
+        else {
+            Write-Host "Installing $package..."
+            return $false
+        }
+    }
 }
 
 function install_msvc_build_tools {  # Installs C++ build tools, CMake, and Windows 10/11 SDK
@@ -215,22 +237,28 @@ function install_rustup {
 }
 
 function install_protoc {
-    # Download and extract the 64-bit version of Protoc
-    Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win64.zip" -OutFile "protoc-$global:protoc_version-win64.zip" -ErrorAction SilentlyContinue
-        while ((Get-Item "protoc-$global:protoc_version-win64.zip").Length -lt 2MB) {
-            Start-Sleep -Seconds 1
+    $exists = check_non_winget_or_installer_package "Protoc"
+    if (!$exists) {
+        if ($global:os -eq "64") {
+            # Download and extract the 64-bit version of Protoc
+            Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win64.zip" -OutFile "protoc-$global:protoc_version-win64.zip" -ErrorAction SilentlyContinue
+            while ((Get-Item "protoc-$global:protoc_version-win64.zip").Length -lt 2MB) {
+                Start-Sleep -Seconds 1
+            }
+            Expand-Archive -Path "protoc-$global:protoc_version-win64.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win64" -ErrorAction SilentlyContinue
         }
-    Expand-Archive -Path "protoc-$global:protoc_version-win64.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win64" -ErrorAction SilentlyContinue
-
-    # Download and extract the 32-bit version of Protoc
-    Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win32.zip" -OutFile "protoc-$global:protoc_version-win32.zip" -ErrorAction SilentlyContinue
-    while ((Get-Item "protoc-$global:protoc_version-win32.zip").Length -lt 2MB) {
-        Start-Sleep -Seconds 1
+        else {
+            # Download and extract the 32-bit version of Protoc
+            Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$global:protoc_version/protoc-$global:protoc_version-win32.zip" -OutFile "protoc-$global:protoc_version-win32.zip" -ErrorAction SilentlyContinue
+            while ((Get-Item "protoc-$global:protoc_version-win32.zip").Length -lt 2MB) {
+                Start-Sleep -Seconds 1
+            }
+            Expand-Archive -Path "protoc-$global:protoc_version-win32.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win32" -ErrorAction SilentlyContinue
+        }
+        
+        # Add the Protoc installation directory to the user's PATH environment variable
+        [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\protoc-$global:protoc_version-win64\bin", "User")
     }
-    Expand-Archive -Path "protoc-$global:protoc_version-win32.zip" -DestinationPath "$env:USERPROFILE\protoc-$global:protoc_version-win32" -ErrorAction SilentlyContinue
-
-    # Add the Protoc installation directory to the user's PATH environment variable
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\protoc-$global:protoc_version-win64\bin", "User")
 }
 
 function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo components
@@ -280,6 +308,8 @@ function install_python {
   else {
 	winget upgrade --id Python.Python.3.11 -silent
   }
+  python -m pip install --upgrade pip
+  python -m pip install schemathesis
 }
 
 function install_pnpm {
@@ -315,6 +345,7 @@ install_openssl
 install_nodejs
 install_pnpm
 install_postgresql
+install_python
 install_protoc
 install_rustup
 install_cargo_plugins
