@@ -233,6 +233,15 @@ function install_protoc {
     [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\protoc-$global:protoc_version-win64\bin", "User")
 }
 
+function install_cargo_plugins {  # Installs Grcov, protoc components, and cargo components
+    cargo install protoc-gen-prost --locked
+    cargo install protoc-gen-prost-serde --locked
+    cargo install protoc-gen-prost-crate --locked
+    cargo install grcov --version $global:grcov_version --locked
+    cargo install cargo-sort --locked
+    cargo install cargo-nextest --locked
+}
+
 function install_llvm {
   $result = check_package "LLVM"
   if ($result) {
@@ -308,4 +317,5 @@ install_pnpm
 install_postgresql
 install_protoc
 install_rustup
+install_cargo_plugins
 Write-Host "Finished..."
