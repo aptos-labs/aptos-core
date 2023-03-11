@@ -20,9 +20,9 @@ This tutorial details how to deploy and run Move modules on Remix IDE. It is a n
 
 ## Step 1: Connect to Remix IDE
 
-[WELL DONE Code](https://docs.welldonestudio.io/code) is the official Remix IDE Plug-in. Please visit the [Remix IDE](https://remix.ethereum.org/) and follow the guide below.
+[WELLDONE Code](https://docs.welldonestudio.io/code) is the official Remix IDE Plug-in. Please visit the [Remix IDE](https://remix.ethereum.org/) and follow the guide below.
 
-Click **Plugin Manager** button in the left bar and search for **CODE BY WELL DONE STUDIO** and click the Activate button.
+Click **Plugin Manager** button in the left bar and search for **CODE BY WELLDONE STUDIO** and click the Activate button.
 
 <center>
 <ThemedImage
@@ -53,22 +53,22 @@ width="50%"
 ## Step 3: Install a browser extension wallet
 
 :::info 
-Petra wallet will be supported soon, and WELL DONE Wallet can be used now.
+Petra wallet will be supported soon, and WELLDONE Wallet can be used now.
 :::
 
-After choosing a chain, click the `Connect to WELL DONE` button to connect to the **WELL DONE Wallet.** 
+After choosing a chain, click the `Connect to WELLDONE` button to connect to the **WELLDONE Wallet.** 
 
-If you haven't installed the WELL DONE Wallet yet, please follow the following [manual](https://docs.welldonestudio.io/wallet/manual/) to install and create a wallet and create an account for the selected chain. Finally, go into the Setting tab of your wallet and activate Developer Mode.
+If you haven't installed the WELLDONE Wallet yet, please follow the following [manual](https://docs.welldonestudio.io/wallet/manual/) to install and create a wallet and create an account for the selected chain. Finally, go into the Setting tab of your wallet and activate Developer Mode.
 
 And you must click the Refresh button in the upper right corner of the plug-in to apply changes to your wallet.
 
 ## Step 4: Create the Project
 
-In Aptos, you can write smart contracts with Move language. **WELL DONE Code** provides two features to help developers new to Aptos and Move.
+In Aptos, you can write smart contracts with Move language. **WELLDONE Code** provides two features to help developers new to Aptos and Move.
 
-### Create Template
+### Select a Template
 
-Create a simple example contract code written in Move. You can create a sample contract by selecting the template option and clicking the `Create a Template` button.
+Create a simple example contract code written in Move. You can create a sample contract by selecting the template option and clicking the `Create` button.
 
 <center>
 <ThemedImage
@@ -83,7 +83,7 @@ width="50%"
 
 ### New Project
 
-Automatically generate a Move module structure. Write a name for the project, and click the `New Project` button to create a Move module structure.
+Automatically generate a Move module structure. Write a name for the project, and click the `Create` button to create a Move module structure.
 
 :::info
 You can create your own Move projects without using the features above. However, for the remix plugin to build and deploy the Move module, it must be built within the directory `aptos/`. If you start a new project, the structure should look like the following.
@@ -142,6 +142,7 @@ sources={{
     light: useBaseUrl('/img/docs/remix-view-function.png'),
     dark: useBaseUrl('/img/docs/remix-view-function.png'),
   }}
+width="50%"
 />
 
 <ThemedImage
@@ -150,5 +151,6 @@ sources={{
     light: useBaseUrl('/img/docs/remix-entry-function.png'),
     dark: useBaseUrl('/img/docs/remix-entry-function.png'),
   }}
+width="50%"
 />
 </center>
