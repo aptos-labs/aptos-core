@@ -54,7 +54,13 @@ impl Cluster {
             );
             match instance.rest_client().get_ledger_information().await {
                 Ok(v) => instance_states.push((instance, v.into_inner())),
-                Err(err) => errors.push(err),
+                Err(err) => {
+                    warn!(
+                        "Excluding client {} because failing to fetch the ledger information",
+                        instance.peer_name()
+                    );
+                    errors.push(err)
+                },
             }
         }
 
@@ -75,18 +81,22 @@ impl Cluster {
         for (instance, state) in instance_states.into_iter() {
             if state.chain_id != chain_id.id() {
                 warn!(
-                    "Client {} running wrong chain {}",
+                    "Excluding client {} running wrong chain {}",
                     instance.peer_name(),
                     state.chain_id
                 );
             } else if state.version + 100000 < max_version {
                 warn!(
-                    "Client {} too stale, {}, while chain at {}",
+                    "Excluding Client {} too stale, {}, while chain at {}",
                     instance.peer_name(),
                     state.version,
                     max_version
                 );
             } else {
+                info!(
+                    "Client {} is healthy, adding to the list of end points for load testing",
+                    instance.peer_name()
+                );
                 instances.push(instance);
             }
         }
@@ -114,7 +124,7 @@ impl Cluster {
 
     pub async fn try_from_cluster_args(args: &ClusterArgs) -> Result<Self> {
         let mut urls = Vec::new();
-        for url in &args.targets {
+        for url in &args.get_targets()? {
             if !url.has_host() {
                 bail!("No host found in URL: {}", url);
             }

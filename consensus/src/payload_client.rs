@@ -16,7 +16,7 @@ use futures::{
     channel::{mpsc, oneshot},
     future::BoxFuture,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 
 const NO_TXN_DELAY: u64 = 30; // TODO: consider moving to a config
@@ -116,18 +116,22 @@ impl PayloadClient for QuorumStoreClient {
         let mut callback_wrapper = Some(wait_callback);
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let mut count = self.poll_count;
+        let start_time = Instant::now();
+        let max_duration = (self.poll_count.saturating_sub(1) * NO_TXN_DELAY) as u128;
         let payload = loop {
             count -= 1;
+            // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
+            let done = count == 0 || start_time.elapsed().as_millis() >= max_duration;
             let payload = self
                 .pull_internal(
                     round,
                     max_items,
                     max_bytes,
-                    return_non_full || return_empty || count == 0 || self.poll_count == u64::MAX,
+                    return_non_full || return_empty || done || self.poll_count == u64::MAX,
                     exclude_payloads.clone(),
                 )
                 .await?;
-            if payload.is_empty() && !return_empty && count > 0 {
+            if payload.is_empty() && !return_empty && !done {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
@@ -145,6 +149,7 @@ impl PayloadClient for QuorumStoreClient {
             pending_ordering = pending_ordering,
             return_empty = return_empty,
             return_non_full = return_non_full,
+            duration = start_time.elapsed().as_secs_f32(),
             "Pull payloads from QuorumStore: proposal"
         );
         Ok(payload)

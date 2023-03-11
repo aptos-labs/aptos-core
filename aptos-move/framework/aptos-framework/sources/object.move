@@ -248,7 +248,7 @@ module aptos_framework::object {
 
     // Deletion helpers
 
-    /// Returns the address of within a DeleteRef.
+    /// Returns an Object<T> from within a DeleteRef.
     public fun object_from_delete_ref<T: key>(ref: &DeleteRef): Object<T> {
         address_to_object<T>(ref.self)
     }
@@ -270,6 +270,11 @@ module aptos_framework::object {
     /// Create a signer for the ExtendRef
     public fun generate_signer_for_extending(ref: &ExtendRef): signer {
         create_signer(ref.self)
+    }
+
+    /// Returns an address from within a ExtendRef.
+    public fun address_from_extend_ref(ref: &ExtendRef): address {
+        ref.self
     }
 
     // Transfer functionality

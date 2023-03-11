@@ -20,7 +20,7 @@ use aptos_crypto::{
     multi_ed25519,
     traits::*,
 };
-use aptos_types::on_chain_config::{TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
@@ -33,7 +33,7 @@ use move_vm_types::{
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, convert::TryFrom};
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 
 /// DEPRECATED: See `public_key_validate_internal` comments in `multi_ed25519.move`.
 ///
@@ -268,6 +268,7 @@ fn native_sign(
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
     natives.append(&mut vec![
@@ -280,6 +281,7 @@ pub fn make_all(
                 make_safe_native(
                     gas_params.clone(),
                     timed_features.clone(),
+                    features.clone(),
                     native_public_key_validate_with_gas_fix,
                 )
             } else {
@@ -291,12 +293,18 @@ pub fn make_all(
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_public_key_validate_v2,
             ),
         ),
         (
             "signature_verify_strict_internal",
-            make_safe_native(gas_params, timed_features, native_signature_verify_strict),
+            make_safe_native(
+                gas_params,
+                timed_features,
+                features,
+                native_signature_verify_strict,
+            ),
         ),
     ]);
     #[cfg(feature = "testing")]

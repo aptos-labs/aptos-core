@@ -177,7 +177,7 @@ A section heading is the title for an individual section within a document page.
     - **Preferred**: Execute on your macOS or Linux system
     - **Avoid**: Execute on your macOS/Linux system
     
-    ## Use these Aptos words and phrases consistently
+## Use these Aptos words and phrases consistently
 
 The below table lists the correct usage of Aptos words and phrases. 
 
