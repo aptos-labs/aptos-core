@@ -18,7 +18,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -44,6 +44,8 @@ impl MoveVmExt {
                 5
             };
 
+        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -51,12 +53,10 @@ impl MoveVmExt {
                     abs_val_size_gas_params,
                     gas_feature_version,
                     timed_features.clone(),
+                    Arc::new(features),
                 ),
                 VMConfig {
-                    verifier: verifier_config(
-                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                        &timed_features,
-                    ),
+                    verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
