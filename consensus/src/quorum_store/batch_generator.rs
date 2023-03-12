@@ -313,6 +313,10 @@ impl BatchGenerator {
                         now.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
+
+
+
+
                     if !self.back_pressure.proof_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
                         last_non_empty_pull = now;
                         let dynamic_pull_max_txn = std::cmp::max(
