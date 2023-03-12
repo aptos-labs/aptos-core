@@ -352,21 +352,18 @@ module aptos_std::algebra_bls12381 {
         let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &BLS12_381_G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
-        // Deserialization: on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12a76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12")), 1);
+        // Deserialization should fail if given a point on the curve but off its prime-order subgroup, e.g., `(0,2)`.
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
-        // Deserialization: a valid point in (Fq,Fq) but not on the curve.
+        // Deserialization should fail if given a valid point in (Fq,Fq) but not on the curve.
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
-        //TODO: a point on the curve but not in the prime-order subgroup.
-
-        // Deserialization: an invalid point (x not in Fq).
+        // Deserialization should fail if given an invalid point (x not in Fq).
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        //TODO: Compressed version.
-        // assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
-        // Deserialization: byte array of wrong size.
+        // Deserialization should fail if given a byte array of wrong size.
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
@@ -487,20 +484,18 @@ module aptos_std::algebra_bls12381 {
         let point_7g_from_comp = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_compressed_format(), &BLS12_381_G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP));
         assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
 
-        // Deserialization: on the curve but not in the prime-order subgroup.
+        // Deserialization should fail if given a point on the curve but not in the prime-order subgroup.
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
 
-        // Deserialization: a valid point in (Fq2,Fq2) but not on the curve.
+        // Deserialization should fail if given a valid point in (Fq2,Fq2) but not on the curve.
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
-        //TODO: a point on the curve but not in the prime-order subgroup.
-
-        // Deserialization: an invalid point (x not in Fq2).
+        // Deserialization should fail if given an invalid point (x not in Fq2).
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
-        // Deserialization: byte array of wrong size.
+        // Deserialization should fail if given a byte array of wrong size.
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
         assert!(std::option::is_none(&deserialize<BLS12_381_G1>(bls12_381_g1_compressed_format(), &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
