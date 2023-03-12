@@ -70,6 +70,10 @@ pub struct IndexerConfig {
     /// Which address does the ans contract live at. Only available for token_processor. If null, disable ANS indexing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ans_contract_address: Option<String>,
+
+    /// Custom NFT points contract
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_points_contract: Option<String>,
 }
 
 impl Debug for IndexerConfig {
@@ -94,6 +98,7 @@ impl Debug for IndexerConfig {
             .field("emit_every", &self.emit_every)
             .field("gap_lookback_versions", &self.gap_lookback_versions)
             .field("ans_contract_address", &self.ans_contract_address)
+            .field("nft_points_contract", &self.nft_points_contract)
             .finish()
     }
 }
