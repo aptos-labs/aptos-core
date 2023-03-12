@@ -26,7 +26,8 @@ Below are the operations currently supported.
 - Addition.
 - Subtraction.
 - Negation.
-- Efficient sclar multiplication.
+- Sclar multiplication.
+- Efficient multi-sclar multiplication.
 - Efficient doubling.
 - Equal-to-identity check.
 - Field operations.
@@ -44,6 +45,7 @@ Below are the operations currently supported.
 - Equal-to-multiplicative-identity check.
 - Equality check.
 - Upcasting/downcasting between structures.
+- Hash-to-structure.
 
 Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> additive group notions are used.
 
@@ -82,7 +84,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
 -  [Function `hash_to`](#0x1_algebra_hash_to)
--  [Function `hash_to_group`](#0x1_algebra_hash_to_group)
 -  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
 -  [Function `downcast_internal`](#0x1_algebra_downcast_internal)
 -  [Function `eq_internal`](#0x1_algebra_eq_internal)
@@ -111,7 +112,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_scalar_mul_internal`](#0x1_algebra_group_scalar_mul_internal)
 -  [Function `group_sub_internal`](#0x1_algebra_group_sub_internal)
 -  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
--  [Function `hash_to_group_internal`](#0x1_algebra_hash_to_group_internal)
 -  [Function `multi_pairing_internal`](#0x1_algebra_multi_pairing_internal)
 -  [Function `pairing_internal`](#0x1_algebra_pairing_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
@@ -1083,10 +1083,13 @@ NOTE: Membership check is performed inside, which can be expensive, depending on
 
 ## Function `hash_to`
 
-Hash some bytes into structure <code>Struc</code> using suite <code>Suite</code>.
+Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> using the given <code>suite</code>.
+A unique domain separation tag <code>dst</code> of size 255 bytes or shorter is required
+for each independent collision-resistent mapping involved in the protocol built atop.
+Abort if <code>dst</code> is too long.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;Struc, Suite&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Struc&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S&gt;(suite: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -1095,38 +1098,10 @@ Hash some bytes into structure <code>Struc</code> using suite <code>Suite</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;Struc, Suite&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;Struc&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to">hash_to</a>&lt;S&gt;(suite: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, msg: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a> {
-        handle: <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;Struc, Suite&gt;(bytes)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_hash_to_group"></a>
-
-## Function `hash_to_group`
-
-Hash some bytes with domain separation tag <code>dst</code> into group <code>G</code> using suite <code>S</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_group">hash_to_group</a>&lt;G, S&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_group">hash_to_group</a>&lt;G, S&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a> {
-        handle: <a href="algebra.md#0x1_algebra_hash_to_group_internal">hash_to_group_internal</a>&lt;G, S&gt;(dst, bytes)
+        handle: <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S&gt;(suite, dst, msg)
     }
 }
 </code></pre>
@@ -1735,7 +1710,7 @@ Hash some bytes with domain separation tag <code>dst</code> into group <code>G</
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S, C&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S&gt;(suite: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -1744,29 +1719,7 @@ Hash some bytes with domain separation tag <code>dst</code> into group <code>G</
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S,C&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_hash_to_group_internal"></a>
-
-## Function `hash_to_group_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_group_internal">hash_to_group_internal</a>&lt;G, C&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_group_internal">hash_to_group_internal</a>&lt;G,C&gt;(dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_hash_to_internal">hash_to_internal</a>&lt;S&gt;(suite: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, dst: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 

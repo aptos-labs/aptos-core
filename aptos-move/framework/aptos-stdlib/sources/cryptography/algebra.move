@@ -21,7 +21,8 @@
 ///   - Addition.
 ///   - Subtraction.
 ///   - Negation.
-///   - Efficient sclar multiplication.
+///   - Sclar multiplication.
+///   - Efficient multi-sclar multiplication.
 ///   - Efficient doubling.
 ///   - Equal-to-identity check.
 /// - Field operations.
@@ -39,6 +40,7 @@
 ///   - Equal-to-multiplicative-identity check.
 /// - Equality check.
 /// - Upcasting/downcasting between structures.
+/// - Hash-to-structure.
 ///
 /// Note: in `algebra.move` additive group notions are used.
 module aptos_std::algebra {
@@ -338,19 +340,14 @@ module aptos_std::algebra {
         }
     }
 
-    /// Hash some bytes into structure `Struc` using suite `Suite`.
-    public fun hash_to<Struc, Suite>(bytes: &vector<u8>): Element<Struc> {
+    /// Hash an arbitrary-length byte array `msg` into structure `S` using the given `suite`.
+    /// A unique domain separation tag `dst` of size 255 bytes or shorter is required
+    /// for each independent collision-resistent mapping involved in the protocol built atop.
+    /// Abort if `dst` is too long.
+    public fun hash_to<S>(suite: vector<u8>, dst: &vector<u8>, msg: &vector<u8>): Element<S> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         Element {
-            handle: hash_to_internal<Struc, Suite>(bytes)
-        }
-    }
-
-    /// Hash some bytes with domain separation tag `dst` into group `G` using suite `S`.
-    public fun hash_to_group<G, S>(dst: &vector<u8>, bytes: &vector<u8>): Element<G> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        Element {
-            handle: hash_to_group_internal<G, S>(dst, bytes)
+            handle: hash_to_internal<S>(suite, dst, msg)
         }
     }
 
@@ -394,8 +391,7 @@ module aptos_std::algebra {
     native fun group_scalar_mul_typed_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
     native fun group_scalar_mul_internal<G>(element_handle: u64, scalar_encoded: &vector<u8>): u64;
     native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun hash_to_internal<S,C>(bytes: &vector<u8>): u64;
-    native fun hash_to_group_internal<G,C>(dst: &vector<u8>, bytes: &vector<u8>): u64;
+    native fun hash_to_internal<S>(suite: vector<u8>, dst: &vector<u8>, bytes: &vector<u8>): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;

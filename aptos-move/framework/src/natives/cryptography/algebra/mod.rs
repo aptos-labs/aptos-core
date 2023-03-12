@@ -35,6 +35,7 @@ use std::{
     rc::Rc,
 };
 use std::cmp::{max, min};
+use std::hash::Hash;
 use itertools::Itertools;
 use move_compiler::parser::lexer::Tok::Native;
 
@@ -96,20 +97,24 @@ impl SerializationFormat {
     }
 }
 
+/// Hash-to-structure suites.
 pub enum HashToStructureSuite {
-    HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_,
-    HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_,
+    BLS12381G1_XMD_SHA_256_SSWU_RO_,
+    BLS12381G2_XMD_SHA_256_SSWU_RO_,
 }
 
-impl HashToStructureSuite {
-    pub fn from_type_tag(type_tag: &TypeTag) -> Option<HashToStructureSuite> {
-        match type_tag.to_string().as_str() {
-            "0x1::algebra_bls12381::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_),
-            "0x1::algebra_bls12381::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_" => Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_),
-            _ => None
+impl TryFrom<Vec<u8>> for HashToStructureSuite {
+    type Error = ();
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        match hex::encode(value).as_str() {
+            "0001" => Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_),
+            "0002" => Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_),
+            _ => Err(())
         }
     }
 }
+
 #[derive(Tid, Default)]
 pub struct AlgebraContext {
     objs: Vec<Rc<dyn Any>>,
@@ -1668,65 +1673,48 @@ fn group_scalar_mul_typed_internal(
     }
 }
 
-macro_rules! ark_bls12_381_h2g_internal {
+macro_rules! ark_bls12381gx_xmd_sha_256_sswu_ro_internal {
     (
         $gas_params:expr,
         $context:expr,
-        $args:ident,
+        $dst:expr,
+        $msg:expr,
         $h2s_suite:expr,
         $target_type:ty,
         $config_type:ty
     ) => {{
-        let vector_ref = pop_arg!($args, VectorRef);
-        let bytes_ref = vector_ref.as_bytes_ref();
-        let msg = bytes_ref.as_slice();
-
-        let tag_ref = pop_arg!($args, VectorRef);
-        let bytes_ref = tag_ref.as_bytes_ref();
-        let dst = bytes_ref.as_slice();
         let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
             ark_ec::models::short_weierstrass::Projective<$config_type>,
             ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
-            ark_ec::hashing::curve_maps::wb::WBMap<$config_type>>::new(dst).unwrap();
-        let new_element = <$target_type>::from(mapper.hash(msg).unwrap());
+            ark_ec::hashing::curve_maps::wb::WBMap<$config_type>>::new($dst).unwrap();
+        let new_element = <$target_type>::from(mapper.hash($msg).unwrap());
         let new_handle = store_obj!($context, new_element);
         Ok(NativeResult::ok(
-            $gas_params.hash_to_structure($h2s_suite, dst.len(), msg.len()),
+            $gas_params.hash_to($h2s_suite, $dst.len(), $msg.len()),
             smallvec![Value::u64(new_handle as u64)],
         ))
     }}
 }
 
-fn hash_to_group_internal(
+fn hash_to_internal(
     gas_params: &GasParameters,
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert_eq!(2, ty_args.len());
-    let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let h2s_opt = suite_from_ty_arg!(context, &ty_args[1]);
-    match (group_opt, h2s_opt) {
-        (Some(Structure::BLS12381G1), Some(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_)) => {
-            let vector_ref = pop_arg!(args, VectorRef);
-            let bytes_ref = vector_ref.as_bytes_ref();
-            let msg = bytes_ref.as_slice();
-
-            let tag_ref = pop_arg!(args, VectorRef);
-            let bytes_ref = tag_ref.as_bytes_ref();
-            let dst = bytes_ref.as_slice();
-            let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
-                ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
-                ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
-                ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>>::new(dst).unwrap();
-            let new_element = ark_bls12_381::G1Projective::from(mapper.hash(msg).unwrap());
-            let new_handle = store_obj!(context, new_element);
-            Ok(NativeResult::ok(
-                gas_params.hash_to_structure(HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_, dst.len(), msg.len()),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
-        }
-        (Some(Structure::BLS12381G2), Some(HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12_381_h2g_internal!(gas_params, context, args, HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let vector_ref = pop_arg!(args, VectorRef);
+    let bytes_ref = vector_ref.as_bytes_ref();
+    let msg = bytes_ref.as_slice();
+    let tag_ref = pop_arg!(args, VectorRef);
+    let bytes_ref = tag_ref.as_bytes_ref();
+    let dst = bytes_ref.as_slice();
+    let suite = pop_arg!(args, Vec<u8>);
+    let suite_opt = HashToStructureSuite::try_from(suite);
+    match (structure_opt, suite_opt) {
+        (Some(Structure::BLS12381G1), Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G1Projective, ark_bls12_381::g1::Config),
+        (Some(Structure::BLS12381G2), Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
         _ => unreachable!(),
     }
 }
@@ -2187,8 +2175,8 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
             make_native_from_func(gas_params.clone(), group_sub_internal),
         ),
         (
-            "hash_to_group_internal",
-            make_native_from_func(gas_params.clone(), hash_to_group_internal),
+            "hash_to_internal",
+            make_native_from_func(gas_params.clone(), hash_to_internal),
         ),
         (
             "multi_pairing_internal",

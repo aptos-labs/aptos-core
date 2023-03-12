@@ -24,8 +24,6 @@ Below are the BLS12-381 structures currently supported.
 -  [Struct `BLS12_381_G2`](#0x1_algebra_bls12381_BLS12_381_G2)
 -  [Struct `BLS12_381_Gt`](#0x1_algebra_bls12381_BLS12_381_Gt)
 -  [Struct `BLS12_381_Fr`](#0x1_algebra_bls12381_BLS12_381_Fr)
--  [Struct `HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_`](#0x1_algebra_bls12381_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_)
--  [Struct `HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_`](#0x1_algebra_bls12381_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_)
 -  [Function `bls12_381_fq_format`](#0x1_algebra_bls12381_bls12_381_fq_format)
 -  [Function `bls12_381_fq_bendian_format`](#0x1_algebra_bls12381_bls12_381_fq_bendian_format)
 -  [Function `bls12_381_fq2_format`](#0x1_algebra_bls12381_bls12_381_fq2_format)
@@ -43,6 +41,8 @@ Below are the BLS12-381 structures currently supported.
 -  [Function `bls12_381_gt_format`](#0x1_algebra_bls12381_bls12_381_gt_format)
 -  [Function `bls12_381_fr_lendian_format`](#0x1_algebra_bls12381_bls12_381_fr_lendian_format)
 -  [Function `bls12_381_fr_bendian_format`](#0x1_algebra_bls12381_bls12_381_fr_bendian_format)
+-  [Function `h2s_suite_bls12381g1_xmd_sha_256_sswu_ro`](#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro)
+-  [Function `h2s_suite_bls12381g2_xmd_sha_256_sswu_ro`](#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro)
 
 
 <pre><code></code></pre>
@@ -339,64 +339,6 @@ for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_"></a>
-
-## Struct `HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_`
-
-A ciphersuite for hashing bytes to a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code> element.
-Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
-
-
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_"></a>
-
-## Struct `HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_`
-
-A ciphersuite for hashing bytes to a <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> element.
-Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
-
-
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_">HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_</a>
 </code></pre>
 
 
@@ -895,6 +837,54 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_bls12_381_fr_bendian_format">bls12_381_fr_bendian_format</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0a01" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro"></a>
+
+## Function `h2s_suite_bls12381g1_xmd_sha_256_sswu_ro`
+
+The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code>
+defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0001" }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro"></a>
+
+## Function `h2s_suite_bls12381g2_xmd_sha_256_sswu_ro`
+
+The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code>
+defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0002" }
 </code></pre>
 
 

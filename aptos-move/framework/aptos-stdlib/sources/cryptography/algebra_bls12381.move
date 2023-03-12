@@ -218,13 +218,13 @@ module aptos_std::algebra_bls12381 {
 
     // Hash-to-structure suites begin.
 
-    /// A ciphersuite for hashing bytes to a `BLS12_381_G1` element.
-    /// Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
-    struct HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_ {}
+    /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`
+    /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
+    public fun h2s_suite_bls12381g1_xmd_sha_256_sswu_ro(): vector<u8> { x"0001" }
 
-    /// A ciphersuite for hashing bytes to a `BLS12_381_G2` element.
-    /// Defined in https://datatracker.ietf.org/doc/draft-irtf-cfrg-hash-to-curve/.
-    struct HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_ {}
+    /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`
+    /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
+    public fun h2s_suite_bls12381g2_xmd_sha_256_sswu_ro(): vector<u8> { x"0002" }
 
     // Hash-to-structure suites end.
 
@@ -430,10 +430,12 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
+        let actual = hash_to<BLS12_381_G1>(
+            h2s_suite_bls12381g1_xmd_sha_256_sswu_ro(), &b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
         let expected = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to_group<BLS12_381_G1, HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let actual = hash_to<BLS12_381_G1>(
+            h2s_suite_bls12381g1_xmd_sha_256_sswu_ro(), &b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
         let expected = std::option::extract(&mut deserialize<BLS12_381_G1>(bls12_381_g1_uncompressed_format(), &x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
         assert!(eq(&expected, &actual), 1);
     }
@@ -562,10 +564,12 @@ module aptos_std::algebra_bls12381 {
 
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        let actual = hash_to_group<BLS12_381_G2, HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
+        let actual = hash_to<BLS12_381_G2>(
+            h2s_suite_bls12381g2_xmd_sha_256_sswu_ro(), &b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
         let expected = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to_group<BLS12_381_G2, HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
+        let actual = hash_to<BLS12_381_G2>(
+            h2s_suite_bls12381g2_xmd_sha_256_sswu_ro(), &b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
         let expected = std::option::extract(&mut deserialize<BLS12_381_G2>(bls12_381_g2_uncompressed_format(), &x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
         assert!(eq(&expected, &actual), 1);
     }
@@ -635,7 +639,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_is_identity, group_scalar_mul_typed, group_scalar_mul, group_add, group_multi_scalar_mul, group_multi_scalar_mul_typed, group_double, group_neg, group_sub, hash_to_group, upcast, downcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing};
+    use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_is_identity, group_scalar_mul_typed, group_scalar_mul, group_add, group_multi_scalar_mul, group_multi_scalar_mul_typed, group_double, group_neg, group_sub, hash_to, upcast, downcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing};
 
     #[test_only]
     const BLS12_381_FR_VAL_7_SERIALIZED_LENDIAN: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
