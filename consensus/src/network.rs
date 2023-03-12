@@ -17,6 +17,7 @@ use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, SignedNodeDigest},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -99,6 +100,28 @@ pub trait QuorumStoreSender: Send + Clone {
     async fn broadcast_fragment(&mut self, fragment: Fragment);
 
     async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore);
+}
+
+#[async_trait::async_trait]
+pub(crate) trait DagSender {
+    async fn send_node(&mut self, node: Node, maybe_recipients: Option<Vec<Author>>);
+
+    async fn send_signed_node_digest(
+        &self,
+        signed_node_digest: SignedNodeDigest,
+        recipients: Vec<Author>,
+    );
+
+    async fn send_certified_node(
+        &mut self,
+        certified_node: CertifiedNode,
+        maybe_recipients: Option<Vec<Author>>,
+        ack_required: bool,
+    );
+
+    async fn send_certified_node_ack(&self, ack: CertifiedNodeAck, recipients: Vec<Author>);
+
+    async fn send_certified_node_request(&self, req: CertifiedNodeRequest, recipients: Vec<Author>);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -369,6 +392,60 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store));
         self.broadcast_without_self(msg).await
+    }
+}
+
+#[async_trait::async_trait]
+impl DagSender for NetworkSender {
+    async fn send_node(&mut self, node: Node, maybe_recipients: Option<Vec<Author>>) {
+        fail_point!("consensus::send::node", |_| ());
+        let msg = ConsensusMsg::NodeMsg(Box::new(node));
+
+        match maybe_recipients {
+            None => self.broadcast(msg).await,
+            Some(recipients) => self.send(msg, recipients).await,
+        }
+    }
+
+    async fn send_signed_node_digest(
+        &self,
+        signed_node_digest: SignedNodeDigest,
+        recipients: Vec<Author>,
+    ) {
+        fail_point!("consensus::send::signed_node_digest", |_| ());
+        let msg = ConsensusMsg::SignedNodeDigestMsg(Box::new(signed_node_digest));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_certified_node(
+        &mut self,
+        certified_node: CertifiedNode,
+        maybe_recipients: Option<Vec<Author>>,
+        ack_required: bool,
+    ) {
+        fail_point!("consensus::send::certified_node", |_| ());
+        let msg = ConsensusMsg::CertifiedNodeMsg(Box::new(certified_node), ack_required);
+
+        match maybe_recipients {
+            None => self.broadcast(msg).await,
+            Some(recipients) => self.send(msg, recipients).await,
+        }
+    }
+
+    async fn send_certified_node_ack(&self, ack: CertifiedNodeAck, recipients: Vec<Author>) {
+        fail_point!("consensus::send::certified_node_ack_msg", |_| ());
+        let msg = ConsensusMsg::CertifiedNodeAckMsg(Box::new(ack));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_certified_node_request(
+        &self,
+        req: CertifiedNodeRequest,
+        recipients: Vec<Author>,
+    ) {
+        fail_point!("consensus::send::certified_node_request_msg", |_| ());
+        let msg = ConsensusMsg::CertifiedNodeRequestMsg(Box::new(req));
+        self.send(msg, recipients).await
     }
 }
 

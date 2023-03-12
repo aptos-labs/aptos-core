@@ -19,6 +19,8 @@ use thiserror::Error;
 
 mod consensus_config;
 pub use consensus_config::*;
+mod dag_config;
+pub use dag_config::*;
 mod quorum_store_config;
 pub use quorum_store_config::*;
 mod error;

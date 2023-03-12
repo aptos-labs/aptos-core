@@ -45,6 +45,7 @@ mod util;
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
+mod dag;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;

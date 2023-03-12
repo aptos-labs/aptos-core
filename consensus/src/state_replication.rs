@@ -36,6 +36,14 @@ pub trait PayloadClient: Send + Sync {
         recent_max_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError>;
 
+    async fn pull_payload_for_dag(
+        &self,
+        round: Round,
+        max_items: u64,
+        max_bytes: u64,
+        exclude: PayloadFilter,
+    ) -> Result<Payload, QuorumStoreError>;
+
     fn trace_payloads(&self) {}
 }
 

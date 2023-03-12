@@ -11,6 +11,7 @@ pub mod common;
 pub mod epoch_retrieval;
 pub mod executed_block;
 pub mod experimental;
+pub mod node;
 pub mod proof_of_store;
 pub mod proposal_msg;
 pub mod quorum_cert;

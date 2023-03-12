@@ -31,6 +31,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, SignedNodeDigest},
     proof_of_store::{ProofOfStore, SignedDigest},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -159,6 +160,11 @@ pub enum VerifiedEvent {
     FragmentMsg(Box<Fragment>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
+    NodeMsg(Box<Node>), // TODO: add these events to the consensus networking flow
+    SignedNodeDigestMsg(Box<SignedNodeDigest>),
+    CertifiedNodeMsg(Box<CertifiedNode>, bool),
+    CertifiedNodeAckMsg(Box<CertifiedNodeAck>),
+    CertifiedNodeRequestMsg(Box<CertifiedNodeRequest>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

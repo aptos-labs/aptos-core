@@ -90,6 +90,9 @@ impl ValidatorConsensusInfo {
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
     validator_infos: Vec<ValidatorConsensusInfo>,
+    /// The minimum voting power required to achieve a minimal quorum
+    #[serde(skip)]
+    minority_quorum_voting_power: u128,
     /// The minimum voting power required to achieve a quorum
     #[serde(skip)]
     quorum_voting_power: u128,
@@ -124,6 +127,7 @@ impl ValidatorVerifier {
     /// Private constructor to calculate the in-memory index
     fn build_index(
         validator_infos: Vec<ValidatorConsensusInfo>,
+        minority_quorum_voting_power: u128,
         quorum_voting_power: u128,
         total_voting_power: u128,
     ) -> Self {
@@ -134,6 +138,7 @@ impl ValidatorVerifier {
             .collect();
         Self {
             validator_infos,
+            minority_quorum_voting_power,
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
@@ -144,17 +149,21 @@ impl ValidatorVerifier {
     /// default (`2f + 1`) or zero if `address_to_validator_info` is empty.
     pub fn new(validator_infos: Vec<ValidatorConsensusInfo>) -> Self {
         let total_voting_power = sum_voting_power(&validator_infos);
-        let quorum_voting_power = if validator_infos.is_empty() {
-            0
+        let (minority_quorum_voting_power, quorum_voting_power) = if validator_infos.is_empty() {
+            (0, 0)
         } else {
-            total_voting_power * 2 / 3 + 1
+            (
+                total_voting_power * 1 / 3 + 1,
+                total_voting_power * 2 / 3 + 1,
+            )
         };
-        Self::build_index(validator_infos, quorum_voting_power, total_voting_power)
+        Self::build_index(validator_infos, minority_quorum_voting_power, quorum_voting_power, total_voting_power)
     }
 
     /// Initializes a validator verifier with a specified quorum voting power.
     pub fn new_with_quorum_voting_power(
         validator_infos: Vec<ValidatorConsensusInfo>,
+        minority_quorum_voting_power: u128,
         quorum_voting_power: u128,
     ) -> Result<Self> {
         let total_voting_power = sum_voting_power(&validator_infos);
@@ -167,6 +176,7 @@ impl ValidatorVerifier {
         );
         Ok(Self::build_index(
             validator_infos,
+            minority_quorum_voting_power,
             quorum_voting_power,
             total_voting_power,
         ))
@@ -315,11 +325,26 @@ impl ValidatorVerifier {
         Ok(())
     }
 
+    pub fn check_voting_power<'a>(
+        &self,
+        authors: impl Iterator<Item = &'a AccountAddress>,
+    ) -> std::result::Result<(), VerifyError> {
+        self.check_power(self.quorum_voting_power, authors)
+    }
+
+    pub fn check_minority_voting_power<'a>(
+        &self,
+        authors: impl Iterator<Item = &'a AccountAddress>,
+    ) -> std::result::Result<(), VerifyError> {
+        self.check_power(self.minority_quorum_voting_power, authors)
+    }
+
     /// Ensure there is at least quorum_voting_power in the provided signatures and there
     /// are only known authors. According to the threshold verification policy,
     /// invalid public keys are not allowed.
-    pub fn check_voting_power<'a>(
+    fn check_power<'a>(
         &self,
+        target: u128,
         authors: impl Iterator<Item = &'a AccountAddress>,
     ) -> std::result::Result<(), VerifyError> {
         // Add voting power for valid accounts, exiting early for unknown authors
@@ -331,10 +356,10 @@ impl ValidatorVerifier {
             }
         }
 
-        if aggregated_voting_power < self.quorum_voting_power {
+        if aggregated_voting_power < target {
             return Err(VerifyError::TooLittleVotingPower {
                 voting_power: aggregated_voting_power,
-                expected_voting_power: self.quorum_voting_power,
+                expected_voting_power: target,
             });
         }
         Ok(())
@@ -464,6 +489,7 @@ pub fn generate_validator_verifier(validators: &[ValidatorSigner]) -> ValidatorV
 
     ValidatorVerifier::new_with_quorum_voting_power(
         validator_consensus_info,
+        0,
         validators.len() as u128 / 2,
     )
     .expect("Incorrect quorum size.")
@@ -496,6 +522,7 @@ pub fn random_validator_verifier(
     (signers, match custom_voting_power_quorum {
         Some(custom_voting_power_quorum) => ValidatorVerifier::new_with_quorum_voting_power(
             validator_infos,
+            0,
             custom_voting_power_quorum,
         )
         .expect("Unable to create testing validator verifier"),

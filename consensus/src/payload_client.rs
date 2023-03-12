@@ -154,4 +154,15 @@ impl PayloadClient for QuorumStoreClient {
         );
         Ok(payload)
     }
+
+    async fn pull_payload_for_dag(
+        &self,
+        round: Round,
+        max_items: u64,
+        max_bytes: u64,
+        exclude: PayloadFilter,
+    ) -> Result<Payload, QuorumStoreError> {
+        self.pull_internal(round, max_items, max_bytes, true,exclude)
+            .await
+    }
 }

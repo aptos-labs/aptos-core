@@ -599,6 +599,7 @@ impl Arbitrary for LedgerInfoWithSignatures {
             .prop_map(|(ledger_info, validator_infos)| {
                 let validator_verifier = ValidatorVerifier::new_with_quorum_voting_power(
                     validator_infos.iter().map(|x| x.1.clone()).collect(),
+                    0,
                     validator_infos.len() as u128 / 2,
                 )
                 .unwrap();
