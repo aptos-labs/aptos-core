@@ -90,6 +90,8 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_proj_to_affine: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
     pub ark_bls12_381_pairing: InternalGasPerArg,
+    pub ark_bls12_381_multi_pairing_base: InternalGasPerArg,
+    pub ark_bls12_381_multi_pairing_per_pair: InternalGasPerArg,
     pub ark_h2c_bls12381g1_xmd_sha256_sswu_base: InternalGasPerArg,
     pub ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: InternalGasPerArg,
     pub ark_h2c_bls12381g2_xmd_sha256_sswu_base: InternalGasPerArg,
@@ -313,7 +315,6 @@ impl GasParameters {
         match structure {
             Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
             Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
-            Structure::BLS12381Gt => pippenger_gas(self.ark_bls12_381_fq12_mul, self.ark_bls12_381_fq12_square, num_entries, scalar_bit_len, pippenger_window_size(structure, num_entries)),
             _ => unreachable!(),
         }
     }
@@ -322,7 +323,6 @@ impl GasParameters {
         match structure {
             Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
             Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
-            Structure::BLS12381Gt => pippenger_gas(self.ark_bls12_381_fq12_mul, self.ark_bls12_381_fq12_square, num_entries, 255, pippenger_window_size(structure, num_entries)),
             _ => unreachable!(),
         }
     }
@@ -367,11 +367,10 @@ impl GasParameters {
         }
     }
 
-    pub fn multi_pairing(&self, g1: Structure, g2: Structure, g3: Structure, input_size: usize) -> InternalGas {
+    pub fn multi_pairing(&self, g1: Structure, g2: Structure, g3: Structure, num_pairs: usize) -> InternalGas {
         match (g1, g2, g3) {
             (Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt) => {
-                //TODO
-                InternalGas::zero()
+                self.ark_bls12_381_multi_pairing_base * NumArgs::one() + self.ark_bls12_381_multi_pairing_per_pair * NumArgs::from(num_pairs as u64)
             },
             _ => unreachable!(),
         }
@@ -410,43 +409,4 @@ impl GasParameters {
             _ => unreachable!(),
         }
     }
-
-    pub fn serialize_v2(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
-        match (structure, format) {
-            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12) => self.ark_bls12_381_fq12_serialize * NumArgs::one(),
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Uncompressed) => {
-                self.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Compressed) => {
-                self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Unompressed) => {
-                self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Compressed) => {
-                self.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
-            },
-            (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
-                self.ark_bls12_381_fq12_serialize * NumArgs::one()
-            },
-            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLEndian)
-            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrBEndian) => {
-                self.ark_bls12_381_fr_serialize * NumArgs::one()
-            },
-            _ => unreachable!(),
-        }
-    }
-}
-
-fn pippenger_window_size(structure: Structure, num_entries: usize) -> usize {
-    match structure {
-        Structure::BLS12381Gt => 8, //TODO: precompute and hardcode.
-        _ => unimplemented!()
-    }
-}
-
-fn pippenger_gas(addition_gas: InternalGasPerArg, doubling_gas: InternalGasPerArg, num_entries: usize, scalar_bit_length: usize, window_size_in_bits: usize) -> InternalGas {
-    let num_windows = (scalar_bit_length + window_size_in_bits - 1) / window_size_in_bits;
-    return addition_gas * NumArgs::from((num_windows * (num_entries + (1<<num_windows) + 1)) as u64) + doubling_gas * NumArgs::from(scalar_bit_length as u64);
-    // A\cdot w(n + 2^w + 1) + |s|D
 }
