@@ -151,10 +151,14 @@ impl GasParameters {
                 ark_bls12_381_fq12_is_zero: 0.into(),
                 ark_bls12_381_fq12_zero: 0.into(),
                 ark_bls12_381_pairing: 0.into(),
+                ark_h2c_bls12381g1_xmd_sha256_sswu_base: 0.into(),
+                ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: 0.into(),
+                ark_h2c_bls12381g2_xmd_sha256_sswu_base: 0.into(),
                 ark_bls12_381_g1_proj_is_zero: 0.into(),
                 ark_bls12_381_g2_proj_is_zero: 0.into(),
                 ark_bls12_381_g1_affine_msm_per_entry: 0.into(),
-                ark_bls12_381_g2_affine_msm_per_entry: 0.into()
+                ark_bls12_381_g2_affine_msm_per_entry: 0.into(),
+                ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte: 0.into(),
             },
             ed25519: ed25519::GasParameters {
                 base: 0.into(),

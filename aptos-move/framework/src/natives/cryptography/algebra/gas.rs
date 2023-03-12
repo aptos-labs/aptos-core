@@ -90,6 +90,10 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_proj_to_affine: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_to_prepared: InternalGasPerArg,
     pub ark_bls12_381_pairing: InternalGasPerArg,
+    pub ark_h2c_bls12381g1_xmd_sha256_sswu_base: InternalGasPerArg,
+    pub ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte: InternalGasPerArg,
+    pub ark_h2c_bls12381g2_xmd_sha256_sswu_base: InternalGasPerArg,
+    pub ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte: InternalGasPerArg,
 }
 
 impl GasParameters {
@@ -350,9 +354,17 @@ impl GasParameters {
         }
     }
 
-    pub fn hash_to_structure(&self, suite: HashToStructureSuite, dst_len: usize, msg_len: usize) -> InternalGas {
-        //TODO
-        InternalGas::zero()
+    pub fn hash_to_structure(&self, suite: HashToStructureSuite, _dst_len: usize, msg_len: usize) -> InternalGas {
+        match suite {
+            HashToStructureSuite::HASH_SUITE_BLS12381G1_XMD_SHA_256_SSWU_RO_ => {
+                // Simplified formula, by fixing `dst_len` to be its maximum value (255).
+                self.ark_h2c_bls12381g1_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
+            }
+            HashToStructureSuite::HASH_SUITE_BLS12381G2_XMD_SHA_256_SSWU_RO_ => {
+                // Simplified formula, by fixing `dst_len` to be its maximum value (255).
+                self.ark_h2c_bls12381g2_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
+            }
+        }
     }
 
     pub fn multi_pairing(&self, g1: Structure, g2: Structure, g3: Structure, input_size: usize) -> InternalGas {
