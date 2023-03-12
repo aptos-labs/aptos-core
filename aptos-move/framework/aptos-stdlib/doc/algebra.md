@@ -69,10 +69,8 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_generator`](#0x1_algebra_group_generator)
 -  [Function `group_identity`](#0x1_algebra_group_identity)
 -  [Function `group_multi_scalar_mul`](#0x1_algebra_group_multi_scalar_mul)
--  [Function `group_multi_scalar_mul_typed`](#0x1_algebra_group_multi_scalar_mul_typed)
 -  [Function `handles_from_elements`](#0x1_algebra_handles_from_elements)
 -  [Function `group_neg`](#0x1_algebra_group_neg)
--  [Function `group_scalar_mul_typed`](#0x1_algebra_group_scalar_mul_typed)
 -  [Function `group_scalar_mul`](#0x1_algebra_group_scalar_mul)
 -  [Function `group_sub`](#0x1_algebra_group_sub)
 -  [Function `multi_pairing`](#0x1_algebra_multi_pairing)
@@ -105,10 +103,8 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_identity_internal`](#0x1_algebra_group_identity_internal)
 -  [Function `group_is_identity_internal`](#0x1_algebra_group_is_identity_internal)
 -  [Function `group_multi_scalar_mul_internal`](#0x1_algebra_group_multi_scalar_mul_internal)
--  [Function `group_multi_scalar_mul_typed_internal`](#0x1_algebra_group_multi_scalar_mul_typed_internal)
 -  [Function `group_neg_internal`](#0x1_algebra_group_neg_internal)
 -  [Function `group_order_internal`](#0x1_algebra_group_order_internal)
--  [Function `group_scalar_mul_typed_internal`](#0x1_algebra_group_scalar_mul_typed_internal)
 -  [Function `group_scalar_mul_internal`](#0x1_algebra_group_scalar_mul_internal)
 -  [Function `group_sub_internal`](#0x1_algebra_group_sub_internal)
 -  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
@@ -637,48 +633,11 @@ Get the identity of a group <code>G</code>.
 
 ## Function `group_multi_scalar_mul`
 
-Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where <code>P[]</code> are <code>n</code> elements of group <code>G</code>,
-and <code>k[]</code> are <code>n</code> scalars represented by a byte array <code>scalars</code>.
-<code>k[]</code> will be parsed assuming <code>bin(k[0]) || ... || bin(k[n-1]) == scalar_bin[0..w*n]</code>, where
-<code>w</code> is the scalar bit length, specified by parameter <code>scalar_size_in_bits</code>,
-<code>bin(x)</code> is the least-significant-bit-first <code>w</code>-bit representation of an integer <code>x</code>,
-<code>||</code> is bit array concatenation,
-<code>scalar_bin</code> is all <code>bin(scalar[i])</code> concatenated, then extended at the back with 0s if not long enough.
-
-NOTE: in some groups, this function is much faster and cheaper than
-calling <code>element_scalar_mul</code> and adding up the results using <code>scalar_add</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <b>let</b> element_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(elements);
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles, scalars, scalar_size_in_bits)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_multi_scalar_mul_typed"></a>
-
-## Function `group_multi_scalar_mul_typed`
-
 Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where <code>P[]</code> are <code>n</code> elements of group <code>G</code>
 and <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed">group_multi_scalar_mul_typed</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -687,11 +646,11 @@ and <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</cod
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed">group_multi_scalar_mul_typed</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
     <b>let</b> element_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(elements);
     <b>let</b> scalar_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(scalars);
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles, scalar_handles)
+        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles, scalar_handles)
     }
 }
 </code></pre>
@@ -759,34 +718,6 @@ Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
 
 </details>
 
-<a name="0x1_algebra_group_scalar_mul_typed"></a>
-
-## Function `group_scalar_mul_typed`
-
-Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed">group_scalar_mul_typed</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed">group_scalar_mul_typed</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_algebra_group_scalar_mul"></a>
 
 ## Function `group_scalar_mul`
@@ -794,7 +725,7 @@ Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G<
 Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of group <code>G</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -803,10 +734,10 @@ Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G<
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_p.handle, scalar_encoded)
+        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
     }
 }
 </code></pre>
@@ -1556,7 +1487,7 @@ Abort if <code>dst</code> is too long.
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalars_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
 </code></pre>
 
 
@@ -1565,29 +1496,7 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalars_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar_size_in_bits: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_multi_scalar_mul_typed_internal"></a>
-
-## Function `group_multi_scalar_mul_typed_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_typed_internal">group_multi_scalar_mul_typed_internal</a>&lt;G&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
 </code></pre>
 
 
@@ -1638,35 +1547,13 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
-<a name="0x1_algebra_group_scalar_mul_typed_internal"></a>
-
-## Function `group_scalar_mul_typed_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_typed_internal">group_scalar_mul_typed_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_algebra_group_scalar_mul_internal"></a>
 
 ## Function `group_scalar_mul_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_handle: u64, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
 </code></pre>
 
 
@@ -1675,7 +1562,7 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G&gt;(element_handle: u64, scalar_encoded: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64;
 </code></pre>
 
 

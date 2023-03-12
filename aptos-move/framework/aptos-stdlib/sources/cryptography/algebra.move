@@ -194,30 +194,13 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` where `P[]` are `n` elements of group `G`,
-    /// and `k[]` are `n` scalars represented by a byte array `scalars`.
-    /// `k[]` will be parsed assuming `bin(k[0]) || ... || bin(k[n-1]) == scalar_bin[0..w*n]`, where
-    /// `w` is the scalar bit length, specified by parameter `scalar_size_in_bits`,
-    /// `bin(x)` is the least-significant-bit-first `w`-bit representation of an integer `x`,
-    /// `||` is bit array concatenation,
-    /// `scalar_bin` is all `bin(scalar[i])` concatenated, then extended at the back with 0s if not long enough.
-    ///
-    /// NOTE: in some groups, this function is much faster and cheaper than
-    /// calling `element_scalar_mul` and adding up the results using `scalar_add`.
-    public fun group_multi_scalar_mul<G>(elements: &vector<Element<G>>, scalars: &vector<u8>, scalar_size_in_bits: u64): Element<G> {
-        let element_handles = handles_from_elements(elements);
-        Element<G> {
-            handle: group_multi_scalar_mul_internal<G>(element_handles, scalars, scalar_size_in_bits)
-        }
-    }
-
     /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` where `P[]` are `n` elements of group `G`
     /// and `k[]` are `n` elements of the scalarfield `S` of group `G`.
-    public fun group_multi_scalar_mul_typed<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
+    public fun group_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
         Element<G> {
-            handle: group_multi_scalar_mul_typed_internal<G>(element_handles, scalar_handles)
+            handle: group_multi_scalar_mul_internal<G, S>(element_handles, scalar_handles)
         }
     }
 
@@ -241,18 +224,10 @@ module aptos_std::algebra {
     }
 
     /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
-    public fun group_scalar_mul_typed<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
+    public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         Element<G> {
-            handle: group_scalar_mul_typed_internal<G, S>(element_p.handle, scalar_k.handle)
-        }
-    }
-
-    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
-    public fun group_scalar_mul<G>(element_p: &Element<G>, scalar_encoded: &vector<u8>): Element<G> {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        Element<G> {
-            handle: group_scalar_mul_internal<G>(element_p.handle, scalar_encoded)
+            handle: group_scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
         }
     }
 
@@ -384,12 +359,10 @@ module aptos_std::algebra {
     native fun group_generator_internal<G>(): u64;
     native fun group_identity_internal<G>(): u64;
     native fun group_is_identity_internal<G>(handle: u64): bool;
-    native fun group_multi_scalar_mul_internal<G>(element_handles: vector<u64>, scalars_encoded: &vector<u8>, scalar_size_in_bits: u64): u64;
-    native fun group_multi_scalar_mul_typed_internal<G>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
+    native fun group_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun group_neg_internal<G>(handle: u64): u64;
     native fun group_order_internal<G>(): vector<u8>;
-    native fun group_scalar_mul_typed_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
-    native fun group_scalar_mul_internal<G>(element_handle: u64, scalar_encoded: &vector<u8>): u64;
+    native fun group_scalar_mul_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
     native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
     native fun hash_to_internal<S>(suite: vector<u8>, dst: &vector<u8>, bytes: &vector<u8>): u64;
     #[test_only]
