@@ -81,37 +81,52 @@ impl UnverifiedEvent {
         peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
+        self_message: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator, quorum_store_enabled)?;
+                if !self_message {
+                    p.verify(validator, quorum_store_enabled)?;
+                }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
-                v.verify(validator)?;
+                if !self_message {
+                    v.verify(validator)?;
+                }
                 VerifiedEvent::VoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
-                cv.verify(validator)?;
+                if !self_message {
+                    cv.verify(validator)?;
+                }
                 VerifiedEvent::CommitVote(cv)
             },
             UnverifiedEvent::CommitDecision(cd) => {
-                cd.verify(validator)?;
+                if !self_message {
+                    cd.verify(validator)?;
+                }
                 VerifiedEvent::CommitDecision(cd)
             },
             UnverifiedEvent::FragmentMsg(f) => {
-                f.verify(peer_id)?;
+                if !self_message {
+                    f.verify(peer_id)?;
+                }
                 VerifiedEvent::FragmentMsg(f)
             },
             UnverifiedEvent::SignedDigestMsg(sd) => {
-                sd.verify(validator)?;
+                if !self_message {
+                    sd.verify(validator)?;
+                }
                 VerifiedEvent::SignedDigestMsg(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                p.verify(validator)?;
+                if !self_message {
+                    p.verify(validator)?;
+                }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
