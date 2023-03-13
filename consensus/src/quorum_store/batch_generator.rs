@@ -30,6 +30,7 @@ use tokio::time::Interval;
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
     CommitNotification(LogicalTime),
+    ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -335,6 +336,19 @@ impl BatchGenerator {
                                 }
                             }
                         },
+                        BatchGeneratorCommand::ProofExpiration(batch_ids) => {
+                            // Quorum store measurements
+                            counters::TIMEOUT_BATCHES_COUNT.inc();
+
+                            for batch_id in batch_ids {
+                                debug!(
+                                    "QS: received timeout for proof of store, batch id = {}",
+                                    batch_id
+                                );
+                                // Not able to gather the proof, allow transactions to be polled again.
+                                self.batches_in_progress.remove(&batch_id);
+                            }
+                        }
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
                                 .send(())

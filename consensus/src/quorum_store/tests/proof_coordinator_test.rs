@@ -33,8 +33,9 @@ impl BatchReader for MockBatchReader {
 async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
+    let (tx, _rx) = channel(100);
     let proof_coordinator =
-        ProofCoordinator::new(100, signers[0].author(), Arc::new(MockBatchReader));
+        ProofCoordinator::new(100, signers[0].author(), Arc::new(MockBatchReader), tx);
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
     let network_sender = MockQuorumStoreSender::new(tx);

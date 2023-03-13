@@ -334,6 +334,7 @@ impl InnerBuilder {
             self.config.proof_timeout_ms,
             self.author,
             self.batch_store.clone().unwrap(),
+            self.batch_generator_cmd_tx.clone(),
         );
         spawn_named!(
             "proof_coordinator",

@@ -4,7 +4,9 @@
 use crate::{
     monitor,
     network::QuorumStoreSender,
-    quorum_store::{batch_store::BatchReader, counters, utils::Timeouts},
+    quorum_store::{
+        batch_generator::BatchGeneratorCommand, batch_store::BatchReader, counters, utils::Timeouts,
+    },
 };
 use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
@@ -84,8 +86,9 @@ pub(crate) struct ProofCoordinator {
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
-    timeouts: Timeouts<HashValue>,
+    timeouts: Timeouts<SignedDigestInfo>,
     batch_reader: Arc<dyn BatchReader>,
+    batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -94,6 +97,7 @@ impl ProofCoordinator {
         proof_timeout_ms: usize,
         peer_id: PeerId,
         batch_reader: Arc<dyn BatchReader>,
+        batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     ) -> Self {
         Self {
             peer_id,
@@ -102,12 +106,13 @@ impl ProofCoordinator {
             digest_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
             batch_reader,
+            batch_generator_cmd_tx,
         }
     }
 
     fn init_proof(&mut self, signed_digest: &SignedDigest) {
         self.timeouts
-            .add(signed_digest.digest(), self.proof_timeout_ms);
+            .add(signed_digest.info().clone(), self.proof_timeout_ms);
         self.digest_to_proof.insert(
             signed_digest.digest(),
             IncrementalProofState::new(signed_digest.info().clone()),
@@ -156,10 +161,20 @@ impl ProofCoordinator {
         Ok(None)
     }
 
-    fn expire(&mut self) {
-        for digest in self.timeouts.expire() {
+    async fn expire(&mut self) {
+        let mut batch_ids = vec![];
+        for signed_digest_info in self.timeouts.expire() {
             counters::TIMEOUT_BATCHES_COUNT.inc();
-            self.digest_to_proof.remove(&digest);
+            self.digest_to_proof.remove(&signed_digest_info.digest);
+            batch_ids.push(signed_digest_info.batch_id);
+        }
+        if self
+            .batch_generator_cmd_tx
+            .send(BatchGeneratorCommand::ProofExpiration(batch_ids))
+            .await
+            .is_err()
+        {
+            warn!("Failed to send proof expiration to batch generator");
         }
     }
 
@@ -202,7 +217,7 @@ impl ProofCoordinator {
                     }
                 }),
                 _ = interval.tick() => {
-                    monitor!("proof_coordinator_handle_tick", self.expire());
+                    monitor!("proof_coordinator_handle_tick", self.expire().await);
                 }
             }
         }
