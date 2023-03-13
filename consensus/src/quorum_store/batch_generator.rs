@@ -131,7 +131,7 @@ impl BatchGenerator {
                 exclude_txns,
             )
             .await
-            .unwrap();
+            .unwrap_or_default();
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
         if pulled_txns.is_empty() {
