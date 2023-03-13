@@ -17,7 +17,7 @@ type Task = {
 
 export const provider = new Provider(Network.DEVNET);
 // change this to be your module account address
-export const moduleAddress = "0xdf45ae6235bf48c2036f0e32f98af74890773b8cd229db8a078b118708632585";
+export const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
