@@ -4,7 +4,7 @@
 use crate::{
     monitor,
     network::QuorumStoreSender,
-    quorum_store::{counters, utils::Timeouts},
+    quorum_store::{batch_store::BatchReader, counters, utils::Timeouts},
 };
 use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
@@ -16,6 +16,7 @@ use aptos_types::{
 };
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
@@ -84,17 +85,23 @@ pub(crate) struct ProofCoordinator {
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
     timeouts: Timeouts<HashValue>,
+    batch_reader: Arc<dyn BatchReader>,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
 impl ProofCoordinator {
-    pub fn new(proof_timeout_ms: usize, peer_id: PeerId) -> Self {
+    pub fn new(
+        proof_timeout_ms: usize,
+        peer_id: PeerId,
+        batch_reader: Arc<dyn BatchReader>,
+    ) -> Self {
         Self {
             peer_id,
             proof_timeout_ms,
             digest_to_proof: HashMap::new(),
             digest_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
+            batch_reader,
         }
     }
 
@@ -116,7 +123,9 @@ impl ProofCoordinator {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<Option<ProofOfStore>, SignedDigestError> {
         if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
-            if signed_digest.info().batch_author == self.peer_id {
+            if signed_digest.info().batch_author == self.peer_id
+                && self.batch_reader.exists(&signed_digest.digest())
+            {
                 self.init_proof(&signed_digest);
             } else {
                 return Err(SignedDigestError::WrongInfo);

@@ -330,7 +330,11 @@ impl InnerBuilder {
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
-        let proof_coordinator = ProofCoordinator::new(self.config.proof_timeout_ms, self.author);
+        let proof_coordinator = ProofCoordinator::new(
+            self.config.proof_timeout_ms,
+            self.author,
+            self.batch_store.clone().unwrap(),
+        );
         spawn_named!(
             "proof_coordinator",
             proof_coordinator.start(

@@ -3,7 +3,10 @@
 
 use crate::{
     network::NetworkSender,
-    quorum_store::{batch_store::BatchStore, quorum_store_coordinator::CoordinatorCommand},
+    quorum_store::{
+        batch_store::{BatchReader, BatchStore},
+        quorum_store_coordinator::CoordinatorCommand,
+    },
 };
 use aptos_consensus_types::{
     block::Block,
@@ -56,6 +59,7 @@ impl PayloadManager {
         match self {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
+                // TODO: move this to somewhere in quorum store, so this can be a batch reader
                 batch_store.update_certified_round(logical_time).await;
 
                 let digests: Vec<HashValue> = payloads

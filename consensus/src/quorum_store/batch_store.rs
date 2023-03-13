@@ -472,8 +472,23 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             Err(Error::CouldNotGetData)
         }
     }
+}
 
-    pub fn get_batch(
+pub trait BatchReader: Send + Sync {
+    fn exists(&self, digest: &HashValue) -> bool;
+
+    fn get_batch(
+        &self,
+        proof: ProofOfStore,
+    ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>;
+}
+
+impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
+    fn exists(&self, digest: &HashValue) -> bool {
+        self.get_batch_from_local(digest).is_ok()
+    }
+
+    fn get_batch(
         &self,
         proof: ProofOfStore,
     ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>> {
