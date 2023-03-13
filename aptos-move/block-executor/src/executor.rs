@@ -139,6 +139,181 @@ where
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
+    fn preexecute(
+        &self,
+        version: Version,
+        signature_verified_block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        scheduler: &Scheduler,
+        executor: &E,
+        base_view: &S,
+    ) {
+        let _timer = TASK_EXECUTE_SECONDS.start_timer();
+        let (idx_to_execute, incarnation) = version;
+        let txn = &signature_verified_block[idx_to_execute];
+
+        let speculative_view = MVHashMapView::new(versioned_data_cache, scheduler);
+
+        // VM execution.
+        let execute_result = executor.execute_transaction(
+            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+            txn,
+            idx_to_execute,
+            false,
+        );
+        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
+
+        // For tracking whether the recent execution wrote outside of the previous write/delta set.
+        let mut updates_outside = false;
+        let mut apply_updates = |output: &E::Output| {
+            // First, apply writes.
+            let write_version = (idx_to_execute, incarnation);
+            for (k, v) in output.get_writes().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_data_cache.add_write(&k, write_version, v);
+            }
+
+            // Then, apply deltas.
+            for (k, d) in output.get_deltas().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_data_cache.add_delta(&k, idx_to_execute, d);
+            }
+        };
+
+        let result = match execute_result {
+            // These statuses are the results of speculative execution, so even for
+            // SkipRest (skip the rest of transactions) and Abort (abort execution with
+            // user defined error), no immediate action is taken. Instead the statuses
+            // are recorded and (final statuses) are analyzed when the block is executed.
+            ExecutionStatus::Success(output) => {
+                // Apply the writes/deltas to the versioned_data_cache.
+                apply_updates(&output);
+
+                for (key, _) in output.get_writes() {
+                    versioned_data_cache.update_lock_table(key.clone(), idx_to_execute);
+                    versioned_data_cache.add_rw(key.clone(), idx_to_execute);
+                }
+                for read in speculative_view.take_reads() {
+                    let key = read.path();
+                    versioned_data_cache.add_rw(key.clone(), idx_to_execute);
+                }
+                ExecutionStatus::Success(output)
+            },
+            ExecutionStatus::SkipRest(output) => {
+                // Apply the writes/deltas and record status indicating skip.
+                apply_updates(&output);
+                ExecutionStatus::SkipRest(output)
+            },
+            ExecutionStatus::Abort(err) => {
+                // Record the status indicating abort.
+                ExecutionStatus::Abort(Error::UserError(err))
+            },
+        };
+
+        // Remove entries from previous write/delta set that were not overwritten.
+        for k in prev_modified_keys {
+            versioned_data_cache.delete(&k, idx_to_execute);
+        }
+
+        last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
+        // scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
+    }
+
+    fn preexecute_commit(
+        &self,
+        version: Version,
+        signature_verified_block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        scheduler: &Scheduler,
+        executor: &E,
+        base_view: &S,
+    ) {
+        let _timer = TASK_EXECUTE_SECONDS.start_timer();
+        let (idx_to_execute, incarnation) = version;
+        let txn = &signature_verified_block[idx_to_execute];
+
+        let speculative_view = MVHashMapView::new(versioned_data_cache, scheduler);
+
+        if versioned_data_cache.can_commit(idx_to_execute) {
+
+        }
+
+
+        // VM execution.
+        let execute_result = executor.execute_transaction(
+            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+            txn,
+            idx_to_execute,
+            false,
+        );
+        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
+
+        // For tracking whether the recent execution wrote outside of the previous write/delta set.
+        let mut updates_outside = false;
+        let mut apply_updates = |output: &E::Output| {
+            // First, apply writes.
+            let write_version = (idx_to_execute, incarnation);
+            for (k, v) in output.get_writes().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_data_cache.add_write(&k, write_version, v);
+            }
+
+            // Then, apply deltas.
+            for (k, d) in output.get_deltas().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_data_cache.add_delta(&k, idx_to_execute, d);
+            }
+        };
+
+        let result = match execute_result {
+            // These statuses are the results of speculative execution, so even for
+            // SkipRest (skip the rest of transactions) and Abort (abort execution with
+            // user defined error), no immediate action is taken. Instead the statuses
+            // are recorded and (final statuses) are analyzed when the block is executed.
+            ExecutionStatus::Success(output) => {
+                // Apply the writes/deltas to the versioned_data_cache.
+                apply_updates(&output);
+
+                for (key, _) in output.get_writes() {
+                    versioned_data_cache.update_lock_table(key.clone(), idx_to_execute);
+                    versioned_data_cache.add_rw(key.clone(), idx_to_execute);
+                }
+                for read in speculative_view.take_reads() {
+                    let key = read.path();
+                    versioned_data_cache.add_rw(key.clone(), idx_to_execute);
+                }
+                ExecutionStatus::Success(output)
+            },
+            ExecutionStatus::SkipRest(output) => {
+                // Apply the writes/deltas and record status indicating skip.
+                apply_updates(&output);
+                ExecutionStatus::SkipRest(output)
+            },
+            ExecutionStatus::Abort(err) => {
+                // Record the status indicating abort.
+                ExecutionStatus::Abort(Error::UserError(err))
+            },
+        };
+
+        // Remove entries from previous write/delta set that were not overwritten.
+        for k in prev_modified_keys {
+            versioned_data_cache.delete(&k, idx_to_execute);
+        }
+
+        last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
+        // scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
+    }
+
     fn validate(
         &self,
         version_to_validate: Version,
@@ -254,6 +429,188 @@ where
         }
     }
 
+    fn parallel_preexecution(
+        &self,
+        executor_arguments: &E::Argument,
+        block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        scheduler: &Scheduler,
+        base_view: &S,
+        // committing: bool,
+    ) {
+        // Make executor for each task. TODO: fast concurrent executor.
+        let init_timer = VM_INIT_SECONDS.start_timer();
+        let executor = E::init(*executor_arguments);
+        drop(init_timer);
+
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
+        let mut scheduler_task = SchedulerTask::NoTask;
+        loop {
+            scheduler_task = scheduler.next_execution_task_for_preexecution();
+            match scheduler_task {
+                SchedulerTask::ExecutionTask(version_to_execute, None) => {
+                    self.preexecute(
+                    version_to_execute,
+                    block,
+                    last_input_output,
+                    versioned_data_cache,
+                    scheduler,
+                    &executor,
+                    base_view,
+                );
+                },
+                SchedulerTask::Done => {
+                    break;
+                },
+                _ => {
+                    unreachable!();
+                }
+            }
+        }
+    }
+
+    fn parallel_preexecution_commit(
+        &self,
+        executor_arguments: &E::Argument,
+        block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        scheduler: &Scheduler,
+        base_view: &S,
+        commit_status : &Vec<AtomicBool>,
+    ) {
+        // Make executor for each task. TODO: fast concurrent executor.
+        let init_timer = VM_INIT_SECONDS.start_timer();
+        let executor = E::init(*executor_arguments);
+        drop(init_timer);
+
+        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
+        let mut scheduler_task = SchedulerTask::NoTask;
+        loop {
+            scheduler_task = scheduler.next_execution_task_for_preexecution();
+            match scheduler_task {
+                SchedulerTask::ExecutionTask(version_to_execute, None) => {
+                    let txn_idx = version_to_execute.0;
+                    if versioned_data_cache.can_commit(txn_idx) {
+                        commit_status[txn_idx].store(true, Ordering::Relaxed);
+                    }
+                },
+                SchedulerTask::Done => {
+                    break;
+                },
+                _ => {
+                    unreachable!();
+                }
+            }
+        }
+    }
+
+    pub(crate) fn preexecute_transactions_parallel(
+        &self,
+        executor_initial_arguments: E::Argument,
+        signature_verified_block: &Vec<T>,
+        base_view: &S,
+    ) -> (Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>, Vec<AtomicBool>) {
+        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
+        assert!(self.concurrency_level > 1, "Must use sequential execution");
+
+        let versioned_data_cache = MVHashMap::new();
+
+        let num_txns = signature_verified_block.len();
+        let commit_status : Vec<AtomicBool> = (0..num_txns).map(|_| AtomicBool::new(false)).collect();
+
+        if signature_verified_block.is_empty() {
+            return (Ok(vec![]), commit_status);
+        }
+
+        let last_input_output = TxnLastInputOutput::new(num_txns);
+        let scheduler = Scheduler::new(num_txns);
+
+        // optimistically execute all txns in parallel, mark r/w
+        RAYON_EXEC_POOL.scope(|s| {
+            for _ in 0..self.concurrency_level {
+                s.spawn(|_| {
+                    self.parallel_preexecution(
+                        &executor_initial_arguments,
+                        signature_verified_block,
+                        &last_input_output,
+                        &versioned_data_cache,
+                        &scheduler,
+                        base_view,
+                    );
+                });
+            }
+        });
+
+        scheduler.init_exe_idx();
+
+        RAYON_EXEC_POOL.scope(|s| {
+            for _ in 0..self.concurrency_level {
+                s.spawn(|_| {
+                    self.parallel_preexecution_commit(
+                        &executor_initial_arguments,
+                        signature_verified_block,
+                        &last_input_output,
+                        &versioned_data_cache,
+                        &scheduler,
+                        base_view,
+                        &commit_status,
+                    );
+                });
+            }
+        });
+
+        let num_committed = commit_status.iter().filter(|&x| x.load(Ordering::Relaxed)).count();
+
+        // TODO: for large block sizes and many cores, extract outputs in parallel.
+        let mut final_results = Vec::with_capacity(num_committed);
+
+        let maybe_err = if last_input_output.module_publishing_may_race() {
+            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
+            Some(Error::ModulePathReadWrite)
+        } else {
+            let mut ret = None;
+            for idx in 0..num_txns {
+                if commit_status[idx].load(Ordering::Relaxed) {
+                    match last_input_output.take_output(idx) {
+                        ExecutionStatus::Success(t) => final_results.push(t),
+                        ExecutionStatus::SkipRest(t) => {
+                            final_results.push(t);
+                            break;
+                        },
+                        ExecutionStatus::Abort(err) => {
+                            ret = Some(err);
+                            break;
+                        },
+                    };
+                }
+            }
+            ret
+        };
+
+        RAYON_EXEC_POOL.spawn(move || {
+            // Explicit async drops.
+            drop(last_input_output);
+            drop(scheduler);
+        });
+
+        match maybe_err {
+            Some(err) => (Err(err), commit_status),
+            None => {
+                final_results.resize_with(num_txns, E::Output::skip_output);
+                let delta_resolver: OutputDeltaResolver<T> =
+                    OutputDeltaResolver::new(versioned_data_cache);
+                // TODO: parallelize when necessary.
+                (Ok(final_results
+                    .into_iter()
+                    .zip(delta_resolver.resolve(base_view, num_committed).into_iter())
+                    .collect()),
+                commit_status)
+            },
+        }
+    }
+
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
@@ -273,6 +630,25 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
+
+        RAYON_EXEC_POOL.scope(|s| {
+            for _ in 0..self.concurrency_level {
+                s.spawn(|_| {
+                    self.parallel_preexecution(
+                        &executor_initial_arguments,
+                        signature_verified_block,
+                        &last_input_output,
+                        &versioned_data_cache,
+                        &scheduler,
+                        base_view,
+                    );
+                });
+            }
+        });
+
+        scheduler.init_exe_idx();
+
+
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         RAYON_EXEC_POOL.scope(|s| {
@@ -393,11 +769,39 @@ where
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
-            self.execute_transactions_parallel(
+            let mut res = vec![];
+            let (pre_ret, commit_status) = self.preexecute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
-            )
+            );
+
+            match pre_ret {
+                Ok(v) => res.extend(v),
+                _ => return pre_ret,
+            }
+
+            let mut remaining_block = vec![];
+            for i in 0..commit_status.len() {
+                if commit_status[i].load(Ordering::Relaxed) {
+                    remaining_block.push(signature_verified_block[i].clone());
+                }
+            }
+
+            // TODO: update the base_view properly
+
+            let remain_ret = self.execute_transactions_parallel(
+                executor_arguments,
+                &remaining_block,
+                base_view,
+            );
+
+            match remain_ret {
+                Ok(v) => res.extend(v),
+                _ => return remain_ret,
+            }
+
+            Ok(res)
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,

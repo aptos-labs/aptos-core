@@ -24,7 +24,7 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
-pub trait ModulePath {
+pub trait ModulePath: Eq + PartialEq + Hash {
     fn module_path(&self) -> Option<AccessPath>;
 }
 
@@ -41,7 +41,7 @@ impl ModulePath for StateKey {
 
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + 'static {
+pub trait Transaction: Sync + Send + 'static + Clone {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + TransactionWrite;
 }

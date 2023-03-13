@@ -8,12 +8,12 @@ use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
-    collections::btree_map::BTreeMap,
+    collections::{btree_map::BTreeMap, HashSet},
     hash::Hash,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
-    },
+    }, cmp::min,
 };
 
 #[cfg(test)]
@@ -104,6 +104,9 @@ impl<V: TransactionWrite> Default for VersionedValue<V> {
 pub struct MVHashMap<K, V> {
     data: DashMap<K, VersionedValue<V>>,
     delta_keys: Mutex<Vec<K>>,
+    // hashmap that stores smallest txn idx that writes to each key
+    lock_table: DashMap<K, usize>,
+    rw_set: DashMap<usize, HashSet<K>>,
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
@@ -136,6 +139,8 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
             delta_keys: Mutex::new(Vec::new()),
+            lock_table: DashMap::new(),
+            rw_set: DashMap::new(),
         }
     }
 
@@ -295,6 +300,40 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
             },
             None => Err(NotFound),
         }
+    }
+
+    pub fn update_lock_table(&self, key: K, version: usize) {
+        let mut entry = self.lock_table.entry(key).or_insert(version);
+        *entry = min(*entry, version);
+    }
+
+    pub fn read_lock_table(&self, key: &K) -> Option<usize> {
+        if !self.lock_table.contains_key(key) {
+            return None;
+        }
+        Some(*self.lock_table.get(key).unwrap())
+    }
+
+    pub fn init_lock_table(&self) {
+        self.lock_table.clear();
+    }
+
+    pub fn add_rw(&self, key: K, version: usize) {
+        let mut entry = self.rw_set.entry(version).or_insert(HashSet::new());
+        entry.insert(key);
+    }
+
+    pub fn can_commit(&self, version: usize) -> bool {
+        if let Some(read_write_set) = self.rw_set.get(&version) {
+            for k in read_write_set.value() {
+                if let Some(v) = self.read_lock_table(&k) {
+                    if v < version {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 }
 

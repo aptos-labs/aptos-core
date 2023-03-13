@@ -223,6 +223,10 @@ impl Scheduler {
         }
     }
 
+    pub fn init_exe_idx(&self) {
+        self.execution_idx.store(0, Ordering::Relaxed);
+    }
+
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
     pub fn try_commit(&self) -> Option<TxnIndex> {
@@ -331,6 +335,24 @@ impl Scheduler {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
             } else if let Some((version_to_execute, maybe_condvar)) =
+                self.try_execute_next_version()
+            {
+                return SchedulerTask::ExecutionTask(version_to_execute, maybe_condvar);
+            }
+        }
+    }
+
+    /// Return the next execution task for the thread.
+    pub fn next_execution_task_for_preexecution(&self) -> SchedulerTask {
+        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
+        loop {
+            let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
+
+            if idx_to_execute >= self.num_txns {
+                return SchedulerTask::Done;
+            }
+
+            if let Some((version_to_execute, maybe_condvar)) =
                 self.try_execute_next_version()
             {
                 return SchedulerTask::ExecutionTask(version_to_execute, maybe_condvar);
