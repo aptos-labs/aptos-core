@@ -588,6 +588,13 @@ impl EpochManager {
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
 
+
+    async fn start_dag_driver(
+        &mut self,
+    ) {
+        let dag_driver = DagDriver::new();
+    }
+
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
@@ -801,6 +808,7 @@ impl EpochManager {
                     execution_config,
                 )
                 .await
+                // TODO: start dag_river here and eventually move important parts from start_round_manager and delete.
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await

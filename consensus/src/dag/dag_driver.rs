@@ -37,6 +37,7 @@ pub struct DagDriver {
     // TODO: Should we clean more often than once an epoch?
     dag: Dag,
     rb_tx: Sender<ReliableBroadcastCommand>,
+    network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
 }
 
 #[allow(dead_code)]
@@ -50,14 +51,14 @@ impl DagDriver {
         verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
         rb_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-        _self_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     ) -> Self {
         // TODO: should basically replace round manager. Spawns Bullshark and RB and pass channels around
 
         let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
-        // TODO: Start dummy Bullshark. Then spawn from epoch_manager.rs
+        // TODO: Spawn from epoch_manager.rs
 
         let rb = ReliableBroadcast::new(
             author,
@@ -81,6 +82,7 @@ impl DagDriver {
             network_sender,
             dag: Dag::new(epoch, dag_bullshark_tx, verifier.clone()),
             rb_tx,
+            network_msg_rx,
         }
     }
 
@@ -145,8 +147,7 @@ impl DagDriver {
 
     #[allow(dead_code)]
     pub(crate) async fn start(
-        &mut self,
-        mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        mut self,
     ) {
         let node = self.create_node(HashSet::new()).await;
         self.rb_tx
@@ -177,7 +178,7 @@ impl DagDriver {
                     }
                 }
 
-            Some(msg) = network_msg_rx.next() => {
+            Some(msg) = self.network_msg_rx.next() => {
                     match msg {
 
                         VerifiedEvent::CertifiedNodeMsg(certified_node, ack_required) => {
