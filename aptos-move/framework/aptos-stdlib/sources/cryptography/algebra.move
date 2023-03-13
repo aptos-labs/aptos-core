@@ -194,8 +194,11 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]` where `P[]` are `n` elements of group `G`
-    /// and `k[]` are `n` elements of the scalarfield `S` of group `G`.
+    /// Compute `k[0]*P[0]+...+k[n-1]*P[n-1]`, where
+    /// `P[]` are `n` elements of group `G` represented by parameter `elements`, and
+    /// `k[]` are `n` elements of the scalarfield `S` of group `G` represented by parameter `scalars`.
+    ///
+    /// Abort with code 0x010000 if the sizes of `elements` and `scalars` do not match.
     public fun group_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
@@ -242,10 +245,10 @@ module aptos_std::algebra {
 
     /// Efficiently compute `e(P[0],Q[0])+...+e(P[n-1],Q[n-1])`,
     /// where `e: (G1,G2) -> (Gt)` is a pre-compiled pairing function from groups `(G1,G2)` to group `Gt`,
-    /// `P[]` are `n` elements of `G1` taken from parameter `g1_elements`, and
-    /// `Q[]` are `n` elements of `G2` taken from parameter `g2_elements`.
+    /// `P[]` are `n` elements of group `G1` represented by parameter `g1_elements`, and
+    /// `Q[]` are `n` elements of group `G2` represented by parameter `g2_elements`.
     ///
-    /// Abort if sizes of `g1_elements` and `g2_elements` do not match.
+    /// Abort with code 0x010000 if the sizes of `g1_elements` and `g2_elements` do not match.
     public fun multi_pairing<G1,G2,Gt>(g1_elements: &vector<Element<G1>>, g2_elements: &vector<Element<G2>>): Element<Gt> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         let g1_handles = handles_from_elements(g1_elements);

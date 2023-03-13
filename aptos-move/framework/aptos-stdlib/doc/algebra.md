@@ -633,8 +633,11 @@ Get the identity of a group <code>G</code>.
 
 ## Function `group_multi_scalar_mul`
 
-Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code> where <code>P[]</code> are <code>n</code> elements of group <code>G</code>
-and <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code>.
+Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code>, where
+<code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and
+<code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code> represented by parameter <code>scalars</code>.
+
+Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars</code> do not match.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
@@ -781,10 +784,10 @@ Compute <code>P - Q</code> for elements <code>P</code> and <code>Q</code> of a g
 
 Efficiently compute <code>e(P[0],Q[0])+...+e(P[n-1],Q[n-1])</code>,
 where <code>e: (G1,G2) -&gt; (Gt)</code> is a pre-compiled pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,
-<code>P[]</code> are <code>n</code> elements of <code>G1</code> taken from parameter <code>g1_elements</code>, and
-<code>Q[]</code> are <code>n</code> elements of <code>G2</code> taken from parameter <code>g2_elements</code>.
+<code>P[]</code> are <code>n</code> elements of group <code>G1</code> represented by parameter <code>g1_elements</code>, and
+<code>Q[]</code> are <code>n</code> elements of group <code>G2</code> represented by parameter <code>g2_elements</code>.
 
-Abort if sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
+Abort with code 0x010000 if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>&lt;G1, G2, Gt&gt;(g1_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G1&gt;&gt;, g2_elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G2&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;Gt&gt;

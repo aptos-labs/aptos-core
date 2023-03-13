@@ -738,5 +738,15 @@ module aptos_std::algebra_bls12381 {
         multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&g1_elements, &g2_elements);
     }
 
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
+    fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
+        enable_initial_generic_algebraic_operations(&fx);
+        enable_bls12_381_structures(&fx);
+        let elements = vector[insecure_random_element<BLS12_381_G1>()];
+        let scalars = vector[insecure_random_element<BLS12_381_Fr>(), insecure_random_element<BLS12_381_Fr>()];
+        group_multi_scalar_mul(&elements, &scalars);
+    }
+
     // Tests end.
 }

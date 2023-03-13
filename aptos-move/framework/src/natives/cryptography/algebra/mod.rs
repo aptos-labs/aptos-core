@@ -42,7 +42,7 @@ use move_compiler::parser::lexer::Tok::Native;
 pub mod gas;
 
 /// Equivalent to `std::error::invalid_argument(0)` in Move.
-const MOVE_ABORT_CODE_INPUT_SIZE_MISMATCH: u64 = 0x010000;
+const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x010000;
 
 /// Equivalent to `std::error::not_implemented(0)` in Move.
 const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c0000;
@@ -1224,6 +1224,10 @@ macro_rules! ark_multi_scalar_mul_internal {
             let scalar_handles = pop_arg!($args, Vec<u64>);
             let element_handles = pop_arg!($args, Vec<u64>);
             let num_elements = element_handles.len();
+            let num_scalars = scalar_handles.len();
+            if num_elements != num_scalars {
+                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING))
+            }
             let bases = element_handles
                 .iter()
                 .map(|&handle|{
@@ -1744,7 +1748,7 @@ fn multi_pairing_internal(
             let g2_element_handles = pop_arg!(args, Vec<u64>);
             let g1_element_handles = pop_arg!(args, Vec<u64>);
             if g1_element_handles.len() != g2_element_handles.len() {
-                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_SIZE_MISMATCH));
+                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING));
             }
 
             let g1_elements_affine = g1_element_handles.iter().map(|&handle|{
