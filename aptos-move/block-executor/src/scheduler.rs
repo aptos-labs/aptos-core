@@ -227,6 +227,20 @@ impl Scheduler {
         self.execution_idx.store(0, Ordering::Relaxed);
     }
 
+    pub fn import_dep(&self, dep: Vec<Vec<TxnIndex>>) {
+        for (i, dep_vec) in dep.iter().enumerate() {
+            let mut txn_deps = self.txn_dependency[i].lock();
+            *txn_deps = dep_vec.clone();
+        }
+    }
+
+    pub fn export_dep(&self) -> Vec<Vec<TxnIndex>> {
+        self.txn_dependency
+            .iter()
+            .map(|mutex_guard| std::mem::take(&mut *mutex_guard.lock()))
+            .collect()
+    }
+
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
     pub fn try_commit(&self) -> Option<TxnIndex> {

@@ -10,7 +10,7 @@ use crate::{
     },
     errors::*,
     output_delta_resolver::OutputDeltaResolver,
-    scheduler::{Scheduler, SchedulerTask, Version, Wave},
+    scheduler::{Scheduler, SchedulerTask, Version, Wave, TxnIndex},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -511,19 +511,19 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> (Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>, Vec<AtomicBool>) {
+    ) -> (Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>, Vec<Vec<TxnIndex>>, Vec<AtomicBool>) {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_data_cache = MVHashMap::new();
 
-        let num_txns = signature_verified_block.len();
-        let commit_status : Vec<AtomicBool> = (0..num_txns).map(|_| AtomicBool::new(false)).collect();
-
         if signature_verified_block.is_empty() {
-            return (Ok(vec![]), commit_status);
+            return (Ok(vec![]), vec![], vec![]);
         }
 
+
+        let num_txns = signature_verified_block.len();
+        let commit_status : Vec<AtomicBool> = (0..num_txns).map(|_| AtomicBool::new(false)).collect();
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
@@ -562,9 +562,11 @@ where
         });
 
         let num_committed = commit_status.iter().filter(|&x| x.load(Ordering::Relaxed)).count();
+        let txn_dependency = scheduler.export_dep();
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_committed);
+        let mut est_txn_dependency = Vec::with_capacity(num_txns - num_committed);
 
         let maybe_err = if last_input_output.module_publishing_may_race() {
             counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
@@ -573,6 +575,7 @@ where
             let mut ret = None;
             for idx in 0..num_txns {
                 if commit_status[idx].load(Ordering::Relaxed) {
+                    // committed
                     match last_input_output.take_output(idx) {
                         ExecutionStatus::Success(t) => final_results.push(t),
                         ExecutionStatus::SkipRest(t) => {
@@ -584,6 +587,9 @@ where
                             break;
                         },
                     };
+                } else {
+                    // not committed
+                    est_txn_dependency.push(txn_dependency[idx].clone());
                 }
             }
             ret
@@ -596,16 +602,18 @@ where
         });
 
         match maybe_err {
-            Some(err) => (Err(err), commit_status),
+            Some(err) => (Err(err), est_txn_dependency, commit_status),
             None => {
-                final_results.resize_with(num_txns, E::Output::skip_output);
+                final_results.resize_with(num_committed, E::Output::skip_output);
                 let delta_resolver: OutputDeltaResolver<T> =
                     OutputDeltaResolver::new(versioned_data_cache);
                 // TODO: parallelize when necessary.
+                // TODO: revisit delta_resolver logic here
                 (Ok(final_results
                     .into_iter()
                     .zip(delta_resolver.resolve(base_view, num_committed).into_iter())
                     .collect()),
+                est_txn_dependency,
                 commit_status)
             },
         }
@@ -615,6 +623,7 @@ where
         &self,
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
+        est_txn_dependency: Vec<Vec<TxnIndex>>,
         base_view: &S,
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -630,6 +639,7 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
+        scheduler.import_dep(est_txn_dependency);
 
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
@@ -770,7 +780,7 @@ where
     ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             let mut res = vec![];
-            let (pre_ret, commit_status) = self.preexecute_transactions_parallel(
+            let (pre_ret, est_txn_dependency, commit_status) = self.preexecute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
@@ -793,6 +803,7 @@ where
             let remain_ret = self.execute_transactions_parallel(
                 executor_arguments,
                 &remaining_block,
+                est_txn_dependency,
                 base_view,
             );
 

@@ -38,7 +38,7 @@ where
     /// The number of accounts created by default.
     pub const DEFAULT_NUM_ACCOUNTS: usize = 10000;
     /// The number of transactions created by default.
-    pub const DEFAULT_NUM_TRANSACTIONS: usize = 10000;
+    pub const DEFAULT_NUM_TRANSACTIONS: usize = 100000;
 
     /// Creates a new transaction bencher with default settings.
     pub fn new(strategy: S) -> Self {

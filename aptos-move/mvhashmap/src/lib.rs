@@ -105,8 +105,8 @@ pub struct MVHashMap<K, V> {
     data: DashMap<K, VersionedValue<V>>,
     delta_keys: Mutex<Vec<K>>,
     // hashmap that stores smallest txn idx that writes to each key
-    lock_table: DashMap<K, usize>,
-    rw_set: DashMap<usize, HashSet<K>>,
+    lock_table: DashMap<K, TxnIndex>,
+    rw_set: DashMap<TxnIndex, HashSet<K>>,
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
@@ -302,12 +302,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         }
     }
 
-    pub fn update_lock_table(&self, key: K, version: usize) {
+    pub fn update_lock_table(&self, key: K, version: TxnIndex) {
         let mut entry = self.lock_table.entry(key).or_insert(version);
         *entry = min(*entry, version);
     }
 
-    pub fn read_lock_table(&self, key: &K) -> Option<usize> {
+    pub fn read_lock_table(&self, key: &K) -> Option<TxnIndex> {
         if !self.lock_table.contains_key(key) {
             return None;
         }
@@ -318,12 +318,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         self.lock_table.clear();
     }
 
-    pub fn add_rw(&self, key: K, version: usize) {
+    pub fn add_rw(&self, key: K, version: TxnIndex) {
         let mut entry = self.rw_set.entry(version).or_insert(HashSet::new());
         entry.insert(key);
     }
 
-    pub fn can_commit(&self, version: usize) -> bool {
+    pub fn can_commit(&self, version: TxnIndex) -> bool {
         if let Some(read_write_set) = self.rw_set.get(&version) {
             for k in read_write_set.value() {
                 if let Some(v) = self.read_lock_table(&k) {
