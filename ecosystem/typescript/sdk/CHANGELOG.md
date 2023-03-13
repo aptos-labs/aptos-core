@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.8.2 (2023-03-13)
+
 - `CoinClient` and `TokenClient` to use remote ABI instead of local ABIs
 - Reorganize SDK files structure for a better readability and maintainability
 - Add `getIndexerLedgerInfo` query to `IndexerClient`
