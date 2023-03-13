@@ -6,12 +6,15 @@ use crate::{
     quorum_store::{
         counters,
         quorum_store_db::QuorumStoreStorage,
-        types::{BatchId, Fragment},
+        types::Fragment,
         utils::{BatchBuilder, MempoolProxy, RoundExpirations, Timeouts},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::TransactionSummary, proof_of_store::LogicalTime};
+use aptos_consensus_types::{
+    common::TransactionSummary,
+    proof_of_store::{BatchId, LogicalTime},
+};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;

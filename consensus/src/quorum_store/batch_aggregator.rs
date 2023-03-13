@@ -4,10 +4,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::quorum_store::{
-    counters,
-    types::{BatchId, SerializedTransaction},
-};
+use crate::quorum_store::{counters, types::SerializedTransaction};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_logger::{error, warn};
 use aptos_types::transaction::SignedTransaction;

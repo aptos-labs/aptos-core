@@ -3,14 +3,11 @@
 
 use crate::{
     monitor,
-    quorum_store::{
-        counters,
-        types::{BatchId, SerializedTransaction},
-    },
+    quorum_store::{counters, types::SerializedTransaction},
 };
 use aptos_consensus_types::{
     common::{Round, TransactionSummary},
-    proof_of_store::{LogicalTime, ProofOfStore},
+    proof_of_store::{BatchId, LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;

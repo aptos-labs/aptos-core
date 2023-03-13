@@ -63,6 +63,7 @@ impl BatchCoordinator {
                 fragment.batch_id(),
                 fragment.fragment_id(),
             );
+            let batch_id = fragment.batch_id();
             if expiration.epoch() == self.epoch {
                 match entry.end_batch(
                     fragment.batch_id(),
@@ -70,8 +71,9 @@ impl BatchCoordinator {
                     fragment.into_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
-                        let persist_request =
-                            PersistRequest::new(source, payload, digest, num_bytes, expiration);
+                        let persist_request = PersistRequest::new(
+                            source, batch_id, payload, digest, num_bytes, expiration,
+                        );
                         return Some(persist_request);
                     },
                     Err(e) => {

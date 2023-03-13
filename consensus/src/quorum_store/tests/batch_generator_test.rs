@@ -6,10 +6,10 @@ use crate::quorum_store::{
     batch_generator::BatchGenerator,
     quorum_store_db::MockQuorumStoreDB,
     tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
-    types::{BatchId, SerializedTransaction},
+    types::SerializedTransaction,
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::common::TransactionSummary;
+use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{

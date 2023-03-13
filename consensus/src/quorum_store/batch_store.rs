@@ -11,7 +11,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::{
     common::Round,
-    proof_of_store::{LogicalTime, ProofOfStore, SignedDigest},
+    proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigest},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
@@ -42,6 +42,7 @@ pub struct PersistRequest {
 impl PersistRequest {
     pub fn new(
         author: PeerId,
+        batch_id: BatchId,
         payload: Vec<SignedTransaction>,
         digest_hash: HashValue,
         num_bytes: usize,
@@ -49,7 +50,7 @@ impl PersistRequest {
     ) -> Self {
         Self {
             digest: digest_hash,
-            value: PersistedValue::new(Some(payload), expiration, author, num_bytes),
+            value: PersistedValue::new(Some(payload), expiration, author, batch_id, num_bytes),
         }
     }
 }
@@ -367,6 +368,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
                 let num_bytes = persist_request.value.num_bytes as u64;
                 let batch_author = persist_request.value.author;
+                let batch_id = persist_request.value.batch_id;
                 trace!("QS: sign digest {}", persist_request.digest);
                 if needs_db {
                     self.db
@@ -375,6 +377,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 }
                 SignedDigest::new(
                     batch_author,
+                    batch_id,
                     self.epoch(),
                     persist_request.digest,
                     expiration,
