@@ -1714,7 +1714,7 @@ fn pairing_internal(
                 Structure::BLS12381G1,
                 Structure::BLS12381G2,
                 Structure::BLS12381Gt,
-            ));
+            ))?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_obj!(context, new_element);
