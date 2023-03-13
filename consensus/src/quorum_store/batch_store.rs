@@ -191,7 +191,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 expired_keys.push(digest);
             } else {
                 batch_store
-                    .update_cache(digest, value)
+                    .insert_to_cache(digest, value)
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
@@ -219,28 +219,64 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         );
     }
 
-    // Return an error if storage quota is exceeded.
-    fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> anyhow::Result<()> {
+    // Inserts a PersistedValue into the in-memory db_cache. If an entry with a higher
+    // value is already in the db_cache, Ok(false) is returned. If there was no entry
+    // Ok(true) is returned after the successful insertion. Finally, the method returns
+    // an error if storage quota is exceeded (if in-memory quota is exceeded,
+    // only the metadata is stored in the db-cache).
+    // Note: holds db_cache entry lock (due to DashMap), while accessing peer_quota
+    // DashMap. Hence, peer_quota reference should never be held while accessing the
+    // db_cache to avoid the deadlock (if needed, order is db_cache, then peer_quota).
+    pub(crate) fn insert_to_cache(
+        &self,
+        digest: HashValue,
+        mut value: PersistedValue,
+    ) -> anyhow::Result<bool> {
         let author = value.author;
-        if self
-            .peer_quota
-            .entry(author)
-            .or_insert(QuotaManager::new(self.db_quota, self.memory_quota))
-            .update_quota(value.num_bytes)?
-            == StorageMode::PersistedOnly
+        let expiration_round = value.expiration.round();
+
         {
-            value.remove_payload();
+            // Acquire dashmap internal lock on the entry corresponding to the digest.
+            let cache_entry = self.db_cache.entry(digest);
+
+            if let Occupied(entry) = &cache_entry {
+                if entry.get().expiration.round() >= value.expiration.round() {
+                    debug!(
+                        "QS: already have the digest with higher expiration {}",
+                        digest
+                    );
+                    return Ok(false);
+                }
+            };
+
+            if self
+                .peer_quota
+                .entry(author)
+                .or_insert(QuotaManager::new(self.db_quota, self.memory_quota))
+                .update_quota(value.num_bytes)?
+                == StorageMode::PersistedOnly
+            {
+                value.remove_payload();
+            }
+
+            match cache_entry {
+                Occupied(entry) => {
+                    let (k, prev_value) = entry.replace_entry(value);
+                    debug_assert!(k == digest);
+                    self.free_quota(prev_value);
+                },
+                Vacant(slot) => {
+                    slot.insert(value);
+                },
+            }
         }
 
-        let expiration_round = value.expiration.round();
-        if let Some(prev_value) = self.db_cache.insert(digest, value) {
-            self.free_quota(prev_value);
-        }
+        // Add expiration for the inserted entry, no need to be atomic w. insertion.
         self.expirations
             .lock()
             .unwrap()
             .add_item(digest, expiration_round);
-        Ok(())
+        Ok(true)
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
@@ -266,17 +302,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     Ok(false)
                 });
 
-                if let Some(entry) = self.db_cache.get(&digest) {
-                    if entry.expiration.round() >= value.expiration.round() {
-                        debug!(
-                            "QS: already have the digest with higher expiration {}",
-                            digest
-                        );
-                        return Ok(false);
-                    }
-                }
-                self.update_cache(digest, value)?;
-                return Ok(true);
+                return self.insert_to_cache(digest, value);
             }
         }
         bail!("Incorrect expiration {:?} with init gap {} in epoch {}, last committed round {} and max behind gap {} max beyond gap {}",
@@ -288,7 +314,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             self.batch_expiry_round_gap_beyond_latest_certified);
     }
 
-    fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
+    // pub(crate) for testing
+    pub(crate) fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
         assert_eq!(
             certified_time.epoch(),
             self.epoch(),
