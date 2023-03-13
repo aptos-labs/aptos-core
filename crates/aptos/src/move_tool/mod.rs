@@ -67,7 +67,6 @@ use serde::Serialize;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    env,
     fmt::{Display, Formatter},
     ops::Deref,
     path::{Path, PathBuf},
@@ -126,18 +125,6 @@ impl MoveTool {
             MoveTool::View(tool) => tool.execute_serialized().await,
             MoveTool::Coverage(tool) => tool.execute_serialized().await,
         }
-    }
-}
-
-const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
-
-pub(crate) fn set_bytecode_version(version: Option<u32>) {
-    // Note: this is a bit of a hack to get the compiler emit bytecode with the right
-    //       version. In the future, we should add an option to the Move package system
-    //       that would allow us to configure this directly instead of relying on
-    //       environment variables.
-    if let Some(ver) = version {
-        env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
     }
 }
 
@@ -305,7 +292,6 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
@@ -367,7 +353,6 @@ impl CliCommand<CompileScriptOutput> for CompileScript {
 
 impl CompileScript {
     async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..IncludedArtifacts::None.build_options(
@@ -441,7 +426,6 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let mut config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
@@ -454,6 +438,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.move_options.get_package_path()?.as_path(),
             self.move_options.named_addresses(),
             None,
+            self.move_options.bytecode_version,
         )?;
         let _ = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -544,7 +529,6 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let ProvePackage {
             move_options,
             prover_options,
@@ -554,6 +538,7 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options.prove(
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
+                move_options.bytecode_version,
             )
         })
         .await
@@ -660,8 +645,6 @@ impl CliCommand<&'static str> for CoveragePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
-
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: false,
@@ -696,7 +679,6 @@ impl CliCommand<&'static str> for DocumentPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let DocumentPackage {
             move_options,
             docgen_options,
@@ -833,7 +815,6 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let PublishPackage {
             move_options,
             txn_options,
@@ -900,7 +881,6 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let CreateResourceAccountAndPublishPackage {
             seed,
             address_name,
@@ -1054,7 +1034,6 @@ impl CliCommand<&'static str> for VerifyPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
@@ -1177,7 +1156,6 @@ impl CliCommand<&'static str> for CleanPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
         // Only remove the build dir if it exists, allowing for users to still clean their cache

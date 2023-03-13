@@ -106,6 +106,11 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
+                label: "Latest Releases",
+                type: "doc",
+                docId: "releases/index",
+              },
+              {
                 label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",

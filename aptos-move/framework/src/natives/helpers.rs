@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::on_chain_config::{TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -173,6 +173,7 @@ macro_rules! safely_pop_type_arg {
 #[allow(unused)]
 pub struct SafeNativeContext<'a, 'b, 'c> {
     timed_features: &'c TimedFeatures,
+    features: Arc<Features>,
     inner: &'c mut NativeContext<'a, 'b>,
 
     gas_budget: InternalGas,
@@ -212,6 +213,10 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
             Ok(())
         }
     }
+
+    pub fn get_feature_flags(&self) -> &Features {
+        self.features.deref()
+    }
 }
 
 #[allow(unused)]
@@ -233,6 +238,7 @@ pub type SafeNativeResult<T> = Result<T, SafeNativeError>;
 pub fn make_safe_native<G>(
     gas_params: G,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
     func: impl Fn(
             &G,
             &mut SafeNativeContext,
@@ -253,6 +259,7 @@ where
 
         let mut context = SafeNativeContext {
             timed_features: &timed_features,
+            features: features.clone(),
             inner: context,
 
             gas_budget,
