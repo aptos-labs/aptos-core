@@ -7,23 +7,23 @@ This module defines marker types, constants and test cases for working with BLS1
 using generic API defined in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code>.
 
 Below are the BLS12-381 structures currently supported.
-- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Gt">BLS12_381_Gt</a></code>.
-- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code>.
+- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>.
+- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code>.
+- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code>.
+- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>.
+- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>.
 
 
--  [Struct `BLS12_381_Fq`](#0x1_algebra_bls12381_BLS12_381_Fq)
--  [Struct `BLS12_381_Fq2`](#0x1_algebra_bls12381_BLS12_381_Fq2)
--  [Struct `BLS12_381_Fq6`](#0x1_algebra_bls12381_BLS12_381_Fq6)
--  [Struct `BLS12_381_Fq12`](#0x1_algebra_bls12381_BLS12_381_Fq12)
--  [Struct `BLS12_381_G1_Parent`](#0x1_algebra_bls12381_BLS12_381_G1_Parent)
--  [Struct `BLS12_381_G1`](#0x1_algebra_bls12381_BLS12_381_G1)
--  [Struct `BLS12_381_G2_Parent`](#0x1_algebra_bls12381_BLS12_381_G2_Parent)
--  [Struct `BLS12_381_G2`](#0x1_algebra_bls12381_BLS12_381_G2)
--  [Struct `BLS12_381_Gt`](#0x1_algebra_bls12381_BLS12_381_Gt)
--  [Struct `BLS12_381_Fr`](#0x1_algebra_bls12381_BLS12_381_Fr)
+-  [Struct `Fq`](#0x1_algebra_bls12381_Fq)
+-  [Struct `Fq2`](#0x1_algebra_bls12381_Fq2)
+-  [Struct `Fq6`](#0x1_algebra_bls12381_Fq6)
+-  [Struct `Fq12`](#0x1_algebra_bls12381_Fq12)
+-  [Struct `G1AffineParent`](#0x1_algebra_bls12381_G1AffineParent)
+-  [Struct `G1Affine`](#0x1_algebra_bls12381_G1Affine)
+-  [Struct `G2AffineParent`](#0x1_algebra_bls12381_G2AffineParent)
+-  [Struct `G2Affine`](#0x1_algebra_bls12381_G2Affine)
+-  [Struct `Gt`](#0x1_algebra_bls12381_Gt)
+-  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
 -  [Function `format_bls12381fq_lsb`](#0x1_algebra_bls12381_format_bls12381fq_lsb)
 -  [Function `format_bls12381fq_msb`](#0x1_algebra_bls12381_format_bls12381fq_msb)
 -  [Function `format_bls12381fq2_lsc_lsb`](#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb)
@@ -49,9 +49,9 @@ Below are the BLS12-381 structures currently supported.
 
 
 
-<a name="0x1_algebra_bls12381_BLS12_381_Fq"></a>
+<a name="0x1_algebra_bls12381_Fq"></a>
 
-## Struct `BLS12_381_Fq`
+## Struct `Fq`
 
 The finite field $F_q$ used in BLS12-381 curves.
 It has a prime order $q$ equal to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab.
@@ -59,7 +59,7 @@ It has a prime order $q$ equal to 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f385
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq">BLS12_381_Fq</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a>
 </code></pre>
 
 
@@ -80,17 +80,17 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_Fq2"></a>
+<a name="0x1_algebra_bls12381_Fq2"></a>
 
-## Struct `BLS12_381_Fq2`
+## Struct `Fq2`
 
 The finite field $F_{q^2}$ used in BLS12-381 curves.
-It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq">BLS12_381_Fq</a></code>, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
+It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code>, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
 
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq2">BLS12_381_Fq2</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a>
 </code></pre>
 
 
@@ -111,17 +111,17 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_Fq6"></a>
+<a name="0x1_algebra_bls12381_Fq6"></a>
 
-## Struct `BLS12_381_Fq6`
+## Struct `Fq6`
 
 The finite field $F_{q^6}$ used in BLS12-381 curves.
-It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq2">BLS12_381_Fq2</a></code>, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
+It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code>, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
 
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq6">BLS12_381_Fq6</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6">Fq6</a>
 </code></pre>
 
 
@@ -142,15 +142,15 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_Fq12"></a>
+<a name="0x1_algebra_bls12381_Fq12"></a>
 
-## Struct `BLS12_381_Fq12`
+## Struct `Fq12`
 
 The finite field $F_{q^12}$ used in BLS12-381 curves.
-It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq6">BLS12_381_Fq6</a></code>, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
+It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6">Fq6</a></code>, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq12">BLS12_381_Fq12</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a>
 </code></pre>
 
 
@@ -171,9 +171,9 @@ It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_G1_Parent"></a>
+<a name="0x1_algebra_bls12381_G1AffineParent"></a>
 
-## Struct `BLS12_381_G1_Parent`
+## Struct `G1AffineParent`
 
 A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at inifinity,
 under the elliptic curve point addition.
@@ -183,7 +183,7 @@ The identity is the point at infinity.
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a>
 </code></pre>
 
 
@@ -204,17 +204,17 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_G1"></a>
+<a name="0x1_algebra_bls12381_G1Affine"></a>
 
-## Struct `BLS12_381_G1`
+## Struct `G1Affine`
 
 The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-It is subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code>.
+It is subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
+(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a>
 </code></pre>
 
 
@@ -235,18 +235,18 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_G2_Parent"></a>
+<a name="0x1_algebra_bls12381_G2AffineParent"></a>
 
-## Struct `BLS12_381_G2_Parent`
+## Struct `G2AffineParent`
 
 A group constructed by the points on a curve $E'(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
 $E'(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
-The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> is the point at infinity.
+The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> is the point at infinity.
 
 NOTE: currently information-only and no operations are implemented for this structure.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParent">G2AffineParent</a>
 </code></pre>
 
 
@@ -267,17 +267,17 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_G2"></a>
+<a name="0x1_algebra_bls12381_G2Affine"></a>
 
-## Struct `BLS12_381_G2`
+## Struct `G2Affine`
 
 The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-It is a subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code>.
+It is a subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParent">G2AffineParent</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
+(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a>
 </code></pre>
 
 
@@ -298,18 +298,18 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_Gt"></a>
+<a name="0x1_algebra_bls12381_Gt"></a>
 
-## Struct `BLS12_381_Gt`
+## Struct `Gt`
 
 The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
-It is a multiplicative subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq12">BLS12_381_Fq12</a></code>.
+It is a multiplicative subgroup of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>.
 It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001.
-(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code> is the scalar field).
-The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Gt">BLS12_381_Gt</a></code> is 1.
+(so <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> is the scalar field).
+The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> is 1.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Gt">BLS12_381_Gt</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a>
 </code></pre>
 
 
@@ -330,15 +330,15 @@ The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_38
 
 </details>
 
-<a name="0x1_algebra_bls12381_BLS12_381_Fr"></a>
+<a name="0x1_algebra_bls12381_Fr"></a>
 
-## Struct `BLS12_381_Fr`
+## Struct `Fr`
 
 The finite field $F_r$ that can be used as the scalar fields
 for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 
-<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a>
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a>
 </code></pre>
 
 
@@ -363,7 +363,7 @@ for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 ## Function `format_bls12381fq_lsb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq">BLS12_381_Fq</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 48 with the least signature byte coming first.
 
 NOTE: currently information-only, not implemented.
@@ -389,7 +389,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381fq_msb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq">BLS12_381_Fq</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 48 with the most significant byte coming first.
 
 NOTE: currently information-only, not implemented.
@@ -415,7 +415,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381fq2_lsc_lsb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq2">BLS12_381_Fq2</a></code> elements.
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements.
 where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96
 with the following rules.
 - <code>b[0..48]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>()</code>.
@@ -444,7 +444,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381fq2_msc_msb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq2">BLS12_381_Fq2</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements,
 where an element in the form $(c_1\cdot u+c_0)$ is represented by a byte array <code>b[]</code> of size 96,
 with the following rules.
 - <code>b[0..48]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>.
@@ -473,7 +473,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381fq6_lsc_lsc_lsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq6">BLS12_381_Fq6</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6">Fq6</a></code> elements,
 where an element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 288,
 with the following rules.
 - <code>b[0..96]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>()</code>.
@@ -503,7 +503,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381fq12_lsc_lsc_lsc_lsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fq12">BLS12_381_Fq12</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> elements,
 where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
 <code>b[0..288]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>()</code>.
 <code>b[288..576]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>()</code>.
@@ -531,7 +531,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 
 ## Function `format_bls12381g1_affine_parent_uncompressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 96,
 with the following rules deseribed from the perspective of deserialization.
 1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
@@ -566,7 +566,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381g1_affine_parent_compressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 48,
 with the following rules deseribed from the perspective of deserialization.
 1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
@@ -602,9 +602,9 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381g1_affine_uncompressed`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
 essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>()</code>
-but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
@@ -629,9 +629,9 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 
 ## Function `format_bls12381g1_affine_compressed`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
 essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>()</code>
-but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1">BLS12_381_G1</a></code> elements.
+but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
@@ -656,7 +656,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 
 ## Function `format_bls12381g2_affine_parent_uncompressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2_Parent">BLS12_381_G2_Parent</a></code> elements.
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParent">G2AffineParent</a></code> elements.
 where an element is represented by a byte array <code>b[]</code> of size 192,
 with the following rules deseribed from the perspective of deserialization.
 1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
@@ -691,7 +691,7 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381g2_affine_parent_compressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G1_Parent">BLS12_381_G1_Parent</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 96,
 with the following rules deseribed from the perspective of deserialization.
 1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
@@ -727,8 +727,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381g2_affine_uncompressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
 
 NOTE: currently information-only, not implemented.
 
@@ -753,8 +753,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381g2_affine_compressed`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_G2">BLS12_381_G2</a></code> elements.
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
 
 NOTE: currently information-only, not implemented.
 
@@ -779,8 +779,8 @@ NOTE: currently information-only, not implemented.
 
 ## Function `format_bls12381gt`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Gt">BLS12_381_Gt</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Gt">BLS12_381_Gt</a></code> elements.
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements.
 
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
@@ -805,7 +805,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 
 ## Function `format_bls12381fr_lsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the least significant byte coming first.
 
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
@@ -831,7 +831,7 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 
 ## Function `format_bls12381fr_msb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_BLS12_381_Fr">BLS12_381_Fr</a></code> elements,
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the most significant byte coming first.
 
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).

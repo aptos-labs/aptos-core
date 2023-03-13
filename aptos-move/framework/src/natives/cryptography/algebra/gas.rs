@@ -1,7 +1,9 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::algebra::{Structure, BLS12_381_FQ12_FORMAT, BLS12_381_FR_BENDIAN_FORMAT, BLS12_381_FR_FORMAT, BLS12_381_G1_COMPRESSED_FORMAT, BLS12_381_G1_UNCOMPRESSED_FORMAT, BLS12_381_G2_COMPRESSED_FORMAT, BLS12_381_G2_UNCOMPRESSED_FORMAT, BLS12_381_GT_FORMAT, SerializationFormat, HashToStructureSuite};
+use crate::natives::cryptography::algebra::{Structure, SerializationFormat, HashToStructureSuite};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 
 #[derive(Debug, Clone)]
@@ -99,58 +101,25 @@ pub struct GasParameters {
 }
 
 impl GasParameters {
-    pub fn deserialize(&self, structure: Structure, scheme: &[u8]) -> InternalGas {
-        match (structure, scheme) {
-            (Structure::BLS12381Fr, sch) if sch == BLS12_381_FR_FORMAT.as_slice() => {
-                self.ark_bls12_381_fr_deser * NumArgs::one()
-            },
-            (Structure::BLS12381Fr, sch) if sch == BLS12_381_FR_BENDIAN_FORMAT.as_slice() => {
-                self.ark_bls12_381_fr_deser * NumArgs::one()
-            },
-            (Structure::BLS12381Fq12, sch) if sch == BLS12_381_FQ12_FORMAT.as_slice() => {
-                self.ark_bls12_381_fq12_deser * NumArgs::one()
-            },
-            (Structure::BLS12381G1, sch) if sch == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G1, sch) if sch == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, sch) if sch == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, sch) if sch == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
-            },
-            (Structure::BLS12381Gt, sch) if sch == BLS12_381_GT_FORMAT.as_slice() => {
-                self.ark_bls12_381_fq12_deser * NumArgs::one()
-            },
-            (Structure::BLS12381Gt, sch) if sch == BLS12_381_GT_FORMAT.as_slice() => {
-                self.ark_bls12_381_fq12_deser * NumArgs::one()
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn deserialize_v2(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
+    pub fn deserialize(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
         match (structure, format) {
-            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLEndian)
-            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrBEndian) => {
+            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLsb)
+            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrMsb) => {
                 self.ark_bls12_381_fr_deser * NumArgs::one()
             },
-            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12) => {
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLscLscLsb) => {
                 self.ark_bls12_381_fq12_deser * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Uncompressed) => {
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
                 self.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1Compressed) => {
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
                 self.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Unompressed) => {
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUnompressed) => {
                 self.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2Compressed) => {
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
                 self.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
             },
             (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
@@ -387,25 +356,30 @@ impl GasParameters {
         }
     }
 
-    pub fn serialize(&self, structure: Structure, scheme: &[u8]) -> InternalGas {
-        match (structure, scheme) {
-            (Structure::BLS12381Fq12, _) => self.ark_bls12_381_fq12_serialize * NumArgs::one(),
-            (Structure::BLS12381G1, s) if s == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G1, s) if s == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, s) if s == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
-            },
-            (Structure::BLS12381G2, s) if s == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() => {
-                self.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
-            },
-            (Structure::BLS12381Gt, s) if s == BLS12_381_GT_FORMAT.as_slice() => {
+    pub fn serialize(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
+        match (structure, format) {
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLscLscLsb) => {
                 self.ark_bls12_381_fq12_serialize * NumArgs::one()
             },
-            (Structure::BLS12381Fr, _) => self.ark_bls12_381_fr_serialize * NumArgs::one(),
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
+                self.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
+                self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUnompressed) => {
+                self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
+            },
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
+                self.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
+            },
+            (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
+                self.ark_bls12_381_fq12_serialize * NumArgs::one()
+            },
+            (Structure::BLS12381Fr, SerializationFormat::BLS12381FrLsb)
+            | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrMsb) => {
+                self.ark_bls12_381_fr_serialize * NumArgs::one()
+            },
             _ => unreachable!(),
         }
     }

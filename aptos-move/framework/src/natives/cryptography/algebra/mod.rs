@@ -63,11 +63,11 @@ pub enum Structure {
 impl Structure {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
         match type_tag.to_string().as_str() {
-            "0x1::algebra_bls12381::BLS12_381_Fr" => Some(Structure::BLS12381Fr),
-            "0x1::algebra_bls12381::BLS12_381_Fq12" => Some(Structure::BLS12381Fq12),
-            "0x1::algebra_bls12381::BLS12_381_G1" => Some(Structure::BLS12381G1),
-            "0x1::algebra_bls12381::BLS12_381_G2" => Some(Structure::BLS12381G2),
-            "0x1::algebra_bls12381::BLS12_381_Gt" => Some(Structure::BLS12381Gt),
+            "0x1::algebra_bls12381::Fr" => Some(Structure::BLS12381Fr),
+            "0x1::algebra_bls12381::Fq12" => Some(Structure::BLS12381Fq12),
+            "0x1::algebra_bls12381::G1Affine" => Some(Structure::BLS12381G1),
+            "0x1::algebra_bls12381::G2Affine" => Some(Structure::BLS12381G2),
+            "0x1::algebra_bls12381::Gt" => Some(Structure::BLS12381Gt),
             _ => None,
         }
     }
@@ -75,28 +75,29 @@ impl Structure {
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum SerializationFormat {
-    BLS12381Fq12,
-    BLS12381G1Compressed,
-    BLS12381G1Uncompressed,
-    BLS12381G2Compressed,
-    BLS12381G2Unompressed,
+    BLS12381Fq12LscLscLscLsb,
+    BLS12381G1AffineCompressed,
+    BLS12381G1AffineUncompressed,
+    BLS12381G2AffineCompressed,
+    BLS12381G2AffineUnompressed,
     BLS12381Gt,
-    BLS12381FrLEndian,
-    BLS12381FrBEndian,
+    BLS12381FrLsb,
+    BLS12381FrMsb,
 }
 
-impl SerializationFormat {
-    pub fn from_type_tag(type_tag: &TypeTag) -> Option<SerializationFormat> {
-        match type_tag.to_string().as_str() {
-            "0x1::algebra_bls12381::BLS12_381_Fq12_Format" => Some(SerializationFormat::BLS12381Fq12),
-            "0x1::algebra_bls12381::BLS12_381_G1_Format_Compressed" => Some(SerializationFormat::BLS12381G1Compressed),
-            "0x1::algebra_bls12381::BLS12_381_G1_Format_Uncompressed" => Some(SerializationFormat::BLS12381G1Uncompressed),
-            "0x1::algebra_bls12381::BLS12_381_G2_Format_Compressed" => Some(SerializationFormat::BLS12381G2Compressed),
-            "0x1::algebra_bls12381::BLS12_381_G2_Format_Uncompressed" => Some(SerializationFormat::BLS12381G2Unompressed),
-            "0x1::algebra_bls12381::BLS12_381_Gt_Format" => Some(SerializationFormat::BLS12381Gt),
-            "0x1::algebra_bls12381::BLS12_381_Fr_Format_LEndian" => Some(SerializationFormat::BLS12381FrLEndian),
-            "0x1::algebra_bls12381::BLS12_381_Fr_Format_BEndian" => Some(SerializationFormat::BLS12381FrBEndian),
-            _ => None,
+impl TryFrom<Vec<u8>> for SerializationFormat {
+    type Error = ();
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        match hex::encode(value).as_str() {
+            "04" => Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb),
+            "06" => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
+            "0601" => Ok(SerializationFormat::BLS12381G1AffineCompressed),
+            "08" => Ok(SerializationFormat::BLS12381G2AffineUnompressed),
+            "0801" => Ok(SerializationFormat::BLS12381G2AffineCompressed),
+            "09" => Ok(SerializationFormat::BLS12381Gt),
+            "0a" => Ok(SerializationFormat::BLS12381FrLsb),
+            "0a01" => Ok(SerializationFormat::BLS12381FrMsb),
+            _ => Err(()),
         }
     }
 }
@@ -166,31 +167,20 @@ macro_rules! get_obj_pointer {
     }};
 }
 
-// Pre-defined serialization scheme IDs.
-// They has to match those in `aptos-move/framework/aptos-stdlib/sources/cryptography/algebra.move`.
-static BLS12_381_FQ12_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("04").unwrap());
-static BLS12_381_G1_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("06").unwrap());
-static BLS12_381_G1_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("0601").unwrap());
-static BLS12_381_G2_UNCOMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("08").unwrap());
-static BLS12_381_G2_COMPRESSED_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("0801").unwrap());
-static BLS12_381_GT_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("09").unwrap());
-static BLS12_381_FR_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("0a").unwrap());
-static BLS12_381_FR_BENDIAN_FORMAT: Lazy<Vec<u8>> = Lazy::new(|| hex::decode("0a01").unwrap());
-
 macro_rules! ark_serialize_internal {
     (
         $gas_params:expr,
         $context:expr,
         $structure:expr,
         $handle:expr,
-        $scheme:expr,
+        $format:expr,
         $typ:ty,
         $ser_func:ident
     ) => {{
         let element_ptr = get_obj_pointer!($context, $handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let mut buf = Vec::new();
-        $context.charge($gas_params.serialize($structure, $scheme))?;
+        $context.charge($gas_params.serialize($structure, $format))?;
         element.$ser_func(&mut buf).unwrap();
         buf
     }};
@@ -202,7 +192,7 @@ macro_rules! ark_ec_point_serialize_internal {
         $context:expr,
         $structure:expr,
         $handle:expr,
-        $scheme:expr,
+        $format:expr,
         $typ:ty,
         $ser_func:ident
     ) => {{
@@ -210,7 +200,7 @@ macro_rules! ark_ec_point_serialize_internal {
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
-        $context.charge($gas_params.serialize($structure, $scheme))?;
+        $context.charge($gas_params.serialize($structure, $format))?;
         element_affine.$ser_func(&mut buf).unwrap();
         buf
     }};
@@ -224,117 +214,101 @@ fn serialize_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     let handle = safely_pop_arg!(args, u64) as usize;
-    let scheme = safely_pop_arg!(args, Vec<u8>);
+    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, Vec<u8>));
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    match (structure_opt, scheme) {
-        (Some(Structure::BLS12381Fr), scheme)
-            if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() =>
-        {
+    match (structure_opt, format_opt) {
+        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fr,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Fr), scheme)
-            if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
             let mut buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fr,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381FrMsb,
                 ark_bls12_381::Fr,
                 serialize_uncompressed
             );
             buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Fq12), scheme)
-            if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fq12,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381Fq12LscLscLscLsb,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G1), scheme)
-            if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G1,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G1AffineUncompressed,
                 ark_bls12_381::G1Projective,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G1), scheme)
-            if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G1,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G1AffineCompressed,
                 ark_bls12_381::G1Projective,
                 serialize_compressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G2), scheme)
-            if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUnompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G2,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G2AffineUnompressed,
                 ark_bls12_381::G2Projective,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G2), scheme)
-            if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G2,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G2AffineCompressed,
                 ark_bls12_381::G2Projective,
                 serialize_compressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Gt), scheme)
-            if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Gt,
                 handle,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381Gt,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
@@ -350,11 +324,11 @@ macro_rules! ark_deserialize_internal {
         $context:expr,
         $bytes:expr,
         $structure:expr,
-        $scheme:expr,
+        $format:expr,
         $typ:ty,
         $deser_func:ident
     ) => {{
-        $context.charge($gas_params.deserialize($structure, $scheme))?;
+        $context.charge($gas_params.deserialize($structure, $format))?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let handle = store_obj!($context, element);
@@ -371,11 +345,11 @@ macro_rules! ark_ec_point_deserialize_internal {
         $context:expr,
         $bytes:expr,
         $structure:expr,
-        $scheme:expr,
+        $format:expr,
         $typ:ty,
         $deser_func:ident
     ) => {{
-        $context.charge($gas_params.deserialize($structure, $scheme))?;
+        $context.charge($gas_params.deserialize($structure, $format))?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = Projective::from(element);
@@ -398,11 +372,9 @@ fn deserialize_internal(
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
-    let scheme = safely_pop_arg!(args, Vec<u8>);
-    match (structure, scheme) {
-        (Some(Structure::BLS12381Fr), scheme)
-            if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() =>
-        {
+    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, Vec<u8>));
+    match (structure, format_opt) {
+        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -411,14 +383,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381Fr,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381Fr), scheme)
-            if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -430,14 +400,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381Fr,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381FrMsb,
                 ark_bls12_381::Fr,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381Fq12), scheme)
-            if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb)) => {
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -446,14 +414,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381Fq12,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381Fq12LscLscLscLsb,
                 ark_bls12_381::Fq12,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G1), scheme)
-            if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -462,14 +428,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381G1,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G1AffineUncompressed,
                 ark_bls12_381::G1Affine,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G1), scheme)
-            if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
             if bytes.len() != 48 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -478,14 +442,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381G1,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G1AffineCompressed,
                 ark_bls12_381::G1Affine,
                 deserialize_compressed
             )
         },
-        (Some(Structure::BLS12381G2), scheme)
-            if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUnompressed)) => {
             if bytes.len() != 192 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -494,14 +456,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381G2,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G2AffineUnompressed,
                 ark_bls12_381::G2Affine,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G2), scheme)
-            if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -510,18 +470,16 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381G2,
-                scheme.as_slice(),
+                SerializationFormat::BLS12381G2AffineCompressed,
                 ark_bls12_381::G2Affine,
                 deserialize_compressed
             )
         },
-        (Some(Structure::BLS12381Gt), scheme)
-            if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() =>
-        {
+        (Some(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
-            context.charge(gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()))?;
+            context.charge(gas_params.deserialize(Structure::BLS12381Gt, SerializationFormat::BLS12381Gt))?;
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
@@ -1464,7 +1422,7 @@ fn group_scalar_mul_internal(
                 context,
                 args,
                 Structure::BLS12381G1,
-                Structure::BLS12_381_Fr,
+                Structure::BLS12381Fr,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr,
                 mul_bigint
@@ -1476,7 +1434,7 @@ fn group_scalar_mul_internal(
                 context,
                 args,
                 Structure::BLS12381G2,
-                Structure::BLS12_381_Fr,
+                Structure::BLS12381Fr,
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr,
                 mul_bigint
