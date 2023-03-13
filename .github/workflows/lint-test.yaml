@@ -180,6 +180,7 @@ jobs:
 
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
+    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }} 
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

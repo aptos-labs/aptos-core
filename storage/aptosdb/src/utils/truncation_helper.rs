@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 use crate::{
+    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -31,6 +32,30 @@ use std::{
         Arc,
     },
 };
+
+pub(crate) fn get_overall_commit_progress(ledger_db: &DB) -> Result<Option<Version>> {
+    get_commit_progress(ledger_db, &DbMetadataKey::OverallCommitProgress)
+}
+
+pub(crate) fn get_ledger_commit_progress(ledger_db: &DB) -> Result<Option<Version>> {
+    get_commit_progress(ledger_db, &DbMetadataKey::LedgerCommitProgress)
+}
+
+pub(crate) fn get_state_kv_commit_progress(state_kv_db: &DB) -> Result<Option<Version>> {
+    get_commit_progress(state_kv_db, &DbMetadataKey::StateKVCommitProgress)
+}
+
+fn get_commit_progress(db: &DB, progress_key: &DbMetadataKey) -> Result<Option<Version>> {
+    Ok(
+        if let Some(DbMetadataValue::Version(overall_commit_progress)) =
+            db.get::<DbMetadataSchema>(progress_key)?
+        {
+            Some(overall_commit_progress)
+        } else {
+            None
+        },
+    )
+}
 
 pub(crate) fn truncate_ledger_db(
     ledger_db: Arc<DB>,
@@ -77,6 +102,10 @@ pub(crate) fn truncate_state_kv_db(
         let end_version = current_version + 1;
         let batch = SchemaBatch::new();
         delete_state_value_and_index(&state_kv_db, start_version, end_version, &batch)?;
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateKVCommitProgress,
+            &DbMetadataValue::Version(start_version - 1),
+        )?;
         state_kv_db.write_schemas(batch)?;
         current_version = start_version - 1;
         status.set_current_version(current_version);
@@ -185,13 +214,15 @@ fn truncate_ledger_db_single_batch(
     delete_transaction_index_data(transaction_store, start_version, end_version, &batch)?;
     delete_per_epoch_data(ledger_db, start_version, end_version, &batch)?;
     delete_per_version_data(start_version, end_version, &batch)?;
-    // TODO(grao): Remove this once we move to state K/V db.
-    delete_state_value_and_index(ledger_db, start_version, end_version, &batch)?;
 
     event_store.prune_events(start_version, end_version, &batch)?;
 
     truncate_transaction_accumulator(ledger_db, start_version, end_version, &batch)?;
 
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::LedgerCommitProgress,
+        &DbMetadataValue::Version(start_version - 1),
+    )?;
     ledger_db.write_schemas(batch)
 }
 

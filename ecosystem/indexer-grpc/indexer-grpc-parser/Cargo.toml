@@ -1,0 +1,49 @@
+[package]
+name = "aptos-indexer-grpc-parser"
+description = "Indexer GRPC Parser (Rust)"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-bitvec = { workspace = true }
+aptos-crash-handler = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+bigdecimal = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+diesel = { workspace = true }
+diesel_migrations = { workspace = true }
+field_count = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+once_cell = { workspace = true }
+prost = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+url = { workspace = true }
+warp = { workspace = true }

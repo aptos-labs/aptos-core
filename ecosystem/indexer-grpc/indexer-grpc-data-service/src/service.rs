@@ -13,7 +13,7 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::datastream::v1::{
     indexer_stream_server::IndexerStream,
     raw_datastream_response::Response as DatastreamProtoResponse, RawDatastreamRequest,
-    RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+    RawDatastreamResponse, StreamStatus, TransactionOutput, TransactionsOutput,
 };
 use futures::Stream;
 use std::{pin::Pin, sync::Arc, time::Duration};
@@ -107,6 +107,16 @@ impl IndexerStream for DatastreamServer {
                 current_version = current_version,
                 "[Indexer Data] New request received."
             );
+            tx.send(Ok(RawDatastreamResponse {
+                chain_id: chain_id as u32,
+                response: Some(DatastreamProtoResponse::Status(StreamStatus {
+                    r#type: 1,
+                    start_version: current_version,
+                    ..StreamStatus::default()
+                })),
+            }))
+            .await
+            .unwrap();
             loop {
                 // 1. Fetch data from cache and file store.
                 let transaction_data =
