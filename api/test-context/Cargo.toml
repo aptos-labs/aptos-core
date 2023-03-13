@@ -22,6 +22,7 @@ aptos-crypto = { workspace = true }
 aptos-db = { workspace = true, features = ["fuzzing"] }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-mempool-notifications = { workspace = true }
@@ -31,6 +32,7 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-validator = { workspace = true }
+bcs = { workspace = true }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
 hyper = { workspace = true }

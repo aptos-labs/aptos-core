@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Mempool is used to track transactions which have been submitted but not yet
@@ -19,7 +20,6 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
@@ -115,10 +115,9 @@ impl Mempool {
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
-        sequence_info: AccountSequenceInfo,
+        db_sequence_number: u64,
         timeline_state: TimelineState,
     ) -> MempoolStatus {
-        let db_sequence_number = sequence_info.min_seq();
         trace!(
             LogSchema::new(LogEntry::AddTxn)
                 .txns(TxnsLog::new_txn(txn.sender(), txn.sequence_number())),
@@ -143,7 +142,7 @@ impl Mempool {
             expiration_time,
             ranking_score,
             timeline_state,
-            AccountSequenceInfo::Sequential(db_sequence_number),
+            db_sequence_number,
             now,
         );
 
@@ -166,6 +165,7 @@ impl Mempool {
         &self,
         max_txns: u64,
         max_bytes: u64,
+        return_non_full: bool,
         mut seen: HashSet<TxnPointer>,
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
@@ -215,12 +215,14 @@ impl Mempool {
         }
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);
+        let mut full_bytes = false;
         for (address, seq) in result {
             if let Some((txn, ranking_score)) =
                 self.transactions.get_with_ranking_score(&address, seq)
             {
                 let txn_size = txn.raw_txn_bytes_len();
                 if total_bytes + txn_size > max_bytes as usize {
+                    full_bytes = true;
                     break;
                 }
                 total_bytes += txn_size;
@@ -234,15 +236,37 @@ impl Mempool {
             }
         }
 
-        debug!(
-            LogSchema::new(LogEntry::GetBlock),
-            seen_consensus = seen_size,
-            walked = txn_walked,
-            seen_after = seen.len(),
-            result_size = result_size,
-            block_size = block.len(),
-            byte_size = total_bytes,
-        );
+        if result_size > 0 {
+            debug!(
+                LogSchema::new(LogEntry::GetBlock),
+                seen_consensus = seen_size,
+                walked = txn_walked,
+                seen_after = seen.len(),
+                // before size and non full check
+                result_size = result_size,
+                // before non full check
+                byte_size = total_bytes,
+                block_size = block.len(),
+                return_non_full = return_non_full,
+            );
+        } else {
+            trace!(
+                LogSchema::new(LogEntry::GetBlock),
+                seen_consensus = seen_size,
+                walked = txn_walked,
+                seen_after = seen.len(),
+                // before size and non full check
+                result_size = result_size,
+                // before non full check
+                byte_size = total_bytes,
+                block_size = block.len(),
+                return_non_full = return_non_full,
+            );
+        }
+
+        if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
+            block.clear();
+        }
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);

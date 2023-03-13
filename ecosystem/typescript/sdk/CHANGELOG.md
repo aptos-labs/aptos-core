@@ -6,6 +6,18 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- `CoinClient` and `TokenClient` to use remote ABI instead of local ABIs
+- Reorganize SDK files structure for a better readability and maintainability
+
+## 1.7.1 (2023-03-02)
+
+- Fix IndexerClient error parsing using JSON.stringify() to display the error message correctly on the console
+
+## 1.7.0 (2023-03-01)
+
+- Add Indexer support. We introduce a new class `IndexerClient` that queries our Indexer to support data shaping fetching and providing users with a seamless experience.
+- Introduces a `Provider` class we can initialize and query our blockchain by hiding the underlying implementation (fullnode vs indexer)
+
 ## 1.6.0 (2023-01-20)
 
 - Add support to Move view functions

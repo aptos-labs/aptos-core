@@ -121,13 +121,38 @@ module std::features {
         is_enabled(RESOURCE_GROUPS)
     }
 
-    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 10;
+    /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+    const MULTISIG_ACCOUNTS: u64 = 10;
+
+    public fun get_multisig_accounts_feature(): u64 { MULTISIG_ACCOUNTS }
+
+    public fun multisig_accounts_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_ACCOUNTS)
+    }
+
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
+    public fun delegation_pools_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOLS)
+    }
+
+    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    ///
+    /// Lifetime: transient
+    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 12;
     public fun get_generic_agebraic_structures_basic_operations_feature(): u64 { GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS }
     public fun generic_algebraic_structures_basic_operations_enabled(): bool acquires Features {
         is_enabled(GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS)
     }
 
-    const BLS12_381_STRUCTURES: u64 = 11;
+    /// Whether the generic algebra implementation for BLS12381 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_381_STRUCTURES: u64 = 13;
     public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
     public fun bls12_381_structures_enabled(): bool acquires Features {
         is_enabled(BLS12_381_STRUCTURES)

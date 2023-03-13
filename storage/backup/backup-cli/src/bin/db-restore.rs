@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -65,8 +66,7 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).init();
-    #[allow(deprecated)]
-    let _mp = MetricsPusher::start();
+    let _mp = MetricsPusher::start(vec![]);
 
     let opt = Opt::from_args();
     let global_opt: GlobalRestoreOptions = opt.global.clone().try_into()?;

@@ -233,26 +233,31 @@ module aptos_framework::coin {
         borrow_global<CoinStore<CoinType>>(owner).coin.value
     }
 
+    #[view]
     /// Returns `true` if the type `CoinType` is an initialized coin.
     public fun is_coin_initialized<CoinType>(): bool {
         exists<CoinInfo<CoinType>>(coin_address<CoinType>())
     }
 
+    #[view]
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
     public fun is_account_registered<CoinType>(account_addr: address): bool {
         exists<CoinStore<CoinType>>(account_addr)
     }
 
+    #[view]
     /// Returns the name of the coin.
     public fun name<CoinType>(): string::String acquires CoinInfo {
         borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).name
     }
 
+    #[view]
     /// Returns the symbol of the coin, usually a shorter version of the name.
     public fun symbol<CoinType>(): string::String acquires CoinInfo {
         borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).symbol
     }
 
+    #[view]
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -260,6 +265,7 @@ module aptos_framework::coin {
         borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).decimals
     }
 
+    #[view]
     /// Returns the amount of coin in existence.
     public fun supply<CoinType>(): Option<u128> acquires CoinInfo {
         let maybe_supply = &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
@@ -466,8 +472,8 @@ module aptos_framework::coin {
         spec {
             assume dst_coin.value + source_coin.value <= MAX_U64;
         };
-        dst_coin.value = dst_coin.value + source_coin.value;
-        let Coin { value: _ } = source_coin;
+        let Coin { value } = source_coin;
+        dst_coin.value = dst_coin.value + value;
     }
 
     /// Mint new `Coin` with capability.

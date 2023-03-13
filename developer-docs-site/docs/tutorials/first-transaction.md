@@ -119,7 +119,7 @@ Now see the below walkthrough of the SDK functions used to accomplish the above 
 
 ## Step 4: The SDK in depth
 
-The `transfer-coin` example code uses helper functions to interact with the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). This section reviews each of the calls and gives insights into functionality.
+The `transfer-coin` example code uses helper functions to interact with the [REST API](https://aptos.dev/nodes/aptos-api-spec#/). This section reviews each of the calls and gives insights into functionality.
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -149,7 +149,7 @@ See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/mai
 In the first step, the `transfer-coin` example initializes both the REST and faucet clients:
 
 - The REST client interacts with the REST API.
-- The faucet client interacts with the devnet Faucet service for creating and funding accounts.
+- The faucet client interacts with the devnet Faucet service for [creating and funding accounts](../guides/get-test-funds.md).
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -275,7 +275,7 @@ In this step, the SDK translates a single call into the process of querying a re
 Behind the scenes, the `checkBalance` function in `CoinClient` in the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
 
 ```ts
-:!: static/sdks/typescript/src/coin_client.ts checkBalance
+:!: static/sdks/typescript/src/plugins/coin_client.ts checkBalance
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -323,12 +323,12 @@ Like the previous step, this is another helper step that constructs a transactio
 
 Behind the scenes, the `transfer` function generates a transaction payload and has the client sign, send, and wait for it:
 ```ts
-:!: static/sdks/typescript/src/coin_client.ts transfer
+:!: static/sdks/typescript/src/plugins/coin_client.ts transfer
 ```
 
 Within the client, <code>generateSignSubmitTransaction</code> is doing this:
 ```ts
-:!: static/sdks/typescript/src/aptos_client.ts generateSignSubmitTransactionInner
+:!: static/sdks/typescript/src/providers/aptos_client.ts generateSignSubmitTransactionInner
 ```
 
 Breaking the above down into pieces:
@@ -418,4 +418,4 @@ The transaction hash can be used to query the status of a transaction:
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

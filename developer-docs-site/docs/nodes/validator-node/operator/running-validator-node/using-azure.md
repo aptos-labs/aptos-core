@@ -88,7 +88,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
   }
   ```
 
-    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+    For the full customization options, see the variables file [`variables.tf`](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file.
   ```bash
@@ -155,7 +155,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create two YAML files in the `~/$WORKSPACE/$USERNAME` directory: `owner.yaml` and `operator.yaml`. 
 
-12. Download the following files by following the download commands on the [Node Files](/nodes/node-files-all-networks/node-files.md) page:
+12. Download the following files by following the download commands on the [Node Files](../../../node-files-all-networks/node-files.md) page:
     - `genesis.blob`
     - `waypoint.txt`
 

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -190,7 +191,6 @@ impl DB {
     /// Writes single record.
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
-        // Used in tests only anyway.
         let batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.write_schemas(batch)

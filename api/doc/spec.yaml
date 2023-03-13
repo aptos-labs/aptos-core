@@ -9820,6 +9820,22 @@ components:
           description: The number of signatures required for a successful transaction
         bitmap:
           $ref: '#/components/schemas/HexEncodedBytes'
+    MultisigPayload:
+      type: object
+      description: |-
+        A multisig transaction that allows an owner of a multisig account to execute a pre-approved
+        transaction as the multisig account.
+      required:
+      - multisig_address
+      properties:
+        multisig_address:
+          $ref: '#/components/schemas/Address'
+        transaction_payload:
+          $ref: '#/components/schemas/MultisigTransactionPayload'
+    MultisigTransactionPayload:
+      type: object
+      anyOf:
+      - $ref: '#/components/schemas/EntryFunctionPayload'
     PendingTransaction:
       type: object
       description: A transaction waiting in mempool
@@ -10005,12 +10021,14 @@ components:
       - $ref: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
       - $ref: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
+      - $ref: '#/components/schemas/TransactionPayload_MultisigPayload'
       discriminator:
         propertyName: type
         mapping:
           entry_function_payload: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
           module_bundle_payload: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
+          multisig_payload: '#/components/schemas/TransactionPayload_MultisigPayload'
     TransactionPayload_EntryFunctionPayload:
       allOf:
       - type: object
@@ -10031,6 +10049,16 @@ components:
             type: string
             example: module_bundle_payload
       - $ref: '#/components/schemas/ModuleBundlePayload'
+    TransactionPayload_MultisigPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: multisig_payload
+      - $ref: '#/components/schemas/MultisigPayload'
     TransactionPayload_ScriptPayload:
       allOf:
       - type: object

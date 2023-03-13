@@ -10,12 +10,12 @@ This document explains how the rewards for validator are evaluated and displayed
 ## How rewards are calculated
 
 :::tip Staking documentation
-For a backgrounder on staking with explanations of epoch, rewards and how to join and leave validator set, see the [Staking](/concepts/staking.md). 
+For a backgrounder on staking with explanations of epoch, rewards and how to join and leave validator set, see the [Staking](../concepts/staking.md). 
 :::
 
 - An epoch starts with a finalized validator set. During the epoch, only validators in this validator set will vote. 
-- Epoch value on the mainnet is set by the governance. See [Aptos Blockchain Deployments](/nodes/aptos-deployments.md) for epoch values for other Aptos networks.
-- During the epoch, following the process described in [Validation on the Aptos blockchain](/concepts/staking#validation-on-the-aptos-blockchain), a validator is selected as a leader to make a proposal. Because the validator set is unchanged during the course of an epoch, this will result in a validator being selected multiple times as a leader in an epoch.
+- Epoch value on the mainnet is set by the governance. See [Aptos Blockchain Deployments](./aptos-deployments.md) for epoch values for other Aptos networks.
+- During the epoch, following the process described in [Validation on the Aptos blockchain](../concepts/staking.md#validation-on-the-aptos-blockchain), a validator is selected as a leader to make a proposal. Because the validator set is unchanged during the course of an epoch, this will result in a validator being selected multiple times as a leader in an epoch.
 -  On successful proposals, i.e., proposals achieving the quorum consensus, the leaders earn rewards based on their stake and on the reward rate that is configured on-chain. The reward rate is the same for every validator.
 -  If all the proposals in an epoch achieve quorum consensus, a validator earns the maximum reward for the epoch. **Rewards are given only to the leader validators, and not to the voters.**
 -  On failed proposals, i.e., a proposal that did not achieve the quorum consensus, the leaders do not earn any reward for that proposal.

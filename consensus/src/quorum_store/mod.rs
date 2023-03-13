@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod counters;
@@ -8,7 +8,6 @@ pub mod direct_mempool_quorum_store;
 pub(crate) mod batch_aggregator;
 pub(crate) mod batch_coordinator;
 pub(crate) mod batch_generator;
-pub(crate) mod batch_reader;
 pub(crate) mod batch_requester;
 pub(crate) mod batch_store;
 pub(crate) mod network_listener;

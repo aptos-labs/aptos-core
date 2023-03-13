@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -13,14 +13,14 @@ use aptos_framework::natives::{
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -34,6 +34,7 @@ impl MoveVmExt {
         gas_feature_version: u64,
         chain_id: u8,
         features: Features,
+        timed_features: TimedFeatures,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
@@ -45,17 +46,19 @@ impl MoveVmExt {
                 5
             };
 
+        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
+                    timed_features.clone(),
+                    Arc::new(features),
                 ),
                 VMConfig {
-                    verifier: verifier_config(
-                        features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                    ),
+                    verifier: verifier_config(treat_friend_as_private, &timed_features),
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                 },
@@ -114,7 +117,33 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
+pub fn verifier_config(
+    _treat_friend_as_private: bool,
+    timed_features: &TimedFeatures,
+) -> VerifierConfig {
+    let mut max_back_edges_per_function = None;
+    let mut max_back_edges_per_module = None;
+    let mut max_basic_blocks_in_script = None;
+
+    let mut max_per_fun_meter_units = None;
+    let mut max_per_mod_meter_units = None;
+
+    let legacy_limit_back_edges =
+        timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges);
+    let metering = timed_features.is_enabled(TimedFeatureFlag::VerifierMetering);
+
+    if legacy_limit_back_edges && !metering {
+        // Turn on limit on back edges, as long as metering is not active
+        max_back_edges_per_function = Some(20);
+        max_back_edges_per_module = Some(400);
+        max_basic_blocks_in_script = Some(1024);
+    }
+
+    if metering {
+        max_per_fun_meter_units = Some(1000 * 80000);
+        max_per_mod_meter_units = Some(1000 * 80000);
+    }
+
     VerifierConfig {
         max_loop_depth: Some(5),
         max_generic_instantiation_length: Some(32),
@@ -127,5 +156,10 @@ pub fn verifier_config(_treat_friend_as_private: bool) -> VerifierConfig {
         max_struct_definitions: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
+        max_back_edges_per_function,
+        max_back_edges_per_module,
+        max_basic_blocks_in_script,
+        max_per_fun_meter_units,
+        max_per_mod_meter_units,
     }
 }

@@ -1,10 +1,13 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    access_path::AccessPath, state_store::state_key::StateKey, write_set::TransactionWrite,
+    access_path::AccessPath,
+    state_store::state_key::{StateKey, StateKeyInner},
+    write_set::TransactionWrite,
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -27,7 +30,7 @@ pub trait ModulePath {
 
 impl ModulePath for StateKey {
     fn module_path(&self) -> Option<AccessPath> {
-        if let StateKey::AccessPath(ap) = self {
+        if let StateKeyInner::AccessPath(ap) = self.inner() {
             if ap.is_code() {
                 return Some(ap.clone());
             }
@@ -39,7 +42,7 @@ impl ModulePath for StateKey {
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + TransactionWrite;
 }
 

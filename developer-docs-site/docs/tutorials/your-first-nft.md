@@ -311,7 +311,7 @@ Your application will call `createCollection`:
 
 The is the function signature of `createCollection`. It returns a transaction hash:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts createCollection
+:!: static/sdks/typescript/src/plugins/token_client.ts createCollection
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -348,7 +348,7 @@ Your application will call `createToken`:
 
 The is the function signature of `createToken`. It returns a transaction hash:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts createToken
+:!: static/sdks/typescript/src/plugins/token_client.ts createToken
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -390,7 +390,7 @@ To read a token's metadata:
 
 Here's how `getTokenData` queries the token metadata:
 ```ts
-:!: static/sdks/typescript/src/token_client.ts getTokenData
+:!: static/sdks/typescript/src/plugins/token_client.ts getTokenData
 ```
 
   </TabItem>
@@ -524,4 +524,4 @@ Coming soon.
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)
-* [REST API specification](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [REST API specification](https://aptos.dev/nodes/aptos-api-spec#/)

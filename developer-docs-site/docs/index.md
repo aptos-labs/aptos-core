@@ -14,6 +14,10 @@ This documentation will help you develop applications for the Aptos blockchain, 
 
 > Please note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## Find the latest releases
+
+See the newest Aptos releases in the [Latest Releases](./releases/index.md) list and its subpages.
+
 ## Set up your environment and start with the tutorials
 
 <div class="docs-card-container">
@@ -108,7 +112,7 @@ This documentation will help you develop applications for the Aptos blockchain, 
   <div class="col">
   <div class="card h-100" >
     <div class="card-body d-flex flex-column"  >
-    <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
+    <a href="https://aptos.dev/nodes/aptos-api-spec/#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
     <p class="card-text">Reference for the REST API to interact with the Aptos blockchain.</p>
 </div>
 </div>
@@ -124,33 +128,13 @@ Aptos offers the ability to run a local testnet, as well as provides a shared de
 The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos Discord](https://discord.gg/aptoslabs).
 :::info
 
-## Ask questions and offer answers
-
-Join [Aptos Discord](https://discord.gg/aptoslabs) to speak with developers and hop into the Aptos community. It's the best way to keep up to date with news and developments in the Aptos universe. Be sure to check pinned messages in the channels - this is where we like to keep topic-specific links, events, and more.
-
-For technical questions, we recommend [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos) so anyone in the world may search for, benefit from, and upvote questions and answers in a persistent location.
-
-:::caution Be safe with communications
-
-Please remember, community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in [Aptos Discord](https://discord.gg/aptoslabs), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com).
-
 :::
-
-## Join the team
-
-Want to join a great team working on amazing world-scale problems? Take a look at [active roles](https://aptoslabs.com/careers) on [AptosLabs.com](https://www.aptoslabs.com/) and come build with us! Or [create a pull request](https://github.com/aptos-labs/aptos-core/pulls) to make updates and [file issues](https://github.com/aptos-labs/aptos-core/issues) to report problems.
-
-We welcome your own [contributions](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) to the Aptos blockchain and this site! In fact, every contributor to Aptos.dev is listed as an *author* on the pages they edit and update. See the *Authors* list at the bottom of any page other than this for example. See the [Aptos Docs](https://github.com/orgs/aptos-labs/projects/14/views/1) project for open issues by status.
-
-Simply click *Edit this page* at the bottom of any location to go to the source and trigger editing there. The contents are in [Markdown](https://www.markdownguide.org/basic-syntax/) format. When ready, [start a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) with your changes. We will get back to you shortly.
-
-Finally, you may report problems and supply other input in the [#docs-feedback](https://discord.com/channels/945856774056083548/1034215378299133974) channel of [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Find the ecosystem
 
 We are excited that you are here, and we look forward to getting to know you. Welcome to the Aptos community! Find out more about us and exchange ideas at:
 
-* [Aptos Discord](https://discord.gg/aptoslabs)
+* [Discord](https://discord.gg/aptoslabs)
 * [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos)
 * [Forum](https://forum.aptoslabs.com/)
 * [Medium](https://medium.com/aptoslabs)
@@ -159,4 +143,6 @@ We are excited that you are here, and we look forward to getting to know you. We
 
 ## Community projects on Aptos
 
-Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/).  If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
+Here's a [list of community-maintained projects](https://github.com/aptos-foundation/ecosystem-projects) collected by the [Aptos Foundation](https://aptosfoundation.org/). If you have a project that you want added to the list, just edit the page and add a GitHub pull request.
+
+Want to pitch in on smaller tasks, such as doc updates and code fixes? See our [Community](./community/index.md) list for opportunities to help the Aptos ecosystem.

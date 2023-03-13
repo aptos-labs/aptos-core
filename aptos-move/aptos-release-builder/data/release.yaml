@@ -1,0 +1,21 @@
+---
+testnet: true
+remote_endpoint: ~
+framework_release:
+  bytecode_version: 6
+  git_hash: ~
+feature_flags:
+  enabled:
+    - code_dependency_check
+    - treat_friend_as_private
+    - sha512_and_ripe_md160_natives
+    - aptos_std_chain_id_natives
+    - v_m_binary_format_v6
+    - multi_ed25519_pk_validate_v2_natives
+    - blake2b256_native
+    - resource_groups
+    - multisig_accounts
+    - delegation_pools
+  disabled: []
+is_multi_step: true
+framework_release_at_end: true

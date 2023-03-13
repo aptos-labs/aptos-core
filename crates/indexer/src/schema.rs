@@ -1,5 +1,4 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
+// Copyright © Aptos Foundation
 
 // @generated automatically by Diesel CLI.
 
@@ -141,6 +140,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_delegator_balances (delegator_address, pool_address, pool_type) {
+        delegator_address -> Varchar,
+        pool_address -> Varchar,
+        pool_type -> Varchar,
+        table_handle -> Varchar,
+        amount -> Numeric,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_staking_pool_voter (staking_pool_address) {
         staking_pool_address -> Varchar,
         voter_address -> Varchar,
@@ -226,6 +237,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    delegated_staking_activities (transaction_version, event_index) {
+        transaction_version -> Int8,
+        event_index -> Int8,
+        delegator_address -> Varchar,
+        pool_address -> Varchar,
+        event_type -> Text,
+        amount -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     events (account_address, creation_number, sequence_number) {
         sequence_number -> Int8,
         creation_number -> Int8,
@@ -283,6 +306,18 @@ diesel::table! {
         generic_type_params -> Nullable<Jsonb>,
         data -> Nullable<Jsonb>,
         is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    nft_points (transaction_version) {
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        token_name -> Text,
+        point_type -> Text,
+        amount -> Numeric,
+        transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -505,16 +540,19 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_ans_lookup,
     current_coin_balances,
     current_collection_datas,
+    current_delegator_balances,
     current_staking_pool_voter,
     current_table_items,
     current_token_datas,
     current_token_ownerships,
     current_token_pending_claims,
+    delegated_staking_activities,
     events,
     indexer_status,
     ledger_infos,
     move_modules,
     move_resources,
+    nft_points,
     processor_status,
     processor_statuses,
     proposal_votes,

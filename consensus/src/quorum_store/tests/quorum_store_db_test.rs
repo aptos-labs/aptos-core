@@ -1,10 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    quorum_store_db::{BatchIdDB, QuorumStoreDB},
+    quorum_store_db::{QuorumStoreDB, QuorumStoreStorage},
     tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
-    types::PersistedValue,
+    types::{BatchId, PersistedValue},
 };
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_temppath::TempPath;
@@ -22,7 +22,7 @@ fn test_db_for_data() {
     assert!(db.save_batch(digest_1, value_1.clone()).is_ok());
 
     assert_eq!(
-        db.get_batch(digest_1)
+        db.get_batch(&digest_1)
             .expect("could not read from db")
             .unwrap(),
         value_1
@@ -41,7 +41,7 @@ fn test_db_for_data() {
     let batches = vec![digest_3];
     assert!(db.delete_batches(batches).is_ok());
     assert_eq!(
-        db.get_batch(digest_3).expect("could not read from db"),
+        db.get_batch(&digest_3).expect("could not read from db"),
         None
     );
 
@@ -60,20 +60,20 @@ fn test_db_for_batch_id() {
         .clean_and_get_batch_id(0)
         .expect("could not read from db")
         .is_none());
-    assert!(db.save_batch_id(0, 0).is_ok());
-    assert!(db.save_batch_id(0, 4).is_ok());
+    assert!(db.save_batch_id(0, BatchId::new_for_test(0)).is_ok());
+    assert!(db.save_batch_id(0, BatchId::new_for_test(4)).is_ok());
     assert_eq!(
         db.clean_and_get_batch_id(0)
             .expect("could not read from db")
             .unwrap(),
-        4
+        BatchId::new_for_test(4)
     );
-    assert!(db.save_batch_id(1, 1).is_ok());
-    assert!(db.save_batch_id(2, 2).is_ok());
+    assert!(db.save_batch_id(1, BatchId::new_for_test(1)).is_ok());
+    assert!(db.save_batch_id(2, BatchId::new_for_test(2)).is_ok());
     assert_eq!(
         db.clean_and_get_batch_id(2)
             .expect("could not read from db")
             .unwrap(),
-        2
+        BatchId::new_for_test(2)
     );
 }

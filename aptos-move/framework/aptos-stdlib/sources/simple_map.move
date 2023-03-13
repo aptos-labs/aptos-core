@@ -77,6 +77,29 @@ module aptos_std::simple_map {
         vector::push_back(&mut map.data, Element { key, value });
     }
 
+    /// Transform the map into two vectors with the keys and values respectively
+    /// Primarily used to destroy a map
+    public fun to_vec_pair<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
+        let keys: vector<Key> = vector::empty();
+        let values: vector<Value> = vector::empty();
+        let SimpleMap { data } = map;
+        vector::for_each(data, |e| { let Element { key, value } = e; vector::push_back(&mut keys, key); vector::push_back(&mut values, value); });
+        (keys, values)
+    }
+
+    /// For maps that cannot be dropped this is a utility to destroy them
+    /// using lambdas to destroy the individual keys and values.
+    public inline fun destroy<Key: store, Value: store>(
+        map: SimpleMap<Key, Value>,
+        dk: |Key|,
+        dv: |Value|
+    ) {
+        let (keys, values) = to_vec_pair(map);
+        vector::destroy(keys, |_k| dk(_k));
+        vector::destroy(values, |_v| dv(_v));
+    }
+
     public fun remove<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
@@ -103,93 +126,6 @@ module aptos_std::simple_map {
         };
         option::none<u64>()
     }
-
-    /// Apply the function to each key-value pair in the map, consuming it.
-    public inline fun for_each<Key, Value>(map: SimpleMap<Key, Value>, f: |Key, Value|) {
-        let SimpleMap {data} = map;
-        vector::for_each(data, |elem| {
-            let Element {key, value} = elem;
-            f(key, value)
-        })
-    }
-
-    /// Apply the function to a reference of each key-value pair in the map.
-    public inline fun for_each_ref<Key, Value>(map: &SimpleMap<Key, Value>, f: |&Key, &Value|) {
-        vector::for_each_ref(&map.data, |elem| {
-            let e : &Element<Key, Value> = elem;
-            f(&e.key, &e.value)
-        })
-    }
-
-    /// Apply the function to a reference of each key-value pair in the map.
-    public inline fun for_each_mut<Key, Value>(map: &mut SimpleMap<Key, Value>, f: |&Key, &mut Value|) {
-        vector::for_each_mut(&mut map.data, |elem| {
-            let e : &mut Element<Key, Value> = elem;
-            f(&mut e.key, &mut e.value)
-        })
-    }
-
-    /// Fold the function over the key-value pairs of the map.
-    public inline fun fold<Accumulator, Key, Value>(
-        map: SimpleMap<Key, Value>,
-        init: Accumulator,
-        f: |Accumulator,Key,Value|Accumulator
-    ): Accumulator {
-        for_each(map, |key, value| init = f(init, key, value));
-        init
-    }
-
-    /// Map the function over the key-value pairs of the map.
-    public inline fun map<Key, Value1, Value2>(
-        map: SimpleMap<Key, Value1>,
-        f: |Value1|Value2
-    ): SimpleMap<Key, Value2> {
-        let data = vector::empty();
-        for_each(map, |key, value| vector::push_back(&mut data, Element {key, value: f(value)}));
-        SimpleMap {data}
-    }
-
-    /// Filter entries in the map.
-    public inline fun filter<Key:drop, Value:drop>(
-        map: SimpleMap<Key, Value>,
-        p: |&Value|bool
-    ): SimpleMap<Key, Value> {
-        let data = vector::empty();
-        for_each(map, |key, value| {
-            if (p(&value)) {
-                vector::push_back(&mut data, Element {key, value});
-            }
-        });
-        SimpleMap {data}
-    }
-
-    /// Return true if any key-value pair in the map satisfies the predicate.
-    public inline fun any<Key, Value>(
-        map: &SimpleMap<Key, Value>,
-        p: |&Key, &Value|bool
-    ): bool {
-        let SimpleMap {data} = map;
-        let result = false;
-        let i = 0;
-        while (i < vector::length(data)) {
-            let Element {key, value} = vector::borrow(data, i);
-            result = p(key, value);
-            if (result) {
-                break
-            };
-            i = i + 1
-        };
-        result
-    }
-
-    /// Return true if all key-value pairs in the map satisfies the predicate.
-    public inline fun all<Key, Value>(
-        map: &SimpleMap<Key, Value>,
-        p: |&Key, &Value|bool
-    ): bool {
-        !any(map, |k, v| !p(k, v))
-    }
-
 
     #[test]
     public fun add_remove_many() {
@@ -244,81 +180,5 @@ module aptos_std::simple_map {
         remove(&mut map, &3);
 
         destroy_empty(map);
-    }
-
-    #[test_only]
-    fun make(k1: u64, v1: u64, k2: u64, v2: u64): SimpleMap<u64, u64> {
-        let m = create();
-        add(&mut m, k1, v1);
-        add(&mut m, k2, v2);
-        m
-    }
-
-    #[test]
-    fun test_for_each() {
-        let m = make(1, 4, 2, 5);
-        let s = 0;
-        for_each(m, |x, y| {
-            s = s + x + y;
-        });
-        assert!(s == 12, 0)
-    }
-
-    #[test]
-    fun test_for_each_ref() {
-        let m = make(1, 4, 2, 5);
-        let s = 0;
-        for_each_ref(&m, |x, y| {
-            s = s + *x + *y;
-        });
-        assert!(s == 12, 0)
-    }
-
-    #[test]
-    fun test_for_each_mut() {
-        let m = make(1, 4, 2, 5);
-        for_each_mut(&mut m, |_key, val| {
-            let val : &mut u64 = val;
-            *val = *val + 1
-        });
-        assert!(*borrow(&m, &1) == 5, 1)
-    }
-
-    #[test]
-    fun test_fold() {
-        let m = make(1, 4, 2, 5);
-        let r = fold(m, 0, |accu, key, val| {
-            accu + key + val
-        });
-        assert!(r == 12, 0);
-    }
-
-    #[test]
-    fun test_map() {
-        let m = make(1, 4, 2, 5);
-        let r = map(m, |val| val + 1);
-        assert!(*borrow(&r, &1) == 5, 1)
-    }
-
-    #[test]
-    fun test_filter() {
-        let m = make(1, 4, 2, 5);
-        let r = filter(m, |val| *val > 4);
-        assert!(length(&r) == 1, 1);
-        assert!(*borrow(&r, &2) == 5, 1)
-    }
-
-    #[test]
-    fun test_any() {
-        let m = make(1, 4, 2, 5);
-        let r = any(&m, |_k, v| *v > 4);
-        assert!(r, 1)
-    }
-
-    #[test]
-    fun test_all() {
-        let m = make(1, 4, 2, 5);
-        let r = all(&m, |_k, v| *v > 4);
-        assert!(!r, 1)
     }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{CheckResult, Checker, CheckerError, CommonCheckerConfig};
@@ -124,7 +124,8 @@ impl Checker for TpsChecker {
         };
 
         let cluster_config = ClusterArgs {
-            targets: vec![target_url; self.config.repeat_target_count],
+            targets: Some(vec![target_url; self.config.repeat_target_count]),
+            targets_file: None,
             reuse_accounts: false,
             coin_source_args: self.config.coin_source_args.clone(),
             chain_id,

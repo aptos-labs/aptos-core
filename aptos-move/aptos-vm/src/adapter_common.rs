@@ -1,13 +1,10 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    logging::AdapterLogSchema,
-    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-};
+use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_aggregator::transaction::TransactionOutputExt;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{
@@ -17,6 +14,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::WriteSet,
 };
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -50,7 +48,7 @@ pub trait VMAdapter {
     fn should_restart_execution(output: &TransactionOutput) -> bool;
 
     /// Execute a single transaction.
-    fn execute_single_transaction<S: MoveResolverExt + StateView>(
+    fn execute_single_transaction<S: MoveResolverExt>(
         &self,
         txn: &PreprocessedTransaction,
         data_cache: &S,

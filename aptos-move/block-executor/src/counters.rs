@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
@@ -20,6 +20,28 @@ pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_execution_speculative_abort_count",
         "Number of speculative aborts in parallel execution (leading to re-execution)"
+    )
+    .unwrap()
+});
+
+pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_parallel_execution_seconds",
+        // metric description
+        "The time spent in seconds in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_rayon_execution_seconds",
+        // metric description
+        "The time spent in seconds in rayon thread pool in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });
@@ -46,12 +68,34 @@ pub static TASK_VALIDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static WORK_WITH_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_work_with_task_seconds",
+        // metric description
+        "The time spent in work task with scope call in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
         "aptos_execution_task_execute_seconds",
         // metric description
         "The time spent in seconds for task execution in Block STM",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static GET_NEXT_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_get_next_task_seconds",
+        // metric description
+        "The time spent in seconds for getting next task from the scheduler",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()

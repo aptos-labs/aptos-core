@@ -1,5 +1,4 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
+// Copyright © Aptos Foundation
 
 // @generated
 impl serde::Serialize for Timestamp {

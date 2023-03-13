@@ -1,4 +1,4 @@
 processed 2 tasks
 
 task 1 'publish'. lines 4-9:
-Error: Transaction discarded. VM status code: MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+Error: Failed to execute transaction. ExecutionStatus: OutOfGas

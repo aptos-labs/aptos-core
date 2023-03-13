@@ -17,4 +17,4 @@ The source code for the official Rust SDK is available in the [aptos-core GitHub
 
 ## Using Rust SDK
 
-See the [Developer Tutorials](/tutorials/index.md) for code examples showing how to use the Rust SDK.
+See the [Developer Tutorials](../tutorials/index.md) for code examples showing how to use the Rust SDK.

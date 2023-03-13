@@ -15,4 +15,6 @@ There are multiple types of wallets including:
 
 The most commonly used wallet for dapps is a Chrome extension such as [Petra wallet](https://petra.app).
 
+All wallets should meet the [Aptos Wallet Standard](./wallet-standard.md).
+
 Visit each of the individual wallets' websites for installation instructions.

@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -49,7 +50,7 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
     // This is safe because the `state::get_state()` uses a thread_local for storing states. Thus the state can only be mutated to VERIFIER by the thread that's running the bytecode verifier.
     //
     // TODO: once `can_unwind` is stable, we should assert it. See https://github.com/rust-lang/rust/issues/92988.
-    if state::get_state() == VMState::VERIFIER {
+    if state::get_state() == VMState::VERIFIER || state::get_state() == VMState::DESERIALIZER {
         return;
     }
 

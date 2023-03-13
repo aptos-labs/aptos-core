@@ -23,6 +23,10 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 * The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
 * As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
+:::important
+Ensure the [fullnode](../nodes/aptos-deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
+:::
+
 The storage service on a node employs two forms of pruning that erase data from nodes: 
 
 * state
@@ -40,9 +44,13 @@ The REST API offers querying transactions and events in these ways:
 
 ## Reading state with the View function
 
-View functions do not modify blockchain state. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. See [this file](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example, related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code, and [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+View functions do not modify blockchain state. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
 
-The View function operates similar to the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
+* [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example
+* related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
+* [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+
+The View function operates like the [Aptos Simulation API](./system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
 In order to use the View functions, you need to pass `--bytecode-version 6` to the [Aptos CLI](../cli-tools/aptos-cli-tool/index.md) when publishing the module.
 

@@ -1,10 +1,11 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod checkpoint;
+pub mod checkpoint;
 mod common;
-mod ledger;
-mod state_tree;
+pub mod ledger;
+pub mod state_tree;
+pub mod truncate;
 
 use anyhow::Result;
 use clap::Parser;
@@ -18,6 +19,8 @@ pub enum Cmd {
 
     #[clap(subcommand)]
     Ledger(ledger::Cmd),
+
+    Truncate(truncate::Cmd),
 }
 
 impl Cmd {
@@ -26,6 +29,7 @@ impl Cmd {
             Cmd::StateTree(cmd) => cmd.run(),
             Cmd::Checkpoint(cmd) => cmd.run(),
             Cmd::Ledger(cmd) => cmd.run(),
+            Cmd::Truncate(cmd) => cmd.run(),
         }
     }
 }

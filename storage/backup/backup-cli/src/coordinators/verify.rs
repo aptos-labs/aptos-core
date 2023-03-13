@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -59,7 +60,6 @@ impl VerifyCoordinator {
             info!("Verify coordinator exiting with success.");
             VERIFY_COORDINATOR_SUCC_TS.set(unix_timestamp_sec());
         }
-
         ret
     }
 

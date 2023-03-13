@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra-ext = { workspace = true }
 aptos-global-constants = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }

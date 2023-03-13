@@ -1,9 +1,9 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "testing")]
-use crate::natives::util::make_test_only_native_from_func;
-use crate::natives::{cryptography::algebra::gas::GasParameters, util::make_native_from_func};
+use crate::natives::{cryptography::algebra::gas::GasParameters};
 use ark_ec::{CurveGroup, Group};
 use ark_ec::pairing::Pairing;
 use ark_ec::short_weierstrass::Projective;
@@ -27,7 +27,7 @@ use move_vm_types::{
 };
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 use std::{
     any::Any,
     collections::VecDeque,
@@ -36,8 +36,12 @@ use std::{
 };
 use std::cmp::{max, min};
 use std::hash::Hash;
+use std::sync::Arc;
 use itertools::Itertools;
 use move_compiler::parser::lexer::Tok::Native;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use crate::natives::helpers::{make_safe_native, make_test_only_native_from_func, SafeNativeContext, SafeNativeError, SafeNativeResult};
+use crate::safely_pop_arg;
 
 pub mod gas;
 
@@ -186,9 +190,9 @@ macro_rules! ark_serialize_internal {
         let element_ptr = get_obj_pointer!($context, $handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let mut buf = Vec::new();
+        $context.charge($gas_params.serialize($structure, $scheme))?;
         element.$ser_func(&mut buf).unwrap();
-        let cost = $gas_params.serialize($structure, $scheme);
-        (cost, buf)
+        buf
     }};
 }
 
@@ -206,27 +210,27 @@ macro_rules! ark_ec_point_serialize_internal {
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
+        $context.charge($gas_params.serialize($structure, $scheme))?;
         element_affine.$ser_func(&mut buf).unwrap();
-        let cost = $gas_params.serialize($structure, $scheme);
-        (cost, buf)
+        buf
     }};
 }
 
 fn serialize_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
-    let handle = pop_arg!(args, u64) as usize;
-    let scheme = pop_arg!(args, Vec<u8>);
+    let handle = safely_pop_arg!(args, u64) as usize;
+    let scheme = safely_pop_arg!(args, Vec<u8>);
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match (structure_opt, scheme) {
         (Some(Structure::BLS12381Fr), scheme)
             if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_serialize_internal!(
+            let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fr,
@@ -235,12 +239,12 @@ fn serialize_internal(
                 ark_bls12_381::Fr,
                 serialize_uncompressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fr), scheme)
             if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() =>
         {
-            let (cost, mut buf) = ark_serialize_internal!(
+            let mut buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fr,
@@ -250,12 +254,12 @@ fn serialize_internal(
                 serialize_uncompressed
             );
             buf.reverse();
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fq12), scheme)
             if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_serialize_internal!(
+            let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fq12,
@@ -264,12 +268,12 @@ fn serialize_internal(
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381G1), scheme)
             if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_ec_point_serialize_internal!(
+            let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G1,
@@ -278,12 +282,12 @@ fn serialize_internal(
                 ark_bls12_381::G1Projective,
                 serialize_uncompressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381G1), scheme)
             if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_ec_point_serialize_internal!(
+            let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G1,
@@ -292,12 +296,12 @@ fn serialize_internal(
                 ark_bls12_381::G1Projective,
                 serialize_compressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381G2), scheme)
             if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_ec_point_serialize_internal!(
+            let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G2,
@@ -306,12 +310,12 @@ fn serialize_internal(
                 ark_bls12_381::G2Projective,
                 serialize_uncompressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381G2), scheme)
             if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_ec_point_serialize_internal!(
+            let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G2,
@@ -320,12 +324,12 @@ fn serialize_internal(
                 ark_bls12_381::G2Projective,
                 serialize_compressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Gt), scheme)
             if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() =>
         {
-            let (cost, buf) = ark_serialize_internal!(
+            let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Gt,
@@ -334,9 +338,9 @@ fn serialize_internal(
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
-            Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(buf)]))
+            Ok(smallvec![Value::vector_u8(buf)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
@@ -350,18 +354,13 @@ macro_rules! ark_deserialize_internal {
         $typ:ty,
         $deser_func:ident
     ) => {{
+        $context.charge($gas_params.deserialize($structure, $scheme))?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let handle = store_obj!($context, element);
-                Ok(NativeResult::ok(
-                    $gas_params.deserialize($structure, $scheme),
-                    smallvec![Value::bool(true), Value::u64(handle as u64)],
-                ))
+                Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
-            _ => Ok(NativeResult::ok(
-                $gas_params.deserialize($structure, $scheme),
-                smallvec![Value::bool(false), Value::u64(0)],
-            )),
+            _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
         }
     }};
 }
@@ -376,44 +375,36 @@ macro_rules! ark_ec_point_deserialize_internal {
         $typ:ty,
         $deser_func:ident
     ) => {{
+        $context.charge($gas_params.deserialize($structure, $scheme))?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = Projective::from(element);
                 let handle = store_obj!($context, element_proj);
-                Ok(NativeResult::ok(
-                    $gas_params.deserialize($structure, $scheme),
-                    smallvec![Value::bool(true), Value::u64(handle as u64)],
-                ))
+                Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
-            _ => Ok(NativeResult::ok(
-                $gas_params.deserialize($structure, $scheme),
-                smallvec![Value::bool(false), Value::u64(0)],
-            )),
+            _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
         }
     }};
 }
 
 fn deserialize_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     let structure = structure_from_ty_arg!(context, &ty_args[0]);
-    let vector_ref = pop_arg!(args, VectorRef);
+    let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
-    let scheme = pop_arg!(args, Vec<u8>);
+    let scheme = safely_pop_arg!(args, Vec<u8>);
     match (structure, scheme) {
         (Some(Structure::BLS12381Fr), scheme)
             if scheme.as_slice() == BLS12_381_FR_FORMAT.as_slice() =>
         {
             if bytes.len() != 32 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_deserialize_internal!(
                 gas_params,
@@ -429,10 +420,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_FR_BENDIAN_FORMAT.as_slice() =>
         {
             if bytes.len() != 32 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             let mut lendian: Vec<u8> = bytes.to_vec();
             lendian.reverse();
@@ -451,10 +439,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_FQ12_FORMAT.as_slice() =>
         {
             if bytes.len() != 576 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_deserialize_internal!(
                 gas_params,
@@ -470,10 +455,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_G1_UNCOMPRESSED_FORMAT.as_slice() =>
         {
             if bytes.len() != 96 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
                 gas_params,
@@ -489,10 +471,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_G1_COMPRESSED_FORMAT.as_slice() =>
         {
             if bytes.len() != 48 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
                 gas_params,
@@ -508,10 +487,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_G2_UNCOMPRESSED_FORMAT.as_slice() =>
         {
             if bytes.len() != 192 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
                 gas_params,
@@ -527,10 +503,7 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_G2_COMPRESSED_FORMAT.as_slice() =>
         {
             if bytes.len() != 96 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
                 gas_params,
@@ -546,54 +519,41 @@ fn deserialize_internal(
             if scheme.as_slice() == BLS12_381_GT_FORMAT.as_slice() =>
         {
             if bytes.len() != 576 {
-                return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::bool(false),
-                    Value::u64(0)
-                ]));
+                return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
+            context.charge(gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()))?;
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_obj!(context, element);
-                        Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
-                            smallvec![Value::bool(true), Value::u64(handle as u64)],
-                        ))
+                        Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {
-                        Ok(NativeResult::ok(
-                            gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
-                            smallvec![Value::bool(false), Value::u64(0)],
-                        ))
+                        Ok(smallvec![Value::bool(false), Value::u64(0)])
                     }
                 },
-                _ => Ok(NativeResult::ok(
-                    gas_params.deserialize(Structure::BLS12381Gt, scheme.as_slice()),
-                    smallvec![Value::bool(false), Value::u64(0)],
-                )),
+                _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
             }
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! from_u64_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let value = pop_arg!($args, u64);
+        let value = safely_pop_arg!($args, u64);
+        $context.charge($gas_params.from_u128($structure))?;
         let element = <$typ>::from(value as u128);
         let handle = store_obj!($context, element);
-        Ok(NativeResult::ok(
-            $gas_params.from_u128($structure),
-            smallvec![Value::u64(handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
 
 fn from_u64_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => from_u64_internal!(
@@ -610,33 +570,31 @@ fn from_u64_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_add($structure))?;
         let new_element = element_1.add(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_add($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_add_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_add_internal!(
@@ -653,33 +611,31 @@ fn field_add_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_sub_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_sub($structure))?;
         let new_element = element_1.sub(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_sub($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_sub_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_sub_internal!(
@@ -696,33 +652,31 @@ fn field_sub_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_mul_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_mul($structure))?;
         let new_element = element_1.mul(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_mul($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_mul_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_mul_internal!(
@@ -739,39 +693,34 @@ fn field_mul_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_div_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         if element_2.is_zero() {
-            return Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                Value::bool(false),
-                Value::u64(0_u64)
-            ]));
+            return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
         }
+        $context.charge($gas_params.field_div($structure))?;
         let new_element = element_1.div(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_div($structure),
-            smallvec![Value::bool(true), Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_div_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_div_internal!(
@@ -788,30 +737,28 @@ fn field_div_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_neg_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_neg($structure))?;
         let new_element = element.neg();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_neg($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_neg_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_neg_internal!(
@@ -828,37 +775,32 @@ fn field_neg_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_inv_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_inv($structure))?;
         match element.inverse() {
             Some(new_element) => {
                 let new_handle = store_obj!($context, new_element);
-                Ok(NativeResult::ok(
-                    $gas_params.field_inv($structure),
-                    smallvec![Value::bool(true), Value::u64(new_handle as u64)],
-                ))
+                Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
             },
-            None => Ok(NativeResult::ok(
-                $gas_params.field_inv($structure),
-                smallvec![Value::bool(false), Value::u64(0)],
-            )),
+            None => Ok(smallvec![Value::bool(false), Value::u64(0)]),
         }
     }};
 }
 
 fn field_inv_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_inv_internal!(
             gas_params,
@@ -874,30 +816,28 @@ fn field_inv_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_sqr_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_sqr($structure))?;
         let new_element = element.square();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_sqr($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_sqr_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_sqr_internal!(
             gas_params,
@@ -913,27 +853,25 @@ fn field_sqr_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_zero_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        $context.charge($gas_params.field_zero($structure))?;
         let new_element = <$typ>::zero();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_zero($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_zero_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_zero_internal!(
             gas_params,
@@ -949,27 +887,25 @@ fn field_zero_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_one_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+        $context.charge($gas_params.field_one($structure))?;
         let new_element = <$typ>::one();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.field_one($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn field_one_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_one_internal!(
             gas_params,
@@ -985,29 +921,27 @@ fn field_one_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_is_one_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_is_one($structure))?;
         let result = element.is_one();
-        Ok(NativeResult::ok(
-            $gas_params.field_is_one($structure),
-            smallvec![Value::bool(result)],
-        ))
+        Ok(smallvec![Value::bool(result)])
     }};
 }
 
 fn field_is_one_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_is_one_internal!(
             gas_params,
@@ -1023,29 +957,27 @@ fn field_is_one_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_field_is_zero_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.field_is_zero($structure))?;
         let result = element.is_zero();
-        Ok(NativeResult::ok(
-            $gas_params.field_is_zero($structure),
-            smallvec![Value::bool(result)],
-        ))
+        Ok(smallvec![Value::bool(result)])
     }};
 }
 
 fn field_is_zero_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_field_is_zero_internal!(
             gas_params,
@@ -1061,30 +993,30 @@ fn field_is_zero_internal(
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_eq_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        Ok(NativeResult::ok($gas_params.eq($structure), smallvec![
-            Value::bool(element_1 == element_2)
-        ]))
+        $context.charge($gas_params.eq($structure))?;
+        let result = element_1 == element_2;
+        Ok(smallvec![Value::bool(result)])
     }};
 }
 
 fn eq_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381Fr) => ark_eq_internal!(
@@ -1122,27 +1054,25 @@ fn eq_internal(
             Structure::BLS12381Gt,
             ark_bls12_381::Fq12
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_group_identity_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty, $func:ident) => {{
+        $context.charge($gas_params.group_identity($structure))?;
         let element = <$typ>::$func();
         let handle = store_obj!($context, element);
-        Ok(NativeResult::ok(
-            $gas_params.group_identity($structure),
-            smallvec![Value::u64(handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
 
 fn group_identity_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_identity_internal!(
@@ -1166,29 +1096,27 @@ fn group_identity_internal(
             ark_bls12_381::Fq12,
             one
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_group_is_identity_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.group_is_identity($structure))?;
         let result = element.$op();
-        Ok(NativeResult::ok(
-            $gas_params.group_is_identity($structure),
-            smallvec![Value::bool(result)],
-        ))
+        Ok(smallvec![Value::bool(result)])
     }};
 }
 
 fn group_is_identity_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_is_identity_internal!(
@@ -1215,18 +1143,18 @@ fn group_is_identity_internal(
             ark_bls12_381::Fq12,
             is_one
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_multi_scalar_mul_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $element_typ:ty, $scalar_typ:ty) => {{
-            let scalar_handles = pop_arg!($args, Vec<u64>);
-            let element_handles = pop_arg!($args, Vec<u64>);
+            let scalar_handles = safely_pop_arg!($args, Vec<u64>);
+            let element_handles = safely_pop_arg!($args, Vec<u64>);
             let num_elements = element_handles.len();
             let num_scalars = scalar_handles.len();
             if num_elements != num_scalars {
-                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING))
+                return Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING });
             }
             let bases = element_handles
                 .iter()
@@ -1244,18 +1172,19 @@ macro_rules! ark_multi_scalar_mul_internal {
                     scalar
                 })
                 .collect::<Vec<_>>();
+            $context.charge($gas_params.group_multi_scalar_mul_typed($structure, num_elements))?;
             let new_element: $element_typ = ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
             let new_handle = store_obj!($context, new_element);
-            Ok(NativeResult::ok($gas_params.group_multi_scalar_mul_typed($structure, num_elements), smallvec![Value::u64(new_handle as u64)] ))
+            Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_multi_scalar_mul_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
     let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_opt = structure_from_ty_arg!(context, &ty_args[1]);
@@ -1276,7 +1205,7 @@ fn group_multi_scalar_mul_internal(
             ark_bls12_381::G2Projective,
             ark_bls12_381::Fr
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
@@ -1295,21 +1224,19 @@ static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(|| {
 
 macro_rules! ark_group_generator_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty) => {{
+        $context.charge($gas_params.group_generator($structure))?;
         let element = <$typ>::generator();
         let handle = store_obj!($context, element);
-        Ok(NativeResult::ok(
-            $gas_params.group_generator($structure),
-            smallvec![Value::u64(handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
 
 fn group_generator_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_generator_internal!(
@@ -1325,31 +1252,27 @@ fn group_generator_internal(
             ark_bls12_381::G2Projective
         ),
         Some(Structure::BLS12381Gt) => {
+            context.charge(gas_params.group_generator(Structure::BLS12381Gt))?;
             let element = BLS12381_GT_GENERATOR.add(ark_bls12_381::Fq12::zero());
             let handle = store_obj!(context, element);
-            Ok(NativeResult::ok(
-                gas_params.group_generator(Structure::BLS12381Gt),
-                smallvec![Value::u64(handle as u64)],
-            ))
+            Ok(smallvec![Value::u64(handle as u64)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 fn group_order_internal(
     _gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) | Some(Structure::BLS12381G2) | Some(Structure::BLS12381Gt) => {
-            Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                Value::vector_u8(BLS12381_R_LENDIAN.clone())
-            ]))
+            Ok(smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())])
         },
-        _ => Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_NOT_IMPLEMENTED)),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
@@ -1399,27 +1322,26 @@ fn insecure_random_element_internal(
 
 macro_rules! ark_group_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.group_add($structure))?;
+
         let new_element = element_1.$op(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.group_add($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_add_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_add_internal!(
@@ -1446,33 +1368,31 @@ fn group_add_internal(
             ark_bls12_381::Fq12,
             mul
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_group_sub_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle_2 = pop_arg!($args, u64) as usize;
-        let handle_1 = pop_arg!($args, u64) as usize;
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
         let element_1_ptr = get_obj_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.group_sub($structure))?;
         let new_element = element_1.$op(element_2);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.group_sub($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_sub_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_sub_internal!(
@@ -1499,7 +1419,7 @@ fn group_sub_internal(
             ark_bls12_381::Fq12,
             div
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
@@ -1514,28 +1434,26 @@ macro_rules! ark_group_scalar_mul_internal {
         $scalar_typ:ty,
         $op:ident
     ) => {{
-        let scalar_handle = pop_arg!($args, u64) as usize;
-        let element_handle = pop_arg!($args, u64) as usize;
+        let scalar_handle = safely_pop_arg!($args, u64) as usize;
+        let element_handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, element_handle);
         let element = element_ptr.downcast_ref::<$group_typ>().unwrap();
         let scalar_ptr = get_obj_pointer!($context, scalar_handle);
         let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
         let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
+        $context.charge($gas_params.group_scalar_mul($group_structure))?;
         let new_element = element.$op(scalar_bigint);
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.group_scalar_mul($group_structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_scalar_mul_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
     let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
@@ -1565,22 +1483,19 @@ fn group_scalar_mul_internal(
             )
         },
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
-            let scalar_handle = pop_arg!( args , u64 ) as usize;
-            let element_handle = pop_arg!( args , u64 ) as usize;
+            let scalar_handle = safely_pop_arg!( args , u64 ) as usize;
+            let element_handle = safely_pop_arg!( args , u64 ) as usize;
             let element_ptr = get_obj_pointer!( context , element_handle );
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
             let scalar_ptr = get_obj_pointer!( context , scalar_handle );
             let scalar = scalar_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
-            let new_element = element.pow
-            (scalar_bigint);
+            context.charge(gas_params.group_scalar_mul(Structure::BLS12381Gt))?;
+            let new_element = element.pow(scalar_bigint);
             let new_handle = store_obj!( context , new_element );
-            Ok(NativeResult::ok(
-                gas_params.group_scalar_mul(Structure::BLS12381Gt),
-                smallvec![ Value :: u64 ( new_handle as u64 ) ],
-            ))
+            Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
@@ -1594,62 +1509,58 @@ macro_rules! ark_bls12381gx_xmd_sha_256_sswu_ro_internal {
         $target_type:ty,
         $config_type:ty
     ) => {{
+        $context.charge($gas_params.hash_to($h2s_suite, $dst.len(), $msg.len()))?;
         let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
             ark_ec::models::short_weierstrass::Projective<$config_type>,
             ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
             ark_ec::hashing::curve_maps::wb::WBMap<$config_type>>::new($dst).unwrap();
         let new_element = <$target_type>::from(mapper.hash($msg).unwrap());
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.hash_to($h2s_suite, $dst.len(), $msg.len()),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }}
 }
 
 fn hash_to_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let vector_ref = pop_arg!(args, VectorRef);
+    let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let msg = bytes_ref.as_slice();
-    let tag_ref = pop_arg!(args, VectorRef);
+    let tag_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = tag_ref.as_bytes_ref();
     let dst = bytes_ref.as_slice();
-    let suite = pop_arg!(args, Vec<u8>);
+    let suite = safely_pop_arg!(args, Vec<u8>);
     let suite_opt = HashToStructureSuite::try_from(suite);
     match (structure_opt, suite_opt) {
         (Some(Structure::BLS12381G1), Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G1Projective, ark_bls12_381::g1::Config),
         (Some(Structure::BLS12381G2), Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_group_double_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.group_double($structure))?;
         let new_element = element.$op();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.group_double($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_double_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_double_internal!(
@@ -1676,30 +1587,28 @@ fn group_double_internal(
             ark_bls12_381::Fq12,
             square
         ),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 macro_rules! ark_group_neg_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = pop_arg!($args, u64) as usize;
+        let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        $context.charge($gas_params.group_neg($structure))?;
         let new_element = element.$op();
         let new_handle = store_obj!($context, new_element);
-        Ok(NativeResult::ok(
-            $gas_params.group_neg($structure),
-            smallvec![Value::u64(new_handle as u64)],
-        ))
+        Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
 fn group_neg_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
         Some(Structure::BLS12381G1) => ark_group_neg_internal!(
@@ -1719,38 +1628,41 @@ fn group_neg_internal(
             neg
         ),
         Some(Structure::BLS12381Gt) => {
-            let handle = pop_arg!(args, u64) as usize;
+            let handle = safely_pop_arg!(args, u64) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            context.charge(gas_params.group_neg(Structure::BLS12381Gt))?;
             let new_element = element.inverse().unwrap();
             let new_handle = store_obj!(context, new_element);
-            Ok(NativeResult::ok(
-                gas_params.group_neg(Structure::BLS12381Gt),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
+            Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 fn multi_pairing_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());
     let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     match (g1_opt, g2_opt, gt_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
-            let g2_element_handles = pop_arg!(args, Vec<u64>);
-            let g1_element_handles = pop_arg!(args, Vec<u64>);
+            let g2_element_handles = safely_pop_arg!(args, Vec<u64>);
+            let g1_element_handles = safely_pop_arg!(args, Vec<u64>);
             if g1_element_handles.len() != g2_element_handles.len() {
-                return Ok(NativeResult::err(InternalGas::zero(), MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING));
+                return Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING });
             }
-
+            context.charge(gas_params.multi_pairing(
+                Structure::BLS12381G1,
+                Structure::BLS12381G2,
+                Structure::BLS12381Gt,
+                g1_element_handles.len()
+            ))?;
             let g1_elements_affine = g1_element_handles.iter().map(|&handle|{
                 let ptr = get_obj_pointer!(context, handle as usize);
                 let element = ptr
@@ -1758,7 +1670,6 @@ fn multi_pairing_internal(
                     .unwrap();
                 element.into_affine()
             }).collect::<Vec<_>>();
-
             let g2_elements_affine = g2_element_handles.iter().map(|&handle|{
                 let ptr = get_obj_pointer!(context, handle as usize);
                 let element = ptr
@@ -1766,39 +1677,29 @@ fn multi_pairing_internal(
                     .unwrap();
                 element.into_affine()
             }).collect::<Vec<_>>();
-
             let new_element =
                 ark_bls12_381::Bls12_381::multi_pairing(g1_elements_affine, g2_elements_affine).0;
             let new_handle = store_obj!(context, new_element);
-
-            Ok(NativeResult::ok(
-                gas_params.multi_pairing(
-                    Structure::BLS12381G1,
-                    Structure::BLS12381G2,
-                    Structure::BLS12381Gt,
-                    g1_element_handles.len()
-                ),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
+            Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 fn pairing_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());
     let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     match (g1_opt, g2_opt, gt_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
-            let g2_element_handle = pop_arg!(args, u64) as usize;
-            let g1_element_handle = pop_arg!(args, u64) as usize;
+            let g2_element_handle = safely_pop_arg!(args, u64) as usize;
+            let g1_element_handle = safely_pop_arg!(args, u64) as usize;
             let g1_element_ptr = get_obj_pointer!(context, g1_element_handle);
             let g2_element_ptr = get_obj_pointer!(context, g2_element_handle);
             let g1_element = g1_element_ptr
@@ -1809,196 +1710,191 @@ fn pairing_internal(
                 .unwrap();
             let g1_element_affine = g1_element.into_affine();
             let g2_element_affine = g2_element.into_affine();
+            context.charge(gas_params.pairing(
+                Structure::BLS12381G1,
+                Structure::BLS12381G2,
+                Structure::BLS12381Gt,
+            ));
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_obj!(context, new_element);
-            Ok(NativeResult::ok(
-                gas_params.pairing(
-                    Structure::BLS12381G1,
-                    Structure::BLS12381G2,
-                    Structure::BLS12381Gt,
-                ),
-                smallvec![Value::u64(new_handle as u64)],
-            ))
+            Ok(smallvec![Value::u64(new_handle as u64)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 fn downcast_internal(
     gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
     let parent_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let child_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (parent_opt, child_opt) {
         (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
-            let handle = pop_arg!(args, u64) as usize;
+            let handle = safely_pop_arg!(args, u64) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            context.charge(gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one())?;
             if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
-                Ok(NativeResult::ok(
-                    gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
-                    smallvec![Value::bool(true), Value::u64(handle as u64)],
-                ))
+                Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             } else {
-                Ok(NativeResult::ok(
-                    gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
-                    smallvec![Value::bool(false), Value::u64(handle as u64)],
-                ))
+                Ok(smallvec![Value::bool(false), Value::u64(handle as u64)])
             }
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
 fn upcast_internal(
     _gas_params: &GasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
     let child_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
-    let handle = pop_arg!(args, u64);
+    let handle = safely_pop_arg!(args, u64);
     match (child_opt, parent_opt) {
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
-            Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                Value::u64(handle)
-            ]))
+            Ok(smallvec![Value::u64(handle)])
         },
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
 
     // Always-on natives.
     natives.append(&mut vec![
         (
             "deserialize_internal",
-            make_native_from_func(gas_params.clone(), deserialize_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), deserialize_internal),
         ),
         (
             "downcast_internal",
-            make_native_from_func(gas_params.clone(), downcast_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), downcast_internal),
         ),
         (
             "eq_internal",
-            make_native_from_func(gas_params.clone(), eq_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), eq_internal),
         ),
         (
             "field_add_internal",
-            make_native_from_func(gas_params.clone(), field_add_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_add_internal),
         ),
         (
             "field_div_internal",
-            make_native_from_func(gas_params.clone(), field_div_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_div_internal),
         ),
         (
             "field_inv_internal",
-            make_native_from_func(gas_params.clone(), field_inv_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_inv_internal),
         ),
         (
             "field_is_one_internal",
-            make_native_from_func(gas_params.clone(), field_is_one_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_is_one_internal),
         ),
         (
             "field_is_zero_internal",
-            make_native_from_func(gas_params.clone(), field_is_zero_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_is_zero_internal),
         ),
         (
             "field_mul_internal",
-            make_native_from_func(gas_params.clone(), field_mul_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_mul_internal),
         ),
         (
             "field_neg_internal",
-            make_native_from_func(gas_params.clone(), field_neg_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_neg_internal),
         ),
         (
             "field_one_internal",
-            make_native_from_func(gas_params.clone(), field_one_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_one_internal),
         ),
         (
             "field_sqr_internal",
-            make_native_from_func(gas_params.clone(), field_sqr_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_sqr_internal),
         ),
         (
             "field_sub_internal",
-            make_native_from_func(gas_params.clone(), field_sub_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_sub_internal),
         ),
         (
             "field_zero_internal",
-            make_native_from_func(gas_params.clone(), field_zero_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), field_zero_internal),
         ),
         (
             "from_u64_internal",
-            make_native_from_func(gas_params.clone(), from_u64_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), from_u64_internal),
         ),
         (
             "group_add_internal",
-            make_native_from_func(gas_params.clone(), group_add_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_add_internal),
         ),
         (
             "group_double_internal",
-            make_native_from_func(gas_params.clone(), group_double_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_double_internal),
         ),
         (
             "group_generator_internal",
-            make_native_from_func(gas_params.clone(), group_generator_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_generator_internal),
         ),
         (
             "group_identity_internal",
-            make_native_from_func(gas_params.clone(), group_identity_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_identity_internal),
         ),
         (
             "group_is_identity_internal",
-            make_native_from_func(gas_params.clone(), group_is_identity_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_is_identity_internal),
         ),
         (
             "group_multi_scalar_mul_internal",
-            make_native_from_func(gas_params.clone(), group_multi_scalar_mul_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_multi_scalar_mul_internal),
         ),
         (
             "group_neg_internal",
-            make_native_from_func(gas_params.clone(), group_neg_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_neg_internal),
         ),
         (
             "group_order_internal",
-            make_native_from_func(gas_params.clone(), group_order_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_order_internal),
         ),
         (
             "group_scalar_mul_internal",
-            make_native_from_func(gas_params.clone(), group_scalar_mul_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_scalar_mul_internal),
         ),
         (
             "group_sub_internal",
-            make_native_from_func(gas_params.clone(), group_sub_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), group_sub_internal),
         ),
         (
             "hash_to_internal",
-            make_native_from_func(gas_params.clone(), hash_to_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), hash_to_internal),
         ),
         (
             "multi_pairing_internal",
-            make_native_from_func(gas_params.clone(), multi_pairing_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), multi_pairing_internal),
         ),
         (
             "pairing_internal",
-            make_native_from_func(gas_params.clone(), pairing_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), pairing_internal),
         ),
         (
             "serialize_internal",
-            make_native_from_func(gas_params.clone(), serialize_internal),
+            make_safe_native(gas_params.clone(), timed_features.clone(), features.clone(), serialize_internal),
         ),
         (
             "upcast_internal",
-            make_native_from_func(gas_params, upcast_internal),
+            make_safe_native(gas_params, timed_features, features, upcast_internal),
         ),
     ]);
 

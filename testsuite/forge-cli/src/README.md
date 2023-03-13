@@ -11,7 +11,7 @@ run local and remote Aptos swarms (i.e., networks of validators and validator fu
 example, to deploy a local validator swarm, run:
 
 ```
-cargo run -p forge-cli -- --suite "run_forever" --num-validators 4 test local-swarm
+cargo run -p aptos-forge-cli -- --suite "run_forever" --num-validators 4 test local-swarm
 ```
 
 This will start a local network of 4 validators, each running in their own process. The
@@ -66,12 +66,12 @@ Likewise, see the documentation about how to use the [Aptos CLI](https://aptos.d
 
 To also run validator fullnodes inside the network, use the `--num-validator-fullnodes` flag, e.g.,:
 ```
-cargo run -p forge-cli -- --suite "run_forever" --num-validators 3 --num-validator-fullnodes 1 test local-swarm
+cargo run -p aptos-forge-cli -- --suite "run_forever" --num-validators 3 --num-validator-fullnodes 1 test local-swarm
 ```
 
 ## Additional usage
 
 To see all tool usage options, run:
 ```
-cargo run -p forge-cli --help
+cargo run -p aptos-forge-cli --help
 ```

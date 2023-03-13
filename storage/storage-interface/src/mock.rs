@@ -1,4 +1,5 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides mock dbreader for tests.
@@ -11,7 +12,10 @@ use aptos_types::{
     account_state::AccountState,
     event::EventHandle,
     proof::SparseMerkleProofExt,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{StateKey, StateKeyInner},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use move_core_types::move_resource::MoveResource;
@@ -38,15 +42,15 @@ impl DbReader for MockDbReaderWriter {
         state_key: &StateKey,
         _: Version,
     ) -> Result<Option<StateValue>> {
-        match state_key {
-            StateKey::AccessPath(access_path) => {
+        match state_key.inner() {
+            StateKeyInner::AccessPath(access_path) => {
                 let account_state = get_mock_account_state();
                 Ok(account_state
                     .get(&access_path.path)
                     .cloned()
                     .map(StateValue::from))
             },
-            StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
+            StateKeyInner::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
             _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
         }
     }

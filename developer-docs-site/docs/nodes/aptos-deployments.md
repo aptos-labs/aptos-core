@@ -6,7 +6,11 @@ hide_table_of_contents: true
 
 # Aptos Blockchain Deployments
 
-You can connect to the Aptos blockchain in a few ways. See the below table:
+Ensure your nodes are running the [latest releases](../releases/index.md) of Aptos.
+
+You can connect to the Aptos blockchain by [choosing a network](../guides/system-integrators-guide.md#choose-a-network). See [Check out release branch](../guides/getting-started.md#check-out-release-branch) for the commands to download the versions of Aptos tied to those networks.
+
+See the table below for details on each Aptos network:
 
 |Description | Mainnet | Devnet | Long-lived Testnet | Aptos Incentivized Testnet (AIT)|
 |---|---|---|---|---|
@@ -23,4 +27,4 @@ You can connect to the Aptos blockchain in a few ways. See the below table:
 |**Purpose of the network**| The main Aptos network. |The devnet is built to experiment with new ideas, improve performance and enhance the user experience.| | For executing the Aptos Incentivized Testnet programs for the community.|
 |**Network status**| Always live. |Mostly live, with brief interruptions during regular updates. |Mostly live, with brief interruptions during regular updates. | Live only during Incentivized Testnet drives. |
 |**Type of nodes** |Validators and validator fullnodes. |Validators and public fullnodes. | Validators and public fullnodes. | Validators and validator fullnodes.|
-|**How to run a node**| See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections.  |N/A, run by Aptos Labs team. |See [Validators](/nodes/validator-node/validators) and [Public Fullnode](/nodes/full-node/public-fullnode) sections. | See the node deployment guides published during AIT program.|
+|**How to run a node**| See [Validators](./validator-node/index.md) and [Public Fullnode](./full-node/index.md) sections.  |N/A, run by Aptos Labs team. |See [Validators](./validator-node/index.md) and [Public Fullnode](./full-node/index.md) sections. | See the node deployment guides published during the AIT program.|

@@ -1,9 +1,9 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
     tests::utils::create_vec_signed_transactions,
-    types::{Batch, BatchRequest, Fragment, SerializedTransaction},
+    types::{Batch, BatchId, BatchRequest, Fragment, SerializedTransaction},
 };
 use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::hash::DefaultHasher;
@@ -29,14 +29,14 @@ fn test_batch() {
 
     let batch = Batch::new(source, epoch, digest, signed_txns.clone());
 
-    assert!(batch.verify(source).is_ok());
+    assert!(batch.verify().is_ok());
     assert_eq!(batch.into_payload(), signed_txns);
 }
 
 #[test]
 fn test_fragment() {
     let epoch = 0;
-    let batch_id = 0;
+    let batch_id = BatchId::new_for_test(0);
     let fragment_id = 0;
     let mut data = Vec::new();
     let mut maybe_expiration = None;

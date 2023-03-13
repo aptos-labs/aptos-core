@@ -7,6 +7,7 @@
 # explicitly include stuff we actually need via negation
 
 !docker/build-rust-all.sh
+!docker/experimental/*.sh
 !docker/tools/boto.cfg
 
 !.cargo/
@@ -16,10 +17,12 @@
 !**/*.rs
 !**/*.mrb
 !config/src/config/test_data
+!aptos-move/aptos-release-builder/data/release.yaml
 !aptos-move/framework/
 !crates/aptos/src/move_tool/*.bpl
 !api/doc/
 !crates/indexer/migrations/**/*.sql
+!ecosystem/indexer-grpc/indexer-grpc-parser/migrations/**/*.sql
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/

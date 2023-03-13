@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 ///! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
@@ -9,6 +9,6 @@ mod vm;
 
 pub use crate::move_vm_ext::{
     resolver::MoveResolverExt,
-    session::{SessionExt, SessionId, SessionOutput},
+    session::{SessionExt, SessionId},
     vm::{verifier_config, MoveVmExt},
 };

@@ -53,8 +53,13 @@ spec aptos_framework::block {
     /// Make sure The BlockResource under the caller existed after initializing.
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
+        use std::signer;
         include Initialize;
         include NewEventHandle;
+
+        let addr = signer::address_of(aptos_framework);
+        let account = global<account::Account>(addr);
+        aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
     }
 
     spec schema Initialize {

@@ -1,4 +1,4 @@
-// Copyright (c) Aptos
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::pruner::{db_pruner::DBPruner, ledger_store::ledger_store_pruner::LedgerPruner};
 use aptos_config::config::LedgerPrunerConfig;

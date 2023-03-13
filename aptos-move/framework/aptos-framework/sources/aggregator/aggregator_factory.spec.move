@@ -21,6 +21,9 @@ spec aptos_framework::aggregator_factory {
     }
 
     spec create_aggregator_internal(limit: u128): Aggregator {
+        include CreateAggregatorInternalAbortsIf;
+    }
+    spec schema CreateAggregatorInternalAbortsIf {
         aborts_if !exists<AggregatorFactory>(@aptos_framework);
     }
 

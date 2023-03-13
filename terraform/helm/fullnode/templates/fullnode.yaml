@@ -1,3 +1,4 @@
+{{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (include "aptos-fullnode.fullname" .) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -26,7 +27,11 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: fullnode
-        image: {{ .Values.image.repo }}:{{ .Values.image.tag }}
+        {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $fullnode_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
+        image: {{ .Values.image.repo }}:{{ .Values.image.tag | default $.Values.imageTag }}
+        {{- end }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
         - /bin/sh

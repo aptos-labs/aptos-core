@@ -8,16 +8,16 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Owner 
 
-This document describes how to use [Aptos CLI](/docs/cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
+This document describes how to [use the Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
 
 :::tip Petra on Chrome browser only
-The [Petra wallet extension](/docs/guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
+The [Petra wallet extension](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
 :::
 
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](/docs/nodes/aptos-deployments.md).
+The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
 :::
 
 ### Initialize CLI
