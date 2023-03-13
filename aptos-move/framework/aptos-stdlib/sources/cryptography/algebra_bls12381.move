@@ -20,13 +20,13 @@ module aptos_std::algebra_bls12381 {
     /// where an element is represented by a byte array `b[]` of size 48 with the least signature byte coming first.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381fq_lsb(): vector<u8> { x"01" }
+    public fun format_bls12381fq_lsb(): u64 { 0x0100000000000000 }
 
     /// A serialization format for `Fq` elements,
     /// where an element is represented by a byte array `b[]` of size 48 with the most significant byte coming first.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381fq_msb(): vector<u8> { x"0101" }
+    public fun format_bls12381fq_msb(): u64 { 0x0101000000000000 }
 
     /// The finite field $F_{q^2}$ used in BLS12-381 curves.
     /// It is an extension field of `Fq`, constructed as $F_{q^2}=F_q[u]/(u^2+1)$.
@@ -41,7 +41,7 @@ module aptos_std::algebra_bls12381 {
     /// - `b[48..96]` is $c_1$ serialized using `format_bls12381fq_lsb()`.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381fq2_lsc_lsb(): vector<u8> { x"02" }
+    public fun format_bls12381fq2_lsc_lsb(): u64 { 0x0200000000000000 }
 
     /// A serialization format for `Fq2` elements,
     /// where an element in the form $(c_1\cdot u+c_0)$ is represented by a byte array `b[]` of size 96,
@@ -50,7 +50,7 @@ module aptos_std::algebra_bls12381 {
     /// - `b[48..96]` is $c_0$ serialized using `format_bls12381fq_msb()`.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381fq2_msc_msb(): vector<u8> { x"0201" }
+    public fun format_bls12381fq2_msc_msb(): u64 { 0x0201000000000000 }
 
     /// The finite field $F_{q^6}$ used in BLS12-381 curves.
     /// It is an extension field of `Fq2`, constructed as $F_{q^6}=F_{q^2}[v]/(v^3-u-1)$.
@@ -66,7 +66,7 @@ module aptos_std::algebra_bls12381 {
     /// - `b[192..288]` is $c_2$ serialized using `format_bls12381fq2_lsc_lsb()`.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381fq6_lsc_lsc_lsb(): vector<u8> { x"03" }
+    public fun format_bls12381fq6_lsc_lsc_lsb(): u64 { 0x0300000000000000 }
 
     /// The finite field $F_{q^12}$ used in BLS12-381 curves.
     /// It is an extension field of `Fq6`, constructed as $F_{q^12}=F_{q^6}[w]/(w^2-v)$.
@@ -78,7 +78,7 @@ module aptos_std::algebra_bls12381 {
     /// `b[288..576]` is $c_1$ serialized using `format_bls12381fq6_lsc_lsc_lsb()`.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-    public fun format_bls12381fq12_lsc_lsc_lsc_lsb(): vector<u8> { x"04" }
+    public fun format_bls12381fq12_lsc_lsc_lsc_lsb(): u64 { 0x0400000000000000 }
 
     /// A group constructed by the points on the BLS12-381 curve $E(F_q): y^2=x^3+4$ and the point at inifinity,
     /// under the elliptic curve point addition.
@@ -101,7 +101,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return $(x,y)$.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g1_affine_parent_uncompressed(): vector<u8> { x"05" }
+    public fun format_bls12381g1_affine_parent_uncompressed(): u64 { 0x0500000000000000 }
 
     /// A serialization scheme for `G1AffineParent` elements,
     /// where an element is represented by a byte array `b[]` of size 48,
@@ -117,7 +117,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return $(x,y)$.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g1_affine_parent_compressed(): vector<u8> { x"0501" }
+    public fun format_bls12381g1_affine_parent_compressed(): u64 { 0x0501000000000000 }
 
     /// The group $G_1$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is subgroup of `G1AffineParent`.
@@ -130,14 +130,14 @@ module aptos_std::algebra_bls12381 {
     /// but only applicable to `G1Affine` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-    public fun format_bls12381g1_affine_uncompressed(): vector<u8> { x"06" }
+    public fun format_bls12381g1_affine_uncompressed(): u64 { 0x0600000000000000 }
 
     /// A serialization format for `G1Affine` elements,
     /// essentially the format represented by `format_bls12381g1_affine_parent_compressed()`
     /// but only applicable to `G1Affine` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-    public fun format_bls12381g1_affine_compressed(): vector<u8> { x"0601" }
+    public fun format_bls12381g1_affine_compressed(): u64 { 0x0601000000000000 }
 
     /// A group constructed by the points on a curve $E'(F_{q^2})$ and the point at inifinity under the elliptic curve point addition.
     /// $E'(F_{q^2})$ is an elliptic curve $y^2=x^3+4(u+1)$ defined over $F_{q^2}$.
@@ -159,7 +159,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return $(x,y)$.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g2_affine_parent_uncompressed(): vector<u8> { x"07" }
+    public fun format_bls12381g2_affine_parent_uncompressed(): u64 { 0x0700000000000000 }
 
     /// A serialization scheme for `G1AffineParent` elements,
     /// where an element is represented by a byte array `b[]` of size 96,
@@ -175,7 +175,7 @@ module aptos_std::algebra_bls12381 {
     /// 1. Return $(x,y)$.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g2_affine_parent_compressed(): vector<u8> { x"0701" }
+    public fun format_bls12381g2_affine_parent_compressed(): u64 { 0x0701000000000000 }
 
     /// The group $G_2$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a subgroup of `G2AffineParent`.
@@ -187,13 +187,13 @@ module aptos_std::algebra_bls12381 {
     /// essentially `format_bls12381g2_affine_parent_uncompressed()` but only applicable to `G2Affine` elements.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g2_affine_uncompressed(): vector<u8> { x"08" }
+    public fun format_bls12381g2_affine_uncompressed(): u64 { 0x0800000000000000 }
 
     /// A serialization scheme for `G2Affine` elements,
     /// essentially `format_bls12381g2_affine_parent_compressed()` but only applicable to `G2Affine` elements.
     ///
     /// NOTE: currently information-only, not implemented.
-    public fun format_bls12381g2_affine_compressed(): vector<u8> { x"0801" }
+    public fun format_bls12381g2_affine_compressed(): u64 { 0x0801000000000000 }
 
     /// The group $G_t$ in BLS12-381-based pairing $G_1 \times G_2 \rightarrow G_t$.
     /// It is a multiplicative subgroup of `Fq12`.
@@ -206,7 +206,7 @@ module aptos_std::algebra_bls12381 {
     /// essentially `format_bls12381fq12_lsc_lsc_lsc_lsb()` but only applicable to `Gt` elements.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-    public fun format_bls12381gt(): vector<u8> { x"09" }
+    public fun format_bls12381gt(): u64 { 0x0900000000000000 }
 
     /// The finite field $F_r$ that can be used as the scalar fields
     /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
@@ -216,13 +216,13 @@ module aptos_std::algebra_bls12381 {
     /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte coming first.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
-    public fun format_bls12381fr_lsb(): vector<u8> { x"0a" }
+    public fun format_bls12381fr_lsb(): u64 { 0x0a00000000000000 }
 
     /// A serialization scheme for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the most significant byte coming first.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
-    public fun format_bls12381fr_msb(): vector<u8> { x"0a01" }
+    public fun format_bls12381fr_msb(): u64 { 0x0a01000000000000 }
 
     // Marker types (and their serialization schemes) end.
 
@@ -230,11 +230,11 @@ module aptos_std::algebra_bls12381 {
 
     /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`
     /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
-    public fun h2s_suite_bls12381g1_xmd_sha_256_sswu_ro(): vector<u8> { x"0001" }
+    public fun h2s_suite_bls12381g1_xmd_sha_256_sswu_ro(): u64 { 0x0001000000000000 }
 
     /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`
     /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
-    public fun h2s_suite_bls12381g2_xmd_sha_256_sswu_ro(): vector<u8> { x"0002" }
+    public fun h2s_suite_bls12381g2_xmd_sha_256_sswu_ro(): u64 { 0x0002000000000000 }
 
     // Hash-to-structure suites end.
 

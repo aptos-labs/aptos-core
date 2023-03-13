@@ -85,18 +85,18 @@ pub enum SerializationFormat {
     BLS12381FrMsb,
 }
 
-impl TryFrom<Vec<u8>> for SerializationFormat {
+impl TryFrom<u64> for SerializationFormat {
     type Error = ();
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        match hex::encode(value).as_str() {
-            "04" => Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb),
-            "06" => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
-            "0601" => Ok(SerializationFormat::BLS12381G1AffineCompressed),
-            "08" => Ok(SerializationFormat::BLS12381G2AffineUnompressed),
-            "0801" => Ok(SerializationFormat::BLS12381G2AffineCompressed),
-            "09" => Ok(SerializationFormat::BLS12381Gt),
-            "0a" => Ok(SerializationFormat::BLS12381FrLsb),
-            "0a01" => Ok(SerializationFormat::BLS12381FrMsb),
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            0x0400000000000000 => Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb),
+            0x0600000000000000 => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
+            0x0601000000000000 => Ok(SerializationFormat::BLS12381G1AffineCompressed),
+            0x0800000000000000 => Ok(SerializationFormat::BLS12381G2AffineUnompressed),
+            0x0801000000000000 => Ok(SerializationFormat::BLS12381G2AffineCompressed),
+            0x0900000000000000 => Ok(SerializationFormat::BLS12381Gt),
+            0x0a00000000000000 => Ok(SerializationFormat::BLS12381FrLsb),
+            0x0a01000000000000 => Ok(SerializationFormat::BLS12381FrMsb),
             _ => Err(()),
         }
     }
@@ -108,13 +108,13 @@ pub enum HashToStructureSuite {
     BLS12381G2_XMD_SHA_256_SSWU_RO_,
 }
 
-impl TryFrom<Vec<u8>> for HashToStructureSuite {
+impl TryFrom<u64> for HashToStructureSuite {
     type Error = ();
 
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        match hex::encode(value).as_str() {
-            "0001" => Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_),
-            "0002" => Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_),
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            0x0001000000000000 => Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_),
+            0x0002000000000000 => Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_),
             _ => Err(())
         }
     }
@@ -214,7 +214,7 @@ fn serialize_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     let handle = safely_pop_arg!(args, u64) as usize;
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, Vec<u8>));
+    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match (structure_opt, format_opt) {
         (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
@@ -372,7 +372,7 @@ fn deserialize_internal(
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, Vec<u8>));
+    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
     match (structure, format_opt) {
         (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {
@@ -1492,8 +1492,7 @@ fn hash_to_internal(
     let tag_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = tag_ref.as_bytes_ref();
     let dst = bytes_ref.as_slice();
-    let suite = safely_pop_arg!(args, Vec<u8>);
-    let suite_opt = HashToStructureSuite::try_from(suite);
+    let suite_opt = HashToStructureSuite::try_from(safely_pop_arg!(args, u64));
     match (structure_opt, suite_opt) {
         (Some(Structure::BLS12381G1), Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G1Projective, ark_bls12_381::g1::Config),
         (Some(Structure::BLS12381G2), Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),

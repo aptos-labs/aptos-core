@@ -267,11 +267,11 @@ module aptos_std::algebra {
         }
     }
 
-    /// Try deserializing a byte array to an element of an algebraic structure `S` using a given `scheme`.
+    /// Try deserializing a byte array to an element of an algebraic structure `S` using a given `format`.
     /// Return none if the deserialization failed.
-    public fun deserialize<S>(scheme: vector<u8>, bytes: &vector<u8>): Option<Element<S>> {
+    public fun deserialize<S>(format: u64, bytes: &vector<u8>): Option<Element<S>> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        let (succeeded, handle) = deserialize_internal<S>(scheme, bytes);
+        let (succeeded, handle) = deserialize_internal<S>(format, bytes);
         if (succeeded) {
             some(Element<S> { handle })
         } else {
@@ -279,10 +279,10 @@ module aptos_std::algebra {
         }
     }
 
-    /// Serialize an element of an algebraic structure `S` to a byte array using a given `scheme`.
-    public fun serialize<S>(scheme: vector<u8>, element: &Element<S>): vector<u8> {
+    /// Serialize an element of an algebraic structure `S` to a byte array using a given `format`.
+    public fun serialize<S>(format: u64, element: &Element<S>): vector<u8> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        serialize_internal<S>(scheme, element.handle)
+        serialize_internal<S>(format, element.handle)
     }
 
     /// Get the order of group `G`, a big integer little-endian encoded as a byte array.
@@ -322,7 +322,7 @@ module aptos_std::algebra {
     /// A unique domain separation tag `dst` of size 255 bytes or shorter is required
     /// for each independent collision-resistent mapping involved in the protocol built atop.
     /// Abort if `dst` is too long.
-    public fun hash_to<S>(suite: vector<u8>, dst: &vector<u8>, msg: &vector<u8>): Element<S> {
+    public fun hash_to<S>(suite: u64, dst: &vector<u8>, msg: &vector<u8>): Element<S> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
         Element {
             handle: hash_to_internal<S>(suite, dst, msg)
@@ -342,7 +342,7 @@ module aptos_std::algebra {
 
     // Native functions begin.
 
-    native fun deserialize_internal<G>(scheme_id: vector<u8>, bytes: &vector<u8>): (bool, u64);
+    native fun deserialize_internal<G>(format: u64, bytes: &vector<u8>): (bool, u64);
     native fun downcast_internal<L,S>(handle: u64): (bool, u64);
     native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
@@ -367,12 +367,12 @@ module aptos_std::algebra {
     native fun group_order_internal<G>(): vector<u8>;
     native fun group_scalar_mul_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
     native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun hash_to_internal<S>(suite: vector<u8>, dst: &vector<u8>, bytes: &vector<u8>): u64;
+    native fun hash_to_internal<S>(suite: u64, dst: &vector<u8>, bytes: &vector<u8>): u64;
     #[test_only]
     native fun insecure_random_element_internal<G>(): u64;
     native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
     native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
-    native fun serialize_internal<G>(scheme_id: vector<u8>, h: u64): vector<u8>;
+    native fun serialize_internal<G>(format: u64, h: u64): vector<u8>;
     native fun upcast_internal<S,L>(handle: u64): u64;
 
     // Native functions end.

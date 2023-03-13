@@ -369,7 +369,7 @@ where an element is represented by a byte array <code>b[]</code> of size 48 with
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): u64
 </code></pre>
 
 
@@ -378,7 +378,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"01" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): u64 { 0x0100000000000000 }
 </code></pre>
 
 
@@ -395,7 +395,7 @@ where an element is represented by a byte array <code>b[]</code> of size 48 with
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): u64
 </code></pre>
 
 
@@ -404,7 +404,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0101" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): u64 { 0x0101000000000000 }
 </code></pre>
 
 
@@ -424,7 +424,7 @@ with the following rules.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): u64
 </code></pre>
 
 
@@ -433,7 +433,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"02" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): u64 { 0x0200000000000000 }
 </code></pre>
 
 
@@ -453,7 +453,7 @@ with the following rules.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): u64
 </code></pre>
 
 
@@ -462,7 +462,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0201" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): u64 { 0x0201000000000000 }
 </code></pre>
 
 
@@ -483,7 +483,7 @@ with the following rules.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): u64
 </code></pre>
 
 
@@ -492,7 +492,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"03" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): u64 { 0x0300000000000000 }
 </code></pre>
 
 
@@ -511,7 +511,7 @@ where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</co
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): u64
 </code></pre>
 
 
@@ -520,7 +520,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"04" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): u64 { 0x0400000000000000 }
 </code></pre>
 
 
@@ -546,7 +546,7 @@ with the following rules deseribed from the perspective of deserialization.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): u64
 </code></pre>
 
 
@@ -555,7 +555,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"05" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): u64 { 0x0500000000000000 }
 </code></pre>
 
 
@@ -582,7 +582,7 @@ with the following rules deseribed from the perspective of deserialization.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): u64
 </code></pre>
 
 
@@ -591,7 +591,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0501" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): u64 { 0x0501000000000000 }
 </code></pre>
 
 
@@ -609,7 +609,7 @@ but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): u64
 </code></pre>
 
 
@@ -618,7 +618,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"06" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): u64 { 0x0600000000000000 }
 </code></pre>
 
 
@@ -636,7 +636,7 @@ but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): u64
 </code></pre>
 
 
@@ -645,7 +645,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0601" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): u64 { 0x0601000000000000 }
 </code></pre>
 
 
@@ -671,7 +671,7 @@ with the following rules deseribed from the perspective of deserialization.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): u64
 </code></pre>
 
 
@@ -680,7 +680,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"07" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): u64 { 0x0700000000000000 }
 </code></pre>
 
 
@@ -707,7 +707,7 @@ with the following rules deseribed from the perspective of deserialization.
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): u64
 </code></pre>
 
 
@@ -716,7 +716,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0701" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): u64 { 0x0701000000000000 }
 </code></pre>
 
 
@@ -733,7 +733,7 @@ essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): u64
 </code></pre>
 
 
@@ -742,7 +742,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"08" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): u64 { 0x0800000000000000 }
 </code></pre>
 
 
@@ -759,7 +759,7 @@ essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12
 NOTE: currently information-only, not implemented.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): u64
 </code></pre>
 
 
@@ -768,7 +768,7 @@ NOTE: currently information-only, not implemented.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0801" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): u64 { 0x0801000000000000 }
 </code></pre>
 
 
@@ -785,7 +785,7 @@ essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12
 NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): u64
 </code></pre>
 
 
@@ -794,7 +794,7 @@ NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"09" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): u64 { 0x0900000000000000 }
 </code></pre>
 
 
@@ -811,7 +811,7 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64
 </code></pre>
 
 
@@ -820,7 +820,7 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0a" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64 { 0x0a00000000000000 }
 </code></pre>
 
 
@@ -837,7 +837,7 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): u64
 </code></pre>
 
 
@@ -846,7 +846,7 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0a01" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): u64 { 0x0a01000000000000 }
 </code></pre>
 
 
@@ -861,7 +861,7 @@ The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code>
 defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): u64
 </code></pre>
 
 
@@ -870,7 +870,7 @@ defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-1
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0001" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): u64 { 0x0001000000000000 }
 </code></pre>
 
 
@@ -885,7 +885,7 @@ The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code>
 defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): u64
 </code></pre>
 
 
@@ -894,7 +894,7 @@ defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-1
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; { x"0002" }
+<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): u64 { 0x0002000000000000 }
 </code></pre>
 
 
