@@ -17,7 +17,7 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::Duration,
 };
@@ -35,6 +35,8 @@ pub(crate) enum ProofCoordinatorCommand {
 struct IncrementalProofState {
     info: SignedDigestInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
+    aggregated_voting_power: u128,
+    completed: bool,
 }
 
 impl IncrementalProofState {
@@ -42,10 +44,16 @@ impl IncrementalProofState {
         Self {
             info,
             aggregated_signature: BTreeMap::new(),
+            aggregated_voting_power: 0,
+            completed: false,
         }
     }
 
-    fn add_signature(&mut self, signed_digest: SignedDigest) -> Result<(), SignedDigestError> {
+    fn add_signature(
+        &mut self,
+        signed_digest: SignedDigest,
+        validator_verifier: &ValidatorVerifier,
+    ) -> Result<(), SignedDigestError> {
         if signed_digest.info() != &self.info {
             return Err(SignedDigestError::WrongInfo);
         }
@@ -57,22 +65,56 @@ impl IncrementalProofState {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
-        self.aggregated_signature
-            .insert(signed_digest.signer(), signed_digest.signature());
+        match validator_verifier.get_voting_power(&signed_digest.signer()) {
+            Some(voting_power) => {
+                let signer = signed_digest.signer();
+                if self
+                    .aggregated_signature
+                    .insert(signer, signed_digest.signature())
+                    .is_none()
+                {
+                    self.aggregated_voting_power += voting_power as u128;
+                } else {
+                    error!(
+                        "Author already in aggregated_signatures right after rechecking: {}",
+                        signer
+                    );
+                }
+            },
+            None => {
+                error!(
+                    "Received signature from author not in validator set: {}",
+                    signed_digest.signer()
+                );
+                return Err(SignedDigestError::InvalidAuthor);
+            },
+        }
+
         Ok(())
     }
 
     fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        validator_verifier
-            .check_voting_power(self.aggregated_signature.keys())
-            .is_ok()
+        if self.aggregated_voting_power >= validator_verifier.quorum_voting_power() {
+            let recheck = validator_verifier.check_voting_power(self.aggregated_signature.keys());
+            if recheck.is_err() {
+                error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
+            }
+            recheck.is_ok()
+        } else {
+            false
+        }
     }
 
-    fn take(self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
+    fn take(&mut self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
+        if self.completed {
+            panic!("Cannot call take twice, unexpected issue occurred");
+        }
+        self.completed = true;
+
         let proof = match validator_verifier
-            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature))
+            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
         {
-            Ok(sig) => ProofOfStore::new(self.info, sig),
+            Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
         proof
@@ -143,25 +185,19 @@ impl ProofCoordinator {
             self.init_proof(&signed_digest)?;
         }
         let digest = signed_digest.digest();
-
-        match self.digest_to_proof.entry(signed_digest.digest()) {
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().add_signature(signed_digest)?;
-                if entry.get_mut().ready(validator_verifier) {
-                    let (_, state) = entry.remove_entry();
-                    let proof = state.take(validator_verifier);
-                    // quorum store measurements
-                    let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                        - self
-                            .digest_to_time
-                            .remove(&digest)
-                            .expect("Batch created without recording the time!");
-                    counters::BATCH_TO_POS_DURATION
-                        .observe_duration(Duration::from_micros(duration));
-                    return Ok(Some(proof));
-                }
-            },
-            Entry::Vacant(_) => (),
+        if let Some(value) = self.digest_to_proof.get_mut(&signed_digest.digest()) {
+            value.add_signature(signed_digest, validator_verifier)?;
+            if !value.completed && value.ready(validator_verifier) {
+                let proof = value.take(validator_verifier);
+                // quorum store measurements
+                let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
+                    - self
+                        .digest_to_time
+                        .remove(&digest)
+                        .expect("Batch created without recording the time!");
+                counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
+                return Ok(Some(proof));
+            }
         }
         Ok(None)
     }
@@ -169,9 +205,17 @@ impl ProofCoordinator {
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_digest_info in self.timeouts.expire() {
-            counters::TIMEOUT_BATCHES_COUNT.inc();
-            self.digest_to_proof.remove(&signed_digest_info.digest);
-            batch_ids.push(signed_digest_info.batch_id);
+            if let Some(state) = self.digest_to_proof.remove(&signed_digest_info.digest) {
+                counters::BATCH_RECEIVED_REPLIES_COUNT
+                    .observe(state.aggregated_signature.len() as f64);
+                counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
+                    .observe(state.aggregated_voting_power as f64);
+                counters::BATCH_SUCCESSFUL_CREATION.observe(u64::from(state.completed));
+                if !state.completed {
+                    counters::TIMEOUT_BATCHES_COUNT.inc();
+                    batch_ids.push(signed_digest_info.batch_id);
+                }
+            }
         }
         if self
             .batch_generator_cmd_tx
