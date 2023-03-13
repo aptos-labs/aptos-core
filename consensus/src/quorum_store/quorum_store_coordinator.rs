@@ -55,7 +55,7 @@ impl QuorumStoreCoordinator {
 
     pub async fn start(self, mut rx: futures_channel::mpsc::Receiver<CoordinatorCommand>) {
         while let Some(cmd) = rx.next().await {
-            monitor!("batch_store_coordinator_loop", {
+            monitor!("quorum_store_coordinator_loop", {
                 match cmd {
                     CoordinatorCommand::CommitNotification(logical_time, digests) => {
                         self.proof_manager_cmd_tx
