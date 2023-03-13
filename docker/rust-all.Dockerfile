@@ -292,6 +292,7 @@ RUN apt-get update && apt-get install -y \
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-parser /usr/local/bin/aptos-indexer-grpc-parser
 
 # The health check port
 EXPOSE 8080
