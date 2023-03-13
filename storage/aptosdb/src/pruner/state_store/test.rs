@@ -59,7 +59,7 @@ fn put_value_set(
     state_store.ledger_db.write_schemas(ledger_batch).unwrap();
     state_store
         .state_kv_db
-        .write_schemas(state_kv_batch)
+        .commit(version, state_kv_batch)
         .unwrap();
 
     root
@@ -419,6 +419,8 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
         if pruned {
             assert!(state_store
                 .state_kv_db
+                // TODO(grao): Support sharding here.
+                .metadata_db()
                 .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
                     stale_since_version: version,
                     version: *old_version,

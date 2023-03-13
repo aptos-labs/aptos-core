@@ -9,6 +9,7 @@ use crate::{
         state_kv_pruner::StateKvPruner,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
+    state_kv_db::StateKvDb,
     EventStore, TransactionStore,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
@@ -35,6 +36,6 @@ pub(crate) fn create_ledger_pruner(ledger_db: Arc<DB>) -> Arc<LedgerPruner> {
 }
 
 /// A utility function to instantiate the state kv pruner.
-pub(crate) fn create_state_kv_pruner(state_kv_db: Arc<DB>) -> Arc<StateKvPruner> {
+pub(crate) fn create_state_kv_pruner(state_kv_db: Arc<StateKvDb>) -> Arc<StateKvPruner> {
     Arc::new(StateKvPruner::new(state_kv_db))
 }
