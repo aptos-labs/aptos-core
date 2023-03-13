@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
@@ -164,7 +165,7 @@ impl ProofManager {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                Some(msg) = proposal_rx.next() => {
+                Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
                     self.handle_proposal_request(msg);
 
                     let updated_back_pressure = self.qs_back_pressure();
@@ -174,8 +175,9 @@ impl ProofManager {
                             debug!("Failed to send back_pressure for proposal");
                         }
                     }
-                },
+                }),
                 Some(msg) = proof_rx.recv() => {
+                    monitor!("proof_manager_handle_command", {
                     match msg {
                         ProofManagerCommand::Shutdown(ack_tx) => {
                             ack_tx
@@ -206,6 +208,7 @@ impl ProofManager {
                             }
                         },
                     }
+                    })
                 },
             }
         }

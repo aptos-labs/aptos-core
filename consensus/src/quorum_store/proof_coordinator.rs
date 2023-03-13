@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_generator::ProofError, counters, proof_manager::ProofManagerCommand, types::BatchId,
-    utils::DigestTimeouts,
+use crate::{
+    monitor,
+    quorum_store::{
+        batch_generator::ProofError, counters, proof_manager::ProofManagerCommand, types::BatchId,
+        utils::DigestTimeouts,
+    },
 };
 use aptos_consensus_types::proof_of_store::{
     ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
@@ -195,7 +198,7 @@ impl ProofCoordinator {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
-                Some(command) = rx.recv() => {
+                Some(command) = rx.recv() => monitor!("proof_coordinator_handle_command", {
                     match command {
                         ProofCoordinatorCommand::Shutdown(ack_tx) => {
                             ack_tx
@@ -227,9 +230,9 @@ impl ProofCoordinator {
                             }
                         },
                     }
-                }
+                }),
                 _ = interval.tick() => {
-                    self.expire();
+                    monitor!("proof_coordinator_handle_tick", self.expire());
                 }
             }
         }
