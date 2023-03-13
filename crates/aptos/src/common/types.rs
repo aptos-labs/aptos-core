@@ -48,7 +48,7 @@ use std::{
 };
 use thiserror::Error;
 
-pub const USER_AGENT: &str = concat!("aptos-cli / ", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
 const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
