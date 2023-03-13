@@ -1,0 +1,9 @@
+[package]
+name = "FeatureSandbox"
+version = "0.0.0"
+
+[addresses]
+feature_sandbox = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
