@@ -105,7 +105,7 @@ impl PayloadClient for QuorumStoreClient {
             && pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
         let return_empty = pending_ordering && return_non_full;
 
-        WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(u64::from(!return_non_full));
+        WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(if !return_non_full { 1.0 } else { 0.0 });
 
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
