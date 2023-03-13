@@ -115,6 +115,7 @@ impl DirectMempoolInnerBuilder {
 pub struct InnerBuilder {
     epoch: u64,
     author: Author,
+    num_validators: u64,
     config: QuorumStoreConfig,
     consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -147,6 +148,7 @@ impl InnerBuilder {
     pub(crate) fn new(
         epoch: u64,
         author: Author,
+        num_validators: u64,
         config: QuorumStoreConfig,
         consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -185,6 +187,7 @@ impl InnerBuilder {
         Self {
             epoch,
             author,
+            num_validators,
             config,
             consensus_to_quorum_store_receiver,
             quorum_store_to_mempool_sender,
@@ -355,7 +358,10 @@ impl InnerBuilder {
         let proof_manager = ProofManager::new(
             self.epoch,
             self.config.back_pressure.backlog_txn_limit_count,
-            self.config.back_pressure.backlog_batch_limit_count,
+            self.config
+                .back_pressure
+                .backlog_per_validator_batch_limit_count
+                * self.num_validators,
         );
         spawn_named!(
             "proof_manager",
