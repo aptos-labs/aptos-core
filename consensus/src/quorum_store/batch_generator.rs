@@ -335,7 +335,7 @@ impl BatchGenerator {
                         }
                     }
                 }),
-                Some(cmd) = cmd_rx.recv() =>monitor!("batch_generator_handle_command", {
+                Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
                         BatchGeneratorCommand::CommitNotification(logical_time) => {
                             trace!(
