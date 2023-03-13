@@ -174,7 +174,7 @@ macro_rules! ark_serialize_internal {
         let element_ptr = get_obj_pointer!($context, $handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
         let mut buf = Vec::new();
-        $context.charge($gas_params.serialize($structure, $format))?;
+        $context.charge($gas_params.placeholder)?;
         element.$ser_func(&mut buf).unwrap();
         buf
     }};
@@ -234,7 +234,7 @@ macro_rules! ark_deserialize_internal {
         $typ:ty,
         $deser_func:ident
     ) => {{
-        $context.charge($gas_params.deserialize($structure, $format))?;
+        $context.charge($gas_params.placeholder)?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let handle = store_obj!($context, element);
@@ -298,7 +298,7 @@ fn deserialize_internal(
 macro_rules! from_u64_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let value = safely_pop_arg!($args, u64);
-        $context.charge($gas_params.from_u128($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let element = <$typ>::from(value as u128);
         let handle = store_obj!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
@@ -337,7 +337,7 @@ macro_rules! ark_field_add_internal {
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_add($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element_1.add(element_2);
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -376,7 +376,7 @@ macro_rules! ark_field_sub_internal {
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_sub($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element_1.sub(element_2);
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -415,7 +415,7 @@ macro_rules! ark_field_mul_internal {
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_mul($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element_1.mul(element_2);
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -457,7 +457,7 @@ macro_rules! ark_field_div_internal {
         if element_2.is_zero() {
             return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
         }
-        $context.charge($gas_params.field_div($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element_1.div(element_2);
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
@@ -493,7 +493,7 @@ macro_rules! ark_neg_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_neg($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element.neg();
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -529,7 +529,7 @@ macro_rules! ark_field_inv_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_inv($structure))?;
+        $context.charge($gas_params.placeholder)?;
         match element.inverse() {
             Some(new_element) => {
                 let new_handle = store_obj!($context, new_element);
@@ -568,7 +568,7 @@ macro_rules! ark_field_sqr_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_sqr($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = element.square();
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -600,7 +600,7 @@ fn field_sqr_internal(
 
 macro_rules! ark_field_zero_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        $context.charge($gas_params.field_zero($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = <$typ>::zero();
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -632,7 +632,7 @@ fn field_zero_internal(
 
 macro_rules! ark_field_one_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        $context.charge($gas_params.field_one($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let new_element = <$typ>::one();
         let new_handle = store_obj!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
@@ -667,7 +667,7 @@ macro_rules! ark_field_is_one_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_is_one($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let result = element.is_one();
         Ok(smallvec![Value::bool(result)])
     }};
@@ -701,7 +701,7 @@ macro_rules! ark_field_is_zero_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         let element_ptr = get_obj_pointer!($context, handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.field_is_zero($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let result = element.is_zero();
         Ok(smallvec![Value::bool(result)])
     }};
@@ -738,7 +738,7 @@ macro_rules! ark_eq_internal {
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
         let element_2_ptr = get_obj_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.eq($structure))?;
+        $context.charge($gas_params.placeholder)?;
         let result = element_1 == element_2;
         Ok(smallvec![Value::bool(result)])
     }};
