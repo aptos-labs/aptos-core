@@ -737,5 +737,6 @@ module aptos_std::algebra_bls12381 {
         let g2_elements = vector[insecure_random_element<BLS12_381_G2>(), insecure_random_element<BLS12_381_G2>()];
         multi_pairing<BLS12_381_G1, BLS12_381_G2, BLS12_381_Gt>(&g1_elements, &g2_elements);
     }
+
     // Tests end.
 }

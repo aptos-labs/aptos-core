@@ -294,7 +294,7 @@ ark-bls12-381 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
-ark-std = "0.4.0"
+ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.1.1"
 async-stream = "0.3"

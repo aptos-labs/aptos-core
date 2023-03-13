@@ -383,7 +383,7 @@ module aptos_std::algebra {
 
     #[test_only]
     public fun enable_initial_generic_algebraic_operations(fx: &signer) {
-        std::features::change_feature_flags(fx, std::vector::singleton(std::features::get_generic_agebraic_structures_basic_operations_feature()), std::vector::empty());
+        std::features::change_feature_flags(fx, vector[std::features::get_generic_agebraic_structures_basic_operations_feature()], vector[]);
     }
 
     // Private functions end.
