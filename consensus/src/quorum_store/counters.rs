@@ -478,3 +478,28 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+pub static BATCH_SUCCESSFUL_CREATION: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_batch_successful_creation",
+        "Counter for whether we are successfully creating batches",
+    )
+});
+
+/// Number of validators for which we received signed replies
+pub static BATCH_RECEIVED_REPLIES_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_received_replies_votes",
+        "Number of validators for which we received signed replies.",
+    )
+    .unwrap()
+});
+
+/// Voting power of validators for which we received signed replies
+pub static BATCH_RECEIVED_REPLIES_VOTING_POWER: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_received_replies_voting_power",
+        "Voting power of validators for which we received signed replies.",
+    )
+    .unwrap()
+});
