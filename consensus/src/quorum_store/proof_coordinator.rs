@@ -41,8 +41,10 @@ pub(crate) type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, Batch
 struct IncrementalProofState {
     info: SignedDigestInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
+    aggregated_voting_power: u128,
     batch_id: BatchId,
-    ret_tx: ProofReturnChannel,
+    // None if proof was completed.
+    ret_tx: Option<ProofReturnChannel>,
 }
 
 impl IncrementalProofState {
@@ -50,12 +52,17 @@ impl IncrementalProofState {
         Self {
             info,
             aggregated_signature: BTreeMap::new(),
+            aggregated_voting_power: 0,
             batch_id,
-            ret_tx,
+            ret_tx: Some(ret_tx),
         }
     }
 
-    fn add_signature(&mut self, signed_digest: SignedDigest) -> Result<(), SignedDigestError> {
+    fn add_signature(
+        &mut self,
+        signed_digest: SignedDigest,
+        validator_verifier: &ValidatorVerifier,
+    ) -> Result<(), SignedDigestError> {
         if signed_digest.info() != &self.info {
             return Err(SignedDigestError::WrongInfo);
         }
@@ -67,39 +74,77 @@ impl IncrementalProofState {
             return Err(SignedDigestError::DuplicatedSignature);
         }
 
-        self.aggregated_signature
-            .insert(signed_digest.signer(), signed_digest.signature());
+        match validator_verifier.get_voting_power(&signed_digest.signer()) {
+            Some(voting_power) => {
+                let signer = signed_digest.signer();
+                if self
+                    .aggregated_signature
+                    .insert(signer, signed_digest.signature())
+                    .is_none()
+                {
+                    self.aggregated_voting_power += voting_power as u128;
+                } else {
+                    error!(
+                        "Author already in aggregated_signatures right after rechecking: {}",
+                        signer
+                    );
+                }
+            },
+            None => {
+                error!(
+                    "Received signature from author not in validator set: {}",
+                    signed_digest.signer()
+                );
+                return Err(SignedDigestError::InvalidAuthor);
+            },
+        }
+
         Ok(())
     }
 
     fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
-        self.aggregated_signature.contains_key(&my_peer_id)
-            && validator_verifier
-                .check_voting_power(self.aggregated_signature.keys())
-                .is_ok()
+        if self.aggregated_signature.contains_key(&my_peer_id)
+            && self.aggregated_voting_power >= validator_verifier.quorum_voting_power()
+        {
+            let recheck = validator_verifier.check_voting_power(self.aggregated_signature.keys());
+            if recheck.is_err() {
+                error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
+            }
+            recheck.is_ok()
+        } else {
+            false
+        }
     }
 
     fn take(
-        self,
+        &mut self,
         validator_verifier: &ValidatorVerifier,
     ) -> (ProofOfStore, BatchId, ProofReturnChannel) {
+        if self.ret_tx.is_none() {
+            panic!("Cannot call take twice, unexpected issue occurred");
+        }
         let proof = match validator_verifier
-            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature))
+            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
         {
-            Ok(sig) => ProofOfStore::new(self.info, sig),
+            Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
-        (proof, self.batch_id, self.ret_tx)
+        (proof, self.batch_id, self.ret_tx.take().unwrap())
     }
 
     fn send_timeout(self) {
         if self
             .ret_tx
+            .unwrap()
             .send(Err(ProofError::Timeout(self.batch_id)))
             .is_err()
         {
             debug!("Failed to send timeout for batch {}", self.batch_id);
         }
+    }
+
+    fn completed(&self) -> bool {
+        self.ret_tx.is_none()
     }
 }
 
@@ -150,15 +195,16 @@ impl ProofCoordinator {
         self.digest_to_proof
             .entry(signed_digest.digest())
             .and_modify(|state| {
-                ret = state.add_signature(signed_digest);
+                ret = state.add_signature(signed_digest, validator_verifier);
                 if ret.is_ok() {
-                    proof_changed_to_completed = state.ready(validator_verifier, my_id);
+                    proof_changed_to_completed =
+                        !state.completed() && state.ready(validator_verifier, my_id);
                 }
             });
         if proof_changed_to_completed {
             let (proof, batch_id, tx) = self
                 .digest_to_proof
-                .remove(&digest)
+                .get_mut(&digest)
                 .unwrap()
                 .take(validator_verifier);
 
@@ -184,7 +230,14 @@ impl ProofCoordinator {
     fn expire(&mut self) {
         for digest in self.timeouts.expire() {
             if let Some(state) = self.digest_to_proof.remove(&digest) {
-                state.send_timeout();
+                counters::BATCH_RECEIVED_REPLIES_COUNT
+                    .observe(state.aggregated_signature.len() as f64);
+                counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
+                    .observe(state.aggregated_voting_power as f64);
+                counters::BATCH_SUCCESSFUL_CREATION.observe(u64::from(state.completed()));
+                if !state.completed() {
+                    state.send_timeout();
+                }
             }
         }
     }
