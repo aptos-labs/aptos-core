@@ -6,10 +6,10 @@ use crate::{
     transaction_generator::{TransactionExecutor, SEND_AMOUNT},
     EmitJobRequest, EmitModeParams,
 };
-use anyhow::{anyhow, format_err, Context, Result};
+use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -158,6 +158,15 @@ impl<'t> AccountMinter<'t> {
             }
         }
 
+        let new_source_account = if !req.coordination_delay_between_instances.is_zero() {
+            Some(
+                self.create_new_source_account(txn_executor, coins_for_source)
+                    .await?,
+            )
+        } else {
+            None
+        };
+
         let start = Instant::now();
 
         let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
@@ -168,6 +177,7 @@ impl<'t> AccountMinter<'t> {
         // additional fund for paying gas fees later.
         let seed_accounts = self
             .create_and_fund_seed_accounts(
+                new_source_account,
                 txn_executor,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
@@ -266,6 +276,7 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn create_and_fund_seed_accounts(
         &mut self,
+        mut new_source_account: Option<LocalAccount>,
         txn_executor: &dyn TransactionExecutor,
         seed_account_num: usize,
         coins_per_seed_account: u64,
@@ -279,13 +290,16 @@ impl<'t> AccountMinter<'t> {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
-            let source_account = &mut self.source_account;
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
-                        source_account,
+                        if let Some(account) = &mut new_source_account {
+                            account
+                        } else {
+                            self.source_account
+                        },
                         coins_per_seed_account,
                         account.public_key(),
                         txn_factory,
@@ -325,6 +339,36 @@ impl<'t> AccountMinter<'t> {
                 )
             })?;
         Ok(LocalAccount::new(address, account_key, sequence_number))
+    }
+
+    pub async fn create_new_source_account(
+        &mut self,
+        txn_executor: &dyn TransactionExecutor,
+        coins_for_source: u64,
+    ) -> Result<LocalAccount> {
+        for i in 0..3 {
+            *self.source_account.sequence_number_mut() = txn_executor
+                .query_sequence_number(self.source_account.address())
+                .await?;
+
+            let new_source_account = LocalAccount::generate(self.rng());
+            let txn = create_and_fund_account_request(
+                self.source_account,
+                coins_for_source,
+                new_source_account.public_key(),
+                &self.txn_factory,
+            );
+            if let Err(e) = txn_executor.execute_transactions(&[txn]).await {
+                error!("Couldn't create new source account, {:?}, try {}", e, i)
+            } else {
+                info!(
+                    "New source account created {}",
+                    new_source_account.address()
+                );
+                return Ok(new_source_account);
+            }
+        }
+        bail!("Couldn't create new source account");
     }
 
     pub fn rng(&mut self) -> &mut StdRng {

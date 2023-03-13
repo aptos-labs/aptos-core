@@ -11,7 +11,6 @@ use aptos_types::{
 };
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -78,7 +77,7 @@ impl SignedDigest {
         expiration: LogicalTime,
         num_txns: u64,
         num_bytes: u64,
-        validator_signer: Arc<ValidatorSigner>,
+        validator_signer: &ValidatorSigner,
     ) -> Result<Self, CryptoMaterialError> {
         let info = SignedDigestInfo::new(batch_author, digest, expiration, num_txns, num_bytes);
         let signature = validator_signer.sign(&info)?;

@@ -4,13 +4,13 @@
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    on_chain_config::TimedFeatures,
+    on_chain_config::{Features, TimedFeatures},
 };
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use tempfile::tempdir;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -55,6 +55,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         TimedFeatures::enable_all(),
+        Arc::new(Features::default()),
     )
 }
 

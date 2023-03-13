@@ -5,11 +5,8 @@
 /// * Extensible framework for tokens
 ///
 /// TODO:
-/// * Provide functions for mutability -- the capability model seems to heavy for mutations, so
-///   probably keep the existing model
-/// * Consider adding an optional source name if name is mutated, since the objects address depends
-///   on the name...
-/// * Update ObjectId to be an acceptable param to move
+/// * Provide a Ref/Capability for mutability, relying on the creator is something for the top-level.
+/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
 module token_objects::token {
     use std::error;
     use std::option::{Self, Option};
@@ -17,22 +14,26 @@ module token_objects::token {
     use std::signer;
     use std::vector;
 
-    // The token does not exist
-    const ETOKEN_DOES_NOT_EXIST: u64 = 0;
-    /// The provided signer is not the creator
-    const ENOT_CREATOR: u64 = 1;
-    /// Attempted to mutate an immutable field
-    const EFIELD_NOT_MUTABLE: u64 = 2;
-
+    use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection::{Self, Royalty};
+    use token_objects::collection;
+    use token_objects::royalty::{Self, Royalty};
+
+    // The token does not exist
+    const ETOKEN_DOES_NOT_EXIST: u64 = 1;
+    /// The provided signer is not the creator
+    const ENOT_CREATOR: u64 = 2;
+    /// Attempted to mutate an immutable field
+    const EFIELD_NOT_MUTABLE: u64 = 3;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
     struct Token has key {
         /// An optional categorization of similar token, there are no constraints on collections.
         collection: String,
+        /// Unique identifier within the collection, optional, 0 means unassigned
+        collection_id: u64,
         /// The original creator of this token.
         creator: address,
         /// A brief description of the token.
@@ -48,9 +49,17 @@ module token_objects::token {
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
+        /// Emitted upon any mutation of the token.
+        mutation_events: event::EventHandle<MutationEvent>,
     }
 
-    /// This config specifies which fields in the TokenData are mutable
+    /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
+    /// directly understand the behavior in a writeset.
+    struct MutationEvent has drop, store {
+        mutated_field_name: String,
+    }
+
+    /// This config specifies which fields in the TokenData are mutable.
     struct MutabilityConfig has copy, drop, store {
         description: bool,
         name: bool,
@@ -68,25 +77,27 @@ module token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let seed = create_token_seed(&collection, &name);
-        let creator_ref = object::create_named_object(creator, seed);
-        let object_signer = object::generate_signer(&creator_ref);
+        let constructor_ref = object::create_named_object(creator, seed);
+        let object_signer = object::generate_signer(&constructor_ref);
 
-        collection::increment_supply(&creator_address, &collection);
+        let id = collection::increment_supply(&creator_address, &collection);
         let token = Token {
             collection,
+            collection_id: option::get_with_default(&mut id, 0),
             creator: creator_address,
             description,
             mutability_config,
             name,
             creation_name: option::none(),
             uri,
+            mutation_events: object::new_event_handle(&object_signer),
         };
         move_to(&object_signer, token);
 
         if (option::is_some(&royalty)) {
-            collection::init_royalty(&object_signer, option::extract(&mut royalty))
+            royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
-        creator_ref
+        constructor_ref
     }
 
     public fun create_mutability_config(description: bool, name: bool, uri: bool): MutabilityConfig {
@@ -126,7 +137,7 @@ module token_objects::token {
         );
 
         let royalty = if (enable_royalty) {
-            option::some(collection::create_royalty(
+            option::some(royalty::create(
                 royalty_numerator,
                 royalty_denominator,
                 royalty_payee_address,
@@ -206,6 +217,20 @@ module token_objects::token {
         borrow_global<Token>(token_address).uri
     }
 
+    public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
+        verify(&token);
+        let royalty = royalty::get(token);
+        if (option::is_some(&royalty)) {
+            royalty
+        } else {
+            let creator = creator(token);
+            let collection_name = collection(token);
+            let collection_address = collection::create_collection_address(&creator, &collection_name);
+            let collection = object::address_to_object<collection::Collection>(collection_address);
+            royalty::get(collection)
+        }
+    }
+
     // Mutators
 
     public fun set_description<T: key>(
@@ -224,6 +249,10 @@ module token_objects::token {
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         token.description = description;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"description") },
+        );
     }
 
     public fun set_name<T: key>(
@@ -246,6 +275,10 @@ module token_objects::token {
             option::fill(&mut token.creation_name, token.name)
         };
         token.name = name;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"name") },
+        );
     }
 
     public fun set_uri<T: key>(
@@ -264,6 +297,10 @@ module token_objects::token {
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         token.uri = uri;
+        event::emit_event(
+            &mut token.mutation_events,
+            MutationEvent { mutated_field_name: string::utf8(b"uri") },
+        );
     }
 
     // Entry functions
@@ -280,7 +317,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
-    entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
+    entry fun test_create_and_transfer(creator: &signer, trader: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -293,10 +330,81 @@ module token_objects::token {
         assert!(object::owner(token) == creator_address, 1);
         object::transfer(creator, token, signer::address_of(trader));
         assert!(object::owner(token) == signer::address_of(trader), 1);
+
+        let expected_royalty = royalty::create(25, 10000, creator_address);
+        assert!(option::some(expected_royalty) == royalty(token), 2);
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x20000, location = token_objects::collection)]
+    entry fun test_collection_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        collection::create_collection(
+            creator,
+            string::utf8(b"collection description"),
+            collection_name,
+            string::utf8(b"collection uri"),
+            false,
+            false,
+            5,
+            true,
+            10,
+            1000,
+            signer::address_of(creator),
+        );
+
+        create_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            create_mutability_config(false, false, false),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+
+        let creator_address = signer::address_of(creator);
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+        let expected_royalty = royalty::create(10, 1000, creator_address);
+        assert!(option::some(expected_royalty) == royalty(token), 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_no_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        collection::create_untracked_collection(
+            creator,
+            string::utf8(b"collection description"),
+            collection::create_mutability_config(false, false),
+            collection_name,
+            option::none(),
+            string::utf8(b"collection uri"),
+        );
+
+        create_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            create_mutability_config(false, false, false),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+
+        let creator_address = signer::address_of(creator);
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+        assert!(option::none() == royalty(token), 0);
+    }
+
+
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
     entry fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");

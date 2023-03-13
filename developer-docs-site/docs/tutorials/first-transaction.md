@@ -149,7 +149,7 @@ See the Rust [`transfer-coin`](https://github.com/aptos-labs/aptos-core/blob/mai
 In the first step, the `transfer-coin` example initializes both the REST and faucet clients:
 
 - The REST client interacts with the REST API.
-- The faucet client interacts with the devnet Faucet service for creating and funding accounts.
+- The faucet client interacts with the devnet Faucet service for [creating and funding accounts](../guides/get-test-funds.md).
 
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
@@ -275,7 +275,7 @@ In this step, the SDK translates a single call into the process of querying a re
 Behind the scenes, the `checkBalance` function in `CoinClient` in the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
 
 ```ts
-:!: static/sdks/typescript/src/coin_client.ts checkBalance
+:!: static/sdks/typescript/src/plugins/coin_client.ts checkBalance
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -323,7 +323,7 @@ Like the previous step, this is another helper step that constructs a transactio
 
 Behind the scenes, the `transfer` function generates a transaction payload and has the client sign, send, and wait for it:
 ```ts
-:!: static/sdks/typescript/src/coin_client.ts transfer
+:!: static/sdks/typescript/src/plugins/coin_client.ts transfer
 ```
 
 Within the client, <code>generateSignSubmitTransaction</code> is doing this:
