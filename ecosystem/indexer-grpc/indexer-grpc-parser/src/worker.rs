@@ -36,7 +36,7 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use prost::Message;
 use std::sync::Arc;
 
@@ -195,23 +195,21 @@ impl Worker {
             // Gets a batch of transactions from the stream. Batch size is set in the grpc server.
             // The number of batches depends on our config
             for _ in 0..concurrent_tasks {
-                // TODO(larry): do not block here to wait for consumer items.
-                let next_stream = match resp_stream.next().await {
-                    Some(Ok(r)) => r,
-                    Some(Err(e)) => {
-                        // TODO: If the connection is lost, reconnect.
+                let next_stream = match resp_stream.try_next().await {
+                    Ok(Some(r)) => r,
+                    Ok(None) => {
+                        // Stream is closed. Panic the process to reconnect.
                         error!(
                             processor_name = processor_name,
-                            error = ?e,
-                            "[Parser] Error receiving datastream response"
+                            "[Parser] No next stream"
                         );
-                        break;
-                    },
-                    None => {
-                        // If no next stream wait a bit and try again
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        panic!();
+                    }
+                    _ => {
+                        // Stream is empty now. Skip this iteration and try again.
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                         continue;
-                    },
+                    }
                 };
                 // We only care about stream with transactions
                 let transactions = if let Response::Data(txns) = next_stream.response.unwrap() {
@@ -237,7 +235,7 @@ impl Worker {
                     processor_name = processor_name,
                     "[Parser] Channel is empty now."
                 );
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 continue;
             }
 
