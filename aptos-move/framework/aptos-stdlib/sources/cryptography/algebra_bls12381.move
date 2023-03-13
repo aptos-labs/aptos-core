@@ -40,7 +40,7 @@ module aptos_std::algebra_bls12381 {
     const BLS12_381_FR_VAL_7_NEG_SERIALIZED_LENDIAN: vector<u8> = x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
 
     #[test(fx = @std)]
-    fun test_bls12_381_fr(fx: signer) {
+    fun test_fr(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
         // Special elements and checks.

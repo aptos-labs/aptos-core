@@ -3,22 +3,12 @@
 
 # Module `0x1::algebra`
 
-Module <code><a href="algebra.md#0x1_algebra">algebra</a></code> provides structs/functions for doing arithmetic and other common operations
-on algebraic structures (mostly groups and fields) that are widely used in cryptographic systems.
-
-Different from existing modules like <code><a href="ristretto255.md#0x1_ristretto255">ristretto255</a>.<b>move</b></code>, the functions here are generic.
-Typically, each function represent an operation defined for ANY group/field
-and require some marker type(s) which represents the actual structure(s) to work with.
-See the test cases in <code>*_algebra.<b>move</b></code> for more examples.
-
-The generic APIs should allow Move developers to build generic cryptographic schemes on top of them
-and use the schemes with different underlying algebraic structures by simply changing some type parameters.
-E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
-
-Currently supported structures can be found in <code>algebra_*.<b>move</b></code>.
+This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
+which can be used to build generic cryptographic schemes atop.
+See <code>algebra_*.<b>move</b></code> for currently implemented algebraic structures.
 
 Below are the operations currently supported.
-- Serialization/deserialization.
+- Element serialization/deserialization.
 - Group operations.
 - Getting group order.
 - Getting group identity.
@@ -47,7 +37,7 @@ Below are the operations currently supported.
 - Upcasting/downcasting between structures.
 - Hash-to-structure.
 
-Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> additive group notions are used.
+Note: in this module additive notions are used for groups.
 
 
 -  [Struct `Element`](#0x1_algebra_Element)

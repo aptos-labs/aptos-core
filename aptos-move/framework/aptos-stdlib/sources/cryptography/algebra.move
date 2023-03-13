@@ -1,19 +1,9 @@
-/// Module `algebra` provides structs/functions for doing arithmetic and other common operations
-/// on algebraic structures (mostly groups and fields) that are widely used in cryptographic systems.
-///
-/// Different from existing modules like `ristretto255.move`, the functions here are generic.
-/// Typically, each function represent an operation defined for ANY group/field
-/// and require some marker type(s) which represents the actual structure(s) to work with.
-/// See the test cases in `*_algebra.move` for more examples.
-///
-/// The generic APIs should allow Move developers to build generic cryptographic schemes on top of them
-/// and use the schemes with different underlying algebraic structures by simply changing some type parameters.
-/// E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
-///
-/// Currently supported structures can be found in `algebra_*.move`.
+/// This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
+/// which can be used to build generic cryptographic schemes atop.
+/// See `algebra_*.move` for currently implemented algebraic structures.
 ///
 /// Below are the operations currently supported.
-/// - Serialization/deserialization.
+/// - Element serialization/deserialization.
 /// - Group operations.
 ///   - Getting group order.
 ///   - Getting group identity.
@@ -42,7 +32,7 @@
 /// - Upcasting/downcasting between structures.
 /// - Hash-to-structure.
 ///
-/// Note: in `algebra.move` additive group notions are used.
+/// Note: in this module additive notions are used for groups.
 module aptos_std::algebra {
     use std::option::{Option, some, none};
     use std::features::generic_algebraic_structures_basic_operations_enabled;
