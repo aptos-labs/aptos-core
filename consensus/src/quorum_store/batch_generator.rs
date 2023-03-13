@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use crate::quorum_store::{
-    batch_coordinator::BatchCoordinatorCommand,
-    counters,
-    quorum_store_db::QuorumStoreStorage,
-    types::BatchId,
-    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+use crate::{
+    monitor,
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand,
+        counters,
+        quorum_store_db::QuorumStoreStorage,
+        types::BatchId,
+        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+    },
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
@@ -276,7 +278,7 @@ impl BatchGenerator {
                 Some(updated_back_pressure) = back_pressure_rx.recv() => {
                     self.back_pressure = updated_back_pressure;
                 },
-                _ = interval.tick() => {
+                _ = interval.tick() => monitor!("batch_generator_handle_tick", {
                     let now = Instant::now();
                     // TODO: refactor back_pressure logic into its own function
                     if self.back_pressure.txn_count {
@@ -324,16 +326,16 @@ impl BatchGenerator {
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
                     }
-                },
-                Some(next_proof) = proofs_in_progress.next() => {
+                }),
+                Some(next_proof) = proofs_in_progress.next() => monitor!("batch_generator_handle_proof", {
                     match next_proof {
                         Ok(proof) => self.handle_completed_proof(proof).await,
                         Err(_) => {
                             debug!("QS: proof oneshot dropped");
                         }
                     }
-                },
-                Some(cmd) = cmd_rx.recv() => {
+                }),
+                Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
                         BatchGeneratorCommand::CommitNotification(logical_time) => {
                             trace!(
@@ -370,7 +372,7 @@ impl BatchGenerator {
                             break;
                         },
                     }
-                }
+                })
             }
         }
     }

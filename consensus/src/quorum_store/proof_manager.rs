@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
@@ -174,49 +175,51 @@ impl ProofManager {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                Some(msg) = proposal_rx.next() => {
-                    self.handle_proposal_request(msg);
+                    Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
+                        self.handle_proposal_request(msg);
 
-                    let updated_back_pressure = self.qs_back_pressure();
-                    if updated_back_pressure != back_pressure {
-                        back_pressure = updated_back_pressure;
-                        if back_pressure_tx.send(back_pressure).await.is_err() {
-                            debug!("Failed to send back_pressure for proposal");
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for proposal");
+                            }
                         }
-                    }
-                },
-                Some(msg) = proof_rx.recv() => {
-                    match msg {
-                        ProofManagerCommand::Shutdown(ack_tx) => {
-                            ack_tx
-                                .send(())
-                                .expect("Failed to send shutdown ack to QuorumStore");
-                            break;
-                        },
-                        ProofManagerCommand::LocalProof(proof) => {
-                            self.handle_local_proof(proof, &mut network_sender).await;
-                        },
-                        ProofManagerCommand::RemoteProof(proof) => {
-                            self.handle_remote_proof(proof);
-                        },
-                        ProofManagerCommand::CommitNotification(logical_time, digests) => {
-                            self.handle_commit_notification(logical_time, digests);
+                    }),
+                    Some(msg) = proof_rx.recv() => {
+                        monitor!("proof_manager_handle_command", {
+                        match msg {
+                            ProofManagerCommand::Shutdown(ack_tx) => {
+                                ack_tx
+                                    .send(())
+                                    .expect("Failed to send shutdown ack to QuorumStore");
+                                break;
+                            },
+                            ProofManagerCommand::LocalProof(proof) => {
+                                self.handle_local_proof(proof, &mut network_sender).await;
+                            },
+                            ProofManagerCommand::RemoteProof(proof) => {
+                                self.handle_remote_proof(proof);
+                            },
+                            ProofManagerCommand::CommitNotification(logical_time, digests) => {
+                                self.handle_commit_notification(logical_time, digests);
 
-                            // update the backpressure upon new commit round
-                            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-                                self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
-                            // TODO: keeping here for metrics, might be part of the backpressure in the future?
-                            self.proofs_for_consensus.clean_local_proofs(logical_time);
-                        },
-                    }
-                    let updated_back_pressure = self.qs_back_pressure();
-                    if updated_back_pressure != back_pressure {
-                        back_pressure = updated_back_pressure;
-                        if back_pressure_tx.send(back_pressure).await.is_err() {
-                            debug!("Failed to send back_pressure for commit notification");
+                                // update the backpressure upon new commit round
+                                (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+                                    self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
+                                // TODO: keeping here for metrics, might be part of the backpressure in the future?
+                                self.proofs_for_consensus.clean_local_proofs(logical_time);
+                            },
                         }
-                    }
-                },
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for commit notification");
+                            }
+                        }
+                    })
+                }
             }
         }
     }
