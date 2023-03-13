@@ -28,15 +28,6 @@ module aptos_std::algebra_bls12381 {
 
     // Marker types (and their serialization schemes) end.
 
-    // Private functions begin.
-
-    #[test_only]
-    fun enable_bls12_381_structures(fx: &signer) {
-        std::features::change_feature_flags(fx, vector[std::features::get_bls12_381_strutures_feature()], vector[]);
-    }
-
-    // Private functions end.
-
     // Tests begin.
     #[test_only]
     use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, enable_initial_generic_algebraic_operations};
@@ -51,7 +42,6 @@ module aptos_std::algebra_bls12381 {
     #[test(fx = @std)]
     fun test_bls12_381_fr(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
-        enable_bls12_381_structures(&fx);
 
         // Special elements and checks.
         let val_0 = field_zero<Fr>();
