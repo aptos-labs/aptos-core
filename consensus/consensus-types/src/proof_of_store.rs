@@ -186,6 +186,7 @@ pub enum SignedDigestError {
     WrongAuthor,
     WrongInfo,
     DuplicatedSignature,
+    InvalidAuthor,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
