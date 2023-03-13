@@ -259,6 +259,7 @@ dependencies = [
  "mime",
  "move-core-types",
  "move-package",
+ "num_cpus",
  "once_cell",
  "paste",
  "percent-encoding",

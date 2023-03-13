@@ -42,6 +42,10 @@ pub struct ApiConfig {
 
     /// Max gas unit for view function.
     pub max_gas_view_function: u64,
+
+    /// Performance functionality
+    pub max_runtime_workers: Option<usize>,
+    pub runtime_worker_multiplier: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -83,6 +87,8 @@ impl Default for ApiConfig {
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
+            max_runtime_workers: None,
+            runtime_worker_multiplier: 2,
         }
     }
 }
