@@ -12,6 +12,6 @@ pub use prometheus::{
 };
 
 mod avg_counter;
-pub use avg_counter::{AverageCounter, AverageIntCounter};
+pub use avg_counter::AverageIntCounter;
 pub mod const_metric;
 pub mod op_counters;
