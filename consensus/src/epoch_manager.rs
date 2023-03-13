@@ -1038,22 +1038,26 @@ impl EpochManager {
         loop {
             ::futures::select! {
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
+                    monitor!("epoch_manager_process_consensus_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                    }
+                    });
                 },
                 (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
+                    monitor!("epoch_manager_process_quorum_store_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                    }
+                    });
                 },
                 (peer, request) = network_receivers.rpc_rx.select_next_some() => {
+                    monitor!("epoch_manager_process_rpc",
                     if let Err(e) = self.process_rpc_request(peer, request) {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
-                    }
+                    });
                 },
                 round = round_timeout_sender_rx.select_next_some() => {
-                    self.process_local_timeout(round);
+                    monitor!("epoch_manager_process_round_timeout",
+                    self.process_local_timeout(round));
                 },
             }
             // Continually capture the time of consensus process to ensure that clock skew between
