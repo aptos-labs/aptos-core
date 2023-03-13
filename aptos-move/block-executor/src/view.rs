@@ -19,7 +19,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_binary_format::errors::Location;
-use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, hash::Hash, sync::Arc, fmt::Debug};
 
 /// Resolved and serialized data for WriteOps, None means deletion.
 pub type ResolvedData = Option<Vec<u8>>;
@@ -53,7 +53,7 @@ pub enum ReadResult<V> {
 
 impl<
         'a,
-        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq,
+        K: ModulePath + PartialOrd + Ord + Send + Clone + Hash + Eq + Debug,
         V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
@@ -74,6 +74,7 @@ impl<
     fn read(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
         use MVHashMapError::*;
         use MVHashMapOutput::*;
+        self.versioned_map.add_rw(key, txn_idx);
 
         loop {
             match self.versioned_map.read(key, txn_idx) {

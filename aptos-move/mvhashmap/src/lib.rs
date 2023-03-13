@@ -6,7 +6,7 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_infallible::Mutex;
 use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use std::{
     collections::{btree_map::BTreeMap, HashSet},
     hash::Hash,
@@ -14,6 +14,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     }, cmp::min,
+    fmt::Debug,
 };
 
 #[cfg(test)]
@@ -106,7 +107,7 @@ pub struct MVHashMap<K, V> {
     delta_keys: Mutex<Vec<K>>,
     // hashmap that stores smallest txn idx that writes to each key
     lock_table: DashMap<K, TxnIndex>,
-    rw_set: DashMap<TxnIndex, HashSet<K>>,
+    rw_set: Vec<DashSet<K>>,
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
@@ -134,13 +135,15 @@ pub enum MVHashMapOutput<V> {
     Version(Version, Arc<V>),
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
-    pub fn new() -> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq + Debug, V: TransactionWrite> MVHashMap<K, V> {
+    pub fn new(num_txns: usize) -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
             delta_keys: Mutex::new(Vec::new()),
             lock_table: DashMap::new(),
-            rw_set: DashMap::new(),
+            rw_set: (0..num_txns)
+                .map(|_| DashSet::new())
+                .collect(),
         }
     }
 
@@ -302,9 +305,10 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         }
     }
 
-    pub fn update_lock_table(&self, key: K, version: TxnIndex) {
-        let mut entry = self.lock_table.entry(key).or_insert(version);
-        *entry = min(*entry, version);
+    pub fn update_lock_table(&self, key: &K, txn_idx: TxnIndex) {
+        // println!("txn {} key {:?}", txn_idx, key);
+        let mut entry = self.lock_table.entry(key.clone()).or_insert(txn_idx);
+        *entry = min(*entry, txn_idx);
     }
 
     pub fn read_lock_table(&self, key: &K) -> Option<TxnIndex> {
@@ -314,22 +318,16 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
         Some(*self.lock_table.get(key).unwrap())
     }
 
-    pub fn init_lock_table(&self) {
-        self.lock_table.clear();
+    pub fn add_rw(&self, key: &K, txn_idx: TxnIndex) {
+        self.rw_set[txn_idx].insert(key.clone());
     }
 
-    pub fn add_rw(&self, key: K, version: TxnIndex) {
-        let mut entry = self.rw_set.entry(version).or_insert(HashSet::new());
-        entry.insert(key);
-    }
-
-    pub fn can_commit(&self, version: TxnIndex) -> bool {
-        if let Some(read_write_set) = self.rw_set.get(&version) {
-            for k in read_write_set.value() {
-                if let Some(v) = self.read_lock_table(&k) {
-                    if v < version {
-                        return false;
-                    }
+    pub fn can_commit(&self, txn_idx: TxnIndex) -> bool {
+        for k in self.rw_set[txn_idx].clone() {
+            if let Some(v) = self.read_lock_table(&k) {
+                if v < txn_idx {
+                    // println!("v {} txn_idx {}", v, txn_idx);
+                    return false;
                 }
             }
         }
@@ -337,8 +335,8 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite> Default for MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq + Debug, V: TransactionWrite> Default for MVHashMap<K, V> {
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }

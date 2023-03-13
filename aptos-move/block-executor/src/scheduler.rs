@@ -357,7 +357,7 @@ impl Scheduler {
     }
 
     /// Return the next execution task for the thread.
-    pub fn next_execution_task_for_preexecution(&self) -> SchedulerTask {
+    pub fn next_task_for_preexecution(&self) -> SchedulerTask {
         let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
@@ -366,11 +366,13 @@ impl Scheduler {
                 return SchedulerTask::Done;
             }
 
-            if let Some((version_to_execute, maybe_condvar)) =
-                self.try_execute_next_version()
-            {
-                return SchedulerTask::ExecutionTask(version_to_execute, maybe_condvar);
+            let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
+
+            if idx_to_execute >= self.num_txns {
+                return SchedulerTask::Done;
             }
+
+            return SchedulerTask::ExecutionTask((idx_to_execute, 0), None);
         }
     }
 
