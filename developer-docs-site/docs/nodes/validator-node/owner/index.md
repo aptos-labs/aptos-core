@@ -17,7 +17,7 @@ The [Petra wallet extension](../../../guides/install-petra-wallet.md) is support
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the `--rest-url` values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### Initialize CLI
