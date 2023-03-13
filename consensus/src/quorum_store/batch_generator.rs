@@ -309,15 +309,18 @@ impl BatchGenerator {
                     } else {
                         counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0);
                     }
-                    let since_last_pull_ms = std::cmp::min(
+                    let since_last_non_empty_pull_ms = std::cmp::min(
                         now.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
-                    if !self.back_pressure.proof_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
-                        last_non_empty_pull = now;
+                    if (!self.back_pressure.proof_count
+                        && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
+                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
+
                         let dynamic_pull_max_txn = std::cmp::max(
-                            (since_last_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
+                            (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
+                            last_non_empty_pull = now;
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
                     }
