@@ -149,7 +149,7 @@ where
         executor: &E,
         base_view: &S,
     ) {
-        let _timer = TASK_EXECUTE_SECONDS.start_timer();
+        // let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -162,17 +162,17 @@ where
             idx_to_execute,
             false,
         );
-        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
+        // let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
-        let mut updates_outside = false;
+        // let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
             for (k, v) in output.get_writes().into_iter() {
-                if !prev_modified_keys.remove(&k) {
-                    updates_outside = true;
-                }
+                // if !prev_modified_keys.remove(&k) {
+                //     updates_outside = true;
+                // }
                 versioned_data_cache.add_write(&k, write_version, v);
                 versioned_data_cache.update_lock_table(&k, idx_to_execute);
                 // versioned_data_cache.add_rw(&k, idx_to_execute);
@@ -180,9 +180,9 @@ where
 
             // Then, apply deltas.
             for (k, d) in output.get_deltas().into_iter() {
-                if !prev_modified_keys.remove(&k) {
-                    updates_outside = true;
-                }
+                // if !prev_modified_keys.remove(&k) {
+                //     updates_outside = true;
+                // }
                 versioned_data_cache.add_delta(&k, idx_to_execute, d);
             }
         };
@@ -343,11 +343,11 @@ where
         // committing: bool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
-        let init_timer = VM_INIT_SECONDS.start_timer();
+        // let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
-        drop(init_timer);
+        // drop(init_timer);
 
-        let _timer = WORK_WITH_TASK_SECONDS.start_timer();
+        // let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
             scheduler_task = scheduler.next_task_for_preexecution();
@@ -415,7 +415,7 @@ where
         signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> (Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error>, Vec<Vec<TxnIndex>>, Vec<AtomicBool>) {
-        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
+        // let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
 
@@ -423,6 +423,7 @@ where
             return (Ok(vec![]), vec![], vec![]);
         }
 
+        let start_time = Instant::now();
 
         let num_txns = signature_verified_block.len();
         let commit_status : Vec<AtomicBool> = (0..num_txns).map(|_| AtomicBool::new(false)).collect();
@@ -447,6 +448,9 @@ where
             }
         });
 
+        let elapsed_time = start_time.elapsed();
+        let start_time = Instant::now();
+
         scheduler.init_exe_idx();
 
         RAYON_EXEC_POOL.scope(|s| {
@@ -464,6 +468,10 @@ where
                 });
             }
         });
+
+        let elapsed_time2 = start_time.elapsed();
+        let start_time = Instant::now();
+
 
         let num_committed = commit_status.iter().filter(|&x| x.load(Ordering::Relaxed)).count();
         let txn_dependency = scheduler.export_dep();
@@ -504,6 +512,9 @@ where
             drop(last_input_output);
             drop(scheduler);
         });
+
+        let elapsed_time3 = start_time.elapsed();
+        println!("{:.2?} {:.2?} {:.2?}", elapsed_time, elapsed_time2, elapsed_time3);
 
         match maybe_err {
             Some(err) => (Err(err), est_txn_dependency, commit_status),
