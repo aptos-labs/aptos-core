@@ -27,7 +27,8 @@ use std::{
 type ValidateArg = fn(&[u8]) -> Result<(), VMStatus>;
 
 static ALLOWED_STRUCTS: Lazy<BTreeMap<String, Option<ValidateArg>>> = Lazy::new(|| {
-    [("0x1::string::String", Some(check_string as ValidateArg))]
+    [("0x1::string::String", Some(check_string as ValidateArg)),
+        ("0x1::object::Object", None)]
         .into_iter()
         .map(|(s, validator)| (s.to_string(), validator))
         .collect()
