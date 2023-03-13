@@ -7,7 +7,7 @@ use crate::{
         counters,
         quorum_store_db::QuorumStoreStorage,
         types::Fragment,
-        utils::{BatchBuilder, MempoolProxy, RoundExpirations, Timeouts},
+        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
@@ -48,7 +48,6 @@ pub struct BatchGenerator {
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
     batch_round_expirations: RoundExpirations<BatchId>,
-    batch_time_expirations: Timeouts<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
     last_end_batch_time: Instant,
@@ -90,7 +89,6 @@ impl BatchGenerator {
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
             batch_round_expirations: RoundExpirations::new(),
-            batch_time_expirations: Timeouts::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
             last_end_batch_time: Instant::now(),
@@ -138,11 +136,8 @@ impl BatchGenerator {
         if !self
             .batch_builder
             .append_transactions(&pulled_txns, max_count as usize)
+            || self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128
         {
-            end_batch = true;
-        }
-
-        if self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128 {
             end_batch = true;
         }
 
@@ -205,25 +200,11 @@ impl BatchGenerator {
                 .insert(batch_id, self.batch_builder.take_summaries());
             self.batch_round_expirations
                 .add_item(batch_id, expiry_round);
-            self.batch_time_expirations
-                .add(batch_id, self.config.proof_timeout_ms);
 
             self.last_end_batch_time = Instant::now();
             return Some(fragment);
         }
         None
-    }
-
-    fn expire(&mut self) {
-        for batch_id in self.batch_time_expirations.expire() {
-            if self.batches_in_progress.remove(&batch_id).is_some() {
-                debug!(
-                    "QS: timestamp based expiration batch w. id {} from batches_in_progress, new size {}",
-                    batch_id,
-                    self.batches_in_progress.len(),
-                );
-            }
-        }
     }
 
     pub async fn start(
@@ -255,8 +236,6 @@ impl BatchGenerator {
                     self.back_pressure = updated_back_pressure;
                 },
                 _ = interval.tick() => monitor!("batch_generator_handle_tick", {
-                    // expire based on timestamp
-                    self.expire();
 
                     let now = Instant::now();
                     // TODO: refactor back_pressure logic into its own function

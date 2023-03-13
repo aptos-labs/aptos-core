@@ -433,30 +433,19 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         self.last_certified_round.load(Ordering::Relaxed)
     }
 
-    fn get_batch_from_db(&self, digest: &HashValue) -> Result<Vec<SignedTransaction>, Error> {
+    fn get_batch_from_db(&self, digest: &HashValue) -> Result<PersistedValue, Error> {
         counters::GET_BATCH_FROM_DB_COUNT.inc();
 
         match self.db.get_batch(digest) {
-            Ok(Some(persisted_value)) => {
-                let payload = persisted_value
-                    .maybe_payload
-                    .expect("Persisted value in QuorumStore DB must have payload");
-                return Ok(payload);
-            },
-            Ok(None) => {
-                unreachable!("Could not read persisted value (according to BatchReader) from DB")
-            },
-            Err(_) => {
-                // TODO: handle error, e.g. from self or not, log, panic.
+            Ok(Some(persisted_value)) => Ok(persisted_value),
+            Ok(None) | Err(_) => {
+                error!("Could not get batch from db");
+                Err(Error::CouldNotGetData)
             },
         }
-        Err(Error::CouldNotGetData)
     }
 
-    pub fn get_batch_from_local(
-        &self,
-        digest: &HashValue,
-    ) -> Result<Vec<SignedTransaction>, Error> {
+    pub fn get_batch_from_local(&self, digest: &HashValue) -> Result<PersistedValue, Error> {
         if let Some(value) = self.db_cache.get(digest) {
             if payload_storage_mode(&value) == StorageMode::PersistedOnly {
                 assert!(
@@ -466,10 +455,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 self.get_batch_from_db(digest)
             } else {
                 // Available in memory.
-                Ok(value
-                    .maybe_payload
-                    .clone()
-                    .expect("BatchReader payload and storage kind mismatch"))
+                Ok(value.clone())
             }
         } else {
             Err(Error::CouldNotGetData)
@@ -478,7 +464,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 }
 
 pub trait BatchReader: Send + Sync {
-    fn exists(&self, digest: &HashValue) -> bool;
+    /// Check if the batch corresponding to the digest exists, return the batch author if true
+    fn exists(&self, digest: &HashValue) -> Option<PeerId>;
 
     fn get_batch(
         &self,
@@ -487,8 +474,8 @@ pub trait BatchReader: Send + Sync {
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
-    fn exists(&self, digest: &HashValue) -> bool {
-        self.get_batch_from_local(digest).is_ok()
+    fn exists(&self, digest: &HashValue) -> Option<PeerId> {
+        self.get_batch_from_local(digest).map(|v| v.author).ok()
     }
 
     fn get_batch(
@@ -498,7 +485,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         let (tx, rx) = oneshot::channel();
 
         if let Ok(value) = self.get_batch_from_local(proof.digest()) {
-            tx.send(Ok(value)).unwrap();
+            tx.send(Ok(value.maybe_payload.expect("Must have payload")))
+                .unwrap();
         } else {
             // Quorum store metrics
             counters::MISSED_BATCHES_COUNT.inc();

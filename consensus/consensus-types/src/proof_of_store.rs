@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::Round;
-use anyhow::Context;
+use anyhow::{bail, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -160,8 +160,12 @@ impl SignedDigest {
         self.epoch
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
+    pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        if sender == self.signer {
+            Ok(validator.verify(self.signer, &self.info, &self.signature)?)
+        } else {
+            bail!("Sender {} mismatch signer {}", sender, self.signer);
+        }
     }
 
     pub fn info(&self) -> &SignedDigestInfo {
@@ -179,6 +183,7 @@ impl SignedDigest {
 
 #[derive(Debug, PartialEq)]
 pub enum SignedDigestError {
+    WrongAuthor,
     WrongInfo,
     DuplicatedSignature,
 }

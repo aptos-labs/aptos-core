@@ -387,7 +387,12 @@ impl InnerBuilder {
             while let Some(rpc_request) = batch_retrieval_rx.next().await {
                 counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
                 if let Ok(value) = batch_store.get_batch_from_local(&rpc_request.req.digest()) {
-                    let batch = Batch::new(author, epoch, rpc_request.req.digest(), value);
+                    let batch = Batch::new(
+                        author,
+                        epoch,
+                        rpc_request.req.digest(),
+                        value.maybe_payload.expect("Must have payload"),
+                    );
                     let msg = ConsensusMsg::BatchMsg(Box::new(batch));
                     let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
                     if let Err(e) = rpc_request

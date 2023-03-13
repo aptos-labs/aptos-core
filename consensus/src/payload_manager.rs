@@ -75,7 +75,6 @@ impl PayloadManager {
 
                 let mut tx = coordinator_tx.clone();
 
-                // TODO: don't even need to warn on fail?
                 if let Err(e) = tx
                     .send(CoordinatorCommand::CommitNotification(
                         logical_time,

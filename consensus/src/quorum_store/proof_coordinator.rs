@@ -62,11 +62,10 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
-        self.aggregated_signature.contains_key(&my_peer_id)
-            && validator_verifier
-                .check_voting_power(self.aggregated_signature.keys())
-                .is_ok()
+    fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
+        validator_verifier
+            .check_voting_power(self.aggregated_signature.keys())
+            .is_ok()
     }
 
     fn take(self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
@@ -110,7 +109,19 @@ impl ProofCoordinator {
         }
     }
 
-    fn init_proof(&mut self, signed_digest: &SignedDigest) {
+    fn init_proof(&mut self, signed_digest: &SignedDigest) -> Result<(), SignedDigestError> {
+        // Check if the signed digest corresponding to our batch
+        if signed_digest.info().batch_author != self.peer_id {
+            return Err(SignedDigestError::WrongAuthor);
+        }
+        let batch_author = self
+            .batch_reader
+            .exists(&signed_digest.digest())
+            .ok_or(SignedDigestError::WrongAuthor)?;
+        if batch_author != signed_digest.info().batch_author {
+            return Err(SignedDigestError::WrongAuthor);
+        }
+
         self.timeouts
             .add(signed_digest.info().clone(), self.proof_timeout_ms);
         self.digest_to_proof.insert(
@@ -120,6 +131,7 @@ impl ProofCoordinator {
         self.digest_to_time
             .entry(signed_digest.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+        Ok(())
     }
 
     fn add_signature(
@@ -128,21 +140,14 @@ impl ProofCoordinator {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<Option<ProofOfStore>, SignedDigestError> {
         if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
-            if signed_digest.info().batch_author == self.peer_id
-                && self.batch_reader.exists(&signed_digest.digest())
-            {
-                self.init_proof(&signed_digest);
-            } else {
-                return Err(SignedDigestError::WrongInfo);
-            }
+            self.init_proof(&signed_digest)?;
         }
         let digest = signed_digest.digest();
-        let my_id = self.peer_id;
 
         match self.digest_to_proof.entry(signed_digest.digest()) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_signature(signed_digest)?;
-                if entry.get_mut().ready(validator_verifier, my_id) {
+                if entry.get_mut().ready(validator_verifier) {
                     let (_, state) = entry.remove_entry();
                     let proof = state.take(validator_verifier);
                     // quorum store measurements

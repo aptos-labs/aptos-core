@@ -13,15 +13,19 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigest};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
-use aptos_types::{transaction::SignedTransaction, validator_verifier::random_validator_verifier};
+use aptos_types::{
+    transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
+};
 use std::sync::Arc;
 use tokio::sync::{mpsc::channel, oneshot::Receiver};
 
-pub struct MockBatchReader;
+pub struct MockBatchReader {
+    peer: PeerId,
+}
 
 impl BatchReader for MockBatchReader {
-    fn exists(&self, _digest: &HashValue) -> bool {
-        true
+    fn exists(&self, _digest: &HashValue) -> Option<PeerId> {
+        Some(self.peer)
     }
 
     fn get_batch(&self, _proof: ProofOfStore) -> Receiver<Result<Vec<SignedTransaction>, Error>> {
@@ -34,8 +38,14 @@ async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
     let (tx, _rx) = channel(100);
-    let proof_coordinator =
-        ProofCoordinator::new(100, signers[0].author(), Arc::new(MockBatchReader), tx);
+    let proof_coordinator = ProofCoordinator::new(
+        100,
+        signers[0].author(),
+        Arc::new(MockBatchReader {
+            peer: signers[0].author(),
+        }),
+        tx,
+    );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
     let network_sender = MockQuorumStoreSender::new(tx);
