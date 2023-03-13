@@ -86,7 +86,3 @@ harness = false
 [[bench]]
 name = "secp256k1"
 harness = false
-
-[[bench]]
-name = "blst"
-harness = false
