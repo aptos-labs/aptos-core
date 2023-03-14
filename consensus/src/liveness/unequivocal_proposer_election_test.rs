@@ -8,7 +8,7 @@ use aptos_consensus_types::{
     common::{Author, Payload, Round},
 };
 use aptos_types::validator_signer::ValidatorSigner;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 struct MockProposerElection {
     proposers: HashMap<Round, Author>,
@@ -83,7 +83,7 @@ fn test_is_valid_proposal() {
     .unwrap();
 
     let pe =
-        UnequivocalProposerElection::new(Box::new(MockProposerElection::new(HashMap::from([
+        UnequivocalProposerElection::new(Arc::new(MockProposerElection::new(HashMap::from([
             (1, chosen_author),
             (2, chosen_author),
         ]))));
