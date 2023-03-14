@@ -1,4 +1,4 @@
-import {AptosClient, Provider } from "../providers";
+import { AptosClient, Provider } from "../providers/";
 import * as Gen from "../generated/index";
 import {AptosAccount} from "../account";
 import {AnyNumber} from "../bcs";
@@ -37,6 +37,7 @@ type NameRegistryV1 = {
 
 export class AnsClient {
   contractAddress: string;
+  provider: Provider;
 
   provider: Provider;
 
@@ -209,5 +210,9 @@ export class AnsClient {
       }
       throw new Error(error);
     }
+  }
+
+  async getAccountNames(): Promise<string[] | null> {
+    return null;
   }
 }
