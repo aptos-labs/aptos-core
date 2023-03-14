@@ -355,7 +355,7 @@ impl ProofQueue {
             // before non full check
             byte_size = cur_bytes,
             block_size = cur_txns,
-            batch_count = ret,
+            batch_count = ret.len(),
             remaining_proof_num = size,
             initial_remaining_proof_num = initial_size,
             full = full,

@@ -6,8 +6,15 @@ use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
 // The cache size is estimated to be 10M transactions.
-// (TODO): better huristic to estimate the cache size.
+// For 10M transactions, the cache size is about 40GB.
 const CACHE_SIZE_ESTIMATION: u64 = 10_000_000_u64;
+
+// Hard limit for cache lower bound. Only used for active eviction.
+// Cache worker actively evicts the cache entries if the cache entry version is
+// lower than the latest version - CACHE_SIZE_EVICTION_LOWER_BOUND.
+// The gap between CACHE_SIZE_ESTIMATION and this is to give buffer since
+// reading latest version and actual data not atomic(two operations).
+const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 12_000_000_u64;
 
 // Keys for cache.
 const CACHE_KEY_LATEST_VERSION: &str = "latest_version";
@@ -213,7 +220,17 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
                 .arg("EX")
                 .arg(get_ttl_in_seconds(timestamp_in_seconds))
                 .ignore();
+            // Actively evict the expired cache. This is to avoid using Redis
+            // eviction policy, which is probabilistic-based and may evict the
+            // cache that is still needed.
+            if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
+                redis_pipeline
+                    .cmd("DEL")
+                    .arg(version - CACHE_SIZE_EVICTION_LOWER_BOUND)
+                    .ignore();
+            }
         }
+
         let redis_result: RedisResult<()> =
             redis_pipeline.query_async::<_, _>(&mut self.conn).await;
 

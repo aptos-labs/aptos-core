@@ -637,6 +637,7 @@ impl StateStore {
 
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
+        let base_version_usage = usage;
         let cache = Arc::new(DashMap::<StateKey, (Version, Option<StateValue>)>::new());
 
         if let Some(base_version) = base_version {
@@ -721,9 +722,12 @@ impl StateStore {
         if !expected_usage.is_untracked() {
             ensure!(
                 expected_usage == usage,
-                "Calculated state db usage not expected. expected: {:?}, calculated: {:?}",
+                "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
+                first_version + value_state_sets.len() as u64 - 1,
                 expected_usage,
                 usage,
+                base_version,
+                base_version_usage,
             );
         }
 

@@ -5,7 +5,7 @@ use super::{
     common::{
         submit_transaction, ApiConnectionConfig, GasUnitPriceManager, TransactionSubmissionConfig,
     },
-    traits::{Funder, FunderHealthMessage},
+    FunderHealthMessage, FunderTrait,
 };
 use crate::{
     endpoints::{AptosTapError, AptosTapErrorCode, RejectionReason, RejectionReasonCode},
@@ -211,7 +211,7 @@ impl TransferFunder {
 }
 
 #[async_trait]
-impl Funder for TransferFunder {
+impl FunderTrait for TransferFunder {
     /// Before actually initiating the fund transaction, we do a set of checks,
     /// such as ensuring that the funder has sufficient funds and that the
     /// receiver account does not yet exist. These are not meant to completely

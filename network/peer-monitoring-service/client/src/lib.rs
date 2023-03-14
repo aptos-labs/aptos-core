@@ -29,6 +29,8 @@ mod logging;
 mod metrics;
 mod network;
 pub mod peer_states;
+#[cfg(test)]
+mod tests;
 
 /// A simple container that holds the state of the peer monitor
 #[derive(Clone, Debug, Default)]
@@ -151,7 +153,7 @@ async fn start_peer_monitor_with_state(
 
 /// Spawns a task that continuously updates the peers and metadata
 /// struct with the latest information stored for each peer.
-fn spawn_peer_metadata_updater(
+pub(crate) fn spawn_peer_metadata_updater(
     peer_monitoring_config: PeerMonitoringServiceConfig,
     peer_monitor_state: PeerMonitorState,
     peers_and_metadata: Arc<PeersAndMetadata>,
