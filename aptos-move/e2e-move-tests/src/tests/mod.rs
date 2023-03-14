@@ -21,6 +21,7 @@ mod metadata;
 mod mint_nft;
 mod new_integer_types;
 mod nft_dao;
+mod object_args;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;

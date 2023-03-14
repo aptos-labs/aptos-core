@@ -28,7 +28,7 @@ type ValidateArg = fn(&[u8]) -> Result<(), VMStatus>;
 
 static ALLOWED_STRUCTS: Lazy<BTreeMap<String, Option<ValidateArg>>> = Lazy::new(|| {
     [("0x1::string::String", Some(check_string as ValidateArg)),
-        ("0x1::object::Object", None)]
+        ("0x1::object::Object", Some(check_object as ValidateArg)]
         .into_iter()
         .map(|(s, validator)| (s.to_string(), validator))
         .collect()
@@ -236,4 +236,8 @@ fn check_string(s: &[u8]) -> Result<(), VMStatus> {
         Ok(_) => Ok(()),
         Err(_) => Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
     }
+}
+
+fn check_object(s: &[u8]) -> Result<(), VMStatus> {
+    Ok(())
 }
