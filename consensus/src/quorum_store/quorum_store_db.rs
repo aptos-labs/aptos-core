@@ -82,7 +82,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
         trace!(
             "QS: db persists digest {} expiration {:?}",
             digest,
-            batch.expiration
+            batch.info.expiration
         );
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }

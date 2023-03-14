@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
+    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -28,19 +28,19 @@ use tokio::{
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
-    AppendSignature(SignedDigest),
+    AppendSignature(SignedBatchInfo),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
 struct IncrementalProofState {
-    info: SignedDigestInfo,
+    info: BatchInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
     aggregated_voting_power: u128,
     completed: bool,
 }
 
 impl IncrementalProofState {
-    fn new(info: SignedDigestInfo) -> Self {
+    fn new(info: BatchInfo) -> Self {
         Self {
             info,
             aggregated_signature: BTreeMap::new(),
@@ -51,26 +51,26 @@ impl IncrementalProofState {
 
     fn add_signature(
         &mut self,
-        signed_digest: SignedDigest,
+        signed_batch_info: SignedBatchInfo,
         validator_verifier: &ValidatorVerifier,
-    ) -> Result<(), SignedDigestError> {
-        if signed_digest.info() != &self.info {
-            return Err(SignedDigestError::WrongInfo);
+    ) -> Result<(), SignedBatchInfoError> {
+        if signed_batch_info.info() != &self.info {
+            return Err(SignedBatchInfoError::WrongInfo);
         }
 
         if self
             .aggregated_signature
-            .contains_key(&signed_digest.signer())
+            .contains_key(&signed_batch_info.signer())
         {
-            return Err(SignedDigestError::DuplicatedSignature);
+            return Err(SignedBatchInfoError::DuplicatedSignature);
         }
 
-        match validator_verifier.get_voting_power(&signed_digest.signer()) {
+        match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
             Some(voting_power) => {
-                let signer = signed_digest.signer();
+                let signer = signed_batch_info.signer();
                 if self
                     .aggregated_signature
-                    .insert(signer, signed_digest.signature())
+                    .insert(signer, signed_batch_info.signature())
                     .is_none()
                 {
                     self.aggregated_voting_power += voting_power as u128;
@@ -84,9 +84,9 @@ impl IncrementalProofState {
             None => {
                 error!(
                     "Received signature from author not in validator set: {}",
-                    signed_digest.signer()
+                    signed_batch_info.signer()
                 );
-                return Err(SignedDigestError::InvalidAuthor);
+                return Err(SignedBatchInfoError::InvalidAuthor);
             },
         }
 
@@ -127,7 +127,7 @@ pub(crate) struct ProofCoordinator {
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
-    timeouts: Timeouts<SignedDigestInfo>,
+    timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
 }
@@ -151,42 +151,48 @@ impl ProofCoordinator {
         }
     }
 
-    fn init_proof(&mut self, signed_digest: &SignedDigest) -> Result<(), SignedDigestError> {
+    fn init_proof(
+        &mut self,
+        signed_batch_info: &SignedBatchInfo,
+    ) -> Result<(), SignedBatchInfoError> {
         // Check if the signed digest corresponding to our batch
-        if signed_digest.info().batch_author != self.peer_id {
-            return Err(SignedDigestError::WrongAuthor);
+        if signed_batch_info.info().author != self.peer_id {
+            return Err(SignedBatchInfoError::WrongAuthor);
         }
         let batch_author = self
             .batch_reader
-            .exists(&signed_digest.digest())
-            .ok_or(SignedDigestError::WrongAuthor)?;
-        if batch_author != signed_digest.info().batch_author {
-            return Err(SignedDigestError::WrongAuthor);
+            .exists(&signed_batch_info.digest())
+            .ok_or(SignedBatchInfoError::WrongAuthor)?;
+        if batch_author != signed_batch_info.info().author {
+            return Err(SignedBatchInfoError::WrongAuthor);
         }
 
         self.timeouts
-            .add(signed_digest.info().clone(), self.proof_timeout_ms);
+            .add(signed_batch_info.info().clone(), self.proof_timeout_ms);
         self.digest_to_proof.insert(
-            signed_digest.digest(),
-            IncrementalProofState::new(signed_digest.info().clone()),
+            signed_batch_info.digest(),
+            IncrementalProofState::new(signed_batch_info.info().clone()),
         );
         self.digest_to_time
-            .entry(signed_digest.digest())
+            .entry(signed_batch_info.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
         Ok(())
     }
 
     fn add_signature(
         &mut self,
-        signed_digest: SignedDigest,
+        signed_batch_info: SignedBatchInfo,
         validator_verifier: &ValidatorVerifier,
-    ) -> Result<Option<ProofOfStore>, SignedDigestError> {
-        if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
-            self.init_proof(&signed_digest)?;
+    ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
+        if !self
+            .digest_to_proof
+            .contains_key(&signed_batch_info.digest())
+        {
+            self.init_proof(&signed_batch_info)?;
         }
-        let digest = signed_digest.digest();
-        if let Some(value) = self.digest_to_proof.get_mut(&signed_digest.digest()) {
-            value.add_signature(signed_digest, validator_verifier)?;
+        let digest = signed_batch_info.digest();
+        if let Some(value) = self.digest_to_proof.get_mut(&signed_batch_info.digest()) {
+            value.add_signature(signed_batch_info, validator_verifier)?;
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
                 // quorum store measurements
@@ -204,8 +210,8 @@ impl ProofCoordinator {
 
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
-        for signed_digest_info in self.timeouts.expire() {
-            if let Some(state) = self.digest_to_proof.remove(&signed_digest_info.digest) {
+        for signed_batch_info_info in self.timeouts.expire() {
+            if let Some(state) = self.digest_to_proof.remove(&signed_batch_info_info.digest) {
                 counters::BATCH_RECEIVED_REPLIES_COUNT
                     .observe(state.aggregated_signature.len() as f64);
                 counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
@@ -213,7 +219,7 @@ impl ProofCoordinator {
                 counters::BATCH_SUCCESSFUL_CREATION.observe(u64::from(state.completed));
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
-                    batch_ids.push(signed_digest_info.batch_id);
+                    batch_ids.push(signed_batch_info_info.batch_id);
                 }
             }
         }
@@ -244,10 +250,10 @@ impl ProofCoordinator {
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
-                        ProofCoordinatorCommand::AppendSignature(signed_digest) => {
-                            let peer_id = signed_digest.signer();
-                            let digest = signed_digest.digest();
-                            match self.add_signature(signed_digest, &validator_verifier) {
+                        ProofCoordinatorCommand::AppendSignature(signed_batch_info) => {
+                            let peer_id = signed_batch_info.signer();
+                            let digest = signed_batch_info.digest();
+                            match self.add_signature(signed_batch_info, &validator_verifier) {
                                 Ok(result) => {
                                     if let Some(proof) = result {
                                         debug!("QS: received quorum of signatures, digest {}", digest);
