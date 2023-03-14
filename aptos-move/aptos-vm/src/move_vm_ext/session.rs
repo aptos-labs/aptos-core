@@ -322,13 +322,13 @@ where
 
         let write_set = write_set_mut
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
+                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH, None))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;

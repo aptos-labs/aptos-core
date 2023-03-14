@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreBackPressureConfig {
     pub backlog_txn_limit_count: u64,
-    pub backlog_batch_limit_count: u64,
+    pub backlog_per_validator_batch_limit_count: u64,
     pub decrease_duration_ms: u64,
     pub increase_duration_ms: u64,
     pub decrease_fraction: f64,
@@ -22,8 +22,8 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
-            // QS will create batches immediately until this number is reached
-            backlog_batch_limit_count: 80,
+            // QS will create batches at the max rate until this number is reached
+            backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
@@ -40,6 +40,7 @@ pub struct QuorumStoreConfig {
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
     pub batch_generation_poll_interval_ms: usize,
+    pub batch_generation_min_non_empty_interval_ms: usize,
     pub batch_generation_max_interval_ms: usize,
     pub end_batch_ms: u64,
     pub max_batch_bytes: usize,
@@ -68,6 +69,7 @@ impl Default for QuorumStoreConfig {
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
             batch_generation_poll_interval_ms: 25,
+            batch_generation_min_non_empty_interval_ms: 100,
             batch_generation_max_interval_ms: 250,
             // TODO: This essentially turns fragments off, because there was performance degradation. Needs more investigation.
             end_batch_ms: 10,

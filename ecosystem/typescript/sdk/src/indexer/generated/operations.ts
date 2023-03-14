@@ -13,6 +13,11 @@ export type TokenDataFieldsFragment = { __typename?: 'current_token_datas', crea
 
 export type CollectionDataFieldsFragment = { __typename?: 'current_collection_datas', metadata_uri: string, supply: any, description: string, collection_name: string, collection_data_id_hash: string, table_handle: string, creator_address: string };
 
+export type GetIndexerLedgerInfoQueryVariables = Types.Exact<{ [key: string]: never; }>;
+
+
+export type GetIndexerLedgerInfoQuery = { __typename?: 'query_root', ledger_infos: Array<{ __typename?: 'ledger_infos', chain_id: any }> };
+
 export type GetTokenActivitiesQueryVariables = Types.Exact<{
   idHash: Types.Scalars['String'];
 }>;
