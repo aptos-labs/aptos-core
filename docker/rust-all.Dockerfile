@@ -183,7 +183,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
+COPY --link --from=builder /aptos/dist/aptos-faucet-service /usr/local/bin/aptos-faucet-service
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
@@ -310,7 +310,7 @@ ENV GIT_SHA ${GIT_SHA}
 
 ### EXPERIMENTAL ###
 
-FROM debian-base as validator-testing-base 
+FROM debian-base as validator-testing-base
 
 RUN apt-get update && apt-get install -y \
     libssl1.1 \
@@ -367,9 +367,9 @@ RUN make install
 WORKDIR ..
 
 ### Validator Image ###
-# We will build a base testing image with the necessary packages and 
-# duplicate steps from validator step. This will, however, reduce 
-# cache invalidation and reduce build times. 
+# We will build a base testing image with the necessary packages and
+# duplicate steps from validator step. This will, however, reduce
+# cache invalidation and reduce build times.
 FROM validator-testing-base  AS validator-testing
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos

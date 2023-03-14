@@ -1,7 +1,7 @@
 [package]
-name = "aptos-faucet-cli"
-description = "CLI for minting coins directly in testnets"
-version = "0.1.0"
+name = "aptos-faucet-service"
+description = "Aptos Faucet Service"
+version = "2.0.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -13,14 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos = { workspace = true }
-aptos-config = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-faucet = { workspace = true }
+anyhow = { workspace = true }
+aptos-faucet-core = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-sdk = { workspace = true }
 clap = { workspace = true }
-serde = { workspace = true }
-serde_yaml = { workspace = true }
 tokio = { workspace = true }
-url = { workspace = true }
