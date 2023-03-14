@@ -169,7 +169,7 @@ Until the delegation pool has received 1M APT and the validator has been added t
 8. `can_withdraw_pending_inactive(pool_address: address): bool` - Returns whether `pending_inactive` stake can be directly withdrawn from the delegation pool, implicitly its stake pool, in the special case the validator had gone inactive before its lockup expired.
 
 
-In the TypeScript SDK, a View function request would resemble:
+In the [Aptos TypeScript SDK](../../../sdks/ts-sdk/index.md), a View function request would resemble:
 
 ```bash
 import {AptosClient, ViewRequest} from "aptos";
@@ -188,4 +188,4 @@ const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 
 ```
 
-When publishing the module that has View functions, pass ‘--bytecode-version 6’ to the [Aptos CLI](https://aptos.dev/cli-tools/aptos-cli-tool/use-aptos-cli/) .
+When publishing the module that has View functions, pass ‘--bytecode-version 6’ to the Aptos CLI.
