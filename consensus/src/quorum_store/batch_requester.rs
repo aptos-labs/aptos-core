@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    monitor,
     network::QuorumStoreSender,
     quorum_store::{counters, types::BatchRequest},
 };
@@ -119,27 +120,31 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
         let timeout = Duration::from_millis(self.request_timeout_ms as u64);
 
         tokio::spawn(async move {
-            while let Some(request_peers) = request_state.next_request_peers(request_num_peers) {
-                let mut futures = FuturesUnordered::new();
-                trace!("QS: requesting from {:?}", request_peers);
-                let request = BatchRequest::new(my_peer_id, epoch, digest);
-                for peer in request_peers {
-                    counters::SENT_BATCH_REQUEST_COUNT.inc();
-                    futures.push(network_sender.request_batch(request.clone(), peer, timeout));
-                }
-                while let Some(response) = futures.next().await {
-                    if let Ok(batch) = response {
-                        counters::RECEIVED_BATCH_COUNT.inc();
-                        if batch.verify().is_ok() {
-                            let digest = batch.digest();
-                            let payload = batch.into_payload();
-                            request_state.serve_request(digest, Some(payload));
-                            return;
+            monitor!(
+                "batch_request",
+                while let Some(request_peers) = request_state.next_request_peers(request_num_peers)
+                {
+                    let mut futures = FuturesUnordered::new();
+                    trace!("QS: requesting from {:?}", request_peers);
+                    let request = BatchRequest::new(my_peer_id, epoch, digest);
+                    for peer in request_peers {
+                        counters::SENT_BATCH_REQUEST_COUNT.inc();
+                        futures.push(network_sender.request_batch(request.clone(), peer, timeout));
+                    }
+                    while let Some(response) = futures.next().await {
+                        if let Ok(batch) = response {
+                            counters::RECEIVED_BATCH_COUNT.inc();
+                            if batch.verify().is_ok() {
+                                let digest = batch.digest();
+                                let payload = batch.into_payload();
+                                request_state.serve_request(digest, Some(payload));
+                                return;
+                            }
                         }
                     }
+                    counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
                 }
-                counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
-            }
+            );
             request_state.serve_request(digest, None);
         });
     }
