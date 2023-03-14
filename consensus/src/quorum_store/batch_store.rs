@@ -11,7 +11,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::{
     common::Round,
-    proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigest},
+    proof_of_store::{LogicalTime, ProofOfStore, SignedBatchInfo},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
@@ -37,22 +37,6 @@ use tokio::sync::oneshot;
 pub struct PersistRequest {
     pub digest: HashValue,
     pub value: PersistedValue,
-}
-
-impl PersistRequest {
-    pub fn new(
-        author: PeerId,
-        batch_id: BatchId,
-        payload: Vec<SignedTransaction>,
-        digest_hash: HashValue,
-        num_bytes: usize,
-        expiration: LogicalTime,
-    ) -> Self {
-        Self {
-            digest: digest_hash,
-            value: PersistedValue::new(Some(payload), expiration, author, batch_id, num_bytes),
-        }
-    }
 }
 
 #[derive(PartialEq)]
@@ -190,7 +174,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             last_certified_round
         );
         for (digest, value) in db_content {
-            let expiration = value.expiration;
+            let expiration = value.info.expiration;
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
@@ -225,10 +209,10 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     fn free_quota(&self, persisted_value: PersistedValue) {
         let mut quota_manager = self
             .peer_quota
-            .get_mut(&persisted_value.author)
+            .get_mut(&persisted_value.info.author)
             .expect("No QuotaManager for batch author");
         quota_manager.free_quota(
-            persisted_value.num_bytes,
+            persisted_value.info.num_bytes as usize,
             payload_storage_mode(&persisted_value),
         );
     }
@@ -246,15 +230,15 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         digest: HashValue,
         mut value: PersistedValue,
     ) -> anyhow::Result<bool> {
-        let author = value.author;
-        let expiration_round = value.expiration.round();
+        let author = value.info.author;
+        let expiration_round = value.info.expiration.round();
 
         {
             // Acquire dashmap internal lock on the entry corresponding to the digest.
             let cache_entry = self.db_cache.entry(digest);
 
             if let Occupied(entry) = &cache_entry {
-                if entry.get().expiration.round() >= value.expiration.round() {
+                if entry.get().info.expiration.round() >= value.info.expiration.round() {
                     debug!(
                         "QS: already have the digest with higher expiration {}",
                         digest
@@ -271,7 +255,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     self.memory_quota,
                     self.batch_quota,
                 ))
-                .update_quota(value.num_bytes)?
+                .update_quota(value.info.num_bytes as usize)?
                 == StorageMode::PersistedOnly
             {
                 value.remove_payload();
@@ -298,20 +282,21 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
-        if value.expiration.epoch() == self.epoch() {
+        let expiration = value.info.expiration;
+        if expiration.epoch() == self.epoch() {
             // record the round gaps
-            if value.expiration.round() > self.last_certified_round() {
+            if expiration.round() > self.last_certified_round() {
                 counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER
-                    .observe((value.expiration.round() - self.last_certified_round()) as f64);
+                    .observe((expiration.round() - self.last_certified_round()) as f64);
             }
-            if value.expiration.round() < self.last_certified_round() {
+            if expiration.round() < self.last_certified_round() {
                 counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER
-                    .observe((self.last_certified_round() - value.expiration.round()) as f64);
+                    .observe((self.last_certified_round() - expiration.round()) as f64);
             }
 
-            if value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified
+            if expiration.round() + self.batch_expiry_round_gap_behind_latest_certified
                 >= self.last_certified_round()
-                && value.expiration.round()
+                && expiration.round()
                     <= self.last_certified_round()
                         + self.batch_expiry_round_gap_beyond_latest_certified
             {
@@ -324,7 +309,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             }
         }
         bail!("Incorrect expiration {:?} with init gap {} in epoch {}, last committed round {} and max behind gap {} max beyond gap {}",
-            value.expiration,
+            expiration,
             self.batch_expiry_round_gap_when_init,
             self.epoch(),
             self.last_certified_round(),
@@ -354,7 +339,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     // We need to check up-to-date expiration again because receiving the same
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
-                    if entry.get().expiration.round() <= expired_round {
+                    if entry.get().info.expiration.round() <= expired_round {
                         Some(entry.remove())
                     } else {
                         None
@@ -371,8 +356,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         ret
     }
 
-    pub fn persist(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
-        let expiration = persist_request.value.expiration;
+    pub fn persist(&self, persist_request: PersistRequest) -> Option<SignedBatchInfo> {
+        let expiration = persist_request.value.info.expiration;
         // Network listener should filter messages with wrong expiration epoch.
         assert_eq!(
             expiration.epoch(),
@@ -382,27 +367,14 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
         match self.save(persist_request.digest, persist_request.value.clone()) {
             Ok(needs_db) => {
-                let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
-                let num_bytes = persist_request.value.num_bytes as u64;
-                let batch_author = persist_request.value.author;
-                let batch_id = persist_request.value.batch_id;
+                let batch_info = persist_request.value.info.clone();
                 trace!("QS: sign digest {}", persist_request.digest);
                 if needs_db {
                     self.db
                         .save_batch(persist_request.digest, persist_request.value)
                         .expect("Could not write to DB");
                 }
-                SignedDigest::new(
-                    batch_author,
-                    batch_id,
-                    self.epoch(),
-                    persist_request.digest,
-                    expiration,
-                    num_txns,
-                    num_bytes,
-                    &self.validator_signer,
-                )
-                .ok()
+                SignedBatchInfo::new(batch_info, &self.validator_signer).ok()
             },
 
             Err(e) => {
@@ -492,7 +464,9 @@ pub trait BatchReader: Send + Sync {
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
     fn exists(&self, digest: &HashValue) -> Option<PeerId> {
-        self.get_batch_from_local(digest).map(|v| v.author).ok()
+        self.get_batch_from_local(digest)
+            .map(|v| v.info.author)
+            .ok()
     }
 
     fn get_batch(
