@@ -116,6 +116,22 @@ fn end_to_end() {
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    let ouptputlist = tgt_db
+        .get_transaction_outputs(0, target_version, target_version)
+        .unwrap();
+    assert_eq!(
+        ouptputlist
+            .transactions_and_outputs
+            .iter()
+            .map(|(_, output)| output.write_set().clone())
+            .collect::<Vec<_>>(),
+        blocks
+            .iter()
+            .flat_map(|(txns, _li)| txns)
+            .take(target_version as usize)
+            .map(|txn_to_commit| txn_to_commit.write_set().clone())
+            .collect::<Vec<_>>()
+    );
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()
