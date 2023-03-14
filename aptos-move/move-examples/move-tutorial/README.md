@@ -21,7 +21,7 @@ There are nine steps in total:
 - [Step 7: Use the Move prover](#step-7--use-the-move-prover)
 - [Step 8: Writing formal specifications for the `basic_coin` module](#step-8-write-formal-specifications-for-the-basic_coin-module)
 
-Each step is designed to be self-contained in the corresponding `step_x` folder. For example, if you would like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written before step 5 will be in the `step_5` directory. At the end of some steps, we also include additional material on more advanced topics. 
+Each step is designed to be self-contained in the corresponding `step_x` directory. For example, if you would like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written before step 5 will be in the `step_5` directory. At the end of some steps, we also include additional material on more advanced topics. 
 
 Now let's get started!
 
@@ -106,7 +106,7 @@ Let us take a look at this function and what it is saying:
 * It creates a `Coin` with the given value and stores it under the
   `account` using the `move_to` operator.
 
-Let us make sure it builds! This can be done with the `aptos move compile` command from within the package folder ([`step_1/basic_coin`](./step_1/basic_coin/)):
+Let us make sure it builds! This can be done with the `aptos move compile` command from within the package directory ([`step_1/basic_coin`](./step_1/basic_coin/)):
 
 ```bash
 aptos move compile
