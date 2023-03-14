@@ -78,22 +78,26 @@ module aptos_std::simple_map {
     }
 
     /// Insert key/value pair or update an existing key to a new value
-    public fun upsert<Key: store + drop + copy, Value: store + drop + copy>(
+    public fun upsert<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
-        key: &Key,
-        value: &Value
-    ) {
-        let len = vector::length(&map.data);
+        key: Key,
+        value: Value
+    ): (std::option::Option<Key>, std::option::Option<Value>) {
+        let data = &mut map.data;
+        let len = vector::length(data);
         let i = 0;
         while (i < len) {
-            let element = vector::borrow_mut(&mut map.data, i);
-            if (&element.key == key) {
-                element.value = *value;
-                return
+            let element = vector::borrow(data, i);
+            if (&element.key == &key) {
+                vector::push_back(data, Element { key, value});
+                vector::swap(data, i, len);
+                let Element { key, value } = vector::pop_back(data);
+                return (std::option::some(key), std::option::some(value))
             };
             i = i + 1;
         };
-        vector::push_back(&mut map.data, Element { key: *key, value: *value });
+        vector::push_back(&mut map.data, Element { key, value });
+        (std::option::none(), std::option::none())
     }
 
     /// Transform the map into two vectors with the keys and values respectively
@@ -205,9 +209,9 @@ module aptos_std::simple_map {
     public fun upsert_test() {
         let map = create<u64, u64>();
         // test adding 3 elements using upsert
-        upsert<u64, u64>(&mut map, &1, &1 );
-        upsert(&mut map, &2, &2 );
-        upsert(&mut map, &3, &3 );
+        upsert<u64, u64>(&mut map, 1, 1 );
+        upsert(&mut map, 2, 2 );
+        upsert(&mut map, 3, 3 );
 
         assert!(length(&map) == 3, 0);
         assert!(contains_key(&map, &1), 1);
@@ -218,7 +222,7 @@ module aptos_std::simple_map {
         assert!(borrow(&map, &3) == &3, 6);
 
         // change mapping 1->1 to 1->4
-        upsert(&mut map, &1, &4 );
+        upsert(&mut map, 1, 4 );
 
         assert!(length(&map) == 3, 7);
         assert!(contains_key(&map, &1), 8);
