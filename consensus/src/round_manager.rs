@@ -120,7 +120,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::SignedDigestMsg(sd) => {
                 if !self_message {
-                    sd.verify(validator)?;
+                    sd.verify(peer_id, validator)?;
                 }
                 VerifiedEvent::SignedDigestMsg(sd)
             },

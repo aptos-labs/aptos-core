@@ -3,9 +3,9 @@
 
 use crate::quorum_store::{
     tests::utils::create_vec_signed_transactions,
-    types::{Batch, BatchId, BatchRequest, Fragment, SerializedTransaction},
+    types::{Batch, BatchRequest, Fragment, SerializedTransaction},
 };
-use aptos_consensus_types::proof_of_store::LogicalTime;
+use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::account_address::AccountAddress;
 use bcs::{from_bytes, to_bytes};

@@ -4,8 +4,9 @@
 use crate::quorum_store::{
     batch_aggregator::{BatchAggregationError, BatchAggregator, IncrementalBatchState},
     tests::utils::create_vec_serialized_transactions,
-    types::{BatchId, SerializedTransaction},
+    types::SerializedTransaction,
 };
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_types::transaction::SignedTransaction;
 use claims::{assert_ge, assert_matches, assert_ok, assert_ok_eq};
 
