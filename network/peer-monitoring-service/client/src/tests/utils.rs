@@ -235,6 +235,7 @@ pub fn update_latency_info_for_peer(
     // Create the latency info request and response
     let latency_info_request = PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
         ping_counter: request_ping_counter,
+        garbage_data: vec![],
     });
     let latency_info_response = PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
         ping_counter: response_ping_counter,

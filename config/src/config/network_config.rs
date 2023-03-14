@@ -38,7 +38,7 @@ pub const PING_INTERVAL_MS: u64 = 10_000;
 pub const PING_TIMEOUT_MS: u64 = 20_000;
 pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
-pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
+pub const MAX_CONCURRENT_NETWORK_REQS: usize = 1000;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
 pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
@@ -46,15 +46,15 @@ pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer fo
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
     (MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE) - MESSAGE_PADDING_SIZE; /* The message size that applications should check against */
-pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
+pub const MAX_FRAME_SIZE: usize = 32 * 1024 * 1024; /* 32 MiB large messages will be chunked into multiple frames and streamed */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
-pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoon
-pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
+pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -131,7 +131,7 @@ impl NetworkConfig {
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication,
             network_id,
-            runtime_threads: None,
+            runtime_threads: Some(64),
             seed_addrs: HashMap::new(),
             seeds: PeerSet::default(),
             max_frame_size: MAX_FRAME_SIZE,
@@ -341,14 +341,14 @@ pub struct PeerMonitoringServiceConfig {
 impl Default for PeerMonitoringServiceConfig {
     fn default() -> Self {
         Self {
-            enable_peer_monitoring_client: false,
+            enable_peer_monitoring_client: true,
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
-            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent, so 1 sec is acceptable
+            max_request_jitter_ms: 1, // Monitoring requests are very infrequent
             metadata_update_interval_ms: 5000,
             network_monitoring: NetworkMonitoringConfig::default(),
-            peer_monitor_interval_ms: 1000,
+            peer_monitor_interval_ms: 100,
         }
     }
 }
@@ -356,8 +356,9 @@ impl Default for PeerMonitoringServiceConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LatencyMonitoringConfig {
+    pub garbage_data_size: u64, // Number of bytes of garbage data to transfer
     pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
-    pub latency_ping_timeout_ms: u64,  // The timeout (ms) for each latency ping
+    pub latency_ping_timeout_ms: u64, // The timeout (ms) for each latency ping
     pub max_latency_ping_failures: u64, // Max ping failures before the peer connection fails
     pub max_num_latency_pings_to_retain: usize, // The max latency pings to retain per peer
 }
@@ -365,8 +366,9 @@ pub struct LatencyMonitoringConfig {
 impl Default for LatencyMonitoringConfig {
     fn default() -> Self {
         Self {
-            latency_ping_interval_ms: 30_000, // 30 seconds
-            latency_ping_timeout_ms: 20_000,  // 20 seconds
+            garbage_data_size: 5 * 1024 * 1024, // 10 * 1024 * 1024, // 10 MB
+            latency_ping_interval_ms: 100,      // 500 ms
+            latency_ping_timeout_ms: 20_000,    // 20 seconds
             max_latency_ping_failures: 3,
             max_num_latency_pings_to_retain: 10,
         }
@@ -383,8 +385,8 @@ pub struct NetworkMonitoringConfig {
 impl Default for NetworkMonitoringConfig {
     fn default() -> Self {
         Self {
-            network_info_request_interval_ms: 60_000, // 1 minute
-            network_info_request_timeout_ms: 10_000,  // 10 seconds
+            network_info_request_interval_ms: 600_000, // 10 minutes
+            network_info_request_timeout_ms: 10_000,   // 10 seconds
         }
     }
 }

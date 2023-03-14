@@ -13,6 +13,7 @@ use aptos_peer_monitoring_service_types::{
     LatencyPingRequest, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
 };
 use aptos_time_service::TimeService;
+use rand::{rngs::OsRng, Rng};
 use std::{collections::BTreeMap, sync::Arc};
 
 /// A simple container that holds a peer's latency info
@@ -22,6 +23,7 @@ pub struct LatencyInfoState {
     latency_ping_counter: u64, // The monotonically increasing counter for each ping
     recorded_latency_ping_durations_secs: BTreeMap<u64, f64>, // Successful ping durations by counter (secs)
     request_tracker: Arc<RwLock<RequestTracker>>, // The request tracker for latency ping requests
+    garbage_data: Vec<u8>,
 }
 
 impl LatencyInfoState {
@@ -34,11 +36,23 @@ impl LatencyInfoState {
             time_service,
         );
 
+        // Generate the random garbage data
+        let garbage_data_size = latency_monitoring_config.garbage_data_size;
+        if garbage_data_size % 32 != 0 {
+            panic!("Garbage data size must be a multiple of 32!");
+        }
+        let mut garbage_data = vec![];
+        for _ in 0..garbage_data_size / 32 {
+            let garbage_data_chunk: [u8; 32] = OsRng.gen();
+            garbage_data = [garbage_data, garbage_data_chunk.to_vec()].concat();
+        }
+
         Self {
             latency_monitoring_config,
             latency_ping_counter: 0,
             recorded_latency_ping_durations_secs: BTreeMap::new(),
             request_tracker: Arc::new(RwLock::new(request_tracker)),
+            garbage_data,
         }
     }
 
@@ -112,7 +126,10 @@ impl LatencyInfoState {
 impl StateValueInterface for LatencyInfoState {
     fn create_monitoring_service_request(&mut self) -> PeerMonitoringServiceRequest {
         let ping_counter = self.get_and_increment_latency_ping_counter();
-        PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest { ping_counter })
+        PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
+            ping_counter,
+            garbage_data: self.garbage_data.clone(),
+        })
     }
 
     fn get_request_timeout_ms(&self) -> u64 {
@@ -355,6 +372,7 @@ mod test {
         let peer_monitoring_service_request =
             PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
                 ping_counter: request_ping_counter,
+                garbage_data: vec![],
             });
 
         // Create the service response

@@ -253,8 +253,10 @@ async fn test_latency_ping_request() {
 
     // Process several requests to perform latency pings
     for i in 0..10 {
-        let request =
-            PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest { ping_counter: i });
+        let request = PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
+            ping_counter: i,
+            garbage_data: vec![],
+        });
         let response = mock_client.send_request(request).await.unwrap();
         match response {
             PeerMonitoringServiceResponse::LatencyPing(latecy_ping_response) => {

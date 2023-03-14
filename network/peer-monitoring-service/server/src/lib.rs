@@ -208,6 +208,10 @@ impl Handler {
         &self,
         latency_ping_request: &LatencyPingRequest,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
+        info!(
+            "Received a latency ping! Counter: {:?}",
+            latency_ping_request.ping_counter
+        );
         let latency_ping_response = LatencyPingResponse {
             ping_counter: latency_ping_request.ping_counter,
         };

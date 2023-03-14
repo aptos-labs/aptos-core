@@ -17,6 +17,7 @@ use aptos_config::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
+use aptos_logger::info;
 use aptos_network::application::{
     interface::NetworkClient,
     metadata::{PeerMetadata, PeerMonitoringMetadata},
@@ -88,26 +89,38 @@ impl PeerState {
         let request_task = async move {
             // Add some amount of jitter before sending the request.
             // This helps to prevent requests from becoming too bursty.
+            info!("Sleeping for jitter ms: {:?}", request_jitter_ms);
             sleep(Duration::from_millis(request_jitter_ms)).await;
 
             // Start the request timer
             let start_time = time_service.now();
 
             // Send the request to the peer and wait for a response
+            info!(
+                "Sending request to peer: {:?}. Request: {:?}",
+                peer_network_id,
+                monitoring_service_request.get_label()
+            );
             let request_id = request_id_generator.next();
             let monitoring_service_response = network::send_request_to_peer(
                 peer_monitoring_client,
                 &peer_network_id,
                 request_id,
-                monitoring_service_request,
+                monitoring_service_request.clone(),
                 request_timeout_ms,
             )
             .await;
 
             // Stop the timer and calculate the duration
-            let finish_time = time_service.now();
-            let request_duration: Duration = finish_time.duration_since(start_time);
+            let request_duration = start_time.elapsed();
             let request_duration_secs = request_duration.as_secs_f64();
+
+            info!(
+                "Got response from peer: {:?} ({:?}). Request: {:?}",
+                peer_network_id,
+                request_duration_secs,
+                monitoring_service_request.get_label()
+            );
 
             // Mark the in-flight request as now complete
             request_tracker.write().request_completed();
@@ -127,7 +140,7 @@ impl PeerState {
             peer_state_value.write().handle_monitoring_service_response(
                 &peer_network_id,
                 peer_metadata,
-                monitoring_service_request,
+                monitoring_service_request.clone(),
                 monitoring_service_response,
                 request_duration_secs,
             );

@@ -37,8 +37,11 @@ impl PeerStateKey {
     pub fn get_metrics_request_label(&self) -> &str {
         match self {
             PeerStateKey::LatencyInfo => {
-                PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest { ping_counter: 0 })
-                    .get_label()
+                PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
+                    ping_counter: 0,
+                    garbage_data: vec![],
+                })
+                .get_label()
             },
             PeerStateKey::NetworkInfo => {
                 PeerMonitoringServiceRequest::GetNetworkInformation.get_label()
