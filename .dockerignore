@@ -25,3 +25,4 @@
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/
+!testsuite/testcases/src/data/
