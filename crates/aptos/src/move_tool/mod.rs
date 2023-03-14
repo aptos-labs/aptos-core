@@ -1356,6 +1356,13 @@ impl FunctionArgType {
                         hex::decode(arg)
                             .map_err(|err| CliError::UnableToParse("vector<hex>", err.to_string()))
                     }),
+                    // Note commas cannot be put into the strings.  But, this should be a less likely case,
+                    // and the utility from having this available should be worth it.
+                    FunctionArgType::String => parse_vector_arg(arg, |arg| {
+                        bcs::to_bytes(arg).map_err(|err| {
+                            CliError::UnableToParse("vector<string>", err.to_string())
+                        })
+                    }),
                     FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
@@ -1426,12 +1433,7 @@ impl FromStr for FunctionArgType {
                 if str.starts_with("vector<") && str.ends_with('>') {
                     let arg = FunctionArgType::from_str(&str[7..str.len() - 1])?;
 
-                    // String gets confusing on parsing by commas
-                    if arg == FunctionArgType::String {
-                        return Err(CliError::CommandArgumentError(
-                            "vector<string> is not supported".to_string(),
-                        ));
-                    } else if arg == FunctionArgType::Raw {
+                    if arg == FunctionArgType::Raw {
                         return Err(CliError::CommandArgumentError(
                             "vector<raw> is not supported".to_string(),
                         ));
