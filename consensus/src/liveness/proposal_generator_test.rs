@@ -40,7 +40,7 @@ async fn test_proposal_generation_empty_tree() {
         false,
     );
     let mut proposer_election =
-        UnequivocalProposerElection::new(Box::new(RotatingProposer::new(vec![signer.author()], 1)));
+        UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(vec![signer.author()], 1)));
     let genesis = block_store.ordered_root();
 
     // Generate proposals for an empty tree.
@@ -77,7 +77,7 @@ async fn test_proposal_generation_parent() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
         1,
     )));
@@ -147,7 +147,7 @@ async fn test_old_proposal_generation() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
         1,
     )));
@@ -182,7 +182,7 @@ async fn test_correct_failed_authors() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
-    let mut proposer_election = UnequivocalProposerElection::new(Box::new(RotatingProposer::new(
+    let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![author, peer1, peer2],
         1,
     )));

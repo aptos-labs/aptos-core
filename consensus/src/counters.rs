@@ -150,6 +150,15 @@ pub static PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER: Lazy<Counter> = Lazy::new(||
         .unwrap()
 });
 
+/// Total number of stale proposals received by the validator
+pub static STALE_PROPOSALS_RECEIVED: Lazy<Counter> = Lazy::new(|| {
+    register_counter!(
+        "aptos_proposer_stale_proposals_received",
+        "Total number of stale proposals received by the validator",
+    )
+    .unwrap()
+});
+
 /// Committed proposals map when using LeaderReputation as the ProposerElection
 pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
