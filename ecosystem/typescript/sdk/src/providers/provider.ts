@@ -25,8 +25,8 @@ import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from 
  */
 export class Provider {
   aptosClient: AptosClient;
-
   indexerClient: IndexerClient;
+  network: Network | string;
 
   constructor(
     network: Network | CustomEndpoints,
@@ -39,9 +39,11 @@ export class Provider {
     if (typeof network === "object" && isCustomEndpoints(network)) {
       fullNodeUrl = network.fullnodeUrl;
       indexerUrl = network.indexerUrl;
+      this.network = "CUSTOM";
     } else {
       fullNodeUrl = NetworkToNodeAPI[network];
       indexerUrl = NetworkToIndexerAPI[network];
+      this.network = network;
     }
 
     if (!fullNodeUrl || !indexerUrl) {

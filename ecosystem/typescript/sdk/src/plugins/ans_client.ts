@@ -1,9 +1,9 @@
-import { AptosClient } from "../providers/";
+import { AptosClient, Provider } from "../providers/";
 import * as Gen from "../generated/index";
 
 const ans_contracts: Record<string, string> = {
-  "https://fullnode.testnet.aptoslabs.com/v1": "0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c",
-  "https://fullnode.mainnet.aptoslabs.com/v1": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c",
+  testnet: "0x5f8fd2347449685cf41d4db97926ec3a096eaf381332be4f1318ad4d16a8497c",
+  mainnet: "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c",
 };
 
 // Each name component can only have lowercase letters, number or hyphens, and cannot start or end with a hyphen.
@@ -21,36 +21,32 @@ const namePattern = new RegExp(
 );
 
 export class AnsClient {
-  aptosClient: AptosClient;
   contractAddress: string;
+  provider: Provider;
 
   /**
    * Creates new AnsClient instance
    * @param aptosClient AptosClient instance
-   * @param optional contract address. If there is no contract address matching to the provided node url
+   * @param contractAddress An optional contract address. If there is no contract address matching to the provided node url
    * then the AnsClient class expects a contract address - this is to support both live networks and local development.
    */
-  constructor(aptosClient: AptosClient, contractAddress?: string) {
-    this.aptosClient = aptosClient;
-
-    if (!ans_contracts[this.aptosClient.nodeUrl] && !contractAddress) {
+  constructor(provider: Provider, contractAddress?: string) {
+    this.provider = provider;
+    if (!ans_contracts[this.provider.network] && !contractAddress) {
       throw new Error("Please provide a valid contract address");
     }
-    this.contractAddress = ans_contracts[this.aptosClient.nodeUrl] ?? contractAddress;
+    this.contractAddress = ans_contracts[this.provider.network] ?? contractAddress;
   }
 
   async registerName(name: string) {}
 
   /**
-   * An account's primary name can be a domain_name or subdomain_name, or it does not have any primary name
-   * If an account's primary name is a subdomain_name - return subdomain_name
-   * If an account's primary name is a domain_name - return domain_name
-   * If an account does not have a primary name - return null
+   * Returns the primary name for the given account address
    * @param address An account address
-   * @returns domain_name | subdomain_name | null
+   * @returns Account's name | null
    */
   async getNamebyAddress(address: string): Promise<string | null> {
-    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
       this.contractAddress,
       `${this.contractAddress}::domains::ReverseLookupRegistryV1`,
     );
@@ -61,8 +57,8 @@ export class AnsClient {
       key: address,
     };
     try {
-      const item = await this.aptosClient.getTableItem(handle, domainsTableItemRequest);
-      return item.subdomain_name.vec[0] ? `${item.domain_name}.${item.subdomain_name.vec[0]}` : item.domain_name;
+      const item = await this.provider.getTableItem(handle, domainsTableItemRequest);
+      return item.subdomain_name.vec[0] ? `${item.ubdomain_name.vec[0]}.${item.domain_name}` : item.domain_name;
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
       return null;
@@ -70,7 +66,7 @@ export class AnsClient {
   }
 
   /**
-   * Returns the account address for the given name
+   * Returns the target account address for the given name
    * @param name ANS name
    * @returns account address | null
    */
@@ -92,7 +88,7 @@ export class AnsClient {
    */
   private async getAddressByDomainName(domain: string) {
     if (domain.match(nameComponentPattern) === null) return null;
-    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
       this.contractAddress,
       `${this.contractAddress}::domains::NameRegistryV1`,
     );
@@ -108,7 +104,7 @@ export class AnsClient {
     };
 
     try {
-      const item = await this.aptosClient.getTableItem(handle, domainsTableItemRequest);
+      const item = await this.provider.getTableItem(handle, domainsTableItemRequest);
       return item.target_address.vec[0];
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
@@ -130,7 +126,7 @@ export class AnsClient {
   private async getAddressBySubdomainName(domain: string, subdomain: string): Promise<string | null> {
     if (domain.match(nameComponentPattern) === null) return null;
     if (subdomain.match(nameComponentPattern) === null) return null;
-    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+    const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
       this.contractAddress,
       `${this.contractAddress}::domains::NameRegistryV1`,
     );
@@ -145,11 +141,15 @@ export class AnsClient {
     };
 
     try {
-      const item = await this.aptosClient.getTableItem(handle, domainsTableItemRequest);
+      const item = await this.provider.getTableItem(handle, domainsTableItemRequest);
       return item.target_address.vec[0];
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
       return null;
     }
+  }
+
+  async getAccountNames(): Promise<string[] | null> {
+    return null;
   }
 }
