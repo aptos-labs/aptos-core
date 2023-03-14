@@ -242,6 +242,56 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Add `amount` of coins to the delegation pool `pool_address`.
+    DelegationPoolAddStake {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
+    /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
+    /// to host the delegation pool resource and own the underlying stake pool.
+    /// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
+    DelegationPoolInitializeDelegationPool {
+        operator_commission_percentage: u64,
+        delegation_pool_creation_seed: Vec<u8>,
+    },
+
+    /// Move `amount` of coins from pending_inactive to active.
+    DelegationPoolReactivateStake {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Allows an owner to change the delegated voter of the underlying stake pool.
+    DelegationPoolSetDelegatedVoter {
+        new_voter: AccountAddress,
+    },
+
+    /// Allows an owner to change the operator of the underlying stake pool.
+    DelegationPoolSetOperator {
+        new_operator: AccountAddress,
+    },
+
+    /// Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
+    /// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
+    DelegationPoolSynchronizeDelegationPool {
+        pool_address: AccountAddress,
+    },
+
+    /// Unlock `amount` from the active + pending_active stake of `delegator` or
+    /// at most how much active stake there is on the stake pool.
+    DelegationPoolUnlock {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
+    DelegationPoolWithdraw {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -846,6 +896,38 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            DelegationPoolAddStake {
+                pool_address,
+                amount,
+            } => delegation_pool_add_stake(pool_address, amount),
+            DelegationPoolInitializeDelegationPool {
+                operator_commission_percentage,
+                delegation_pool_creation_seed,
+            } => delegation_pool_initialize_delegation_pool(
+                operator_commission_percentage,
+                delegation_pool_creation_seed,
+            ),
+            DelegationPoolReactivateStake {
+                pool_address,
+                amount,
+            } => delegation_pool_reactivate_stake(pool_address, amount),
+            DelegationPoolSetDelegatedVoter { new_voter } => {
+                delegation_pool_set_delegated_voter(new_voter)
+            },
+            DelegationPoolSetOperator { new_operator } => {
+                delegation_pool_set_operator(new_operator)
+            },
+            DelegationPoolSynchronizeDelegationPool { pool_address } => {
+                delegation_pool_synchronize_delegation_pool(pool_address)
+            },
+            DelegationPoolUnlock {
+                pool_address,
+                amount,
+            } => delegation_pool_unlock(pool_address, amount),
+            DelegationPoolWithdraw {
+                pool_address,
+                amount,
+            } => delegation_pool_withdraw(pool_address, amount),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -1688,6 +1770,162 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Add `amount` of coins to the delegation pool `pool_address`.
+pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("add_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
+/// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
+/// to host the delegation pool resource and own the underlying stake pool.
+/// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
+pub fn delegation_pool_initialize_delegation_pool(
+    operator_commission_percentage: u64,
+    delegation_pool_creation_seed: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("initialize_delegation_pool").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator_commission_percentage).unwrap(),
+            bcs::to_bytes(&delegation_pool_creation_seed).unwrap(),
+        ],
+    ))
+}
+
+/// Move `amount` of coins from pending_inactive to active.
+pub fn delegation_pool_reactivate_stake(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("reactivate_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Allows an owner to change the delegated voter of the underlying stake pool.
+pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("set_delegated_voter").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_voter).unwrap()],
+    ))
+}
+
+/// Allows an owner to change the operator of the underlying stake pool.
+pub fn delegation_pool_set_operator(new_operator: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("set_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_operator).unwrap()],
+    ))
+}
+
+/// Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
+/// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
+pub fn delegation_pool_synchronize_delegation_pool(
+    pool_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("synchronize_delegation_pool").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+/// Unlock `amount` from the active + pending_active stake of `delegator` or
+/// at most how much active stake there is on the stake pool.
+pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("unlock").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
+pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("withdraw").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
     ))
 }
 
@@ -3487,6 +3725,99 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolAddStake {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_initialize_delegation_pool(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolInitializeDelegationPool {
+                operator_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
+                delegation_pool_creation_seed: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_reactivate_stake(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolReactivateStake {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_set_delegated_voter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
+                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSetOperator {
+                new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_synchronize_delegation_pool(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSynchronizeDelegationPool {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolUnlock {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolWithdraw {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -4464,6 +4795,38 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "delegation_pool_add_stake".to_string(),
+            Box::new(decoder::delegation_pool_add_stake),
+        );
+        map.insert(
+            "delegation_pool_initialize_delegation_pool".to_string(),
+            Box::new(decoder::delegation_pool_initialize_delegation_pool),
+        );
+        map.insert(
+            "delegation_pool_reactivate_stake".to_string(),
+            Box::new(decoder::delegation_pool_reactivate_stake),
+        );
+        map.insert(
+            "delegation_pool_set_delegated_voter".to_string(),
+            Box::new(decoder::delegation_pool_set_delegated_voter),
+        );
+        map.insert(
+            "delegation_pool_set_operator".to_string(),
+            Box::new(decoder::delegation_pool_set_operator),
+        );
+        map.insert(
+            "delegation_pool_synchronize_delegation_pool".to_string(),
+            Box::new(decoder::delegation_pool_synchronize_delegation_pool),
+        );
+        map.insert(
+            "delegation_pool_unlock".to_string(),
+            Box::new(decoder::delegation_pool_unlock),
+        );
+        map.insert(
+            "delegation_pool_withdraw".to_string(),
+            Box::new(decoder::delegation_pool_withdraw),
         );
         map.insert(
             "managed_coin_burn".to_string(),

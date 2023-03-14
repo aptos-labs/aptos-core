@@ -11,7 +11,7 @@ use crate::{
         },
         utils::prompt_yes_with_override,
     },
-    move_tool::{set_bytecode_version, FrameworkPackageArgs, IncludedArtifacts},
+    move_tool::{FrameworkPackageArgs, IncludedArtifacts},
     CliCommand, CliResult,
 };
 use aptos_cached_packages::aptos_stdlib;
@@ -176,9 +176,16 @@ impl CliCommand<Vec<ProposalSummary>> for ListProposals {
             .into_inner();
         let mut proposals = vec![];
 
-        for event in events {
-            let event = bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data())?;
-            proposals.push(event.into());
+        for event in &events {
+            match bcs::from_bytes::<CreateProposalFullEvent>(event.event.event_data()) {
+                Ok(valid_event) => proposals.push(valid_event.into()),
+                Err(err) => {
+                    eprintln!(
+                        "Event: {:?} cannot be parsed as a proposal: {:?}",
+                        event, err
+                    )
+                },
+            }
         }
 
         // TODO: Show more information about proposal?
@@ -740,7 +747,6 @@ impl CompileScriptFunction {
         script_name: &str,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<(Vec<u8>, HashValue)> {
-        set_bytecode_version(self.bytecode_version);
         if let Some(compiled_script_path) = &self.compiled_script_path {
             let bytes = std::fs::read(compiled_script_path).map_err(|e| {
                 CliError::IO(format!("Unable to read {:?}", self.compiled_script_path), e)
@@ -953,7 +959,7 @@ struct CreateProposalFullEvent {
     stake_pool: AccountAddress,
     proposal_id: u64,
     execution_hash: Vec<u8>,
-    proposal_metadata: BTreeMap<String, Vec<u8>>,
+    proposal_metadata: Vec<(String, Vec<u8>)>,
 }
 
 /// A proposal and the verified information about it

@@ -91,7 +91,7 @@ Fullnode means either a validator fullnode or a public fullnode.
 - **Git branch:** `devnet` on https://github.com/aptos-labs/aptos-core
 - **Command to download:**
   ```bash
-  wget -O docker-compose.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
+  wget -O docker-compose-fullnode.yaml https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/docker/compose/aptos-node/docker-compose-fullnode.yaml
   ```
 
 ## fullnode.yaml (fullnode only)

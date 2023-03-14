@@ -6,8 +6,13 @@ use super::{
     proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
 };
 use crate::{
-    block_storage::BlockReader, counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
-    state_replication::PayloadClient, util::time_service::TimeService,
+    block_storage::BlockReader,
+    counters::{
+        CHAIN_HEALTH_BACKOFF_TRIGGERED, PROPOSER_PENDING_BLOCKS_COUNT,
+        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+    },
+    state_replication::PayloadClient,
+    util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::ChainHealthBackoffValues;
@@ -239,7 +244,7 @@ impl ProposalGenerator {
                     .max_block_bytes
                     .min(value.max_sending_block_bytes_override);
 
-                CHAIN_HEALTH_BACKOFF_TRIGGERED.inc();
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1);
                 warn!(
                     "Generating proposal reducing limits to {} txns and {} bytes, due to chain health backoff",
                     max_block_txns,
@@ -247,9 +252,24 @@ impl ProposalGenerator {
                 );
                 (max_block_txns, max_block_bytes)
             } else {
+                CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0);
                 (self.max_block_txns, self.max_block_bytes)
             };
 
+            let max_pending_block_len = pending_blocks
+                .iter()
+                .map(|block| block.payload().map_or(0, |p| p.len()))
+                .max()
+                .unwrap_or(0);
+            let max_pending_block_bytes = pending_blocks
+                .iter()
+                .map(|block| block.payload().map_or(0, |p| p.size()))
+                .max()
+                .unwrap_or(0);
+            let max_fill_fraction = (max_pending_block_len as f32 / self.max_block_txns as f32)
+                .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
+            PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
+            PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
             let payload = self
                 .payload_client
                 .pull_payload(
@@ -259,6 +279,8 @@ impl ProposalGenerator {
                     payload_filter,
                     wait_callback,
                     pending_ordering,
+                    pending_blocks.len(),
+                    max_fill_fraction,
                 )
                 .await
                 .context("Fail to retrieve payload")?;

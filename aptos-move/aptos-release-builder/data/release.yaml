@@ -15,6 +15,7 @@ feature_flags:
     - blake2b256_native
     - resource_groups
     - multisig_accounts
+    - delegation_pools
   disabled: []
 is_multi_step: true
 framework_release_at_end: true

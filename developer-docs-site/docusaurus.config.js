@@ -106,6 +106,11 @@ const config = {
                 docId: "whats-new-in-docs",
               },
               {
+                label: "Latest Releases",
+                type: "doc",
+                docId: "releases/index",
+              },
+              {
                 label: "Read the Aptos White Paper",
                 type: "doc",
                 docId: "aptos-white-paper/index",
@@ -329,6 +334,43 @@ const config = {
                 label: "Issues and Workarounds",
                 type: "doc",
                 docId: "issues-and-workarounds",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Community",
+            position: "left",
+            items: [
+              {
+                label: "Help the Aptos Ecosystem",
+                type: "doc",
+                docId: "community/index",
+              },
+              {
+                label: "Community Highlights",
+                type: "doc",
+                docId: "community/contributions/index",
+              },
+              {
+                label: "External Resources",
+                type: "doc",
+                docId: "community/external-resources",
+              },
+              {
+                label: "Rust Coding Guidelines",
+                type: "doc",
+                docId: "community/rust-coding-guidelines",
+              },
+              {
+                label: "Update Aptos.dev",
+                type: "doc",
+                docId: "community/site-updates",
+              },
+              {
+                label: "Follow Aptos Style",
+                type: "doc",
+                docId: "community/aptos-style",
               },
             ],
           },

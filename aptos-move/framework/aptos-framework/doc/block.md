@@ -586,6 +586,9 @@ The number of new events created does not exceed MAX_U64.
 
 <pre><code><b>include</b> <a href="block.md#0x1_block_Initialize">Initialize</a>;
 <b>include</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
 </code></pre>
 
 
@@ -602,6 +605,21 @@ The number of new events created does not exceed MAX_U64.
     <b>aborts_if</b> epoch_interval_microsecs &lt;= 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+}
+</code></pre>
+
+
+
+
+<a name="0x1_block_NewEventHandle"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a> {
+    aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt; <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>;
 }
 </code></pre>
 

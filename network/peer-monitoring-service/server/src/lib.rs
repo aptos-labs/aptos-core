@@ -15,7 +15,7 @@ use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
 use aptos_peer_monitoring_service_types::{
     LatencyPingRequest, LatencyPingResponse, NetworkInformationResponse,
     PeerMonitoringServiceError, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
-    Result, ServerProtocolVersionResponse,
+    Result, ServerProtocolVersionResponse, MAX_DISTANCE_FROM_VALIDATORS,
 };
 use error::Error;
 use futures::stream::StreamExt;
@@ -32,7 +32,6 @@ mod tests;
 
 /// Peer monitoring server constants
 pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
-const MAX_DISTANCE_FROM_VALIDATORS: u64 = 100; // Nodes that aren't connected to the network
 
 /// The server-side actor for the peer monitoring service
 pub struct PeerMonitoringServiceServer {

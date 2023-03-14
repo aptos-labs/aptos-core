@@ -36,9 +36,22 @@ pub struct ConsensusConfig {
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
+    // Whether to create partial blocks when few transactions exist, or empty blocks when there is
+    // pending ordering, or to wait for quorum_store_poll_count * 30ms to collect transactions for a block
+    //
+    // It is more efficient to execute larger blocks, as it creates less overhead. On the other hand
+    // waiting increases latency (unless we are under high load that added waiting latency
+    // is compensated by faster execution time). So we want to balance the two, by waiting only
+    // when we are saturating the execution pipeline:
+    // - if there are more pending blocks then usual in the execution pipeline,
+    //   block is going to wait there anyways, so we can wait to create a bigger/more efificent block
+    // - in case our node is faster than others, and we don't have many pending blocks,
+    //   but we still see very large recent (pending) blocks, we know that there is demand
+    //   and others are creating large blocks, so we can wait as well.
+    pub wait_for_full_blocks_above_pending_blocks: usize,
+    pub wait_for_full_blocks_above_recent_fill_threshold: f32,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
-
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
@@ -81,6 +94,11 @@ impl Default for ConsensusConfig {
             channel_size: 30, // hard-coded
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 10,
+            // disable wait_for_full until fully tested
+            // We never go above 20-30 pending blocks, so this disables it
+            wait_for_full_blocks_above_pending_blocks: 100,
+            // Max is 1, so 1.1 disables it.
+            wait_for_full_blocks_above_recent_fill_threshold: 1.1,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
 

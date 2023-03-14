@@ -39,15 +39,14 @@ async fn test_simple_view_invalid() {
 
     context.commit_block(&vec![txn1, txn2]).await;
 
-    // is_account_registered does not have #[view] attribute
     let resp = context
         .expect_status_code(400)
         .post(
             "/view",
             json!({
-                "function":"0x1::coin::is_account_registered",
+                "function":"0x1::aptos_account::assert_account_exists",
                 "arguments": vec![owner.address().to_string()],
-                "type_arguments": vec!["0x1::aptos_coin::AptosCoin"],
+                "type_arguments": [],
             }),
         )
         .await;

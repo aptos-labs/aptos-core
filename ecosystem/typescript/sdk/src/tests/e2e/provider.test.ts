@@ -1,11 +1,11 @@
-import { AptosAccount } from "../../aptos_account";
+import { AptosAccount } from "../../account/aptos_account";
 import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { Provider } from "../../providers/provider";
-import { FaucetClient } from "../../providers/faucet_client";
-import { TokenClient } from "../../token_client";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../../utils/api-endpoints";
-import { API_TOKEN, longTestTimeout } from "../../utils/test_helper.test";
+import { FaucetClient } from "../../plugins/faucet_client";
+import { TokenClient } from "../../plugins/token_client";
+import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import { API_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 
 describe("Provider", () => {
   const faucetClient = new FaucetClient(
@@ -38,21 +38,22 @@ describe("Provider", () => {
       await faucetClient.fundAccount(alice.address(), 100000000);
     });
 
-    it("gets genesis account from fullnode", async () => {
-      const provider = new Provider(Network.TESTNET);
-      const genesisAccount = await provider.getAccount("0x1");
-      expect(genesisAccount.authentication_key.length).toBe(66);
-      expect(genesisAccount.sequence_number).not.toBeNull();
+    describe("query full node", () => {
+      it("gets genesis account from fullnode", async () => {
+        const provider = new Provider(Network.TESTNET);
+        const genesisAccount = await provider.getAccount("0x1");
+        expect(genesisAccount.authentication_key.length).toBe(66);
+        expect(genesisAccount.sequence_number).not.toBeNull();
+      });
     });
 
-    it(
-      "gets account NFTs from indexer",
-      async () => {
-        const aptosClient = new AptosClient("https://fullnode.testnet.aptoslabs.com");
-        const tokenClient = new TokenClient(aptosClient);
-        const collectionName = "AliceCollection";
-        const tokenName = "Alice Token";
+    describe("query indexer", () => {
+      const aptosClient = new AptosClient("https://fullnode.testnet.aptoslabs.com");
+      const tokenClient = new TokenClient(aptosClient);
+      const collectionName = "AliceCollection";
+      const tokenName = "Alice Token";
 
+      beforeAll(async () => {
         // Create collection and token on Alice's account
         await aptosClient.waitForTransaction(
           await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
@@ -78,15 +79,21 @@ describe("Provider", () => {
           ),
           { checkSuccess: true },
         );
+      }, longTestTimeout);
 
+      jest.retryTimes(5);
+      beforeEach(async () => {
+        await sleep(1000);
+      });
+
+      it("gets account NFTs from indexer", async () => {
         let provider = new Provider(Network.TESTNET);
         const accountNFTs = await provider.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
         expect(accountNFTs.current_token_ownerships).toHaveLength(1);
         expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
         expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
         expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
-      },
-      longTestTimeout,
-    );
+      });
+    });
   });
 });

@@ -78,6 +78,7 @@
     -  [Function `new_event_handle`](#@Specification_1_new_event_handle)
     -  [Function `register_coin`](#@Specification_1_register_coin)
     -  [Function `create_signer_with_capability`](#@Specification_1_create_signer_with_capability)
+    -  [Function `verify_signed_message`](#@Specification_1_verify_signed_message)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -2686,9 +2687,9 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
-<b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 1 &gt; <a href="account.md#0x1_account_MAX_U64">MAX_U64</a>;
+<b>include</b> <a href="account.md#0x1_account_NewEventHandleAbortsIf">NewEventHandleAbortsIf</a> {
+    <a href="account.md#0x1_account">account</a>: account_signer,
+};
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 </code></pre>
 
@@ -2722,6 +2723,7 @@ The guid_creation_num of the Account is up to MAX_U64.
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 1 &gt; <a href="account.md#0x1_account_MAX_U64">MAX_U64</a>;
+    <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 1 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">MAX_GUID_CREATION_NUM</a>;
 }
 </code></pre>
 
@@ -2772,6 +2774,23 @@ The guid_creation_num of the Account is up to MAX_U64.
     <b>aborts_if</b> len(<a href="account.md#0x1_account">account</a>.signer_capability_offer.for.vec) != 0;
     <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.sequence_number != 0;
 }
+</code></pre>
+
+
+
+<a name="@Specification_1_verify_signed_message"></a>
+
+### Function `verify_signed_message`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_verify_signed_message">verify_signed_message</a>&lt;T: drop&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, account_scheme: u8, account_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, signed_message_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, message: T)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
 </code></pre>
 
 

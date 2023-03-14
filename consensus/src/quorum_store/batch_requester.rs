@@ -3,14 +3,14 @@
 
 use crate::{
     network::QuorumStoreSender,
-    quorum_store::{counters, types::BatchRequest, utils::DigestTimeouts},
+    quorum_store::{counters, types::BatchRequest},
 };
-use aptos_crypto::{hash::DefaultHasher, HashValue};
+use aptos_crypto::HashValue;
 use aptos_executor_types::*;
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use bcs::to_bytes;
-use std::collections::HashMap;
+use futures::{stream::FuturesUnordered, StreamExt};
+use std::time::Duration;
 use tokio::sync::oneshot;
 
 struct BatchRequesterState {
@@ -56,9 +56,10 @@ impl BatchRequesterState {
     // TODO: if None, then return an error to the caller
     fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
         if let Some(payload) = maybe_payload {
-            debug!(
+            trace!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
-                digest, self.ret_tx
+                digest,
+                self.ret_tx
             );
             if self.ret_tx.send(Ok(payload)).is_err() {
                 debug!(
@@ -79,17 +80,15 @@ impl BatchRequesterState {
     }
 }
 
-pub(crate) struct BatchRequester<T: QuorumStoreSender> {
+pub(crate) struct BatchRequester<T> {
     epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,
     request_timeout_ms: usize,
-    digest_to_state: HashMap<HashValue, BatchRequesterState>,
-    timeouts: DigestTimeouts,
     network_sender: T,
 }
 
-impl<T: QuorumStoreSender> BatchRequester<T> {
+impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
     pub(crate) fn new(
         epoch: u64,
         my_peer_id: PeerId,
@@ -102,71 +101,46 @@ impl<T: QuorumStoreSender> BatchRequester<T> {
             my_peer_id,
             request_num_peers,
             request_timeout_ms,
-            digest_to_state: HashMap::new(),
-            timeouts: DigestTimeouts::new(),
             network_sender,
         }
     }
 
-    async fn send_requests(&self, digest: HashValue, request_peers: Vec<PeerId>) {
-        // Quorum Store measurements
-        counters::SENT_BATCH_REQUEST_COUNT.inc();
-        let request = BatchRequest::new(self.my_peer_id, self.epoch, digest);
-        self.network_sender
-            .send_batch_request(request, request_peers)
-            .await;
-    }
-
-    pub(crate) async fn add_request(
-        &mut self,
+    pub(crate) fn request_batch(
+        &self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, Error>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
-        let request_peers = request_state
-            .next_request_peers(self.request_num_peers)
-            .unwrap(); // note: this is the first try
+        let network_sender = self.network_sender.clone();
+        let request_num_peers = self.request_num_peers;
+        let my_peer_id = self.my_peer_id;
+        let epoch = self.epoch;
+        let timeout = Duration::from_millis(self.request_timeout_ms as u64);
 
-        debug!("QS: requesting from {:?}", request_peers);
-
-        self.digest_to_state.insert(digest, request_state);
-        self.send_requests(digest, request_peers).await;
-        self.timeouts.add_digest(digest, self.request_timeout_ms);
-    }
-
-    pub(crate) async fn handle_timeouts(&mut self) {
-        for digest in self.timeouts.expire() {
-            debug!("QS: timed out batch request, digest = {}", digest);
-            if let Some(state) = self.digest_to_state.get_mut(&digest) {
-                if let Some(request_peers) = state.next_request_peers(self.request_num_peers) {
-                    // Quorum Store measurements
-                    counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
-                    self.send_requests(digest, request_peers).await;
-                    self.timeouts.add_digest(digest, self.request_timeout_ms);
-                } else {
-                    let state = self.digest_to_state.remove(&digest).unwrap();
-                    state.serve_request(digest, None);
+        tokio::spawn(async move {
+            while let Some(request_peers) = request_state.next_request_peers(request_num_peers) {
+                let mut futures = FuturesUnordered::new();
+                trace!("QS: requesting from {:?}", request_peers);
+                let request = BatchRequest::new(my_peer_id, epoch, digest);
+                for peer in request_peers {
+                    counters::SENT_BATCH_REQUEST_COUNT.inc();
+                    futures.push(network_sender.request_batch(request.clone(), peer, timeout));
                 }
+                while let Some(response) = futures.next().await {
+                    if let Ok(batch) = response {
+                        counters::RECEIVED_BATCH_COUNT.inc();
+                        if batch.verify().is_ok() {
+                            let digest = batch.digest();
+                            let payload = batch.into_payload();
+                            request_state.serve_request(digest, Some(payload));
+                            return;
+                        }
+                    }
+                }
+                counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
             }
-        }
-    }
-
-    pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Vec<SignedTransaction>) {
-        if self.digest_to_state.contains_key(&digest) {
-            let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
-            let serialized_payload: Vec<u8> = payload
-                .iter()
-                .flat_map(|txn| to_bytes(txn).unwrap())
-                .collect();
-            hasher.update(&serialized_payload);
-            if hasher.finish() == digest {
-                debug!("QS: serving batch digest = {}", digest);
-                let state = self.digest_to_state.remove(&digest).unwrap();
-                state.serve_request(digest, Some(payload));
-            } else {
-                debug!("Payload does not fit digest")
-            }
-        }
+            request_state.serve_request(digest, None);
+        });
     }
 }

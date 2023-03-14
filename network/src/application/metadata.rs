@@ -103,7 +103,7 @@ impl PeerMetadata {
     }
 
     /// Returns a copy of the connection metadata
-    pub fn get_connection_medata(&self) -> ConnectionMetadata {
+    pub fn get_connection_metadata(&self) -> ConnectionMetadata {
         self.connection_metadata.clone()
     }
 

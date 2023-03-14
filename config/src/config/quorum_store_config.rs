@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreBackPressureConfig {
     pub backlog_txn_limit_count: u64,
+    pub backlog_per_validator_batch_limit_count: u64,
     pub decrease_duration_ms: u64,
     pub increase_duration_ms: u64,
     pub decrease_fraction: f64,
-    pub dynamic_min_batch_count: u64,
-    pub dynamic_max_batch_count: u64,
+    pub dynamic_min_txn_per_s: u64,
+    pub dynamic_max_txn_per_s: u64,
 }
 
 impl Default for QuorumStoreBackPressureConfig {
@@ -21,11 +22,13 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            // QS will create batches at the max rate until this number is reached
+            backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_batch_count: 40,
-            dynamic_max_batch_count: 500,
+            dynamic_min_txn_per_s: 160,
+            dynamic_max_txn_per_s: 2000,
         }
     }
 }
@@ -36,7 +39,9 @@ pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_request_num_peers: usize,
-    pub mempool_pulling_interval: usize,
+    pub batch_generation_poll_interval_ms: usize,
+    pub batch_generation_min_non_empty_interval_ms: usize,
+    pub batch_generation_max_interval_ms: usize,
     pub end_batch_ms: u64,
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
@@ -63,7 +68,9 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_request_num_peers: 2,
-            mempool_pulling_interval: 250,
+            batch_generation_poll_interval_ms: 25,
+            batch_generation_min_non_empty_interval_ms: 100,
+            batch_generation_max_interval_ms: 250,
             // TODO: This essentially turns fragments off, because there was performance degradation. Needs more investigation.
             end_batch_ms: 10,
             max_batch_bytes: 4 * 1024 * 1024,
@@ -72,8 +79,8 @@ impl Default for QuorumStoreConfig {
             batch_expiry_round_gap_behind_latest_certified: 500,
             batch_expiry_round_gap_beyond_latest_certified: 500,
             batch_expiry_grace_rounds: 5,
-            memory_quota: 100000000,
-            db_quota: 10000000000,
+            memory_quota: 120_000_000,
+            db_quota: 300_000_000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS Fragment messages, should be >= 1

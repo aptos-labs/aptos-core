@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
-import { HexString } from "../hex_string";
+import { HexString } from "../utils";
 import {
   Deserializer,
   Serializer,
@@ -21,10 +21,10 @@ import {
   Uint16,
   Uint256,
 } from "../bcs";
-import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
+import { AccountAddress } from "./account_address";
 
 export class RawTransaction {
   /**

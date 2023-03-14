@@ -1992,16 +1992,12 @@ Remove the next transaction if it has sufficient owner rejections.
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&multisig_account_resource.transactions, sequence_number),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="multisig_account.md#0x1_multisig_account_ETRANSACTION_NOT_FOUND">ETRANSACTION_NOT_FOUND</a>),
     );
-    // Delete the transaction <b>to</b> keep storage efficient. Off-chain components can reconstruct the transaction and
-    // from events.
-    <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> multisig_account_resource.transactions, sequence_number);
-    <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(&multisig_account_resource.owners, &transaction);
+    <b>let</b> (_, num_rejections) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
     <b>assert</b>!(
         num_rejections &gt;= multisig_account_resource.num_signatures_required,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_REJECTIONS">ENOT_ENOUGH_REJECTIONS</a>),
     );
 
-    multisig_account_resource.last_executed_sequence_number = sequence_number;
     emit_event(
         &<b>mut</b> multisig_account_resource.execute_rejected_transaction_events,
         <a href="multisig_account.md#0x1_multisig_account_ExecuteRejectedTransactionEvent">ExecuteRejectedTransactionEvent</a> {
@@ -2092,7 +2088,7 @@ This function is private so no other code can call this beside the VM itself as 
     transaction_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> num_approvals = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
+    <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
     emit_event(
         &<b>mut</b> multisig_account_resource.execute_transaction_events,
         <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionSucceededEvent">TransactionExecutionSucceededEvent</a> {
@@ -2133,7 +2129,7 @@ This function is private so no other code can call this beside the VM itself as 
     execution_error: <a href="multisig_account.md#0x1_multisig_account_ExecutionError">ExecutionError</a>,
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
     <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
-    <b>let</b> num_approvals = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
+    <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
     emit_event(
         &<b>mut</b> multisig_account_resource.transaction_execution_failed_events,
         <a href="multisig_account.md#0x1_multisig_account_TransactionExecutionFailedEvent">TransactionExecutionFailedEvent</a> {
@@ -2157,7 +2153,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">multisig_account::MultisigAccount</a>): u64
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">multisig_account::MultisigAccount</a>): (u64, u64)
 </code></pre>
 
 
@@ -2166,12 +2162,11 @@ This function is private so no other code can call this beside the VM itself as 
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>): u64 {
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>): (u64, u64) {
     <b>let</b> sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
     <b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(&<b>mut</b> multisig_account_resource.transactions, sequence_number);
     multisig_account_resource.last_executed_sequence_number = sequence_number;
-    <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(&multisig_account_resource.owners, &transaction);
-    num_approvals
+    <a href="multisig_account.md#0x1_multisig_account_num_approvals_and_rejections">num_approvals_and_rejections</a>(&multisig_account_resource.owners, &transaction)
 }
 </code></pre>
 

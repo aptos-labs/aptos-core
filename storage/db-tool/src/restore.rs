@@ -67,8 +67,7 @@ pub enum Oneoff {
 impl Command {
     pub async fn run(self) -> Result<()> {
         Logger::new().level(Level::Info).init();
-        #[allow(deprecated)]
-        let _mp = MetricsPusher::start();
+        let _mp = MetricsPusher::start(vec![]);
 
         match self {
             Command::Oneoff(oneoff) => {

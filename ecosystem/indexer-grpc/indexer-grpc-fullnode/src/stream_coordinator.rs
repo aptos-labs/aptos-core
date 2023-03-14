@@ -13,7 +13,7 @@ use aptos_protos::{
     datastream::v1::{
         raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
     },
-    transaction::v1::Transaction as TransactionPB,
+    transaction::testing1::v1::Transaction as TransactionPB,
 };
 use prost::Message;
 use std::{sync::Arc, time::Duration};

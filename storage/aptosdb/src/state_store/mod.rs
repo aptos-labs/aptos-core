@@ -19,7 +19,7 @@ use crate::{
     },
     version_data::VersionDataSchema,
     AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    StateKvPrunerManager, StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -84,8 +84,9 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<DB>,
-    pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_kv_pruner: StateKvPrunerManager,
 }
 
 pub(crate) struct StateStore {
@@ -276,12 +277,53 @@ impl StateStore {
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
         state_kv_db: Arc<DB>,
-        state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
-        epoch_snapshot_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
+        state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+        epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+        state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
+        Self::sync_commit_progress(
+            Arc::clone(&ledger_db),
+            Arc::clone(&state_kv_db),
+            /*crash_if_difference_is_too_large=*/ true,
+        );
+        let state_merkle_db = Arc::new(StateMerkleDb::new(
+            state_merkle_db,
+            max_nodes_per_lru_cache_shard,
+        ));
+        let state_db = Arc::new(StateDb {
+            ledger_db,
+            state_merkle_db,
+            state_kv_db,
+            state_merkle_pruner,
+            epoch_snapshot_pruner,
+            state_kv_pruner,
+        });
+        let buffered_state = Mutex::new(
+            Self::create_buffered_state_from_latest_snapshot(
+                &state_db,
+                buffered_state_target_items,
+                hack_for_tests,
+                /*check_max_versions_after_snapshot=*/ true,
+            )
+            .expect("buffered state creation failed."),
+        );
+        Self {
+            state_db,
+            buffered_state,
+            buffered_state_target_items,
+        }
+    }
+
+    // We commit the overall commit progress at the last, and use it as the source of truth of the
+    // commit progress.
+    pub fn sync_commit_progress(
+        ledger_db: Arc<DB>,
+        state_kv_db: Arc<DB>,
+        crash_if_difference_is_too_large: bool,
+    ) {
         if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
             .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
             .expect("Failed to read overall commit progress.")
@@ -310,7 +352,9 @@ impl StateStore {
                     "Start truncation...",
                 );
                 let difference = ledger_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
                 truncate_ledger_db(
                     Arc::clone(&ledger_db),
                     ledger_commit_progress,
@@ -326,7 +370,9 @@ impl StateStore {
                     "Start truncation..."
                 );
                 let difference = state_kv_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
                 truncate_state_kv_db(
                     Arc::clone(&state_kv_db),
                     state_kv_commit_progress,
@@ -338,31 +384,6 @@ impl StateStore {
         } else {
             info!("No overall commit progress was found!");
         }
-        let state_merkle_db = Arc::new(StateMerkleDb::new(
-            state_merkle_db,
-            max_nodes_per_lru_cache_shard,
-        ));
-        let state_db = Arc::new(StateDb {
-            ledger_db,
-            state_merkle_db,
-            state_kv_db,
-            state_pruner,
-            epoch_snapshot_pruner,
-        });
-        let buffered_state = Mutex::new(
-            Self::create_buffered_state_from_latest_snapshot(
-                &state_db,
-                buffered_state_target_items,
-                hack_for_tests,
-                /*check_max_versions_after_snapshot=*/ true,
-            )
-            .expect("buffered state creation failed."),
-        );
-        Self {
-            state_db,
-            buffered_state,
-            buffered_state_target_items,
-        }
     }
 
     #[cfg(feature = "db-debugger")]
@@ -373,22 +394,27 @@ impl StateStore {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
-        let state_pruner = StatePrunerManager::new(
+        let state_merkle_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
-        let epoch_snapshot_pruner = StatePrunerManager::new(
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
         let state_kv_db = Arc::clone(&ledger_db);
+        let state_kv_pruner = StateKvPrunerManager::new(
+            Arc::clone(&state_kv_db),
+            NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
+        );
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
             state_kv_db,
-            state_pruner,
+            state_merkle_pruner,
             epoch_snapshot_pruner,
+            state_kv_pruner,
         });
         let buffered_state = Self::create_buffered_state_from_latest_snapshot(
             &state_db, 0, /*hack_for_tests=*/ false,
@@ -809,34 +835,6 @@ impl StateStore {
         )?))
     }
 
-    /// Prune the stale state value schema generated between a range of version in (begin, end]
-    pub fn prune_state_values(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> Result<()> {
-        // TODO(grao): Replace ledger_db by state_kv_db.
-        let mut iter = self
-            .state_db
-            .ledger_db
-            .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
-        iter.seek(&begin)?;
-        for item in iter {
-            let (index, _) = item?;
-            if index.stale_since_version > end {
-                break;
-            }
-            // Prune the stale state value index itself first.
-            db_batch.delete::<StaleStateValueIndexSchema>(&index)?;
-            db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
-        }
-        for version in begin..end {
-            db_batch.delete::<VersionDataSchema>(&version)?;
-        }
-        Ok(())
-    }
-
     #[cfg(test)]
     pub fn get_all_jmt_nodes_referenced(
         &self,
@@ -871,7 +869,6 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
-        // TODO(grao): Support state kv db here.
         let batch = SchemaBatch::new();
         node_batch
             .par_iter()
@@ -881,7 +878,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.ledger_db.write_schemas(batch)
+        self.state_kv_db.write_schemas(batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -891,7 +888,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
-            .ledger_db
+            .state_kv_db
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }

@@ -3,4 +3,4 @@
 # hash should be on a new line, with a comment explaining why it is
 # not on the main branch.
 
-# This list is currently empty.
+d883a7c1449b77688d2818cec20707ce4511c59b # Different commit hash and message: https://github.com/aptos-labs/aptos-core/commit/66fb84a035f699e16a54aef0d11d19948b9a575f
