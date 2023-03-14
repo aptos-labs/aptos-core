@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::Round;
 use anyhow::{bail, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -17,26 +16,6 @@ use std::{
     hash::Hash,
     ops::Deref,
 };
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
-pub struct LogicalTime {
-    epoch: u64,
-    round: Round,
-}
-
-impl LogicalTime {
-    pub fn new(epoch: u64, round: Round) -> Self {
-        Self { epoch, round }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn round(&self) -> Round {
-        self.round
-    }
-}
 
 #[derive(
     Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, CryptoHasher, BCSCryptoHash,
@@ -91,7 +70,8 @@ impl Display for BatchId {
 pub struct BatchInfo {
     author: PeerId,
     batch_id: BatchId,
-    expiration: LogicalTime,
+    epoch: u64,
+    expiration: u64,
     digest: HashValue,
     num_txns: u64,
     num_bytes: u64,
@@ -101,7 +81,8 @@ impl BatchInfo {
     pub fn new(
         author: PeerId,
         batch_id: BatchId,
-        expiration: LogicalTime,
+        epoch: u64,
+        expiration: u64,
         digest: HashValue,
         num_txns: u64,
         num_bytes: u64,
@@ -109,6 +90,7 @@ impl BatchInfo {
         Self {
             author,
             batch_id,
+            epoch,
             expiration,
             digest,
             num_txns,
@@ -117,7 +99,7 @@ impl BatchInfo {
     }
 
     pub fn epoch(&self) -> u64 {
-        self.expiration.epoch
+        self.epoch
     }
 
     pub fn author(&self) -> PeerId {
@@ -128,7 +110,7 @@ impl BatchInfo {
         self.batch_id
     }
 
-    pub fn expiration(&self) -> LogicalTime {
+    pub fn expiration(&self) -> u64 {
         self.expiration
     }
 

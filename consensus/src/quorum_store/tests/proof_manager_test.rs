@@ -4,7 +4,7 @@
 use crate::quorum_store::proof_manager::ProofManager;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{BatchId, BatchInfo, LogicalTime, ProofOfStore},
+    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
@@ -15,26 +15,18 @@ use std::collections::HashSet;
 
 #[tokio::test]
 async fn test_block_request() {
-    let mut proof_manager = ProofManager::new(0, AccountAddress::random(), 10, 10);
+    let mut proof_manager = ProofManager::new(AccountAddress::random(), 10, 10);
 
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(1);
     let proof = ProofOfStore::new(
-        BatchInfo::new(
-            PeerId::random(),
-            batch_id,
-            LogicalTime::new(0, 10),
-            digest,
-            1,
-            1,
-        ),
+        BatchInfo::new(PeerId::random(), batch_id, 0, 10, digest, 1, 1),
         AggregateSignature::empty(),
     );
     proof_manager.receive_proof(proof.clone());
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = GetPayloadCommand::GetPayloadRequest(
-        1,
         100,
         1000000,
         true,
