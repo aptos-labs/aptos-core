@@ -161,11 +161,6 @@ impl CliTestFramework {
         let address = account_address_from_public_key(&private_key.public_key());
         self.account_addresses.push(address);
         self.account_keys.push(private_key);
-        println!(
-            "Account: {} (index: {})",
-            address.to_hex_literal(),
-            self.account_keys.len() - 1
-        );
         self.account_keys.len() - 1
     }
 
@@ -213,11 +208,7 @@ impl CliTestFramework {
         }
 
         self.fund_account(index, amount).await?;
-        warn!(
-            "Funded account {:?} with {:?} OCTA",
-            self.account_id(index),
-            amount.unwrap_or(DEFAULT_FUNDED_COINS)
-        );
+        warn!("Funded account {:?}", self.account_id(index));
         Ok(index)
     }
 

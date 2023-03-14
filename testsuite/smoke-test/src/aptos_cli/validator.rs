@@ -1054,12 +1054,11 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap();
-    println!("owner CLI index: {}", owner_cli_index);
 
     cli.assert_account_balance_now(owner_cli_index, owner_initial_coins)
         .await;
 
-    // Faucet can make our root LocalAccount sequence number get out of sync.
+    // faucet can make our root LocalAccount sequence number get out of sync.
     swarm
         .chain_info()
         .resync_root_account_seq_num(&rest_client)
@@ -1079,7 +1078,6 @@ async fn test_owner_create_and_delegate_flow() {
     // Fetch amount of gas used for the above account creations
     let mut owner_gas =
         owner_initial_coins - cli.account_balance_now(owner_cli_index).await.unwrap();
-    println!("owner_gas1: {}", owner_gas);
 
     // Voter and operator start with no coins
     // Owner needs to send small amount of coins to operator and voter, to create their accounts and so they have enough for gas fees.
@@ -1087,7 +1085,7 @@ async fn test_owner_create_and_delegate_flow() {
         .transfer_coins(owner_cli_index, voter_cli_index, voter_initial_coins, None)
         .await
         .unwrap()
-        .octa_spent();
+        .gas_used;
     owner_gas += cli
         .transfer_coins(
             owner_cli_index,
@@ -1097,7 +1095,7 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap()
-        .octa_spent();
+        .gas_used;
 
     cli.assert_account_balance_now(
         owner_cli_index,
@@ -1122,7 +1120,6 @@ async fn test_owner_create_and_delegate_flow() {
         .unwrap(),
     );
 
-    println!("before4");
     cli.assert_account_balance_now(
         owner_cli_index,
         owner_initial_coins
@@ -1132,7 +1129,6 @@ async fn test_owner_create_and_delegate_flow() {
             - owner_gas,
     )
     .await;
-    println!("after4");
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
     assert_eq!(
@@ -1167,10 +1163,8 @@ async fn test_owner_create_and_delegate_flow() {
         .unwrap(),
     );
 
-    println!("before5");
     cli.assert_account_balance_now(operator_cli_index, operator_initial_coins - operator_gas)
         .await;
-    println!("after5");
 
     cli.join_validator_set(operator_cli_index, Some(owner_cli_index))
         .await
