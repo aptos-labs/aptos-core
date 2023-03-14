@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
+    BatchInfo, ProofOfStore, SignedDigest, SignedDigestError,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -33,14 +33,14 @@ pub(crate) enum ProofCoordinatorCommand {
 }
 
 struct IncrementalProofState {
-    info: SignedDigestInfo,
+    info: BatchInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
     aggregated_voting_power: u128,
     completed: bool,
 }
 
 impl IncrementalProofState {
-    fn new(info: SignedDigestInfo) -> Self {
+    fn new(info: BatchInfo) -> Self {
         Self {
             info,
             aggregated_signature: BTreeMap::new(),
@@ -127,7 +127,7 @@ pub(crate) struct ProofCoordinator {
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
-    timeouts: Timeouts<SignedDigestInfo>,
+    timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
 }
@@ -153,14 +153,14 @@ impl ProofCoordinator {
 
     fn init_proof(&mut self, signed_digest: &SignedDigest) -> Result<(), SignedDigestError> {
         // Check if the signed digest corresponding to our batch
-        if signed_digest.info().batch_author != self.peer_id {
+        if signed_digest.info().author != self.peer_id {
             return Err(SignedDigestError::WrongAuthor);
         }
         let batch_author = self
             .batch_reader
             .exists(&signed_digest.digest())
             .ok_or(SignedDigestError::WrongAuthor)?;
-        if batch_author != signed_digest.info().batch_author {
+        if batch_author != signed_digest.info().author {
             return Err(SignedDigestError::WrongAuthor);
         }
 

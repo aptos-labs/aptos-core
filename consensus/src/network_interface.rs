@@ -4,7 +4,7 @@
 
 //! Interface between Consensus and Network layers.
 
-use crate::quorum_store::types::{Batch, BatchRequest, Fragment};
+use crate::quorum_store::types::{Batch, BatchMsg, BatchRequest};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
@@ -50,14 +50,12 @@ pub enum ConsensusMsg {
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
-    /// Quorum Store: Send a fragment -- a sequence of transactions that are part of an in-progress
-    /// batch -- from the fragment generator to remote validators.
-    FragmentMsg(Box<Fragment>),
+    /// Quorum Store: Send a Batch of transactions.
+    BatchMsg(Box<BatchMsg>),
     /// Quorum Store: Request the payloads of a completed batch.
     BatchRequestMsg(Box<BatchRequest>),
-    /// Quorum Store: Respond with a completed batch's payload -- a sequence of transactions,
-    /// identified by its digest.
-    BatchMsg(Box<Batch>),
+    /// Quorum Store: Response to the batch request.
+    BatchResponse(Box<Batch>),
     /// Quorum Store: Send a signed batch digest. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
     SignedDigestMsg(Box<SignedDigest>),
@@ -80,9 +78,9 @@ impl ConsensusMsg {
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
-            ConsensusMsg::FragmentMsg(_) => "FragmentMsg",
-            ConsensusMsg::BatchRequestMsg(_) => "BatchRequestMsg",
             ConsensusMsg::BatchMsg(_) => "BatchMsg",
+            ConsensusMsg::BatchRequestMsg(_) => "BatchRequestMsg",
+            ConsensusMsg::BatchResponse(_) => "BatchResponse",
             ConsensusMsg::SignedDigestMsg(_) => "SignedDigestMsg",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
         }

@@ -39,9 +39,6 @@ impl NetworkListener {
 
     pub async fn start(mut self) {
         info!("QS: starting networking");
-        //batch fragment -> batch_aggregator, persist it, and prapre signedDigests
-        //Keep in memory caching in side the DB wrapper.
-        //chack id -> self, call PoQSB.
         while let Some(msg) = self.network_msg_rx.next().await {
             monitor!("qs_network_listener_main_loop", {
                 match msg {
@@ -60,20 +57,21 @@ impl NetworkListener {
                             .await
                             .expect("Could not send signed_digest to proof_coordinator");
                     },
-                    VerifiedEvent::FragmentMsg(fragment) => {
+                    VerifiedEvent::BatchMsg(batch_msg) => {
+                        let batch = batch_msg.unpack();
                         counters::DELIVERED_FRAGMENTS_COUNT.inc();
-                        let idx = fragment.source().to_vec()[0] as usize
+                        let idx = batch.author().to_vec()[0] as usize
                             % self.remote_batch_coordinator_tx.len();
                         trace!(
                             "QS: peer_id {:?},  # network_worker {}, hashed to idx {}",
-                            fragment.source(),
+                            batch.author(),
                             self.remote_batch_coordinator_tx.len(),
                             idx
                         );
                         self.remote_batch_coordinator_tx[idx]
-                            .send(BatchCoordinatorCommand::AppendFragment(fragment))
+                            .send(BatchCoordinatorCommand::NewBatch(Box::new(batch)))
                             .await
-                            .expect("Could not send remote fragment");
+                            .expect("Could not send remote batch");
                     },
                     VerifiedEvent::ProofOfStoreMsg(proof) => {
                         let cmd = ProofManagerCommand::ReceiveProof(*proof);

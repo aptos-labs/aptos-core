@@ -1,13 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    monitor,
-    quorum_store::{counters, types::SerializedTransaction},
-};
+use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{Round, TransactionSummary},
-    proof_of_store::{BatchId, LogicalTime, ProofOfStore},
+    proof_of_store::{LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -22,95 +19,9 @@ use std::{
         BinaryHeap, HashMap, HashSet, VecDeque,
     },
     hash::Hash,
-    mem,
     time::{Duration, Instant},
 };
 use tokio::time::timeout;
-
-pub(crate) struct BatchBuilder {
-    id: BatchId,
-    fragment_id: usize,
-    summaries: Vec<TransactionSummary>,
-    data: Vec<SerializedTransaction>,
-    num_txns: usize,
-    num_bytes: usize,
-    // TODO: remove
-    max_bytes: usize,
-}
-
-impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
-        Self {
-            id: batch_id,
-            fragment_id: 0,
-            summaries: Vec::new(),
-            data: Vec::new(),
-            num_txns: 0,
-            num_bytes: 0,
-            max_bytes,
-        }
-    }
-
-    pub(crate) fn append_transactions(
-        &mut self,
-        txns: &[SignedTransaction],
-        max_txns_override: usize,
-    ) -> bool {
-        for txn in txns {
-            let serialized_txn = SerializedTransaction::from_signed_txn(txn);
-
-            if self.num_bytes + serialized_txn.len() <= self.max_bytes
-                && self.num_txns < max_txns_override
-            {
-                self.num_txns += 1;
-                self.num_bytes += serialized_txn.len();
-
-                self.summaries.push(TransactionSummary {
-                    sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
-                });
-                self.data.push(serialized_txn);
-            } else {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub(crate) fn take_serialized_txns(&mut self) -> Vec<SerializedTransaction> {
-        mem::take(&mut self.data)
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.summaries.is_empty()
-    }
-
-    pub(crate) fn batch_id(&self) -> BatchId {
-        self.id
-    }
-
-    pub(crate) fn fetch_and_increment_fragment_id(&mut self) -> usize {
-        let id = self.fragment_id;
-        self.fragment_id += 1;
-        id
-    }
-
-    /// Clears the state, increments (batch) id.
-    pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
-        assert!(self.data.is_empty());
-        counters::NUM_FRAGMENT_PER_BATCH.observe((self.fragment_id + 1) as f64);
-
-        self.id.increment();
-        self.fragment_id = 0;
-        self.num_bytes = 0;
-        self.num_txns = 0;
-        mem::take(&mut self.summaries)
-    }
-
-    pub(crate) fn summaries(&self) -> &Vec<TransactionSummary> {
-        &self.summaries
-    }
-}
 
 pub(crate) struct Timeouts<T> {
     timeouts: VecDeque<(i64, T)>,
