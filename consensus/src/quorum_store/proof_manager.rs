@@ -59,7 +59,7 @@ impl ProofManager {
     }
 
     pub(crate) fn receive_proof(&mut self, proof: ProofOfStore) {
-        let is_local = proof.info().batch_author == self.my_peer_id;
+        let is_local = proof.info().author == self.my_peer_id;
         let num_txns = proof.info().num_txns;
         self.increment_remaining_txns(num_txns);
         self.proofs_for_consensus.push(proof, is_local);
