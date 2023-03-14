@@ -296,7 +296,7 @@ function install_nodejs {
 	winget install OpenJS.NodeJS --silent
 	}
   else {
-	winget upgrade --id OpenJS.NodeJS -silent
+	winget upgrade --id OpenJS.NodeJS --silent
   }
 }
 
@@ -306,7 +306,7 @@ function install_python {
 	winget install Python.Python.3.11 --silent
 	}
   else {
-	winget upgrade --id Python.Python.3.11 -silent
+	winget upgrade --id Python.Python.3.11 --silent
   }
   python -m pip install --upgrade pip
   python -m pip install schemathesis
