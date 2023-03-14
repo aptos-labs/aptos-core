@@ -125,6 +125,10 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    // channels to send proposal messages to the round manager
+    proposal_msg_tx: Option<
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    >,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
@@ -172,6 +176,7 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            proposal_msg_tx: None,
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
@@ -532,6 +537,7 @@ impl EpochManager {
                 .expect("[EpochManager] Fail to drop round manager");
         }
         self.round_manager_tx = None;
+        self.proposal_msg_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
@@ -734,7 +740,14 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
+        let (proposal_msg_tx, proposal_msg_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+
         self.round_manager_tx = Some(round_manager_tx.clone());
+        self.proposal_msg_tx = Some(proposal_msg_tx.clone());
 
         counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
         counters::VALIDATOR_VOTING_POWER.set(
@@ -762,7 +775,7 @@ impl EpochManager {
             network_sender,
             self.storage.clone(),
             onchain_consensus_config,
-            round_manager_tx,
+            proposal_msg_tx,
             self.config.clone(),
         );
 
@@ -770,7 +783,7 @@ impl EpochManager {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
+        tokio::spawn(round_manager.start(round_manager_rx, proposal_msg_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }
@@ -842,6 +855,7 @@ impl EpochManager {
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
+            let proposal_msg_tx = self.proposal_msg_tx.clone();
             let my_peer_id = self.author;
             self.bounded_executor
                 .spawn(async move {
@@ -859,6 +873,7 @@ impl EpochManager {
                                 quorum_store_msg_tx,
                                 buffer_manager_msg_tx,
                                 round_manager_tx,
+                                proposal_msg_tx,
                                 peer_id,
                                 verified_event,
                             );
@@ -979,6 +994,9 @@ impl EpochManager {
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
+        proposal_msg_tx: Option<
+            aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+        >,
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) {
@@ -1000,12 +1018,19 @@ impl EpochManager {
                 Self::forward_event_to(buffer_manager_msg_tx, peer_id, buffer_manager_event)
                     .context("buffer manager sender")
             },
-            round_manager_event => Self::forward_event_to(
-                round_manager_tx,
-                (peer_id, discriminant(&round_manager_event)),
-                (peer_id, round_manager_event),
-            )
-            .context("round manager sender"),
+            round_manager_event => {
+                let tx = if matches!(round_manager_event, VerifiedEvent::ProposalMsg(_)) {
+                    proposal_msg_tx
+                } else {
+                    round_manager_tx
+                };
+                Self::forward_event_to(
+                    tx,
+                    (peer_id, discriminant(&round_manager_event)),
+                    (peer_id, round_manager_event),
+                )
+                .context("round manager sender")
+            },
         } {
             warn!("Failed to forward event: {}", e);
         }

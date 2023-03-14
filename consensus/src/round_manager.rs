@@ -8,6 +8,7 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters,
+    counters::STALE_PROPOSALS_RECEIVED,
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -203,7 +204,7 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
-    round_manager_tx:
+    proposal_msg_tx:
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     local_config: ConsensusConfig,
 }
@@ -219,7 +220,7 @@ impl RoundManager {
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
-        round_manager_tx: aptos_channel::Sender<
+        proposal_msg_tx: aptos_channel::Sender<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
@@ -243,7 +244,7 @@ impl RoundManager {
             network,
             storage,
             onchain_config,
-            round_manager_tx,
+            proposal_msg_tx,
             local_config,
         }
     }
@@ -442,6 +443,7 @@ impl RoundManager {
         {
             self.process_proposal(proposal_msg.take_proposal()).await
         } else {
+            STALE_PROPOSALS_RECEIVED.inc();
             bail!(
                 "Stale proposal {}, current round {}",
                 proposal_msg.proposal(),
@@ -722,7 +724,7 @@ impl RoundManager {
         let start = Instant::now();
         let author = self.network.author();
         let block_store = self.block_store.clone();
-        let self_sender = self.round_manager_tx.clone();
+        let self_sender = self.proposal_msg_tx.clone();
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
@@ -969,14 +971,24 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
+        mut proposal_msg_rx: aptos_channel::Receiver<
+            (Author, Discriminant<VerifiedEvent>),
+            (Author, VerifiedEvent),
+        >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
-            futures::select! {
-                (peer_id, event) = event_rx.select_next_some() => {
-                    let result = match event {
+            futures::select_biased! {
+                close_req = close_rx.select_next_some() => {
+                    if let Ok(ack_sender) = close_req {
+                        ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");
+                    }
+                    break;
+                },
+                (peer_id, proposal) = proposal_msg_rx.select_next_some() => {
+                   let result = match proposal {
                         VerifiedEvent::ProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_proposal",
@@ -989,6 +1001,19 @@ impl RoundManager {
                                 self.process_delayed_proposal_msg(*proposal_msg).await
                             )
                         }
+                        unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
+                    }.with_context(|| format!("from peer {}", peer_id));
+                    let round_state = self.round_state();
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                        }
+                    }
+                },
+                (peer_id, event) = event_rx.select_next_some() => {
+                    let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         }
@@ -1014,13 +1039,7 @@ impl RoundManager {
                             warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
                         }
                     }
-                }
-                close_req = close_rx.select_next_some() => {
-                    if let Ok(ack_sender) = close_req {
-                        ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");
-                    }
-                    break;
-                }
+                },
             }
         }
         info!(epoch = self.epoch_state().epoch, "RoundManager stopped");
