@@ -393,7 +393,7 @@ impl TransactionRestoreBatchController {
                         let txns_to_save: Vec<_> = txns.drain(..num_to_save).collect();
                         let txn_infos_to_save: Vec<_> = txn_infos.drain(..num_to_save).collect();
                         let event_vecs_to_save: Vec<_> = event_vecs.drain(..num_to_save).collect();
-                        write_sets.drain(..num_to_save);
+                        let write_sets_to_save = write_sets.drain(..num_to_save).collect();
 
                         tokio::task::spawn_blocking(move || {
                             restore_handler.save_transactions(
@@ -401,6 +401,7 @@ impl TransactionRestoreBatchController {
                                 &txns_to_save,
                                 &txn_infos_to_save,
                                 &event_vecs_to_save,
+                                write_sets_to_save,
                             )
                         })
                         .await??;

@@ -12,6 +12,7 @@ use aptos_consensus_types::proof_of_store::LogicalTime;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
+use claims::assert_ok_eq;
 use futures::executor::block_on;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -19,9 +20,7 @@ use std::sync::{
 };
 use tokio::{sync::mpsc::channel, task::spawn_blocking};
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_extend_expiration_vs_save() {
-    let num_experiments = 2000;
+fn batch_store_for_test_no_db(memory_quota: usize) -> Arc<BatchStore<MockQuorumStoreSender>> {
     let tmp_dir = TempPath::new();
     let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
     let (tx, _rx) = channel(10);
@@ -34,20 +33,78 @@ async fn test_extend_expiration_vs_save() {
     );
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
 
-    let batch_store = Arc::new(BatchStore::new(
+    Arc::new(BatchStore::new(
         10, // epoch
         10, // last committed round
         db,
         0,
         0,
         2100,
-        0,    // grace period rounds
-        0,    // memory_quota
-        1000, // db quota
+        0,            // grace period rounds
+        memory_quota, // memory_quota
+        1000,         // db quota
         requester,
         signers[0].clone(),
         validator_verifier,
-    ));
+    ))
+}
+
+#[test]
+fn test_insert_expire() {
+    let batch_store = batch_store_for_test_no_db(30);
+
+    let digest = HashValue::random();
+    assert_ok_eq!(
+        batch_store.insert_to_cache(
+            digest,
+            PersistedValue::new(
+                Some(Vec::new()),
+                LogicalTime::new(10, 15), // Expiration
+                AccountAddress::random(),
+                10,
+            ),
+        ),
+        true
+    );
+
+    assert_ok_eq!(
+        batch_store.insert_to_cache(
+            digest,
+            PersistedValue::new(
+                Some(Vec::new()),
+                LogicalTime::new(10, 30), // Expiration
+                AccountAddress::random(),
+                10,
+            ),
+        ),
+        true
+    );
+    assert_ok_eq!(
+        batch_store.insert_to_cache(
+            digest,
+            PersistedValue::new(
+                Some(Vec::new()),
+                LogicalTime::new(10, 25), // Expiration
+                AccountAddress::random(),
+                10,
+            ),
+        ),
+        false
+    );
+    let expired = batch_store.clear_expired_payload(LogicalTime::new(10, 27));
+    assert!(expired.is_empty());
+    let expired = batch_store.clear_expired_payload(LogicalTime::new(10, 29));
+    assert!(expired.is_empty());
+    assert_eq!(
+        batch_store.clear_expired_payload(LogicalTime::new(10, 30)),
+        vec![digest]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_extend_expiration_vs_save() {
+    let num_experiments = 2000;
+    let batch_store = batch_store_for_test_no_db(0);
 
     let batch_store_clone1 = batch_store.clone();
     let batch_store_clone2 = batch_store.clone();
@@ -156,5 +213,5 @@ async fn test_extend_expiration_vs_save() {
 // TODO: last certified round.
 // TODO: check correct digests are returned.
 // TODO: check grace period.
-// TODO: check quota.
+// TODO: check quota (cache vs persisted).
 // TODO: check the channels.
