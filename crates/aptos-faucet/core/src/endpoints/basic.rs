@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::ApiTags;
-use crate::funder::Funder;
+use crate::funder::{Funder, FunderTrait};
 use poem::http::StatusCode;
 use poem_openapi::{
     payload::{Html, PlainText},
@@ -15,7 +15,7 @@ const OPEN_API_HTML: &str = include_str!("../../../doc/spec.html");
 
 pub struct BasicApi {
     pub concurrent_requests_semaphore: Option<Arc<Semaphore>>,
-    pub funder: Arc<dyn Funder>,
+    pub funder: Arc<Funder>,
 }
 
 #[OpenApi]

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::traits::Bypasser;
+use super::BypasserTrait;
 use crate::{
     checkers::CheckerData,
     common::{IpRangeManager, IpRangeManagerConfig},
@@ -22,7 +22,7 @@ impl IpAllowlistBypasser {
 }
 
 #[async_trait]
-impl Bypasser for IpAllowlistBypasser {
+impl BypasserTrait for IpAllowlistBypasser {
     async fn request_can_bypass(&self, data: CheckerData) -> Result<bool> {
         Ok(self.manager.contains_ip(&data.source_ip))
     }

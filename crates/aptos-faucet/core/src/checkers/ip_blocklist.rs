@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{CheckerData, CheckerTrait};
 use crate::{
-    checkers::traits::{Checker, CheckerData},
     common::{IpRangeManager, IpRangeManagerConfig},
     endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
 };
@@ -23,7 +23,7 @@ impl IpBlocklistChecker {
 }
 
 #[async_trait]
-impl Checker for IpBlocklistChecker {
+impl CheckerTrait for IpBlocklistChecker {
     async fn check(
         &self,
         data: CheckerData,
