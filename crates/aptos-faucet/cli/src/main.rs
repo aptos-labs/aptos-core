@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
-use aptos_faucet_core::funder::{ApiConnectionConfig, Funder, MintFunder};
+use aptos_faucet_core::funder::{ApiConnectionConfig, FunderTrait, MintFunder};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
     types::{

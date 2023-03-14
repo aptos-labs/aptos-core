@@ -2,10 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    endpoints::{AptosTapError, AptosTapErrorCode},
-    funder::traits::FunderHealthMessage,
-};
+use super::{FunderHealthMessage, FunderTrait};
+use crate::endpoints::{AptosTapError, AptosTapErrorCode};
 use anyhow::{Context, Result};
 use aptos_logger::info;
 use aptos_sdk::{
@@ -31,12 +29,9 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
     "../../../../../aptos-move/move-examples/scripts/minter/build/Minter/bytecode_scripts/main.mv"
 );
 
-use super::{
-    common::{
-        submit_transaction, update_sequence_numbers, ApiConnectionConfig, GasUnitPriceManager,
-        TransactionSubmissionConfig,
-    },
-    traits::Funder,
+use super::common::{
+    submit_transaction, update_sequence_numbers, ApiConnectionConfig, GasUnitPriceManager,
+    TransactionSubmissionConfig,
 };
 
 /// explain these contain additional args for the mint funder.
@@ -301,7 +296,7 @@ impl MintFunder {
 }
 
 #[async_trait]
-impl Funder for MintFunder {
+impl FunderTrait for MintFunder {
     async fn fund(
         &self,
         amount: Option<u64>,

@@ -5,12 +5,10 @@
 //! don't throw out captchas info if it has been sitting there for too long /
 //! the map grows too large.
 
-use crate::{
-    checkers::traits::{Checker, CheckerData},
-    endpoints::{
-        AptosTapError, AptosTapErrorCode, RejectionReason, RejectionReasonCode, CAPTCHA_KEY,
-        CAPTCHA_VALUE,
-    },
+use super::{CheckerData, CheckerTrait};
+use crate::endpoints::{
+    AptosTapError, AptosTapErrorCode, RejectionReason, RejectionReasonCode, CAPTCHA_KEY,
+    CAPTCHA_VALUE,
 };
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -48,7 +46,7 @@ impl TapCaptchaChecker {
 }
 
 #[async_trait]
-impl Checker for TapCaptchaChecker {
+impl CheckerTrait for TapCaptchaChecker {
     async fn check(
         &self,
         data: CheckerData,

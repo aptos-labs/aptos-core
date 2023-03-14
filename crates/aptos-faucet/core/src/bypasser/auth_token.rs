@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::traits::Bypasser;
+use super::BypasserTrait;
 use crate::{
     checkers::CheckerData,
     common::{AuthTokenManager, AuthTokenManagerConfig},
@@ -27,7 +27,7 @@ impl AuthTokenBypasser {
 }
 
 #[async_trait]
-impl Bypasser for AuthTokenBypasser {
+impl BypasserTrait for AuthTokenBypasser {
     async fn request_can_bypass(&self, data: CheckerData) -> Result<bool> {
         let auth_token = match data
             .headers

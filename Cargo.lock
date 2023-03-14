@@ -1090,6 +1090,7 @@ dependencies = [
  "captcha",
  "clap 3.2.23",
  "deadpool-redis",
+ "enum_dispatch",
  "futures",
  "hex",
  "ipnet",

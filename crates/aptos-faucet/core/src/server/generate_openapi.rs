@@ -4,7 +4,7 @@
 use crate::{
     checkers::CaptchaManager,
     endpoints::{build_openapi_service, BasicApi, CaptchaApi, FundApi, FundApiComponents},
-    funder::FakeFunder,
+    funder::{FakeFunder, Funder},
 };
 use anyhow::Result;
 use clap::{ArgEnum, Parser};
@@ -19,7 +19,7 @@ pub struct GenerateOpenapi {
 
 impl GenerateOpenapi {
     pub async fn generate_openapi(&self) -> Result<()> {
-        let funder = Arc::new(FakeFunder);
+        let funder = Arc::new(Funder::from(FakeFunder));
         let fund_api = FundApi {
             components: Arc::new(FundApiComponents {
                 bypassers: Vec::new(),
