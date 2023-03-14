@@ -6,16 +6,17 @@ use crate::quorum_store::{
     batch_generator::BatchGenerator,
     quorum_store_db::MockQuorumStoreDB,
     tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
-    types::{BatchId, SerializedTransaction},
+    types::SerializedTransaction,
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::common::TransactionSummary;
+use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{
     channel::mpsc::{channel, Receiver},
     StreamExt,
 };
+use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
@@ -62,10 +63,10 @@ async fn test_batch_creation() {
 
     let mut batch_generator = BatchGenerator::new(
         0,
+        AccountAddress::random(),
         config,
         Arc::new(MockQuorumStoreDB::new()),
         quorum_store_to_mempool_tx,
-        batch_coordinator_cmd_tx,
         1000,
     );
 
@@ -87,10 +88,11 @@ async fn test_batch_creation() {
         .await;
         // Expect AppendToBatch for 1 txn
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::AppendToBatch(data, batch_id) = quorum_store_command {
-            assert_eq!(batch_id, BatchId::new_for_test(1));
-            assert_eq!(data.len(), signed_txns.len());
-            assert_eq!(data, serialize(&signed_txns));
+        if let BatchCoordinatorCommand::AppendFragment(data) = quorum_store_command {
+            assert_eq!(data.batch_id(), BatchId::new_for_test(1));
+            let txns = data.into_transactions();
+            assert_eq!(txns.len(), signed_txns.len());
+            assert_eq!(txns, serialize(&signed_txns));
         } else {
             panic!("Unexpected variant")
         }
@@ -104,9 +106,10 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect EndBatch for 1 + 9 = 10 txns. The last txn pulled is not included in the batch.
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::EndBatch(data, _, _, _) = quorum_store_command {
-            assert_eq!(data.len(), signed_txns.len() - 1);
-            assert_eq!(data, serialize(&signed_txns[0..8].to_vec()));
+        if let BatchCoordinatorCommand::AppendFragment(data) = quorum_store_command {
+            let txns = data.into_transactions();
+            assert_eq!(txns.len(), signed_txns.len() - 1);
+            assert_eq!(txns, serialize(&signed_txns[0..8].to_vec()));
         } else {
             panic!("Unexpected variant")
         }
@@ -120,22 +123,23 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect AppendBatch for 9 txns
         let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
-        if let BatchCoordinatorCommand::AppendToBatch(data, batch_id) = quorum_store_command {
-            assert_eq!(batch_id, BatchId::new_for_test(2));
-            assert_eq!(data.len(), signed_txns.len());
-            assert_eq!(data, serialize(&signed_txns));
+        if let BatchCoordinatorCommand::AppendFragment(data) = quorum_store_command {
+            assert_eq!(data.batch_id(), BatchId::new_for_test(2));
+            let txns = data.into_transactions();
+            assert_eq!(txns.len(), signed_txns.len());
+            assert_eq!(txns, serialize(&signed_txns));
         } else {
             panic!("Unexpected variant")
         }
     });
 
-    let result = batch_generator.handle_scheduled_pull(300).await;
-    assert!(result.is_none());
-    let result = batch_generator.handle_scheduled_pull(300).await;
-    assert!(result.is_some());
-    let result = batch_generator.handle_scheduled_pull(300).await;
-    assert!(result.is_none());
-
+    for _ in 0..3 {
+        let result = batch_generator.handle_scheduled_pull(300).await.unwrap();
+        batch_coordinator_cmd_tx
+            .send(BatchCoordinatorCommand::AppendFragment(Box::new(result)))
+            .await
+            .unwrap();
+    }
     timeout(Duration::from_millis(10_000), join_handle)
         .await
         .unwrap()

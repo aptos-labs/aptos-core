@@ -1985,6 +1985,10 @@ impl DbWriter for AptosDB {
                 .into_iter()
                 .map(|output| output.events().to_vec())
                 .collect::<Vec<_>>();
+            let wsets: Vec<WriteSet> = outputs
+                .into_iter()
+                .map(|output| output.write_set().clone())
+                .collect();
             let transaction_infos = output_with_proof.proof.transaction_infos;
             restore_utils::save_transactions(
                 self.ledger_db.clone(),
@@ -1995,13 +1999,7 @@ impl DbWriter for AptosDB {
                 &transactions,
                 &transaction_infos,
                 &events,
-                Some(&mut batch),
-            )?;
-            restore_utils::save_transaction_outputs(
-                self.ledger_db.clone(),
-                self.transaction_store.clone(),
-                version,
-                outputs,
+                wsets,
                 Some(&mut batch),
             )?;
 

@@ -30,3 +30,8 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-netcore = { workspace = true }
+aptos-network = { workspace = true, features = ["fuzzing"] }
+rand = { workspace = true }

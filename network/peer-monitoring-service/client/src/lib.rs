@@ -28,7 +28,7 @@ mod error;
 mod logging;
 mod metrics;
 mod network;
-mod peer_states;
+pub mod peer_states;
 
 /// A simple container that holds the state of the peer monitor
 #[derive(Clone, Debug, Default)]
@@ -51,29 +51,50 @@ impl PeerMonitorState {
 pub async fn start_peer_monitor(
     node_config: NodeConfig,
     network_client: NetworkClient<PeerMonitoringServiceMessage>,
-    time_service: TimeService,
     runtime: Option<Handle>,
 ) {
-    // Create a new client and peer monitor state
+    // Create a new monitoring client and peer monitor state
     let peer_monitoring_client = PeerMonitoringServiceClient::new(network_client);
     let peer_monitor_state = PeerMonitorState::new();
 
-    // Get the peers and metadata struct
-    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
-
-    // Spawns the updater for the peers and metadata
-    let peer_monitoring_config = node_config.peer_monitoring_service.clone();
+    // Spawn the peer metadata updater
+    let time_service = TimeService::real();
     spawn_peer_metadata_updater(
-        peer_monitoring_config.clone(),
+        node_config.peer_monitoring_service.clone(),
         peer_monitor_state.clone(),
-        peers_and_metadata.clone(),
+        peer_monitoring_client.get_peers_and_metadata(),
         time_service.clone(),
         runtime.clone(),
     );
 
+    // Start the peer monitor
+    start_peer_monitor_with_state(
+        node_config,
+        peer_monitoring_client,
+        peer_monitor_state,
+        time_service,
+        runtime,
+    )
+    .await
+}
+
+/// A helpful utility function for spawning the peer
+/// monitoring client with the given state.
+async fn start_peer_monitor_with_state(
+    node_config: NodeConfig,
+    peer_monitoring_client: PeerMonitoringServiceClient<
+        NetworkClient<PeerMonitoringServiceMessage>,
+    >,
+    peer_monitor_state: PeerMonitorState,
+    time_service: TimeService,
+    runtime: Option<Handle>,
+) {
+    // Get the peers and metadata
+    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
+
     // Create an interval ticker for the monitor loop
     let peer_monitor_duration =
-        Duration::from_millis(peer_monitoring_config.peer_monitor_interval_ms);
+        Duration::from_millis(node_config.peer_monitoring_service.peer_monitor_interval_ms);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);
     futures::pin_mut!(peer_monitor_ticker);
 
