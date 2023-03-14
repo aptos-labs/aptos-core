@@ -2,42 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     monitor,
+    network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_coordinator::BatchCoordinatorCommand,
         counters,
         quorum_store_db::QuorumStoreStorage,
-        types::BatchId,
+        types::Fragment,
         utils::{BatchBuilder, MempoolProxy, RoundExpirations},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::TransactionSummary,
-    proof_of_store::{LogicalTime, ProofOfStore},
+    proof_of_store::{BatchId, LogicalTime},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
-use futures_channel::{mpsc::Sender, oneshot};
+use aptos_types::PeerId;
+use futures_channel::mpsc::Sender;
 use rand::{thread_rng, RngCore};
 use std::{
     collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::Sender as TokioSender, time::Interval};
-
-type ProofCompletedChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), ProofError>>;
+use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
     CommitNotification(LogicalTime),
+    ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ProofError {
-    Timeout(BatchId),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -47,12 +41,13 @@ pub struct BackPressure {
 }
 
 pub struct BatchGenerator {
+    epoch: u64,
+    my_peer_id: PeerId,
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
-    batch_expirations: RoundExpirations<BatchId>,
+    batch_round_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
     last_end_batch_time: Instant,
@@ -63,10 +58,10 @@ pub struct BatchGenerator {
 impl BatchGenerator {
     pub(crate) fn new(
         epoch: u64,
+        my_peer_id: PeerId,
         config: QuorumStoreConfig,
         db: Arc<dyn QuorumStoreStorage>,
         mempool_tx: Sender<QuorumStoreRequest>,
-        batch_coordinator_tx: TokioSender<BatchCoordinatorCommand>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
         let batch_id = if let Some(mut id) = db
@@ -87,12 +82,13 @@ impl BatchGenerator {
         let max_batch_bytes = config.max_batch_bytes;
 
         Self {
+            epoch,
+            my_peer_id,
             db,
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
-            batch_coordinator_tx,
             batches_in_progress: HashMap::new(),
-            batch_expirations: RoundExpirations::new(),
+            batch_round_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
             last_end_batch_time: Instant::now(),
@@ -103,10 +99,7 @@ impl BatchGenerator {
         }
     }
 
-    pub(crate) async fn handle_scheduled_pull(
-        &mut self,
-        max_count: u64,
-    ) -> Option<ProofCompletedChannel> {
+    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Option<Fragment> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
         let mut exclude_txns: Vec<_> = self
@@ -119,7 +112,6 @@ impl BatchGenerator {
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
         let mut end_batch = false;
-        // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
             .pull_internal(
@@ -131,7 +123,7 @@ impl BatchGenerator {
                 exclude_txns,
             )
             .await
-            .unwrap();
+            .unwrap_or_default();
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
         if pulled_txns.is_empty() {
@@ -141,34 +133,29 @@ impl BatchGenerator {
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
         }
 
-        for txn in pulled_txns {
-            if !self
-                .batch_builder
-                .append_transaction(&txn, max_count as usize)
-            {
-                end_batch = true;
-                break;
-            }
+        if !self
+            .batch_builder
+            .append_transactions(&pulled_txns, max_count as usize)
+            || self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128
+        {
+            end_batch = true;
         }
 
         let serialized_txns = self.batch_builder.take_serialized_txns();
 
-        if self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128 {
-            end_batch = true;
-        }
-
         let batch_id = self.batch_builder.batch_id();
         if !end_batch {
             if !serialized_txns.is_empty() {
-                self.batch_coordinator_tx
-                    .send(BatchCoordinatorCommand::AppendToBatch(
-                        serialized_txns,
-                        batch_id,
-                    ))
-                    .await
-                    .expect("could not send to QuorumStore");
+                let fragment = Fragment::new(
+                    self.epoch,
+                    batch_id,
+                    self.batch_builder.fetch_and_increment_fragment_id(),
+                    serialized_txns,
+                    None,
+                    self.my_peer_id,
+                );
+                return Some(fragment);
             }
-            None
         } else {
             if self.batch_builder.is_empty() {
                 // Quorum store metrics
@@ -179,7 +166,6 @@ impl BatchGenerator {
                     .observe_duration(Duration::from_secs_f64(duration));
 
                 self.last_end_batch_time = Instant::now();
-
                 return None;
             }
 
@@ -197,67 +183,38 @@ impl BatchGenerator {
                 .save_batch_id(self.latest_logical_time.epoch(), incremented_batch_id)
                 .expect("Could not save to db");
 
-            let (proof_tx, proof_rx) = oneshot::channel();
             let expiry_round =
                 self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
-            self.batch_coordinator_tx
-                .send(BatchCoordinatorCommand::EndBatch(
-                    serialized_txns,
-                    batch_id,
-                    logical_time,
-                    proof_tx,
-                ))
-                .await
-                .expect("could not send to QuorumStore");
+            let fragment = Fragment::new(
+                self.epoch,
+                batch_id,
+                self.batch_builder.fetch_and_increment_fragment_id(),
+                serialized_txns,
+                Some(logical_time),
+                self.my_peer_id,
+            );
 
             self.batches_in_progress
                 .insert(batch_id, self.batch_builder.take_summaries());
-            self.batch_expirations.add_item(batch_id, expiry_round);
+            self.batch_round_expirations
+                .add_item(batch_id, expiry_round);
 
             self.last_end_batch_time = Instant::now();
-
-            Some(proof_rx)
+            return Some(fragment);
         }
-    }
-
-    pub(crate) async fn handle_completed_proof(
-        &mut self,
-        msg: Result<(ProofOfStore, BatchId), ProofError>,
-    ) {
-        match msg {
-            Ok((proof, batch_id)) => {
-                trace!(
-                    "QS: received proof of store for batch id {}, digest {}",
-                    batch_id,
-                    proof.digest(),
-                );
-
-                counters::LOCAL_POS_COUNT.inc();
-            },
-            Err(ProofError::Timeout(batch_id)) => {
-                // Quorum store measurements
-                counters::TIMEOUT_BATCHES_COUNT.inc();
-
-                debug!(
-                    "QS: received timeout for proof of store, batch id = {}",
-                    batch_id
-                );
-                // Not able to gather the proof, allow transactions to be polled again.
-                self.batches_in_progress.remove(&batch_id);
-            },
-        }
+        None
     }
 
     pub async fn start(
         mut self,
+        mut network_sender: NetworkSender,
         mut cmd_rx: tokio::sync::mpsc::Receiver<BatchGeneratorCommand>,
         mut back_pressure_rx: tokio::sync::mpsc::Receiver<BackPressure>,
         mut interval: Interval,
     ) {
         let start = Instant::now();
-        let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         let mut last_non_empty_pull = start;
         let back_pressure_decrease_duration =
@@ -279,6 +236,7 @@ impl BatchGenerator {
                     self.back_pressure = updated_back_pressure;
                 },
                 _ = interval.tick() => monitor!("batch_generator_handle_tick", {
+
                     let now = Instant::now();
                     // TODO: refactor back_pressure logic into its own function
                     if self.back_pressure.txn_count {
@@ -321,17 +279,9 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
+                        if let Some(fragment) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
                             last_non_empty_pull = now;
-                            proofs_in_progress.push(Box::pin(proof_rx));
-                        }
-                    }
-                }),
-                Some(next_proof) = proofs_in_progress.next() => monitor!("batch_generator_handle_proof", {
-                    match next_proof {
-                        Ok(proof) => self.handle_completed_proof(proof).await,
-                        Err(_) => {
-                            debug!("QS: proof oneshot dropped");
+                            network_sender.broadcast_fragment(fragment).await;
                         }
                     }
                 }),
@@ -355,16 +305,29 @@ impl BatchGenerator {
                             self.latest_logical_time = logical_time;
                             // Cleans up all batches that expire in rounds <= logical_time.round(). This is
                             // safe since clean request must occur only after execution result is certified.
-                            for batch_id in self.batch_expirations.expire(logical_time.round()) {
+                            for batch_id in self.batch_round_expirations.expire(logical_time.round()) {
                                 if self.batches_in_progress.remove(&batch_id).is_some() {
                                     debug!(
-                                        "QS: expired batch w. id {} from batches_in_progress, new size {}",
+                                        "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
                                         self.batches_in_progress.len(),
                                     );
                                 }
                             }
                         },
+                        BatchGeneratorCommand::ProofExpiration(batch_ids) => {
+                            // Quorum store measurements
+                            counters::TIMEOUT_BATCHES_COUNT.inc();
+
+                            for batch_id in batch_ids {
+                                debug!(
+                                    "QS: received timeout for proof of store, batch id = {}",
+                                    batch_id
+                                );
+                                // Not able to gather the proof, allow transactions to be polled again.
+                                self.batches_in_progress.remove(&batch_id);
+                            }
+                        }
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
                                 .send(())

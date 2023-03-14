@@ -28,7 +28,7 @@ use aptos_backup_cli::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_faucet::FaucetArgs;
+use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_network_checker::args::{
     validate_address, CheckEndpointArgs, HandshakeArgs, NodeAddressArgs,
@@ -50,6 +50,7 @@ use async_trait::async_trait;
 use bcs::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
+use futures::FutureExt;
 use hex::FromHex;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
@@ -1102,9 +1103,12 @@ impl CliCommand<()> for RunLocalTestnet {
             .unwrap_or_else(StdRng::from_entropy);
 
         let global_config = GlobalConfig::load()?;
-        let test_dir = global_config
-            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
-            .join(TESTNET_FOLDER);
+        let test_dir = match self.test_dir {
+            Some(test_dir) => test_dir,
+            None => global_config
+                .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+                .join(TESTNET_FOLDER),
+        };
 
         // Remove the current test directory and start with a new node
         if self.force_restart && test_dir.exists() {
@@ -1182,21 +1186,19 @@ impl CliCommand<()> for RunLocalTestnet {
                 ));
             }
 
+            // Build the config for the faucet service.
+            let faucet_config = RunConfig::build_for_cli(
+                rest_url,
+                self.faucet_port,
+                FunderKeyEnum::KeyFile(test_dir.join("mint.key")),
+                self.do_not_delegate,
+                None,
+            );
+
             // Start the faucet
-            Some(
-                FaucetArgs {
-                    address: "0.0.0.0".to_string(),
-                    port: self.faucet_port,
-                    server_url: rest_url,
-                    mint_key_file_path: test_dir.join("mint.key"),
-                    mint_key: None,
-                    mint_account_address: None,
-                    chain_id: ChainId::test(),
-                    maximum_amount: None,
-                    do_not_delegate: self.do_not_delegate,
-                }
-                .run(),
-            )
+            Some(faucet_config.run().map(|result| {
+                eprintln!("Faucet stopped unexpectedly {:#?}", result);
+            }))
         } else {
             None
         };
