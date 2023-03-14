@@ -238,93 +238,62 @@ module token_objects::property_map {
         (new_type, property_value.value)
     }
 
-    public fun read_bool<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
+    inline fun read_typed<T: key, V>(object: &Object<T>, key: &String): vector<u8> acquires PropertyMap {
         let (type, value) = read(object, key);
         assert!(
-            type == string::utf8(b"bool"),
+            type == type_info::type_name<V>(),
             error::invalid_argument(ETYPE_INVALID),
         );
+        value
+    }
+
+    public fun read_bool<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
+        let value = read_typed<T, bool>(object, key);
         from_bcs::to_bool(value)
     }
 
     public fun read_u8<T: key>(object: &Object<T>, key: &String): u8 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u8"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u8>(object, key);
         from_bcs::to_u8(value)
     }
 
     public fun read_u16<T: key>(object: &Object<T>, key: &String): u16 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u16"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u16>(object, key);
         from_bcs::to_u16(value)
     }
 
     public fun read_u32<T: key>(object: &Object<T>, key: &String): u32 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u32"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u32>(object, key);
         from_bcs::to_u32(value)
     }
 
     public fun read_u64<T: key>(object: &Object<T>, key: &String): u64 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u64"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u64>(object, key);
         from_bcs::to_u64(value)
     }
 
     public fun read_u128<T: key>(object: &Object<T>, key: &String): u128 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u128"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u128>(object, key);
         from_bcs::to_u128(value)
     }
 
     public fun read_u256<T: key>(object: &Object<T>, key: &String): u256 acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"u256"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, u256>(object, key);
         from_bcs::to_u256(value)
     }
 
     public fun read_address<T: key>(object: &Object<T>, key: &String): address acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"address"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, address>(object, key);
         from_bcs::to_address(value)
     }
 
     public fun read_bytes<T: key>(object: &Object<T>, key: &String): vector<u8>acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"vector<u8>"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, vector<u8>>(object, key);
         from_bcs::to_bytes(value)
     }
 
     public fun read_string<T: key>(object: &Object<T>, key: &String): String acquires PropertyMap {
-        let (type, value) = read(object, key);
-        assert!(
-            type == string::utf8(b"0x1::string::String"),
-            error::invalid_argument(ETYPE_INVALID),
-        );
+        let value = read_typed<T, String>(object, key);
         from_bcs::to_string(value)
     }
 

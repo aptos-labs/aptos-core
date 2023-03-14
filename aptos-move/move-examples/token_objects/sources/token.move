@@ -169,28 +169,25 @@ module token_objects::token {
     }
 
     // Accessors
-    inline fun verify<T: key>(token: &Object<T>): address {
+    inline fun borrow<T: key>(token: &Object<T>): &Token {
         let token_address = object::object_address(token);
         assert!(
             exists<Token>(token_address),
             error::not_found(ETOKEN_DOES_NOT_EXIST),
         );
-        token_address
+        borrow_global<Token>(token_address)
     }
 
     public fun creator<T: key>(token: Object<T>): address acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).creator
+        borrow(&token).creator
     }
 
     public fun collection<T: key>(token: Object<T>): String acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).collection
+        borrow(&token).collection
     }
 
     public fun creation_name<T: key>(token: Object<T>): String acquires Token {
-        let token_address = verify(&token);
-        let token = borrow_global<Token>(token_address);
+        let token = borrow(&token);
         if (option::is_some(&token.creation_name)) {
             *option::borrow(&token.creation_name)
         } else {
@@ -199,22 +196,19 @@ module token_objects::token {
     }
 
     public fun description<T: key>(token: Object<T>): String acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).description
+        borrow(&token).description
     }
 
     public fun name<T: key>(token: Object<T>): String acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).name
+        borrow(&token).name
     }
 
     public fun uri<T: key>(token: Object<T>): String acquires Token {
-        let token_address = verify(&token);
-        borrow_global<Token>(token_address).uri
+        borrow(&token).uri
     }
 
     public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
-        verify(&token);
+        borrow(&token);
         let royalty = royalty::get(token);
         if (option::is_some(&royalty)) {
             royalty
@@ -229,12 +223,12 @@ module token_objects::token {
 
     // Mutators
 
-    inline fun mutator_ref_to_address(mutator_ref: &MutatorRef): address {
+    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Token {
         assert!(
             exists<Token>(mutator_ref.self),
             error::not_found(ETOKEN_DOES_NOT_EXIST),
         );
-        mutator_ref.self
+        borrow_global_mut<Token>(mutator_ref.self)
     }
 
     public fun burn(burn_ref: BurnRef) acquires Token {
@@ -268,9 +262,7 @@ module token_objects::token {
         mutator_ref: &MutatorRef,
         description: String,
     ) acquires Token {
-        let token_address = mutator_ref_to_address(mutator_ref);
-        let token = borrow_global_mut<Token>(token_address);
-
+        let token = borrow_mut(mutator_ref);
         token.description = description;
         event::emit_event(
             &mut token.mutation_events,
@@ -282,9 +274,7 @@ module token_objects::token {
         mutator_ref: &MutatorRef,
         name: String,
     ) acquires Token {
-        let token_address = mutator_ref_to_address(mutator_ref);
-        let token = borrow_global_mut<Token>(token_address);
-
+        let token = borrow_mut(mutator_ref);
         if (option::is_none(&token.creation_name)) {
             option::fill(&mut token.creation_name, token.name)
         };
@@ -299,9 +289,7 @@ module token_objects::token {
         mutator_ref: &MutatorRef,
         uri: String,
     ) acquires Token {
-        let token_address = mutator_ref_to_address(mutator_ref);
-        let token = borrow_global_mut<Token>(token_address);
-
+        let token = borrow_mut(mutator_ref);
         token.uri = uri;
         event::emit_event(
             &mut token.mutation_events,
