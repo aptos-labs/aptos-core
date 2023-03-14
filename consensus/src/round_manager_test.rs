@@ -112,8 +112,8 @@ impl NodeSetup {
         RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
-    fn create_proposer_election(proposers: Vec<Author>) -> Box<dyn ProposerElection + Send + Sync> {
-        Box::new(RotatingProposer::new(proposers, 1))
+    fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
+        Arc::new(RotatingProposer::new(proposers, 1))
     }
 
     fn create_nodes(
@@ -255,7 +255,7 @@ impl NodeSetup {
             MetricsSafetyRules::new(safety_rules_manager.client(), storage.clone());
         safety_rules.perform_initialize().unwrap();
 
-        let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        let (round_manager_tx, _) = tokio::sync::mpsc::channel(10);
 
         let mut round_manager = RoundManager::new(
             epoch_state,

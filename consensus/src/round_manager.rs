@@ -52,11 +52,7 @@ use aptos_types::{
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use serde::Serialize;
-use std::{
-    mem::{discriminant, Discriminant},
-    sync::Arc,
-    time::Duration,
-};
+use std::{mem::Discriminant, sync::Arc, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -181,6 +177,16 @@ pub enum VerifiedEvent {
     Shutdown(TokioOneshot::Sender<()>),
 }
 
+impl VerifiedEvent {
+    pub fn round(&self) -> Option<Round> {
+        match self {
+            VerifiedEvent::ProposalMsg(p) => Some(p.proposal().round()),
+            VerifiedEvent::VerifiedProposalMsg(p) => Some(p.round()),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "round_manager_test.rs"]
 mod round_manager_test;
@@ -204,8 +210,7 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
-    proposal_msg_tx:
-        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    proposal_msg_tx: aptos_channel::Sender<(), VerifiedEvent>,
     local_config: ConsensusConfig,
 }
 
@@ -214,16 +219,13 @@ impl RoundManager {
         epoch_state: EpochState,
         block_store: Arc<BlockStore>,
         round_state: RoundState,
-        proposer_election: Box<dyn ProposerElection + Send + Sync>,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
-        proposal_msg_tx: aptos_channel::Sender<
-            (Author, Discriminant<VerifiedEvent>),
-            (Author, VerifiedEvent),
-        >,
+        proposal_msg_tx: aptos_channel::Sender<(), VerifiedEvent>,
         local_config: ConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
@@ -428,6 +430,7 @@ impl RoundManager {
         info!(
             self.new_log(LogEvent::ReceiveProposal)
                 .remote_peer(proposal_msg.proposer()),
+            block_round = proposal_msg.proposal().round(),
             block_hash = proposal_msg.proposal().id(),
             block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
         );
@@ -730,17 +733,17 @@ impl RoundManager {
         timeout_ms: u64,
     ) {
         let start = Instant::now();
-        let author = self.network.author();
         let block_store = self.block_store.clone();
         let self_sender = self.proposal_msg_tx.clone();
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.back_pressure() {
-                    if let Err(e) =
-                        self_sender.push((author, discriminant(&event)), (author, event))
-                    {
-                        error!("Failed to send event to round manager {:?}", e);
+                    if let Err(e) = self_sender.push((), event) {
+                        error!(
+                            "Failed to re-send verified proposal to round manager {:?}",
+                            e
+                        );
                     }
                     break;
                 }
@@ -979,44 +982,49 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
-        mut proposal_msg_rx: aptos_channel::Receiver<
-            (Author, Discriminant<VerifiedEvent>),
-            (Author, VerifiedEvent),
-        >,
+        mut checked_proposal_rx: aptos_channel::Receiver<(), VerifiedEvent>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
-            futures::select_biased! {
+            tokio::select! {
+                biased;
                 close_req = close_rx.select_next_some() => {
                     if let Ok(ack_sender) = close_req {
                         ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");
                     }
                     break;
                 },
-                (peer_id, proposal) = proposal_msg_rx.select_next_some() => {
-                   let result = match proposal {
-                        VerifiedEvent::ProposalMsg(proposal_msg) => {
-                            monitor!(
-                                "process_proposal",
-                                self.process_proposal_msg(*proposal_msg).await
-                            )
-                        }
-                        VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
-                            monitor!(
-                                "process_verified_proposal",
-                                self.process_delayed_proposal_msg(*proposal_msg).await
-                            )
-                        }
-                        unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
-                    }.with_context(|| format!("from peer {}", peer_id));
-                    let round_state = self.round_state();
-                    match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
-                        Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                proposal = checked_proposal_rx.select_next_some() => {
+                    let mut proposals = vec![proposal];
+                    while let Some(Some(proposal)) = checked_proposal_rx.next().now_or_never() {
+                        proposals.push(proposal);
+                    }
+                    proposals.sort_by(|a, b| a.round().unwrap().cmp(&b.round().unwrap()));
+                    for proposal in proposals {
+                        let result = match proposal {
+                            VerifiedEvent::ProposalMsg(proposal_msg) => {
+                                monitor!(
+                                    "process_proposal",
+                                    self.process_proposal_msg(*proposal_msg).await
+                                )
+                            }
+                            VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
+                                monitor!(
+                                    "process_verified_proposal",
+                                    self.process_delayed_proposal_msg(*proposal_msg).await
+                                )
+                            }
+                            unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
+                        };
+                        let round_state = self.round_state();
+                        match result {
+                            Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                            Err(e) => {
+                                counters::ERROR_COUNT.inc();
+                                warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                            }
                         }
                     }
                 },

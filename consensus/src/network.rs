@@ -307,10 +307,6 @@ impl NetworkSender {
         self.send(msg, vec![self.author]).await
     }
 
-    pub fn author(&self) -> Author {
-        self.author
-    }
-
     pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::broadcast_commit_proof", |_| ());
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));

@@ -9,14 +9,14 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, SecurityEvent};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, sync::Arc};
 
 // Wrapper around ProposerElection.
 //
 // Provides is_valid_proposal that remembers, and rejects if
 // the same leader proposes multiple blocks.
 pub struct UnequivocalProposerElection {
-    proposer_election: Box<dyn ProposerElection + Send + Sync>,
+    proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     already_proposed: Mutex<(Round, HashValue)>,
 }
 
@@ -32,7 +32,7 @@ impl ProposerElection for UnequivocalProposerElection {
 }
 
 impl UnequivocalProposerElection {
-    pub fn new(proposer_election: Box<dyn ProposerElection + Send + Sync>) -> Self {
+    pub fn new(proposer_election: Arc<dyn ProposerElection + Send + Sync>) -> Self {
         Self {
             proposer_election,
             already_proposed: Mutex::new((0, HashValue::zero())),
@@ -56,7 +56,6 @@ impl UnequivocalProposerElection {
                     block.id()
                 );
 
-                println!("Not a valid author");
                 return false;
             }
             let mut already_proposed = self.already_proposed.lock();
@@ -82,10 +81,7 @@ impl UnequivocalProposerElection {
                         true
                     }
                 },
-                Ordering::Less => {
-                    println!("Older Block");
-                    false
-                },
+                Ordering::Less => false,
             }
         })
     }
