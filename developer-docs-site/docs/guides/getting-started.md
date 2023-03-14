@@ -230,4 +230,3 @@ This section contains links to frequently referred Aptos developer resources.
 ### IDE plugins for Move language
 
 Install the [IDE plugins for the Move language](../guides/move-guides/index.md#ides-for-move) for even more handy features.
-

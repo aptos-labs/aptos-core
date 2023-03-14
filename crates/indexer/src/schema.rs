@@ -311,6 +311,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    nft_points (transaction_version) {
+        transaction_version -> Int8,
+        owner_address -> Varchar,
+        token_name -> Text,
+        point_type -> Text,
+        amount -> Numeric,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     processor_status (processor) {
         processor -> Varchar,
         last_success_version -> Int8,
@@ -540,6 +552,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ledger_infos,
     move_modules,
     move_resources,
+    nft_points,
     processor_status,
     processor_statuses,
     proposal_votes,

@@ -67,7 +67,7 @@ def wait_for_startup(container_name: str, timeout: int):
     while True:
         try:
             api_response = urlopen(f"http://127.0.0.1:{NODE_PORT}/v1")
-            faucet_response = urlopen(f"http://127.0.0.1:{FAUCET_PORT}/health")
+            faucet_response = urlopen(f"http://127.0.0.1:{FAUCET_PORT}/")
             if api_response.status != 200 or faucet_response.status != 200:
                 raise RuntimeError(
                     f"API or faucet not ready. API response: {api_response}. "

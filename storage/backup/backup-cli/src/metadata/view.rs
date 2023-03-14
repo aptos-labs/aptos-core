@@ -10,6 +10,7 @@ use aptos_types::transaction::Version;
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 
+#[derive(PartialEq, Debug)]
 pub struct MetadataView {
     epoch_ending_backups: Vec<EpochEndingBackupMeta>,
     state_snapshot_backups: Vec<StateSnapshotBackupMeta>,
@@ -127,6 +128,44 @@ impl MetadataView {
 
         Ok(res)
     }
+
+    /// Compact the epoch ending metdata files and merge compaction_cnt files into 1 metadata file
+    /// The generated chunks should be sorted based on version
+    pub fn compact_backups<T>(backups: &[T], compaction_cnt: usize) -> Result<Vec<&[T]>> {
+        // Initialize an empty vector to store the output
+        let mut output_vec = Vec::new();
+
+        // Iterate over the input vector in chunks of compaction_cnt
+        for chunk in backups.chunks(compaction_cnt) {
+            // Create a new vector containing the current chunk
+            let new_slice = chunk;
+            // Add the new vector to the output vector
+            output_vec.push(new_slice);
+        }
+        // Return the output vector
+        Ok(output_vec)
+    }
+
+    pub fn compact_epoch_ending_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[EpochEndingBackupMeta]>> {
+        Self::compact_backups(&self.epoch_ending_backups, compaction_cnt)
+    }
+
+    pub fn compact_transaction_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[TransactionBackupMeta]>> {
+        Self::compact_backups(&self.transaction_backups, compaction_cnt)
+    }
+
+    pub fn compact_state_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[StateSnapshotBackupMeta]>> {
+        Self::compact_backups(&self.state_snapshot_backups, compaction_cnt)
+    }
 }
 
 impl From<Vec<Metadata>> for MetadataView {
@@ -144,6 +183,12 @@ impl From<Vec<Metadata>> for MetadataView {
                 Metadata::Identity(i) => identity = Some(i),
             }
         }
+        epoch_ending_backups.sort_unstable();
+        epoch_ending_backups.dedup();
+        state_snapshot_backups.sort_unstable();
+        state_snapshot_backups.dedup();
+        transaction_backups.sort_unstable();
+        transaction_backups.dedup();
 
         Self {
             epoch_ending_backups,

@@ -21,6 +21,7 @@ aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-logging = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
 criterion = { workspace = true, optional = true }

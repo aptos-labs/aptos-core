@@ -34,6 +34,7 @@ pub const SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION: &str =
     "switch_operator_with_same_commission";
 pub const UPDATE_VOTER_FUNCTION: &str = "update_voter";
 pub const UNLOCK_STAKE_FUNCTION: &str = "unlock_stake";
+pub const DISTRIBUTE_STAKING_REWARDS_FUNCTION: &str = "distribute";
 
 pub const DECIMALS_FIELD: &str = "decimal";
 pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";

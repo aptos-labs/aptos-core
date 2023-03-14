@@ -94,6 +94,7 @@ pub enum OperationType {
     InitializeStakePool,
     ResetLockup,
     UnlockStake,
+    DistributeStakingRewards,
     // Fee must always be last for ordering
     Fee,
 }
@@ -101,6 +102,7 @@ pub enum OperationType {
 impl OperationType {
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
+    const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
     const FEE: &'static str = "fee";
     const INITIALIZE_STAKE_POOL: &'static str = "initialize_stake_pool";
     const RESET_LOCKUP: &'static str = "reset_lockup";
@@ -123,6 +125,7 @@ impl OperationType {
             InitializeStakePool,
             ResetLockup,
             UnlockStake,
+            DistributeStakingRewards,
         ]
     }
 }
@@ -142,6 +145,7 @@ impl FromStr for OperationType {
             Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
             Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
+            Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -163,6 +167,7 @@ impl Display for OperationType {
             InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             ResetLockup => Self::RESET_LOCKUP,
             UnlockStake => Self::UNLOCK_STAKE,
+            DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
             Fee => Self::FEE,
         })
     }

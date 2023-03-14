@@ -1,9 +1,13 @@
 import axios from "axios";
 
 import { AnyNumber } from "../bcs/types";
-import { MaybeHexString } from "../hex_string";
-import { GetAccountCurrentTokensQuery, GetTokenActivitiesQuery } from "../indexer/generated/operations";
-import { GetAccountCurrentTokens, GetTokenActivities } from "../indexer/generated/queries";
+import { MaybeHexString } from "../utils";
+import {
+  GetAccountCurrentTokensQuery,
+  GetIndexerLedgerInfoQuery,
+  GetTokenActivitiesQuery,
+} from "../indexer/generated/operations";
+import { GetAccountCurrentTokens, GetIndexerLedgerInfo, GetTokenActivities } from "../indexer/generated/queries";
 
 interface PaginationArgs {
   offset?: AnyNumber;
@@ -40,6 +44,18 @@ export class IndexerClient {
       throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
     }
     return data.data;
+  }
+
+  /**
+   * Queries Indexer Ledger Info
+   *
+   * @returns GetLedgerInfoQuery response type
+   */
+  async getIndexerLedgerInfo(): Promise<GetIndexerLedgerInfoQuery> {
+    const graphqlQuery = {
+      query: GetIndexerLedgerInfo,
+    };
+    return this.queryIndexer(graphqlQuery);
   }
 
   /**

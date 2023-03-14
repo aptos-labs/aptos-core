@@ -10,7 +10,9 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_types::{
-    on_chain_config::TimedFeatures, transaction::ModuleBundle, vm_status::StatusCode,
+    on_chain_config::{Features, TimedFeatures},
+    transaction::ModuleBundle,
+    vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -29,6 +31,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt,
     str::FromStr,
+    sync::Arc,
 };
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
@@ -310,6 +313,7 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
@@ -317,6 +321,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.request_publish.clone(),
                 timed_features.clone(),
+                features.clone(),
                 native_request_publish,
             ),
         ),
@@ -325,6 +330,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.request_publish,
                 timed_features,
+                features,
                 native_request_publish,
             ),
         ),

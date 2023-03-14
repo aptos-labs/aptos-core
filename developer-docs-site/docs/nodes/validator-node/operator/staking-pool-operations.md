@@ -8,7 +8,7 @@ slug: "staking-pool-operations"
 This document describes how to perform staking pool operations. Note that you can stake only when you meet the minimal staking requirement. 
 
 :::tip Minimum staking requirement
-The current required minimum for staking is 1M APT tokens.
+The current required minimum for staking is 1 million APT tokens.
 :::
 
 ## Connect to Aptos network
@@ -28,15 +28,15 @@ Make sure that this initializing the stake pool step was performed by the owner.
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### 1. Initialize Aptos CLI
 
   ```bash
   aptos init --profile mainnet-operator \
+  --network mainnet \
   --private-key <operator_account_private_key> \
-  --rest-url https://fullnode.mainnet.aptoslabs.com/v1 \
   --skip-faucet
   ```
   

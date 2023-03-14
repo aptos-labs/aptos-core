@@ -22,7 +22,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::{Batch, BatchRequest, Fragment},
+    quorum_store::types::Fragment,
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -69,8 +69,6 @@ pub enum UnverifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    BatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
 }
@@ -83,46 +81,52 @@ impl UnverifiedEvent {
         peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
+        self_message: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator, quorum_store_enabled)?;
+                if !self_message {
+                    p.verify(validator, quorum_store_enabled)?;
+                }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
-                v.verify(validator)?;
+                if !self_message {
+                    v.verify(validator)?;
+                }
                 VerifiedEvent::VoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
-                cv.verify(validator)?;
+                if !self_message {
+                    cv.verify(validator)?;
+                }
                 VerifiedEvent::CommitVote(cv)
             },
             UnverifiedEvent::CommitDecision(cd) => {
-                cd.verify(validator)?;
+                if !self_message {
+                    cd.verify(validator)?;
+                }
                 VerifiedEvent::CommitDecision(cd)
             },
             UnverifiedEvent::FragmentMsg(f) => {
-                f.verify(peer_id)?;
+                if !self_message {
+                    f.verify(peer_id)?;
+                }
                 VerifiedEvent::FragmentMsg(f)
             },
-            UnverifiedEvent::BatchRequestMsg(br) => {
-                br.verify(peer_id)?;
-                VerifiedEvent::BatchRequestMsg(br)
-            },
-            // Only sender is verified. Remaining verification is on-demand (when it's used).
-            UnverifiedEvent::BatchMsg(b) => {
-                b.verify(peer_id)?;
-                VerifiedEvent::UnverifiedBatchMsg(b)
-            },
             UnverifiedEvent::SignedDigestMsg(sd) => {
-                sd.verify(validator)?;
+                if !self_message {
+                    sd.verify(peer_id, validator)?;
+                }
                 VerifiedEvent::SignedDigestMsg(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                p.verify(validator)?;
+                if !self_message {
+                    p.verify(validator)?;
+                }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
@@ -136,8 +140,6 @@ impl UnverifiedEvent {
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
             UnverifiedEvent::FragmentMsg(f) => f.epoch(),
-            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
-            UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
@@ -153,8 +155,6 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
             ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
-            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
-            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
@@ -172,8 +172,6 @@ pub enum VerifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    UnverifiedBatchMsg(Box<Batch>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages

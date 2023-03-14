@@ -437,6 +437,8 @@ SignedDigestInfo:
   STRUCT:
     - batch_author:
         TYPENAME: AccountAddress
+    - batch_id:
+        TYPENAME: BatchId
     - digest:
         TYPENAME: HashValue
     - expiration:
