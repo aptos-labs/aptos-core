@@ -1,4 +1,4 @@
-import { AptosClient, Provider } from "../providers/";
+import { Provider } from "../providers/";
 import * as Gen from "../generated/index";
 
 const ans_contracts: Record<string, string> = {
@@ -26,9 +26,9 @@ export class AnsClient {
 
   /**
    * Creates new AnsClient instance
-   * @param aptosClient AptosClient instance
-   * @param contractAddress An optional contract address. If there is no contract address matching to the provided node url
-   * then the AnsClient class expects a contract address - this is to support both live networks and local development.
+   * @param provider Provider instance
+   * @param contractAddress An optional contract address. If there is no contract address matching to the provided network
+   * then the AnsClient class expects a contract address - this is to support both mainnet/testnet networks and local development.
    */
   constructor(provider: Provider, contractAddress?: string) {
     this.provider = provider;
@@ -38,12 +38,10 @@ export class AnsClient {
     this.contractAddress = ans_contracts[this.provider.network] ?? contractAddress;
   }
 
-  async registerName(name: string) {}
-
   /**
    * Returns the primary name for the given account address
    * @param address An account address
-   * @returns Account's name | null
+   * @returns Account's primary name | null
    */
   async getNamebyAddress(address: string): Promise<string | null> {
     const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
@@ -68,7 +66,7 @@ export class AnsClient {
   /**
    * Returns the target account address for the given name
    * @param name ANS name
-   * @returns account address | null
+   * @returns Account address | null
    */
   async getAddressByName(name: string): Promise<string | null> {
     const { domain, subdomain } = name.match(namePattern)?.groups ?? {};
@@ -147,9 +145,5 @@ export class AnsClient {
       // if item not found, response is 404 error - meaning item not found
       return null;
     }
-  }
-
-  async getAccountNames(): Promise<string[] | null> {
-    return null;
   }
 }
