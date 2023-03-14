@@ -102,7 +102,7 @@ impl AccountIdentifier {
 
     pub fn is_pending_active_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
-            inner.is_pending_inactive_stake()
+            inner.is_pending_active_stake()
         } else {
             false
         }
@@ -134,7 +134,8 @@ impl AccountIdentifier {
 
     pub fn is_operator_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
-            !inner.is_total_stake()
+            !(inner.is_total_stake() || inner.is_active_stake() || inner.is_pending_active_stake()
+                || inner.is_inactive_stake() || inner.is_pending_inactive_stake())
         } else {
             false
         }
@@ -391,10 +392,18 @@ mod test {
         let base_account = AccountIdentifier::base_account(account);
         let total_stake_account = AccountIdentifier::total_stake_account(account);
         let operator_stake_account = AccountIdentifier::operator_stake_account(account, operator);
+        let active_stake_account = AccountIdentifier::active_stake_account(account);
+        let pending_active_stake_account = AccountIdentifier::pending_active_stake_account(account);
+        let inactive_stake_account = AccountIdentifier::inactive_stake_account(account);
+        let pending_inactive_stake_account = AccountIdentifier::pending_inactive_stake_account(account);
 
         assert!(base_account.is_base_account());
         assert!(!operator_stake_account.is_base_account());
         assert!(!total_stake_account.is_base_account());
+        assert!(!active_stake_account.is_base_account());
+        assert!(!pending_active_stake_account.is_base_account());
+        assert!(!inactive_stake_account.is_base_account());
+        assert!(!pending_inactive_stake_account.is_base_account());
 
         assert!(!base_account.is_operator_stake());
         assert!(operator_stake_account.is_operator_stake());
@@ -404,9 +413,19 @@ mod test {
         assert!(!operator_stake_account.is_total_stake());
         assert!(total_stake_account.is_total_stake());
 
+        assert!(active_stake_account.is_active_stake());
+        assert!(pending_active_stake_account.is_pending_active_stake());
+        assert!(inactive_stake_account.is_inactive_stake());
+        assert!(pending_inactive_stake_account.is_pending_inactive_stake());
+
+
         assert_eq!(Ok(account), base_account.account_address());
         assert_eq!(Ok(account), operator_stake_account.account_address());
         assert_eq!(Ok(account), total_stake_account.account_address());
+        assert_eq!(Ok(account), active_stake_account.account_address());
+        assert_eq!(Ok(account), pending_active_stake_account.account_address());
+        assert_eq!(Ok(account), inactive_stake_account.account_address());
+        assert_eq!(Ok(account), pending_inactive_stake_account.account_address());
 
         assert!(base_account.operator_address().is_err());
         assert_eq!(Ok(operator), operator_stake_account.operator_address());
