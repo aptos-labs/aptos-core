@@ -78,11 +78,11 @@ module aptos_std::simple_map {
     }
 
     /// Insert key/value pair or update an existing key to a new value
-    public fun upsert<Key: store, Value: store>(
+    public fun upsert<Key: store + drop, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: Key,
         value: Value
-    ): (std::option::Option<Key>, std::option::Option<Value>) {
+    ): std::option::Option<Value> {
         let data = &mut map.data;
         let len = vector::length(data);
         let i = 0;
@@ -91,13 +91,13 @@ module aptos_std::simple_map {
             if (&element.key == &key) {
                 vector::push_back(data, Element { key, value});
                 vector::swap(data, i, len);
-                let Element { key, value } = vector::pop_back(data);
-                return (std::option::some(key), std::option::some(value))
+                let Element { key: _, value } = vector::pop_back(data);
+                return std::option::some(value)
             };
             i = i + 1;
         };
         vector::push_back(&mut map.data, Element { key, value });
-        (std::option::none(), std::option::none())
+        std::option::none()
     }
 
     /// Transform the map into two vectors with the keys and values respectively
