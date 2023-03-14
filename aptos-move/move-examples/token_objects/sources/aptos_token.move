@@ -249,6 +249,19 @@ module token_objects::aptos_token {
             option::is_some(&aptos_token.burn_ref),
             error::permission_denied(ETOKEN_NOT_BURNABLE),
         );
+        move aptos_token;
+        let aptos_token = move_from<AptosToken>(object::object_address(&token));
+        let AptosToken {
+            burn_ref,
+            transfer_ref: _,
+            mutator_ref: _,
+            property_mutator_ref: _,
+            mutable_description: _,
+            mutable_name: _,
+            mutable_uri: _,
+            freezable_by_creator: _,
+        } = aptos_token;
+        token::burn(option::extract(&mut burn_ref));
     }
 
     public fun freeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosToken {
@@ -745,7 +758,10 @@ module token_objects::aptos_token {
         create_collection_helper(creator, collection_name);
         let token = mint_helper(creator, collection_name, token_name, true);
 
+        let token_addr = token::create_token_address(&signer::address_of(creator), &collection_name, &token_name);
+        assert!(exists<AptosToken>(token_addr), 0);
         burn(creator, token);
+        assert!(!exists<AptosToken>(token_addr), 1);
     }
 
     #[test(creator = @0x123)]
