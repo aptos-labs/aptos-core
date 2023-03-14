@@ -5,9 +5,11 @@ slug: "delegation-pool-operations"
 
 # Delegation Pool Operations
 
+> Beta: This documentation is in experimental, beta mode. Supply feedback by [requesting document changes](../../../community/site-updates.md#request-docs-changes).
+
 Follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
-Once the delegation pool attains 1M APT, the pool's owner should set an operator for the pool via the `set_operator` function described in the [Pool owner operations](#pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations/#joining-validator-set).
+Once the delegation pool attains 1M APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Pool owner operations](#pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations/#joining-validator-set).
 
 The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Delegation pool operations](#delegation-pool-operations).
 
@@ -75,7 +77,7 @@ To create a delegation pool and obtain information about it, connect to the [Apt
 
 Now initialize a delegation pool by following these steps:
 
-1. Run the command below, substituting in your desired profile:
+1. Run the command below, substituting in your previously configured profile:
 
   ```bash
   aptos move run --profile ‘your_profile’ \ 
@@ -137,13 +139,13 @@ This section describes the available operations that can be performed on this re
 Delegation pool owners have access to specific methods designed for modifying the `operator` and `voter` roles of the delegation pool. Use the following Aptos CLI commands and include the relevant addresses:
 
   ```bash
-  aptos move run --profile ‘delagation_pool_owner’ \
+  aptos move run --profile ‘delegation_pool_owner’ \
   --function-id 0x1::delegation_pool::set_operator \
   --args address:’new_operator_address’
   ```
   
   ```bash
- aptos move run --profile ‘delagation_pool_owner’ \
+ aptos move run --profile ‘delegation_pool_owner’ \
  --function-id 0x1::delegation_pool::set_delegated_voter \
  --args address:’new_delegated_voter_address’
   ```
