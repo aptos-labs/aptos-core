@@ -3,8 +3,10 @@
 
 use crate::{
     quorum_store::{
-        batch_requester::BatchRequester, batch_store::BatchStore, quorum_store_db::QuorumStoreDB,
-        types::PersistedValue,
+        batch_requester::BatchRequester,
+        batch_store::{BatchStore, PersistRequest},
+        quorum_store_db::QuorumStoreDB,
+        types::{Batch, PersistedValue},
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
@@ -55,45 +57,38 @@ fn test_insert_expire() {
     let batch_store = batch_store_for_test_no_db(30);
 
     let digest = HashValue::random();
+    let batch = Batch::new(
+        BatchId::new_for_test(1),
+        vec![],
+        LogicalTime::new(10, 15),
+        AccountAddress::random(),
+    );
+    let persisted_request: PersistRequest = batch.into();
     assert_ok_eq!(
-        batch_store.insert_to_cache(
-            digest,
-            PersistedValue::new(
-                Some(Vec::new()),
-                LogicalTime::new(10, 15), // Expiration
-                AccountAddress::random(),
-                BatchId::new_for_test(1),
-                10,
-            ),
-        ),
+        batch_store.insert_to_cache(digest, persisted_request.value),
         true
     );
-
+    let batch = Batch::new(
+        BatchId::new_for_test(1),
+        vec![],
+        LogicalTime::new(10, 30),
+        AccountAddress::random(),
+    );
+    let persisted_request: PersistRequest = batch.into();
     assert_ok_eq!(
-        batch_store.insert_to_cache(
-            digest,
-            PersistedValue::new(
-                Some(Vec::new()),
-                LogicalTime::new(10, 30), // Expiration
-                AccountAddress::random(),
-                BatchId::new_for_test(1),
-                10,
-            ),
-        ),
+        batch_store.insert_to_cache(digest, persisted_request.value),
         true
     );
+    let batch = Batch::new(
+        BatchId::new_for_test(1),
+        vec![],
+        LogicalTime::new(10, 25),
+        AccountAddress::random(),
+    );
+    let persisted_request: PersistRequest = batch.into();
     assert_ok_eq!(
-        batch_store.insert_to_cache(
-            digest,
-            PersistedValue::new(
-                Some(Vec::new()),
-                LogicalTime::new(10, 25), // Expiration
-                AccountAddress::random(),
-                BatchId::new_for_test(1),
-                10,
-            ),
-        ),
-        false
+        batch_store.insert_to_cache(digest, persisted_request.value),
+        false,
     );
     let expired = batch_store.clear_expired_payload(LogicalTime::new(10, 27));
     assert!(expired.is_empty());
@@ -118,30 +113,26 @@ async fn test_extend_expiration_vs_save() {
         .map(|i| {
             // Pre-insert some of them.
             if i % 2 == 0 {
+                let batch = Batch::new(
+                    BatchId::new_for_test(1),
+                    vec![],
+                    LogicalTime::new(10, i as u64 + 30),
+                    AccountAddress::random(),
+                );
+                let persisted_request: PersistRequest = batch.into();
                 batch_store
-                    .save(
-                        digests[i],
-                        PersistedValue::new(
-                            Some(Vec::new()),
-                            LogicalTime::new(10, i as u64 + 30),
-                            AccountAddress::random(),
-                            BatchId::new_for_test(1),
-                            10,
-                        ),
-                    )
+                    .save(digests[i], persisted_request.value)
                     .unwrap();
             }
+            let batch = Batch::new(
+                BatchId::new_for_test(1),
+                vec![],
+                LogicalTime::new(10, i as u64 + 40),
+                AccountAddress::random(),
+            );
+            let persisted_request: PersistRequest = batch.into();
 
-            (
-                digests[i],
-                PersistedValue::new(
-                    Some(Vec::new()),
-                    LogicalTime::new(10, i as u64 + 40),
-                    AccountAddress::random(),
-                    BatchId::new_for_test(1),
-                    10,
-                ),
-            )
+            (digests[i], persisted_request.value)
         })
         .collect();
 
@@ -189,18 +180,14 @@ async fn test_extend_expiration_vs_save() {
         while start_flag.load(Ordering::Acquire) % 3 != 0 {}
 
         if i % 2 == 1 {
-            batch_store
-                .save(
-                    digest,
-                    PersistedValue::new(
-                        Some(Vec::new()),
-                        LogicalTime::new(10, i as u64 + 30),
-                        AccountAddress::random(),
-                        BatchId::new_for_test(1),
-                        10,
-                    ),
-                )
-                .unwrap();
+            let batch = Batch::new(
+                BatchId::new_for_test(1),
+                vec![],
+                LogicalTime::new(10, i as u64 + 30),
+                AccountAddress::random(),
+            );
+            let persisted_request: PersistRequest = batch.into();
+            batch_store.save(digest, persisted_request.value).unwrap();
         }
 
         // Unleash the threads.

@@ -128,14 +128,17 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
                     futures.push(network_sender.request_batch(request.clone(), peer, timeout));
                 }
                 while let Some(response) = futures.next().await {
-                    if let Ok(batch) = response {
-                        counters::RECEIVED_BATCH_COUNT.inc();
-                        if batch.verify().is_ok() {
+                    match response {
+                        Ok(batch) => {
+                            counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
                             let digest = batch.digest();
-                            let payload = batch.into_payload();
+                            let payload = batch.into_transactions();
                             request_state.serve_request(digest, Some(payload));
                             return;
-                        }
+                        },
+                        Err(e) => {
+                            error!("Batch request failed: {}", e);
+                        },
                     }
                 }
                 counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();

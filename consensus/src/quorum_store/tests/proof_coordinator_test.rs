@@ -6,11 +6,12 @@ use crate::{
     quorum_store::{
         batch_store::BatchReader,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
-        tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
+        tests::utils::create_vec_signed_transactions,
+        types::Batch,
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigest};
+use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedBatchInfo};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_types::{
@@ -53,22 +54,14 @@ async fn test_proof_coordinator_basic() {
 
     let batch_author = signers[0].author();
     let batch_id = BatchId::new_for_test(1);
-    let digest = compute_digest_from_signed_transaction(create_vec_signed_transactions(100));
+    let payload = create_vec_signed_transactions(100);
+    let batch = Batch::new(batch_id, payload, LogicalTime::new(1, 20), batch_author);
+    let digest = batch.digest();
 
     for signer in &signers {
-        let signed_digest = SignedDigest::new(
-            batch_author,
-            batch_id,
-            1,
-            digest,
-            LogicalTime::new(1, 20),
-            1,
-            1,
-            signer,
-        )
-        .unwrap();
+        let signed_batch_info = SignedBatchInfo::new(batch.info().clone(), signer).unwrap();
         assert!(proof_coordinator_tx
-            .send(ProofCoordinatorCommand::AppendSignature(signed_digest))
+            .send(ProofCoordinatorCommand::AppendSignature(signed_batch_info))
             .await
             .is_ok());
     }
