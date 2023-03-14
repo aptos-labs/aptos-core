@@ -245,6 +245,7 @@ spec aptos_framework::staking_contract {
         let addr = signer::address_of(staker);
         let account = global<account::Account>(addr);
         aborts_if !exists<account::Account>(addr);
+        aborts_if account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
         aborts_if account.guid_creation_num + 9 > MAX_U64;
     }
 

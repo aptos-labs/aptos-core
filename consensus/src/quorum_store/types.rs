@@ -1,64 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus_types::proof_of_store::LogicalTime;
-use aptos_crypto::HashValue;
+use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
+use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
 use serde::{Deserialize, Serialize};
-use std::{
-    cmp::Ordering,
-    fmt::{Display, Formatter},
-    mem,
-};
-
-#[derive(
-    Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, CryptoHasher, BCSCryptoHash,
-)]
-pub struct BatchId {
-    pub id: u64,
-    /// A random number that is stored in the DB and updated only if the value does not exist in
-    /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
-    /// id starts again at 0.
-    pub nonce: u64,
-}
-
-impl BatchId {
-    pub fn new(nonce: u64) -> Self {
-        Self { id: 0, nonce }
-    }
-
-    pub fn new_for_test(id: u64) -> Self {
-        Self { id, nonce: 0 }
-    }
-
-    pub fn increment(&mut self) {
-        self.id += 1;
-    }
-}
-
-impl PartialOrd<Self> for BatchId {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for BatchId {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.id.cmp(&other.id) {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        self.nonce.cmp(&other.nonce)
-    }
-}
-
-impl Display for BatchId {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "({}, {})", self.id, self.nonce)
-    }
-}
+use std::mem;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SerializedTransaction {
@@ -93,11 +42,12 @@ impl SerializedTransaction {
 }
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
-pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
-    pub(crate) expiration: LogicalTime,
-    pub(crate) author: PeerId,
-    pub(crate) num_bytes: usize,
+pub struct PersistedValue {
+    pub maybe_payload: Option<Vec<SignedTransaction>>,
+    pub expiration: LogicalTime,
+    pub author: PeerId,
+    pub batch_id: BatchId,
+    pub num_bytes: usize,
 }
 
 impl PersistedValue {
@@ -105,12 +55,14 @@ impl PersistedValue {
         maybe_payload: Option<Vec<SignedTransaction>>,
         expiration: LogicalTime,
         author: PeerId,
+        batch_id: BatchId,
         num_bytes: usize,
     ) -> Self {
         Self {
             maybe_payload,
             expiration,
             author,
+            batch_id,
             num_bytes,
         }
     }
@@ -310,16 +262,18 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    // Check the source == the sender. To protect from DDoS we check is Payload matches digest later.
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if self.source == peer_id {
+    pub fn verify(&self) -> anyhow::Result<()> {
+        let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
+        let serialized_payload: Vec<u8> = self
+            .payload
+            .iter()
+            .flat_map(|txn| to_bytes(txn).unwrap())
+            .collect();
+        hasher.update(&serialized_payload);
+        if hasher.finish() == self.digest() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!(
-                "Sender mismatch: peer_id: {}, source: {}",
-                self.source,
-                peer_id
-            ))
+            Err(anyhow::anyhow!("Digest doesn't match"))
         }
     }
 

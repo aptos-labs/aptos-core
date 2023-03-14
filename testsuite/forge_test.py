@@ -751,7 +751,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         namespace = sanitize_forge_resource_name(namespace_too_long)
         self.assertEqual(
             namespace,
-            "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
 
 
@@ -947,9 +947,10 @@ class TestListClusters(unittest.TestCase):
             shell.assert_commands(self)
 
 
-def fake_pod_item(name: str, phase: str) -> GetPodsItem:
+def fake_pod_item(name: str, phase: str, labels: Dict = {}) -> GetPodsItem:
     return GetPodsItem(
-        metadata=GetPodsItemMetadata(name=name), status=GetPodsItemStatus(phase=phase)
+        metadata=GetPodsItemMetadata(name=name, labels=labels),
+        status=GetPodsItemStatus(phase=phase),
     )
 
 
@@ -958,19 +959,69 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
 
     async def testGetAllForgeJobs(self) -> None:
         fake_clusters = ["aptos-forge-banana", "aptos-forge-apple-2"]
+
+        # The first set of test runner pods and their test pods
         fake_first_pods = GetPodsResult(
             items=[
-                fake_pod_item("forge-first", "Running"),
-                fake_pod_item("forge-failed", "Failed"),
-                fake_pod_item("ignore-me", "Failed"),
+                fake_pod_item(
+                    "forge-first", "Running", labels={"forge-namespace": "forge-first"}
+                ),
+                fake_pod_item(
+                    "forge-failed", "Failed", labels={"forge-namespace": "forge-failed"}
+                ),
+                fake_pod_item(
+                    "ignore-me", "Failed", labels={"forge-namespace": "ignore-me"}
+                ),
             ]
         )
+        fake_forge_first_first_cluster_pods = GetPodsResult(
+            items=[
+                fake_pod_item("aptos-node-0-validator", "Running"),
+                fake_pod_item("aptos-node-1-validator", "Running"),
+            ]
+        )
+        fake_forge_first_failed_cluster_pods = GetPodsResult(
+            items=[
+                fake_pod_item("aptos-node-0-validator", "Running"),
+                fake_pod_item("aptos-node-1-validator", "Running"),
+                fake_pod_item("aptos-node-0-fullnode", "Running"),
+                fake_pod_item("aptos-node-1-fullnode", "Running"),
+            ]
+        )
+        fake_forge_first_ignore_me_cluster_pods = GetPodsResult(
+            items=[
+                fake_pod_item("aptos-node-0-validator", "Failed"),
+                fake_pod_item("aptos-node-1-validator", "Running"),
+            ]
+        )
+
+        # The second set of test runner pods and their test pods
         fake_second_pods = GetPodsResult(
             items=[
-                fake_pod_item("forge-second", "Running"),
-                fake_pod_item("forge-succeeded", "Succeeded"),
-                fake_pod_item("me-too", "Failed"),
+                fake_pod_item(
+                    "forge-second",
+                    "Running",
+                    labels={"forge-namespace": "forge-second"},
+                ),
+                fake_pod_item(
+                    "forge-succeeded",
+                    "Succeeded",
+                    labels={"forge-namespace": "forge-succeeded"},
+                ),
+                fake_pod_item("me-too", "Failed", labels={"forge-namespace": "me-too"}),
             ]
+        )
+        fake_forge_second_second_cluster_pods = GetPodsResult(
+            items=[
+                fake_pod_item("aptos-node-0-validator", "Running"),
+                fake_pod_item("aptos-node-1-fullnode", "Running"),
+            ]
+        )
+        fake_forge_second_succeeded_cluster_pods = GetPodsResult(
+            items=[]  # succeeded, so there might be no pods left in its namespace
+        )
+        fake_forge_second_me_too_cluster_pods = GetPodsResult(
+            items=[]  # failed, so there might be no pods left in its namespace
         )
         shell = SpyShell(
             [
@@ -983,12 +1034,48 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                     RunResult(0, json.dumps(fake_first_pods).encode()),
                 ),
                 FakeCommand(
+                    "kubectl get pods -n forge-first --kubeconfig temp1 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_first_first_cluster_pods).encode()
+                    ),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n forge-failed --kubeconfig temp1 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_first_failed_cluster_pods).encode()
+                    ),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n ignore-me --kubeconfig temp1 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_first_ignore_me_cluster_pods).encode()
+                    ),
+                ),
+                FakeCommand(
                     "aws eks update-kubeconfig --name aptos-forge-apple-2 --kubeconfig temp2",
                     RunResult(0, b""),
                 ),
                 FakeCommand(
                     "kubectl get pods -n default --kubeconfig temp2 -o json",
                     RunResult(0, json.dumps(fake_second_pods).encode()),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n forge-second --kubeconfig temp2 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_second_second_cluster_pods).encode()
+                    ),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n forge-succeeded --kubeconfig temp2 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_second_succeeded_cluster_pods).encode()
+                    ),
+                ),
+                FakeCommand(
+                    "kubectl get pods -n me-too --kubeconfig temp2 -o json",
+                    RunResult(
+                        0, json.dumps(fake_forge_second_me_too_cluster_pods).encode()
+                    ),
                 ),
             ],
             strict=True,
@@ -1005,6 +1092,7 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                     name="aptos-forge-banana",
                     kubeconf="temp1",
                 ),
+                num_validators=2,
             ),
             ForgeJob(
                 name="forge-failed",
@@ -1013,6 +1101,8 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                     name="aptos-forge-banana",
                     kubeconf="temp1",
                 ),
+                num_validators=2,
+                num_fullnodes=2,
             ),
             ForgeJob(
                 name="forge-second",
@@ -1021,6 +1111,8 @@ class GetForgeJobsTests(unittest.IsolatedAsyncioTestCase):
                     name="aptos-forge-apple-2",
                     kubeconf="temp2",
                 ),
+                num_validators=1,
+                num_fullnodes=1,
             ),
             ForgeJob(
                 name="forge-succeeded",

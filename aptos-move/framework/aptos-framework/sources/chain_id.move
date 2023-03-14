@@ -17,6 +17,7 @@ module aptos_framework::chain_id {
         move_to(aptos_framework, ChainId { id })
     }
 
+    #[view]
     /// Return the chain ID of this instance.
     public fun get(): u8 acquires ChainId {
         borrow_global<ChainId>(@aptos_framework).id

@@ -4,10 +4,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::quorum_store::{
-    counters,
-    types::{BatchId, SerializedTransaction},
-};
+use crate::quorum_store::{counters, types::SerializedTransaction};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_logger::{error, warn};
 use aptos_types::transaction::SignedTransaction;
@@ -145,8 +143,8 @@ impl BatchAggregator {
                 if Self::is_new_batch(batch_id, self_batch_id) {
                     self.batch_state.is_some() || fragment_id > 0
                 } else {
-                    assert!(
-                        batch_id == self_batch_id,
+                    assert_eq!(
+                        batch_id, self_batch_id,
                         "Missed fragment called with an outdated fragment"
                     );
                     fragment_id > self.next_fragment_id()
@@ -207,11 +205,8 @@ impl BatchAggregator {
             self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
         }
 
-        if self.batch_state.is_some() {
-            self.batch_state
-                .as_mut()
-                .unwrap()
-                .append_transactions(transactions)?
+        if let Some(batch_state) = &mut self.batch_state {
+            batch_state.append_transactions(transactions)?
         }
         Ok(())
     }

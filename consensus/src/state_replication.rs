@@ -5,6 +5,7 @@
 use crate::{
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
+    transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::{
@@ -31,6 +32,8 @@ pub trait PayloadClient: Send + Sync {
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
+        pending_uncommitted_blocks: usize,
+        recent_max_fill_fraction: f32,
     ) -> Result<Payload, QuorumStoreError>;
 
     fn trace_payloads(&self) {}
@@ -67,5 +70,13 @@ pub trait StateComputer: Send + Sync {
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
-    fn new_epoch(&self, epoch_state: &EpochState, payload_manager: Arc<PayloadManager>);
+    fn new_epoch(
+        &self,
+        epoch_state: &EpochState,
+        payload_manager: Arc<PayloadManager>,
+        transaction_shuffler: Arc<dyn TransactionShuffler>,
+    );
+
+    // Reconfigure to clear epoch state at end of epoch.
+    fn end_epoch(&self);
 }

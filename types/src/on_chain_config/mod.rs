@@ -23,6 +23,7 @@ mod aptos_features;
 mod aptos_version;
 mod chain_id;
 mod consensus_config;
+mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod validator_set;
@@ -37,6 +38,7 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
         ProposerElectionType,
     },
+    execution_config::{ExecutionConfigV1, OnChainExecutionConfig, TransactionShufflerType},
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     validator_set::{ConsensusScheme, ValidatorSet},

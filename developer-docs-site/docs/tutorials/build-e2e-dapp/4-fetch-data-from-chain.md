@@ -16,23 +16,26 @@ To fetch data from chain, we can use the [Aptos TypeScript SDK](../../sdks/ts-sd
 To get started:
 
 1. Stop the local server if running.
-2. In the `client` directory, run: `npm i aptos@1.6.0`
-3. In the `App.tsx` file, import the `AptosClient` class like so:
+2. In the `client` directory, run: `npm i aptos`
+3. In the `App.tsx` file, import the `Provider` class and the `Network` type like so:
 
 ```js
-import { AptosClient } from "aptos";
+import { Provider, Network } from "aptos";
 ```
 
-The TypeScript SDK provides us with an `AptosClient` class where we can initialize and query the Aptos chain. `AptosClient` expects`node_url` as an argument, which is the [network URL](../../guides/system-integrators-guide.md#choose-a-network) we want to interact with.
+The TypeScript SDK provides us with a `Provider` class where we can initialize and query the Aptos chain and Indexer. `Provider` expects `Network` type as an argument, which is the [network name](../../guides/system-integrators-guide.md#choose-a-network) we want to interact with.
+
+:::tip
+Read more about the [`Provider`](../../sdks/ts-sdk/typescript-sdk-overview.md#provider-class) class in the Aptos TypeScript SDK overview.
+:::
 
 1. In the `App.tsx` file, add:
 
 ```js
-const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
-const client = new AptosClient(NODE_URL);
+const provider = new Provider(Network.DEVNET);
 ```
 
-This will initialize an `AptosClient` instance for us with the devnet node URL.
+This will initialize a `Provider` instance for us with the devnet network.
 
 Our app displays different UIs based on a user resource (i.e if a user has a list ⇒ if a user has a `TodoList` resource). For that, we need to know the current account connected to our app.
 
@@ -54,6 +57,7 @@ function App (
 The `account` object is `null` if there is no account connected; when an account is connected, the `account` object holds the account information, including the account address.
 
 3. Next, we want to fetch the account’s TodoList resource.
+   Begin by importing `useEffect` by using `jsx import useEffect from "react"; `
    Let’s add a `useEffect` hook to our file that would call a function to fetch the resource whenever our account address changes:
 
 ```jsx
@@ -75,6 +79,8 @@ function App (
   ...
 )
 ```
+also import `useEffect` using 
+```import { useState, useEffect } from "react"; ```
 
 5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
@@ -84,7 +90,7 @@ const fetchList = async () => {
   // change this to be your module account address
   const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
   try {
-    const TodoListResource = await client.getAccountResource(
+    const TodoListResource = await provider.getAccountResource(
       account.address,
       `${moduleAddress}::todolist::TodoList`
     );
@@ -97,7 +103,7 @@ const fetchList = async () => {
 
 The `moduleAddress` is the address we publish the module under, i.e the account address you have in your `Move.toml` file (`myaddr`).
 
-The `client.getAccountResource()`expects an *account address* that holds the resource we are looking for and a string representation of an on-chain *Move struct type*.
+The `provider.getAccountResource()`expects an _account address_ that holds the resource we are looking for and a string representation of an on-chain _Move struct type_.
 
 - account address - is the current connected account (we are getting it from the wallet account object)
 - Move struct type string syntax:
@@ -107,7 +113,10 @@ The `client.getAccountResource()`expects an *account address* that holds the res
 
 If the request succeeds and there is a resource for that account, we want to set our local state to `true`; otherwise, we would set it to `false`.
 
-6. Let’s update our UI based on the `accountHasList` state:
+6. Let’s update ```import { Layout, Row, Col } from "antd"; ``` to import Button:
+   ```import { Layout, Row, Col, Button  } from "antd"; ```
+
+7. Let’s update our UI based on the `accountHasList` state:
 
 ```jsx
 return (

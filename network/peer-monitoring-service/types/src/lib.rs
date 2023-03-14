@@ -11,6 +11,9 @@ use thiserror::Error;
 
 pub type Result<T, E = PeerMonitoringServiceError> = ::std::result::Result<T, E>;
 
+/// Useful global constants
+pub const MAX_DISTANCE_FROM_VALIDATORS: u64 = 100; // Nodes that aren't connected to the network
+
 /// An error that can be returned to the client on a failure to
 /// process a request.
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]

@@ -22,11 +22,13 @@ module aptos_framework::chain_status {
         move_to(aptos_framework, GenesisEndMarker {});
     }
 
+    #[view]
     /// Helper function to determine if Aptos is in genesis state.
     public fun is_genesis(): bool {
         !exists<GenesisEndMarker>(@aptos_framework)
     }
 
+    #[view]
     /// Helper function to determine if Aptos is operating. This is
     /// the same as `!is_genesis()` and is provided for convenience.
     /// Testing `is_operating()` is more frequent than `is_genesis()`.

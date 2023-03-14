@@ -23,6 +23,7 @@ pub struct MempoolTransaction {
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
     pub insertion_time: SystemTime,
+    pub was_parked: bool,
 }
 
 impl MempoolTransaction {
@@ -44,6 +45,7 @@ impl MempoolTransaction {
             ranking_score,
             timeline_state,
             insertion_time,
+            was_parked: false,
         }
     }
 

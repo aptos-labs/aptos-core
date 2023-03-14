@@ -44,7 +44,7 @@ impl IdGenerator<u32> for U32IdGenerator {
 }
 
 /// A generic in order [`IdGenerator`] using an [`AtomicU64`] to guarantee uniqueness
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct U64IdGenerator {
     inner: AtomicU64,
 }

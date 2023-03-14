@@ -826,6 +826,7 @@ impl CliTestFramework {
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
             ignore_compile_warnings: false,
+            compute_coverage: false,
         }
         .execute()
         .await

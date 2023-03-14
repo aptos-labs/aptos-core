@@ -10,6 +10,7 @@ use aptos_consensus_types::{
     common::Author,
     proof_of_store::{ProofOfStore, SignedDigest},
 };
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
@@ -18,8 +19,8 @@ pub struct MockQuorumStoreSender {
 }
 
 impl MockQuorumStoreSender {
-    pub fn new(rx: Sender<(ConsensusMsg, Vec<Author>)>) -> Self {
-        Self { tx: rx }
+    pub fn new(tx: Sender<(ConsensusMsg, Vec<Author>)>) -> Self {
+        Self { tx }
     }
 }
 
@@ -30,6 +31,15 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .send((ConsensusMsg::BatchRequestMsg(Box::new(request)), recipients))
             .await
             .expect("could not send");
+    }
+
+    async fn request_batch(
+        &self,
+        _request: BatchRequest,
+        _recipient: Author,
+        _timeout: Duration,
+    ) -> anyhow::Result<Batch> {
+        unimplemented!();
     }
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
@@ -53,7 +63,13 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         unimplemented!()
     }
 
-    async fn broadcast_proof_of_store(&mut self, _proof_of_store: ProofOfStore) {
-        unimplemented!()
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
+        self.tx
+            .send((
+                ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store)),
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 }
