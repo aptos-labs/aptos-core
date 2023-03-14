@@ -196,7 +196,7 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
             max_response_timeout_ms: 60000, // 60 seconds
-            response_timeout_ms: 10000,     // 10 seconds
+            response_timeout_ms: 20000,     // 20 seconds
             subscription_timeout_ms: 5000,  // 5 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
