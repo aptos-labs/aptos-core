@@ -1,28 +1,28 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::bullshark::Bullshark;
-use crate::dag::dag::Dag;
-use crate::dag::reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand};
-use crate::state_replication::PayloadClient;
 use crate::{
+    dag::{
+        bullshark::Bullshark,
+        dag::Dag,
+        reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
+    },
     network::{DagSender, NetworkSender},
     round_manager::VerifiedEvent,
+    state_replication::PayloadClient,
 };
 use aptos_channels::aptos_channel;
 use aptos_config::config::DagConfig;
-use aptos_consensus_types::common::{Author, PayloadFilter, Round};
-use aptos_consensus_types::node::{
-    CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData,
+use aptos_consensus_types::{
+    common::{Author, PayloadFilter, Round},
+    node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
 use aptos_logger::spawn_named;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+};
 use futures::StreamExt;
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
 
 #[allow(dead_code)]
@@ -146,9 +146,7 @@ impl DagDriver {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn start(
-        mut self,
-    ) {
+    pub(crate) async fn start(mut self) {
         let node = self.create_node(HashSet::new()).await;
         self.rb_tx
             .send(ReliableBroadcastCommand::BroadcastRequest(node))

@@ -157,7 +157,12 @@ impl ValidatorVerifier {
                 total_voting_power * 2 / 3 + 1,
             )
         };
-        Self::build_index(validator_infos, minority_quorum_voting_power, quorum_voting_power, total_voting_power)
+        Self::build_index(
+            validator_infos,
+            minority_quorum_voting_power,
+            quorum_voting_power,
+            total_voting_power,
+        )
     }
 
     /// Initializes a validator verifier with a specified quorum voting power.

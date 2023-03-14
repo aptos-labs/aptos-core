@@ -6,9 +6,9 @@ use aptos_consensus_types::node::{
     SignedNodeDigestInfo,
 };
 use aptos_crypto::{bls12381, HashValue};
-use aptos_types::aggregate_signature::PartialSignatures;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{
+    aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
+};
 use std::collections::{BTreeMap, HashSet};
 
 // pub(crate) trait MissingPeers {

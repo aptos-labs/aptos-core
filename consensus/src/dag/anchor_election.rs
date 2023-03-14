@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::common::Round;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use std::collections::HashMap;
 
 pub trait AnchorElection: Send + Sync {

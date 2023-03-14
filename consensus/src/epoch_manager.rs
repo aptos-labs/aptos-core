@@ -8,6 +8,7 @@ use crate::{
         BlockStore,
     },
     counters,
+    dag::dag_driver::DagDriver,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -87,6 +88,9 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_global_constants::CONSENSUS_KEY;
+use aptos_secure_storage::{KVStorage, Storage};
+use aptos_types::validator_signer::ValidatorSigner;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -123,6 +127,8 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    rb_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>,>,
+    dag_driver_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>,>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
@@ -168,6 +174,8 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
+            rb_tx: None,
+            dag_driver_tx: None,
             round_manager_close_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
@@ -588,13 +596,7 @@ impl EpochManager {
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
 
-
-    async fn start_dag_driver(
-        &mut self,
-    ) {
-        let dag_driver = DagDriver::new();
-    }
-
+    // TODO: rename to start_dag_driver and delete old consensus related code
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
@@ -675,13 +677,14 @@ impl EpochManager {
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
 
-        let payload_client = QuorumStoreClient::new(
+        let payload_client = Arc::new(QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
             self.config.quorum_store_pull_timeout_ms,
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
-        );
+        ));
+
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
@@ -720,7 +723,7 @@ impl EpochManager {
         let proposal_generator = ProposalGenerator::new(
             self.author,
             block_store.clone(),
-            Arc::new(payload_client),
+            payload_client.clone(),
             self.time_service.clone(),
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
@@ -754,13 +757,13 @@ impl EpochManager {
             });
 
         let mut round_manager = RoundManager::new(
-            epoch_state,
+            epoch_state.clone(),
             block_store.clone(),
             round_state,
             proposer_election,
             proposal_generator,
             safety_rules_container,
-            network_sender,
+            network_sender.clone(),
             self.storage.clone(),
             onchain_consensus_config,
             round_manager_tx,
@@ -774,6 +777,49 @@ impl EpochManager {
         tokio::spawn(round_manager.start(round_manager_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
+
+        // Start DagDriver.
+
+        let backend = &self.config.safety_rules.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        let private_key = storage
+            .get(CONSENSUS_KEY)
+            .map(|v| v.value)
+            .expect("Unable to get private key");
+        let signer = ValidatorSigner::new(self.author, private_key);
+
+        let (dag_driver_msg_tx, dag_driver_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+        let (rb_msg_tx, rb_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+
+        self.dag_driver_tx = Some(dag_driver_msg_tx);
+        self.rb_tx = Some(rb_msg_tx);
+
+
+        //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
+        let dag_driver = DagDriver::new(
+            self.epoch(),
+            self.author,
+            self.config.dag_config.clone(),
+            payload_client,
+            network_sender,
+            epoch_state.verifier.clone(),
+            Arc::new(signer),
+            rb_msg_rx,
+            dag_driver_msg_rx,
+        );
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {

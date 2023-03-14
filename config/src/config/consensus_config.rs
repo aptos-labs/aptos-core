@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{QuorumStoreConfig, SafetyRulesConfig};
+use crate::config::{DagConfig, QuorumStoreConfig, SafetyRulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -52,6 +52,7 @@ pub struct ConsensusConfig {
     pub wait_for_full_blocks_above_recent_fill_threshold: f32,
     pub intra_consensus_channel_buffer_size: usize,
     pub quorum_store_configs: QuorumStoreConfig,
+    pub dag_config: DagConfig,
     // Used to decide if backoff is needed.
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
@@ -101,6 +102,7 @@ impl Default for ConsensusConfig {
             wait_for_full_blocks_above_recent_fill_threshold: 1.1,
             intra_consensus_channel_buffer_size: 10,
             quorum_store_configs: QuorumStoreConfig::default(),
+            dag_config: DagConfig::default(),
 
             window_for_chain_health: 100,
             chain_health_backoff: vec![

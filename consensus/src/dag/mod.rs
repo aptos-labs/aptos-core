@@ -4,6 +4,6 @@
 mod anchor_election;
 mod bullshark;
 mod dag;
-mod dag_driver;
+pub(crate) mod dag_driver;
 mod reliable_broadcast;
 mod types;

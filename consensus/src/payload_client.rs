@@ -162,7 +162,7 @@ impl PayloadClient for QuorumStoreClient {
         max_bytes: u64,
         exclude: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
-        self.pull_internal(round, max_items, max_bytes, true,exclude)
+        self.pull_internal(round, max_items, max_bytes, true, exclude)
             .await
     }
 }

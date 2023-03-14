@@ -3,16 +3,14 @@
 
 use crate::common::{Payload, Round};
 use anyhow::Context;
-use aptos_crypto::hash::DefaultHasher;
-use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
+use aptos_crypto::{bls12381, hash::DefaultHasher, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{
+    aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier, PeerId,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 #[derive(Debug)]
 pub enum SignedNodeDigestError {
@@ -21,7 +19,7 @@ pub enum SignedNodeDigestError {
 }
 
 #[derive(
-Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedNodeDigestInfo {
     digest: HashValue,

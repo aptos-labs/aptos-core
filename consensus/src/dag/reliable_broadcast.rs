@@ -1,22 +1,23 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::types::{AckSet, IncrementalNodeCertificateState};
-use crate::network::{DagSender, NetworkSender};
-use crate::round_manager::VerifiedEvent;
+use crate::{
+    dag::types::{AckSet, IncrementalNodeCertificateState},
+    network::{DagSender, NetworkSender},
+    round_manager::VerifiedEvent,
+};
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::Round;
-use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeAck, Node, SignedNodeDigest};
+use aptos_consensus_types::{
+    common::Round,
+    node::{CertifiedNode, CertifiedNodeAck, Node, SignedNodeDigest},
+};
 use aptos_logger::info;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::PeerId;
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+};
 use futures::StreamExt;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::Receiver;
-use tokio::time;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use tokio::{sync::mpsc::Receiver, time};
 
 #[allow(dead_code)]
 #[derive(Debug)]

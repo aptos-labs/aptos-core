@@ -4,8 +4,7 @@
 use crate::dag::anchor_election::{AnchorElection, RoundRobinAnchorElection};
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
 use aptos_crypto::HashValue;
-use aptos_types::validator_verifier::ValidatorVerifier;
-use aptos_types::{block_info::Round, PeerId};
+use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
 use async_recursion::async_recursion;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 use tokio::sync::mpsc::Sender;
@@ -639,4 +638,3 @@ impl Dag {
         }
     }
 }
-
