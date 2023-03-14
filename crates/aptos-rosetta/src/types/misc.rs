@@ -278,7 +278,7 @@ pub async fn get_stake_balances(
             return Ok(Some(Amount {
                 value: balance,
                 currency: native_coin(),
-            })) 
+            }))
         } else {
             Ok(None)
         }

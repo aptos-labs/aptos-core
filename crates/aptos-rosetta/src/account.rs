@@ -147,7 +147,7 @@ async fn get_balances(
                             contract.pool_address,
                             version,
                         )
-                        .await 
+                        .await
                         {
                             Ok(Some(balance)) => {
                                 total_requested_balance = Some(
