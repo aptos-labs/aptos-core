@@ -7,6 +7,10 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 14 March 2023
+
+- Published beta [Delegation Pool Operations](../../nodes/validator-node/operator/delegation-pool-operations.md) instructions for validator operators, written by [Raluca Popescu (dorinbwr](https://github.com/dorinbwr) ) of [Bware Labs](https://bwarelabs.com/).
+
 ## 08 March 2023
 
 - Added a [Latest Releases](releases/index.md) section to the *Start* menu showing the newest, recommended version of each Aptos component (CLI, framework, and node) by network.
