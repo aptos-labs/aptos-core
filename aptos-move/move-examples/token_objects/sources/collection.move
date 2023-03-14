@@ -233,52 +233,46 @@ module token_objects::collection {
     }
 
     // Accessors
-    inline fun verify<T: key>(collection: &Object<T>): address {
+    inline fun borrow<T: key>(collection: &Object<T>): &Collection {
         let collection_address = object::object_address(collection);
         assert!(
             exists<Collection>(collection_address),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
-        collection_address
+        borrow_global<Collection>(collection_address)
     }
 
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).creator
+        borrow(&collection).creator
     }
 
     public fun description<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).description
+        borrow(&collection).description
     }
 
     public fun name<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).name
+        borrow(&collection).name
     }
 
     public fun uri<T: key>(collection: Object<T>): String acquires Collection {
-        let collection_address = verify(&collection);
-        borrow_global<Collection>(collection_address).uri
+        borrow(&collection).uri
     }
 
     // Mutators
 
-    inline fun mutator_ref_to_address(mutator_ref: &MutatorRef): address {
+    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Collection {
         assert!(
             exists<Collection>(mutator_ref.self),
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
-        mutator_ref.self
+        borrow_global_mut<Collection>(mutator_ref.self)
     }
 
     public fun set_description(
         mutator_ref: &MutatorRef,
         description: String,
     ) acquires Collection {
-        let collection_address = mutator_ref_to_address(mutator_ref);
-        let collection = borrow_global_mut<Collection>(collection_address);
-
+        let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
             &mut collection.mutation_events,
@@ -290,9 +284,7 @@ module token_objects::collection {
         mutator_ref: &MutatorRef,
         uri: String,
     ) acquires Collection {
-        let collection_address = mutator_ref_to_address(mutator_ref);
-        let collection = borrow_global_mut<Collection>(collection_address);
-
+        let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
             &mut collection.mutation_events,
