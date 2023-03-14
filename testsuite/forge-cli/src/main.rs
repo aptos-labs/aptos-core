@@ -20,6 +20,7 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
+    multi_region_simulation_test::MultiRegionSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
@@ -491,6 +492,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             run_consensus_only_three_region_simulation(config)
         },
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(config),
+        "consensus_only_multi_region_simulation_test" => {
+            consensus_only_multi_region_simulation_test(config)
+        },
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1439,6 +1443,56 @@ fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> Forg
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
+                }),
+        )
+}
+
+fn consensus_only_multi_region_simulation_test(
+    config: ForgeConfig<'static>,
+) -> ForgeConfig<'static> {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 200_000,
+                })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .with_network_tests(vec![&MultiRegionSimulationTest {
+            add_execution_delay: None,
+        }])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
+                (5 * 60 * 60).into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
+                (5 * 60 * 60_000).into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                30000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                (3 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+        }))
+        // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
+        .with_success_criteria(
+            SuccessCriteria::new(10000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 6,
                 }),
         )
 }

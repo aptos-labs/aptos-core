@@ -28,12 +28,14 @@ aptos-sdk = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+csv = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+itertools = { workspace = true }
 
 [[test]]
 name = "forge-local-compatibility"
