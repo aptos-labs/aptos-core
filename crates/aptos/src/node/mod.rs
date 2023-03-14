@@ -1102,9 +1102,12 @@ impl CliCommand<()> for RunLocalTestnet {
             .unwrap_or_else(StdRng::from_entropy);
 
         let global_config = GlobalConfig::load()?;
-        let test_dir = global_config
-            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
-            .join(TESTNET_FOLDER);
+        let test_dir = match self.test_dir {
+            Some(test_dir) => test_dir,
+            None => global_config
+                .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+                .join(TESTNET_FOLDER),
+        };
 
         // Remove the current test directory and start with a new node
         if self.force_restart && test_dir.exists() {
