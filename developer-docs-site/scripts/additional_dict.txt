@@ -146,6 +146,7 @@ Modularity
 Monterey
 MoonCoin
 MoveVM
+MSVC
 MultiEd
 Multinode
 Multisignature
@@ -171,6 +172,7 @@ Parallelization
 Petra
 Pontem
 Postgres
+PowerShell
 PropertyMap
 PropertyMap
 Prover
