@@ -232,19 +232,19 @@ async fn loopback_rand_share_or_commit_vote(
         Some(Event::Message(author, msg)) => {
             match msg {
                 ConsensusMsg::CommitVoteMsg(_) | ConsensusMsg::CommitDecisionMsg(_) => {
-                    println!("got commit msg!");
+                    // println!("got commit msg!");
                     let event: UnverifiedEvent = msg.into();
                     // verify the message and send the message into self loop
                     commit_msg_tx
-                        .push(author, event.verify(author, verifier, false).unwrap())
+                        .push(author, event.verify(author, verifier, false, false).unwrap())
                         .ok();
                 }
                 ConsensusMsg::RandShareMsg(_) | ConsensusMsg::RandDecisionMsg(_) => {
-                    println!("got rand msg!");
+                    // println!("got rand msg!");
                     let event: UnverifiedEvent = msg.into();
                     // verify the message and send the message into self loop
                     rand_msg_tx
-                        .push(author, event.verify(author, verifier, false).unwrap())
+                        .push(author, event.verify(author, verifier, false, false).unwrap())
                         .ok();
                 }
                 _ => ()

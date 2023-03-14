@@ -475,7 +475,7 @@ impl NetworkTask {
 
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
-            match message {
+            monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
@@ -561,7 +561,7 @@ impl NetworkTask {
                 _ => {
                     // Ignore `NewPeer` and `LostPeer` events
                 },
-            }
+            });
         }
     }
 }

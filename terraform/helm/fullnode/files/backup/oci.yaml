@@ -11,3 +11,5 @@ commands:
   list_metadata_files: |
     curl -s "$ENDPOINT$ACCESS_URI?prefix=/$SUB_DIR/metadata/" \
     | python -c 'import json, sys; print("\n".join("/".join(o["name"].split("/")[2:]) for o in json.loads(sys.stdin.read()).get("objects", [])), end="")'
+  backup_metadata_file: |
+    curl -sSf "$ENDPOINT$ACCESS_URI/$SUB_DIR/metadata_backup" || curl -X PUT "$ENDPOINT$ACCESS_URI/$SUB_DIR/metadata_backup" && curl -sSL "$ENDPOINT$ACCESS_URI/$SUB_DIR/metadata/$FILE_NAME" | curl -X POST -d @- "$ENDPOINT$ACCESS_URI/$SUB_DIR/metadata_backup/$FILE_NAME" && curl -X DELETE "$ENDPOINT$ACCESS_URI/$SUB_DIR/metadata/$FILE_NAME"
