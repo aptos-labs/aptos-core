@@ -1,11 +1,11 @@
 # Exercise 1
-aptos move test -g
+aptos move test --dump
 
 # Exercise 2
 aptos move test --coverage
 
 Followed by:
 
-move coverage summary
-move coverage summary --summarize-functions
-move coverage source --module basic_coin
+aptos move coverage summary
+aptos move coverage summary --summarize-functions
+aptos move coverage source --module basic_coin

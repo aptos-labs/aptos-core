@@ -5,7 +5,7 @@ slug: "move-tutorial"
 
 # Move Tutorial
 
-Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular Network Move is running on, but adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move. This tutorial does not teach you how to use Move on Aptos, and how to use the existing Aptos Move frameworks. See the [Aptos developer documentation](https://aptos.dev/tutorials/aptos-quickstarts) for this.
+Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular Network, adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move. This tutorial does not teach you how to use the existing Aptos Move frameworks or how to run code on the Aptos network. See the [Aptos developer documentation](https://aptos.dev/tutorials/aptos-quickstarts) for this.
 
 There are nine steps in total:
 
@@ -40,7 +40,7 @@ You also need a recent version of the [Aptos CLI](../../cli-tools/aptos-cli-tool
 aptos 1.0.7
 ```
 
-If you want to use an IDE for working through the examples, at this point we recommend CLion/IntelliJ, which has good support for Aptos Move.
+If you want to use an IDE for working through the examples, we recommend CLion/IntelliJ, which has good support for Aptos Move.
 
 
 ## Step 1: Writing my first Move module<span id="Step1"><span>
@@ -54,24 +54,24 @@ is similar to the `Cargo.toml` file, and the `sources` directory similar to
 the `src` directory.
 
 Let's take a look at some Move code! Open up
-[`sources/FirstModule.move`](./step_1/basic_coin/sources/FirstModule.move) in
+[`sources/first_module.move`](./step_1/basic_coin/sources/first_module.move) in
 your editor of choice. The first thing you'll see is this:
 
 ```
-// sources/FirstModule.move
+// sources/first_module.move
 module 0xCAFE::basic_coin {
     ...
 }
 ```
 
 This is defining a Move
-[module](../../guides/move-guides/book/modules-and-scripts.md). Modules are the
+[module](../../../developer-docs-site/docs/guides/move-guides/book/modules-and-scripts.md). Modules are the
 building blocks of Move code, and are defined with a specific address -- the
 address that the module can be published under. In this case, the `basic_coin`
 module can only be published under `0xCAFE`.
 
 Let's now take a look at the next part of this file where we define a
-[struct](../../guides/move-guides/book/structs-and-resources.md)
+[struct](../../../developer-docs-site/docs/guides/move-guides/book/structs-and-resources.md)
 to represent a `Coin` with a given `value`:
 
 ```
@@ -98,7 +98,7 @@ module 0xCAFE::basic_coin {
 ```
 
 Let's take a look at this function and what it's saying:
-* It takes a [`signer`](../../guides/move-guides/book/signer.md) -- an
+* It takes a [`&signer`](../../../developer-docs-site/docs/guides/move-guides/book/signer.md) reference ('`&`') -- an
   unforgeable token that represents control over a particular address, and
   a `value` to mint.
 * It creates a `Coin` with the given value and stores it under the
@@ -119,10 +119,10 @@ aptos move compile
     ```
 * Move code can also live a number of other places.  More information on the
   Move package system can be found in the [Move
-  book](../../guides/move-guides/book/packages.md)
-* More information on the `Move.toml` file can be found in the [package section of the Move book](../../guides/move-guides/book/packages.md#movetoml).
+  book](../../../developer-docs-site/docs/guides/move-guides/book/packages.md)
+* More information on the `Move.toml` file can be found in the [package section of the Move book](../../../developer-docs-site/docs/guides/move-guides/book/packages.md#movetoml).
 * Move also supports the idea of [named
-  addresses](../../guides/move-guides/book/address.md#named-addresses), Named
+  addresses](../../../developer-docs-site/docs/guides/move-guides/book/address.md#named-addresses), Named
   addresses are a way to parametrize Move source code so that you can compile
   the module using different values for `named_addr` to get different bytecode
   that you can deploy, depending on what address(es) you control. They are used quite frequently, and can be defined in the `Move.toml` file in the `[addresses]` section, e.g.,
@@ -130,9 +130,9 @@ aptos move compile
     [addresses]
     Somenamed_address = "0xC0FFEE"
     ```
-* [Structures](../../guides/move-guides/book/structs-and-resources.md) in Move
+* [Structures](../../../developer-docs-site/docs/guides/move-guides/book/structs-and-resources.md) in Move
   can be given different
-  [abilities](../../guides/move-guides/book/abilities.md) that describe what
+  [abilities](../../../developer-docs-site/docs/guides/move-guides/book/abilities.md) that describe what
   can be done with that type. There are four different abilities:
     - `copy`: Allows values of types with this ability to be copied.
     - `drop`: Allows values of types with this ability to be popped/dropped.
@@ -143,14 +143,12 @@ aptos move compile
     in global storage and, because it has no other abilities, it cannot be
     copied, dropped, or stored as a non-key value in storage. So you can't copy
     coins, and you also can't lose coins by accident!
-* [Functions](../../guides/move-guides/book/functions.md) are default
+* [Functions](../../../developer-docs-site/docs/guides/move-guides/book/functions.md) are default
     private, and can also be `public`,
-    [`public(friend)`](../../guides/move-guides/book/friends.md), or
-    `public(script)`. The last of these states that this function can be
-    called from a transaction script. `public(script)` functions can also be
-    called by other `public(script)` functions.
+    [`public(friend)`](../../../developer-docs-site/docs/guides/move-guides/book/friends.md).
+    A function marked as `entry` can be called as a transaction.
 * `move_to` is one of the [five different global storage
-  operators](../../guides/move-guides/book/global-storage-operators.md).
+  operators](../../../developer-docs-site/docs/guides/move-guides/book/global-storage-operators.md).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
@@ -167,8 +165,8 @@ You can run the tests with the `move test` command:
 aptos move test
 ```
 
-Let's now take a look at the contents of the [`FirstModule.move`
-file](./step_2/basic_coin/sources/FirstModule.move). The first new thing you'll
+Let's now take a look at the contents of the [`first_module.move`
+file](./step_2/basic_coin/sources/first_module.move). The first new thing you'll
 see is this test:
 
 ```
@@ -203,12 +201,12 @@ assertion fails the unit test will fail.
 
 #### Exercises
 * Change the assertion to `11` so that the test fails. Find a flag that you can
-  pass to the `aptos move test` command that will show you the global state when
+  pass to the `aptos move test` command that will dump the global state when
   the test fails. It should look something like this:
   ```
   ┌── test_mint_10 ──────
   │ error[E11001]: test failure
-  │    ┌─ ./sources/FirstModule.move:24:9
+  │    ┌─ ./sources/first_module.move:24:9
   │    │
   │ 18 │     fun test_mint_10(account: &signer) acquires Coin {
   │    │         ------------ In this function in 0xcafe::basic_coin
@@ -233,7 +231,9 @@ assertion fails the unit test will fail.
 ## Step 3: Designing my `basic_coin` module<span id="Step3"><span>
 
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
-be minted and transferred between balances held under different addresses.
+be minted and transferred between balances held under different addresses. 
+
+> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer coin type contained in the Aptos framework.
 
 The signatures of the public Move function are the following:
 
@@ -291,7 +291,7 @@ method directly from a transaction, you'll want to change its signature to:
 ```
 public entry fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
 ```
-Read more on Move function [visibilities](../../guides/move-guides/book/functions.md#visibility).
+Read more on Move function [visibilities](../../../developer-docs-site/docs/guides/move-guides/book/functions.md#visibility).
 </details>
 <details>
 <summary>Comparison with Ethereum/Solidity</summary>
@@ -308,7 +308,7 @@ The Ethereum blockchain state might look like this:
 
 We have created a Move package for you in folder `step_4` called `basic_coin`. The `sources` folder contains source code for
 all your Move modules in the package, including `basic_coin.move`. In this section, we will take a closer look at the
-implementation of the methods inside [`basic_coin.move`](./step_4/sources/basic_coin.move).
+implementation of the methods inside [`basic_coin.move`](./step_4/basic_coin/sources/basic_coin.move).
 
 ### Compiling our code
 
@@ -347,10 +347,10 @@ Assert statements in Move can be used in this way: `assert!(<predicate>, <abort_
 is false, then abort the transaction with `<abort_code>`. Here `MODULE_OWNER` and `ENOT_MODULE_OWNER` are both constants
 defined at the beginning of the module. The standard library's [`error` module] also defines common error categories we can use.
 It is important to note that Move is transactional in its execution -- so
-if an [abort](../../guides/move-guides/book/abort-and-assert.md) is raised no unwinding of state
+if an [abort](../../../developer-docs-site/docs/guides/move-guides/book/abort-and-assert.md) is raised no unwinding of state
 needs to be performed, as no changes from that transaction will be persisted to the blockchain.
 
-[`error` module]: https://github.com/move-language/move/blob/main/language/move-stdlib/docs/error.md
+[`error` module]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/sources/error.move
 
 We then deposit a coin with value `amount` to the balance of `mint_addr`.
 ```
@@ -384,7 +384,7 @@ fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
 }
 ```
 At the beginning of the method, we assert that the withdrawing account has enough balance. We then use `borrow_global_mut`
-to get a mutable reference to the global storage, and `&mut` is used to create a [mutable reference](../../guides/move-guides/book/references.md) to a field of a
+to get a mutable reference to the global storage, and `&mut` is used to create a [mutable reference](../../../developer-docs-site/docs/guides/move-guides/book/references.md) to a field of a
 struct. We then modify the balance through this mutable reference and return a new coin with the withdrawn amount.
 </details>
 
@@ -471,15 +471,9 @@ fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Bal
 ```
 Take a look at [`step_6/basic_coin/sources/basic_coin.move`](./step_6/basic_coin/sources/basic_coin.move) to see the full implementation.
 
-At this point, readers who are familiar with Ethereum might notice that this module serves a similar purpose as
-the [ERC20 token standard](https://ethereum.org/en/developers/docs/standards/tokens/erc-20/), which provides an
-interface for implementing fungible tokens in smart contracts. One key advantage of using generics is the ability
-to reuse code since the generic library module already provides a standard implementation and the instantiating module
-can provide customizations by wrapping the standard implementation.
-
-We provide a little module called [`MyOddCoin`](./step_6/basic_coin/sources/MyOddCoin.move) that instantiates
+We provide a little module called [`my_odd_coin`](./step_6/basic_coin/sources/my_odd_coin.move) that instantiates
 the `Coin` type and customizes its transfer policy: only odd number of coins can be transferred. We also include two
-[tests](./step_6/basic_coin/sources/MyOddCoin.move) to test this behavior. You can use the commands you learned in step 2 and step 5 to run the tests.
+[tests](./step_6/basic_coin/sources/my_odd_coin.move) to test this behavior. You can use the commands you learned in step 2 and step 5 to run the tests.
 
 #### Advanced topics:
 <details>
@@ -489,21 +483,11 @@ In definitions of both `Coin` and `Balance`, we declare the type parameter `Coin
 to be phantom because `CoinType` is not used in the struct definition or is only used as a phantom type
 parameter.
 
-Read more about <a href="../../guides/move-guides/book/">phantom type</a> parameters in the Aptos Move Book.
+Read more about <a href="../../../developer-docs-site/docs/guides/move-guides/book/">phantom type</a> parameters in the Aptos Move Book.
 </details>
 
-## Advanced steps
-
-Before moving on to the next steps, let's make sure you have all the prover dependencies installed.
-
-Try running `boogie /version `. If an error message shows up saying "command not found: boogie", you will have to run the
-setup script and source your profile:
-```bash
-# run the following in move repo root directory
-./scripts/dev_setup.sh -yp
-source ~/.profile
-```
 ## Step 7:  Use the Move prover<span id="Step7"><span>
+
 
 Smart contracts deployed on the blockchain may manipulate high-value assets. As a technique that uses strict
 mathematical methods to describe behavior and reason correctness of computer systems, formal verification
@@ -522,9 +506,10 @@ the [basic_coin.move](./step_7/basic_coin/sources/basic_coin.move):
     }
 ```
 
-Informally speaking, the block `spec balance_of {...}` contains the property specification of the method `balance_of`.
+Informally speaking, the block `spec balance_of {...}` contains the property specification of the method `balance_of`. Let's first run the prover using the following command inside [`basic_coin` directory](./step_7/basic_coin/):
 
-Let's first run the prover using the following command inside [`basic_coin` directory](./step_7/basic_coin/):
+> NOTE: Before running the Move prover, ensure that the [Move Prover Tools](https://aptos.dev/cli-tools/install-move-prover) are installed.
+
 ```bash
 aptos move prove
 ```
@@ -548,7 +533,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at ./sources/basic_coin.move:35: balance_of
    =         ABORTED
 
-Error: exiting with verification errors
 ```
 
 The prover basically tells us that we need to explicitly specify the condition under which the function `balance_of` will abort, which is caused by calling the function `borrow_global` when `owner` does not own the resource `Balance<CoinType>`. To remove this error information, we add an `aborts_if` condition as follows:

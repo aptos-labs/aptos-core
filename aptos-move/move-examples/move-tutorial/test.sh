@@ -3,28 +3,28 @@
 APTOS=aptos
 
 COMPILED="\
-  step_1/BasicCoin\
-  step_2/BasicCoin\
-  step_2_sol/BasicCoin\
-  step_4/BasicCoin\
-  step_5/BasicCoin\
-  step_5_sol/BasicCoin\
-  step_6/BasicCoin\
-  step_7/BasicCoin\
-  step_8/BasicCoin\
-  step_8_sol/BasicCoin\
+  step_1/basic_coin\
+  step_2/basic_coin\
+  step_2_sol/basic_coin\
+  step_4/basic_coin\
+  step_5/basic_coin\
+  step_5_sol/basic_coin\
+  step_6/basic_coin\
+  step_7/basic_coin\
+  step_8/basic_coin\
+  step_8_sol/basic_coin\
 "
 
 TESTED="\
-  step_2/BasicCoin\
-  step_2_sol/BasicCoin\
-  step_4/BasicCoin\
-  step_5/BasicCoin\
-  step_5_sol/BasicCoin\
-  step_6/BasicCoin\
-  step_7/BasicCoin\
-  step_8/BasicCoin\
-  step_8_sol/BasicCoin\
+  step_2/basic_coin\
+  step_2_sol/basic_coin\
+  step_4/basic_coin\
+  step_5/basic_coin\
+  step_5_sol/basic_coin\
+  step_6/basic_coin\
+  step_7/basic_coin\
+  step_8/basic_coin\
+  step_8_sol/basic_coin\
 "
 
 
