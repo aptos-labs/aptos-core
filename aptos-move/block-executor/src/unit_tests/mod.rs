@@ -10,8 +10,11 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_types::write_set::TransactionWrite;
-use rand::random;
+use claims::{assert_matches, assert_some_eq};
+use rand::{prelude::*, random};
 use std::{
+    cmp::min,
+    collections::BTreeMap,
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
@@ -39,6 +42,13 @@ where
 
 fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
     ValueType((0..4).map(|_| (random::<u8>())).collect(), !delete_value)
+}
+
+#[test]
+fn empty_block() {
+    // This test checks that we do not trigger asserts due to an empty block, e.g. in the
+    // scheduler. Instead, parallel execution should gracefully early return empty output.
+    run_and_assert::<KeyType<[u8; 32]>, ValueType<[u8; 32]>>(vec![]);
 }
 
 #[test]
@@ -322,7 +332,10 @@ fn scheduler_tasks() {
         s.finish_validation(i, 2)
     }
 
-    while s.try_commit().is_some() {}
+    // Make sure everything can be committed.
+    for i in 0..5 {
+        assert_some_eq!(s.try_commit(), i);
+    }
 
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
@@ -456,15 +469,18 @@ fn incarnation_one_scheduler(num_txns: usize) -> Scheduler {
 fn scheduler_incarnation() {
     let s = incarnation_one_scheduler(5);
 
-    // execution index = 5, wave = 0.
+    // execution/validation index = 5, wave = 0.
     assert!(s.wait_for_dependency(1, 0).is_some());
     assert!(s.wait_for_dependency(3, 0).is_some());
 
+    // Because validation index is higher, return validation task to caller (even with
+    // revalidate_suffix = true) - because now we always decrease validation idx to txn_idx + 1
+    // here validation wave increases to 1, and index is reduced to 3.
     assert!(matches!(
         s.finish_execution(2, 1, true),
-        SchedulerTask::NoTask
+        SchedulerTask::ValidationTask((2, 1), 1)
     ));
-    // wave = 1, and in the following does not change (val index at 2 already).
+    // Here since validation index is lower, wave doesn't increase and no task returned.
     assert!(matches!(
         s.finish_execution(4, 1, true),
         SchedulerTask::NoTask
@@ -472,11 +488,7 @@ fn scheduler_incarnation() {
 
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((2, 1), 1)
-    ));
-    assert!(matches!(
-        s.next_task(false),
-        SchedulerTask::ValidationTask((4, 1), 1)
+        SchedulerTask::ValidationTask((4, 1), 1),
     ));
 
     assert!(s.try_abort(2, 1));
@@ -576,7 +588,10 @@ fn scheduler_basic() {
         s.finish_validation(i, 1)
     }
 
-    while s.try_commit().is_some() {}
+    // make sure everything can be committed.
+    for i in 0..3 {
+        assert_some_eq!(s.try_commit(), i);
+    }
 
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
@@ -623,14 +638,42 @@ fn scheduler_drain_idx() {
         s.finish_validation(i, 1)
     }
 
-    while s.try_commit().is_some() {}
+    // make sure everything can be committed.
+    for i in 0..3 {
+        assert_some_eq!(s.try_commit(), i);
+    }
 
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
 
 #[test]
-fn rolling_commit_wave() {
+fn finish_execution_wave() {
+    // Wave won't be increased, because validation index is already 2, and finish_execution
+    // tries to reduce it to 2.
     let s = incarnation_one_scheduler(2);
+    assert!(matches!(
+        s.finish_execution(1, 1, true),
+        SchedulerTask::ValidationTask((1, 1), 0),
+    ));
+
+    // Here wave will increase, because validation index is reduced from 3 to 2.
+    let s = incarnation_one_scheduler(3);
+    assert!(matches!(
+        s.finish_execution(1, 1, true),
+        SchedulerTask::ValidationTask((1, 1), 1),
+    ));
+
+    // Here wave won't be increased, because we pass revalidate_suffix = false.
+    let s = incarnation_one_scheduler(3);
+    assert!(matches!(
+        s.finish_execution(1, 1, false),
+        SchedulerTask::ValidationTask((1, 1), 0),
+    ));
+}
+
+#[test]
+fn rolling_commit_wave() {
+    let s = incarnation_one_scheduler(3);
 
     // Finish execution for txn 0 without validate_suffix and because
     // validation index is higher will return validation task to the caller.
@@ -641,84 +684,128 @@ fn rolling_commit_wave() {
     // finish validating txn 0 with proper wave
     s.finish_validation(0, 1);
     // txn 0 can be committed
-    assert!(s.try_commit().is_some());
-    assert!(matches!(s.commit_state(), (1, 0)));
+    assert_some_eq!(s.try_commit(), 0);
+    assert_eq!(s.commit_state(), (1, 0));
 
-    // Increase validation_index
-    assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
-
-    // Requires revalidation suffix, so validation index will be decreased to 1
+    // This increases the wave, but only sets max_triggered_wave for transaction 2.
+    // sets validation_index to 2.
     assert!(matches!(
         s.finish_execution(1, 1, true),
-        SchedulerTask::NoTask
+        SchedulerTask::ValidationTask((1, 1), 1),
     ));
 
     // finish validating txn 1 with lower wave
     s.finish_validation(1, 0);
     // txn 1 cannot be committed
     assert!(s.try_commit().is_none());
-    assert!(matches!(s.commit_state(), (1, 1)));
+    assert_eq!(s.commit_state(), (1, 0));
 
     // finish validating txn 1 with proper wave
     s.finish_validation(1, 1);
     // txn 1 can be committed
-    assert!(s.try_commit().is_some());
-    // commit_state wave is updated
-    assert!(matches!(s.commit_state(), (2, 1)));
+    assert_some_eq!(s.try_commit(), 1);
+    assert_eq!(s.commit_state(), (2, 0));
+
+    // No validation task because index is already 2.
+    assert!(matches!(
+        s.finish_execution(2, 1, false),
+        SchedulerTask::NoTask,
+    ));
+    // finish validating with a lower wave.
+    s.finish_validation(2, 0);
+    assert!(s.try_commit().is_none());
+    assert_eq!(s.commit_state(), (2, 1));
+    // Finish validation with appropriate wave.
+    s.finish_validation(2, 1);
+    assert_some_eq!(s.try_commit(), 2);
+    assert_eq!(s.commit_state(), (3, 1));
 
     // All txns have been committed.
-    assert!(s.try_commit().is_none());
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
 }
 
 #[test]
-fn rolling_commit_wave_update() {
-    let s = incarnation_one_scheduler(2);
-    // create txn 0 with max_triggered_wave = 0 and required_wave = 1
-    // create txn 1 with max_triggered_wave = 1 and required_wave = 1
+fn no_conflict_task_count() {
+    // When there are no conflicts and transactions do not abort, the number of
+    // execution and validation tasks should be the same, no matter in which order
+    // the concurrent tasks are performed. We can simulate different order by
+    // assigning a virtual duration to each task, and using it as a priority for
+    // calling finish_ on the corresponding task to the scheduler. We should also
+    // keep calling next_task to keep the total number of tasks being worked on
+    // somewhat constant.
+    //
+    // invariants:
+    // 1. should return same number of validation and execution tasks, = num_txns;
+    // 2. all incarnations should be 0.
+    // 3. current wave should always be 0.
 
-    // Increase validation_index
-    assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
+    let num_txns = 1000;
+    for num_concurrent_tasks in [1, 5, 10, 20] {
+        let s = Scheduler::new(num_txns);
 
-    // Requires revalidation suffix, so validation index will be decreased to 1
-    // validation_index, wave = 1
-    // txn 1 max_triggered_wave = 1
-    assert!(matches!(
-        s.finish_execution(1, 1, true),
-        SchedulerTask::NoTask
-    ));
+        let mut tasks = BTreeMap::new();
 
-    // The required_wave of txn 0 is 1
-    assert!(matches!(
-        s.finish_execution(0, 1, false),
-        SchedulerTask::ValidationTask((0, 1), 1)
-    ));
+        let mut rng = rand::thread_rng();
+        let mut num_exec_tasks = 0;
+        let mut num_val_tasks = 0;
 
-    // finish validating txn 0 with lower wave
-    s.finish_validation(0, 0);
-    // txn 0 cannot be committed since the required_wave of txn 0 is 1
-    assert!(s.try_commit().is_none());
-    assert!(matches!(s.commit_state(), (0, 0)));
+        loop {
+            while tasks.len() < num_concurrent_tasks {
+                match s.next_task(false) {
+                    SchedulerTask::ExecutionTask((txn_idx, incarnation), _) => {
+                        assert_eq!(incarnation, 0);
+                        // true means an execution task.
+                        tasks.insert(rng.gen::<u32>(), (true, txn_idx));
+                    },
+                    SchedulerTask::ValidationTask((txn_idx, incarnation), cur_wave) => {
+                        assert_eq!(incarnation, 0);
+                        assert_eq!(cur_wave, 0);
+                        // false means a validation task.
+                        tasks.insert(rng.gen::<u32>(), (false, txn_idx));
+                    },
+                    SchedulerTask::NoTask => break,
+                    // Unreachable because we never call try_commit.
+                    SchedulerTask::Done => unreachable!(),
+                }
+            }
 
-    // finish validating txn 0 with proper wave
-    s.finish_validation(0, 1);
-    // txn 0 can be committed
-    assert!(s.try_commit().is_some());
-    assert!(matches!(s.commit_state(), (1, 0)));
+            if tasks.is_empty() {
+                break;
+            }
 
-    // finish validating txn 1 with lower wave
-    s.finish_validation(1, 0);
-    // txn 1 cannot be committed
-    assert!(s.try_commit().is_none());
-    assert!(matches!(s.commit_state(), (1, 1)));
+            // Do a few tasks.
+            let num_tasks_to_perform = rng.gen_range(1, min(tasks.len(), 4) + 1);
+            for _ in 0..num_tasks_to_perform {
+                match tasks.pop_first().unwrap() {
+                    (_, (true, txn_idx)) => {
+                        let task_res = s.finish_execution(txn_idx, 0, true);
+                        num_exec_tasks += 1;
 
-    // finish validating txn 1 with proper wave
-    s.finish_validation(1, 1);
-    // txn 1 can be committed
-    assert!(s.try_commit().is_some());
-    assert!(matches!(s.commit_state(), (2, 1)));
+                        // Process a task that may have been returned.
+                        if let SchedulerTask::ValidationTask((idx, incarnation), wave) = task_res {
+                            assert_eq!(idx, txn_idx);
+                            assert_eq!(incarnation, 0);
+                            assert_eq!(wave, 0);
+                            tasks.insert(rng.gen::<u32>(), (false, txn_idx));
+                        } else {
+                            assert_matches!(task_res, SchedulerTask::NoTask);
+                        }
+                    },
+                    (_, (false, txn_idx)) => {
+                        s.finish_validation(txn_idx, 0);
+                        num_val_tasks += 1;
+                    },
+                }
+            }
+        }
 
-    // All txns have been committed.
-    assert!(s.try_commit().is_none());
-    assert!(matches!(s.next_task(false), SchedulerTask::Done));
+        assert_eq!(num_exec_tasks, num_txns);
+        assert_eq!(num_val_tasks, num_txns);
+
+        for i in 0..num_txns {
+            assert_some_eq!(s.try_commit(), i);
+            assert_eq!(s.commit_state(), (i + 1, 0));
+        }
+        assert!(matches!(s.next_task(false), SchedulerTask::Done));
+    }
 }
