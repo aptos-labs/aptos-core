@@ -171,18 +171,18 @@ async fn get_balances(
                     }
 
                     /* TODO: Right now operator stake is not supported
-                      else if account.is_operator_stake() {
-                          // For operator stake, filter on operator address
-                          let operator_address = account.operator_address()?;
-                          if let Some(contract) = store.staking_contracts.get(&operator_address) {
-                              balances.push(get_total_stake(
-                                  rest_client,
-                                  &account,
-                                  contract.pool_address,
-                                  version,
-                              ).await?);
-                          }
-                      }*/
+                    else if account.is_operator_stake() {
+                        // For operator stake, filter on operator address
+                        let operator_address = account.operator_address()?;
+                        if let Some(contract) = store.staking_contracts.get(&operator_address) {
+                            balances.push(get_total_stake(
+                                rest_client,
+                                &account,
+                                contract.pool_address,
+                                version,
+                            ).await?);
+                        }
+                    }*/
                 },
                 _ => {},
             }

@@ -134,8 +134,11 @@ impl AccountIdentifier {
 
     pub fn is_operator_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
-            !(inner.is_total_stake() || inner.is_active_stake() || inner.is_pending_active_stake()
-                || inner.is_inactive_stake() || inner.is_pending_inactive_stake())
+            !(inner.is_total_stake()
+                || inner.is_active_stake()
+                || inner.is_pending_active_stake()
+                || inner.is_inactive_stake()
+                || inner.is_pending_inactive_stake())
         } else {
             false
         }
@@ -395,7 +398,8 @@ mod test {
         let active_stake_account = AccountIdentifier::active_stake_account(account);
         let pending_active_stake_account = AccountIdentifier::pending_active_stake_account(account);
         let inactive_stake_account = AccountIdentifier::inactive_stake_account(account);
-        let pending_inactive_stake_account = AccountIdentifier::pending_inactive_stake_account(account);
+        let pending_inactive_stake_account =
+            AccountIdentifier::pending_inactive_stake_account(account);
 
         assert!(base_account.is_base_account());
         assert!(!operator_stake_account.is_base_account());
@@ -418,14 +422,16 @@ mod test {
         assert!(inactive_stake_account.is_inactive_stake());
         assert!(pending_inactive_stake_account.is_pending_inactive_stake());
 
-
         assert_eq!(Ok(account), base_account.account_address());
         assert_eq!(Ok(account), operator_stake_account.account_address());
         assert_eq!(Ok(account), total_stake_account.account_address());
         assert_eq!(Ok(account), active_stake_account.account_address());
         assert_eq!(Ok(account), pending_active_stake_account.account_address());
         assert_eq!(Ok(account), inactive_stake_account.account_address());
-        assert_eq!(Ok(account), pending_inactive_stake_account.account_address());
+        assert_eq!(
+            Ok(account),
+            pending_inactive_stake_account.account_address()
+        );
 
         assert!(base_account.operator_address().is_err());
         assert_eq!(Ok(operator), operator_stake_account.operator_address());

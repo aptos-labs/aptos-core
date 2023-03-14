@@ -520,8 +520,7 @@ async fn unlock_stake(
     let unlock_stake = info
         .transaction_factory()
         .payload(aptos_stdlib::staking_contract_unlock_stake(
-            operator,
-            amount,
+            operator, amount,
         ))
         .sequence_number(2);
 

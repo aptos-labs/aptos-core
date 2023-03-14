@@ -258,7 +258,9 @@ pub async fn get_stake_balances(
         }
 
         // If the operator address is different, skip
-        if owner_account.is_operator_stake() && owner_account.operator_address()? != stake_pool.operator_address {
+        if owner_account.is_operator_stake()
+            && owner_account.operator_address()? != stake_pool.operator_address
+        {
             return Err(ApiError::InvalidInput(Some(
                 "Stake pool not for matching operator".to_string(),
             )));
@@ -280,7 +282,7 @@ pub async fn get_stake_balances(
         }
 
         if let Some(balance) = requested_balance {
-            return Ok(Some(Amount {
+            Ok(Some(Amount {
                 value: balance,
                 currency: native_coin(),
             }))
