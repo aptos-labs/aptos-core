@@ -21,7 +21,7 @@ aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-tool = { workspace = true }
-aptos-faucet = { workspace = true }
+aptos-faucet-core = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-genesis = { workspace = true }
