@@ -130,31 +130,8 @@ pub static EXPIRED_PROOFS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is higher.
-pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER: Lazy<Histogram> =
-    Lazy::new(|| {
-        register_histogram!(
-        "quorum_store_gap_batch_expiration_and_last_certified_round_higher",
-        "Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is higher.",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
-    )
-    .unwrap()
-    });
-
-/// Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is lower.
-pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER: Lazy<Histogram> = Lazy::new(
-    || {
-        register_histogram!(
-        "quorum_store_gap_batch_expiration_and_last_certified_round_lower",
-        "Histogram for the gaps between expiration round of the batch and the last certified round, and expiration round is lower.",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
-    )
-    .unwrap()
-    },
-);
-
 /// Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.
-pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_ROUND_WHEN_PULL_PROOFS: Lazy<Histogram> =
+pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS: Lazy<Histogram> =
     Lazy::new(|| {
         register_histogram!(
         "quorum_store_gap_batch_expiration_and_current_round_when_pull",
