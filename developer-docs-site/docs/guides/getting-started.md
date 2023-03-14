@@ -142,8 +142,8 @@ If the script above does not work for you, you can install these manually, but i
 1. Install [Rust](https://www.rust-lang.org/tools/install).
 1. Install [LLVM](https://releases.llvm.org/).  Visit their GitHub repository for the [latest prebuilt release](https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.7).
 1. Install [Microsoft Visual Studio Build Tools for Windows](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022). During setup, select "Desktop development with C++" and three additional options: MSVC C++ build tools, Windows 10/11 SDK, and C++ CMake tools for Windows.
-1. Install [CMake](https://cmake.org/download/) (if not already installed with Visual Studio).
 1. If on Windows ARM, install [Visual Studio](https://visualstudio.microsoft.com/vs).
+1. If not already installed during Visual Studio/Build Tools installation, install [CMake](https://cmake.org/download/).
 
 1. Open a new PowerShell terminal after installing all dependencies
 
