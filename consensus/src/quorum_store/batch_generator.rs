@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-
-use crate::quorum_store::{
-    batch_coordinator::BatchCoordinatorCommand,
-    counters,
-    quorum_store_db::QuorumStoreStorage,
-    types::BatchId,
-    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+use crate::{
+    monitor,
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand,
+        counters,
+        quorum_store_db::QuorumStoreStorage,
+        types::BatchId,
+        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+    },
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
@@ -276,7 +278,7 @@ impl BatchGenerator {
                 Some(updated_back_pressure) = back_pressure_rx.recv() => {
                     self.back_pressure = updated_back_pressure;
                 },
-                _ = interval.tick() => {
+                _ = interval.tick() => monitor!("batch_generator_handle_tick", {
                     let now = Instant::now();
                     // TODO: refactor back_pressure logic into its own function
                     if self.back_pressure.txn_count {
@@ -309,28 +311,31 @@ impl BatchGenerator {
                     } else {
                         counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0);
                     }
-                    let since_last_pull_ms = std::cmp::min(
+                    let since_last_non_empty_pull_ms = std::cmp::min(
                         now.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
-                    if !self.back_pressure.proof_count || since_last_pull_ms == self.config.batch_generation_max_interval_ms {
-                        last_non_empty_pull = now;
+                    if (!self.back_pressure.proof_count
+                        && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
+                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
+
                         let dynamic_pull_max_txn = std::cmp::max(
-                            (since_last_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
+                            (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         if let Some(proof_rx) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
+                            last_non_empty_pull = now;
                             proofs_in_progress.push(Box::pin(proof_rx));
                         }
                     }
-                },
-                Some(next_proof) = proofs_in_progress.next() => {
+                }),
+                Some(next_proof) = proofs_in_progress.next() => monitor!("batch_generator_handle_proof", {
                     match next_proof {
                         Ok(proof) => self.handle_completed_proof(proof).await,
                         Err(_) => {
                             debug!("QS: proof oneshot dropped");
                         }
                     }
-                },
-                Some(cmd) = cmd_rx.recv() => {
+                }),
+                Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
                         BatchGeneratorCommand::CommitNotification(logical_time) => {
                             trace!(
@@ -367,7 +372,7 @@ impl BatchGenerator {
                             break;
                         },
                     }
-                }
+                })
             }
         }
     }

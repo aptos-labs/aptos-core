@@ -19,11 +19,15 @@ use crate::{
     },
     utils::error_notes::ErrorNotes,
 };
-use anyhow::Result;
+use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Parser, Debug, Serialize, Deserialize)]
@@ -95,7 +99,7 @@ impl BackupStorage for CommandAdapter {
         let mut child = self
             .cmd(&self.config.commands.create_for_write, vec![
                 EnvVar::backup_handle(backup_handle.to_string()),
-                EnvVar::file_name(name.to_string()),
+                EnvVar::file_name(name.as_ref()),
             ])
             .spawn()?;
         let mut file_handle = FileHandle::new();
@@ -121,15 +125,24 @@ impl BackupStorage for CommandAdapter {
     }
 
     async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
+        let txt = TextLine::new(content.as_ref().trim_end_matches('\n'))?;
+        self.save_metadata_lines(name, vec![txt].as_slice()).await
+    }
+
+    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
         let mut child = self
             .cmd(&self.config.commands.save_metadata_line, vec![
-                EnvVar::file_name(name.to_string()),
+                EnvVar::file_name(name.as_ref()),
             ])
             .spawn()?;
-
+        let content = lines
+            .iter()
+            .map(|e| e.as_ref())
+            .collect::<Vec<&str>>()
+            .join("");
         child
             .stdin()
-            .write_all(content.as_ref().as_bytes())
+            .write_all(content.as_bytes())
             .await
             .err_notes(name)?;
         child.join().await?;
@@ -148,5 +161,28 @@ impl BackupStorage for CommandAdapter {
             .await
             .err_notes((file!(), line!(), &buf))?;
         Ok(buf.lines().map(str::to_string).collect())
+    }
+
+    /// file_handle are expected to be the return results from list_metadata_files
+    /// file_handle is a path with `metadata` in the path, Ex: metadata/epoch_ending_1.meta
+    async fn backup_metadata_file(&self, file_handle: &FileHandleRef) -> Result<()> {
+        // extract the file name from the file_handle
+        let name = Path::new(file_handle)
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| format_err!("cannot extract filename from {}", file_handle))?;
+
+        let child = self
+            .cmd(
+                self.config
+                    .commands
+                    .backup_metadata_file
+                    .as_ref()
+                    .expect("metadata backup command not defined !"),
+                vec![EnvVar::file_name(name)],
+            )
+            .spawn()?;
+        child.join().await?;
+        Ok(())
     }
 }
