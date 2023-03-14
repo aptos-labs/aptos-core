@@ -70,6 +70,7 @@ Install these IDE plugins for the Move language to gain some handy features:
 - [Syntax highlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer): Supports advanced code navigation and syntax highlighting.
 - [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language): Supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
+- [Remix IDE Plugin](../../community/contributions/remix-ide-plugin.md): Offers a web-based development environment. It is a no-setup tool with a graphical interface for developing Move modules.
 
 ## Supporting Move resources
 

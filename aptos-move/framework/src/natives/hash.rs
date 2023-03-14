@@ -5,14 +5,14 @@ use crate::{
     natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
     safely_assert_eq, safely_pop_arg,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, hash::Hasher};
+use std::{collections::VecDeque, hash::Hasher, sync::Arc};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 
 /***************************************************************************************************
@@ -201,39 +201,62 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
             "sip_hash",
-            make_safe_native(gas_params.sip_hash, timed_features.clone(), native_sip_hash),
+            make_safe_native(
+                gas_params.sip_hash,
+                timed_features.clone(),
+                features.clone(),
+                native_sip_hash,
+            ),
         ),
         (
             "keccak256",
             make_safe_native(
                 gas_params.keccak256,
                 timed_features.clone(),
+                features.clone(),
                 native_keccak256,
             ),
         ),
         (
             "sha2_512_internal",
-            make_safe_native(gas_params.sha2_512, timed_features.clone(), native_sha2_512),
+            make_safe_native(
+                gas_params.sha2_512,
+                timed_features.clone(),
+                features.clone(),
+                native_sha2_512,
+            ),
         ),
         (
             "sha3_512_internal",
-            make_safe_native(gas_params.sha3_512, timed_features.clone(), native_sha3_512),
+            make_safe_native(
+                gas_params.sha3_512,
+                timed_features.clone(),
+                features.clone(),
+                native_sha3_512,
+            ),
         ),
         (
             "ripemd160_internal",
             make_safe_native(
                 gas_params.ripemd160,
                 timed_features.clone(),
+                features.clone(),
                 native_ripemd160,
             ),
         ),
         (
             "blake2b_256_internal",
-            make_safe_native(gas_params.blake2b_256, timed_features, native_blake2b_256),
+            make_safe_native(
+                gas_params.blake2b_256,
+                timed_features,
+                features,
+                native_blake2b_256,
+            ),
         ),
     ];
 

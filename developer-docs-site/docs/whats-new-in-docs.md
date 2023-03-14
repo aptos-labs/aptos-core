@@ -7,6 +7,12 @@ slug: "whats-new-in-docs"
 
 This page shows the key updates to the developer documentation on this site. Note, this site is built from the `main` upstream branch of GitHub and so therefore reflects the latest changes to Aptos. If you have checked out [another branch](https://github.com/aptos-labs/aptos-core/branches) to use a [specific network](guides/system-integrators-guide.md#choose-a-network), the code may not yet have all of the features described here.
 
+## 08 March 2023
+
+- Added a [Latest Releases](releases/index.md) section to the *Start* menu showing the newest, recommended version of each Aptos component (CLI, framework, and node) by network.
+
+- Released Aptos Node version [1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.0) to [testnet](releases/testnet-release.md) and a new version to [devnet](releases/devnet-release.md).
+
 ## 07 March 2023
 
 - Published documentation for the new [Aptos Unity SDK](./sdks/unity-sdk.md) highlighting its uses and explaining how to install it.

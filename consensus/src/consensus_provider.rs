@@ -13,6 +13,7 @@ use crate::{
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_event_notifications::ReconfigNotificationListener;
@@ -60,6 +61,7 @@ pub fn start_consensus(
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
+    let bounded_executor = BoundedExecutor::new(4, runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -71,6 +73,7 @@ pub fn start_consensus(
         storage,
         quorum_store_db,
         reconfig_events,
+        bounded_executor,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

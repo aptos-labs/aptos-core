@@ -28,6 +28,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
 
@@ -104,6 +105,8 @@ impl BlockAptosVM {
             });
         drop(signature_verification_timer);
 
+        init_speculative_logs(signature_verified_block.len());
+
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
@@ -124,6 +127,8 @@ impl BlockAptosVM {
                         .collect()
                 })
             });
+
+        flush_speculative_logs();
 
         match ret {
             Ok(outputs) => Ok(outputs),

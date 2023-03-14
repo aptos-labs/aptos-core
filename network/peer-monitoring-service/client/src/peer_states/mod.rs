@@ -10,7 +10,7 @@ use key_value::PeerStateKey;
 use std::collections::HashMap;
 use tokio::runtime::Handle;
 
-mod key_value;
+pub mod key_value;
 mod latency_info;
 mod network_info;
 pub mod peer_state;

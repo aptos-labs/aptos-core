@@ -35,7 +35,7 @@ function App() {
 const fetchList = async () => {
   if (!account) return [];
   try {
-    const TodoListResource = await client.getAccountResource(
+    const TodoListResource = await provider.getAccountResource(
       account?.address,
       `${moduleAddress}::todolist::TodoList`
     );
@@ -53,7 +53,7 @@ const fetchList = async () => {
         value_type: `${moduleAddress}::todolist::Task`,
         key: `${counter}`,
       };
-      const task = await client.getTableItem(tableHandle, tableItem);
+      const task = await provider.getTableItem(tableHandle, tableItem);
       tasks.push(task);
       counter++;
     }
@@ -87,7 +87,7 @@ while (counter <= taskCounter) {
     value_type: `${moduleAddress}::todolist::Task`,
     key: `${counter}`,
   };
-  const task = await client.getTableItem(tableHandle, tableItem);
+  const task = await provider.getTableItem(tableHandle, tableItem);
   tasks.push(task);
   counter++;
 }
@@ -179,7 +179,7 @@ We haven’t added any tasks yet, so we simply see a box of empty data. Let’s 
 
 ## Add task
 
-1. Update our UI with an *add task* input:
+1. Update our UI with an _add task_ input:
 
 ```jsx
 {!accountHasList ? (
@@ -289,7 +289,7 @@ const onTaskAdded = async () => {
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
 
 			// hold the latest task.task_id from our local state
       const latestId = tasks.length > 0 ? parseInt(tasks[tasks.length - 1].task_id) + 1 : 1;
@@ -381,7 +381,7 @@ const onCheckboxChange = async (
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
 
       setTasks((prevState) => {
         const newState = prevState.map((obj) => {
