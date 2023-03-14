@@ -226,16 +226,13 @@ impl InnerBuilder {
             .aptos_db
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
-        let last_committed_round = if latest_ledger_info_with_sigs
+        let last_committed_timestamp = if latest_ledger_info_with_sigs
             .ledger_info()
             .commit_info()
             .epoch()
             == self.epoch
         {
-            latest_ledger_info_with_sigs
-                .ledger_info()
-                .commit_info()
-                .round()
+            latest_ledger_info_with_sigs.commit_info().timestamp_usecs()
         } else {
             0
         };
@@ -249,12 +246,8 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
-            last_committed_round,
+            last_committed_timestamp,
             self.quorum_store_storage.clone(),
-            self.config.batch_expiry_round_gap_when_init,
-            self.config.batch_expiry_round_gap_behind_latest_certified,
-            self.config.batch_expiry_round_gap_beyond_latest_certified,
-            self.config.batch_expiry_grace_rounds,
             self.config.memory_quota,
             self.config.db_quota,
             batch_requester,

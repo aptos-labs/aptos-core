@@ -89,8 +89,9 @@ impl Display for BatchId {
 pub struct SignedDigestInfo {
     pub batch_author: PeerId,
     pub batch_id: BatchId,
+    pub epoch: u64,
     pub digest: HashValue,
-    pub expiration: LogicalTime,
+    pub expiration: u64,
     pub num_txns: u64,
     pub num_bytes: u64,
 }
@@ -99,14 +100,16 @@ impl SignedDigestInfo {
     pub fn new(
         batch_author: PeerId,
         batch_id: BatchId,
+        epoch: u64,
         digest: HashValue,
-        expiration: LogicalTime,
+        expiration: u64,
         num_txns: u64,
         num_bytes: u64,
     ) -> Self {
         Self {
             batch_author,
             batch_id,
+            epoch,
             digest,
             expiration,
             num_txns,
@@ -129,7 +132,7 @@ impl SignedDigest {
         batch_id: BatchId,
         epoch: u64,
         digest: HashValue,
-        expiration: LogicalTime,
+        expiration: u64,
         num_txns: u64,
         num_bytes: u64,
         validator_signer: &ValidatorSigner,
@@ -137,6 +140,7 @@ impl SignedDigest {
         let info = SignedDigestInfo::new(
             batch_author,
             batch_id,
+            epoch,
             digest,
             expiration,
             num_txns,
@@ -210,7 +214,7 @@ impl ProofOfStore {
         &self.info.digest
     }
 
-    pub fn expiration(&self) -> LogicalTime {
+    pub fn expiration(&self) -> u64 {
         self.info.expiration
     }
 
@@ -229,6 +233,6 @@ impl ProofOfStore {
     }
 
     pub fn epoch(&self) -> u64 {
-        self.info.expiration.epoch
+        self.info.epoch
     }
 }

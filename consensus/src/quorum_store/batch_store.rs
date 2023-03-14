@@ -5,7 +5,7 @@ use crate::{
     network::QuorumStoreSender,
     quorum_store::{
         batch_requester::BatchRequester, counters, quorum_store_db::QuorumStoreStorage,
-        types::PersistedValue, utils::RoundExpirations,
+        types::PersistedValue, utils::TimeExpirations,
     },
 };
 use anyhow::bail;
@@ -46,7 +46,7 @@ impl PersistRequest {
         payload: Vec<SignedTransaction>,
         digest_hash: HashValue,
         num_bytes: usize,
-        expiration: LogicalTime,
+        expiration: u64,
     ) -> Self {
         Self {
             digest: digest_hash,
@@ -117,15 +117,11 @@ fn payload_storage_mode(persisted_value: &PersistedValue) -> StorageMode {
 /// efficient concurrent readers.
 pub struct BatchStore<T> {
     epoch: OnceCell<u64>,
-    last_certified_round: AtomicU64,
+    last_certified_timestamp: AtomicU64,
     db_cache: DashMap<HashValue, PersistedValue>,
     peer_quota: DashMap<PeerId, QuotaManager>,
-    expirations: Mutex<RoundExpirations<HashValue>>,
+    expirations: Mutex<TimeExpirations<HashValue>>,
     db: Arc<dyn QuorumStoreStorage>,
-    batch_expiry_round_gap_when_init: Round,
-    batch_expiry_round_gap_behind_latest_certified: Round,
-    batch_expiry_round_gap_beyond_latest_certified: Round,
-    expiry_grace_rounds: Round,
     memory_quota: usize,
     db_quota: usize,
     batch_requester: BatchRequester<T>,
@@ -136,12 +132,8 @@ pub struct BatchStore<T> {
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     pub(crate) fn new(
         epoch: u64,
-        last_certified_round: Round,
+        last_certified_timestamp: u64,
         db: Arc<dyn QuorumStoreStorage>,
-        batch_expiry_round_gap_when_init: Round,
-        batch_expiry_round_gap_behind_latest_certified: Round,
-        batch_expiry_round_gap_beyond_latest_certified: Round,
-        expiry_grace_rounds: Round,
         memory_quota: usize,
         db_quota: usize,
         batch_requester: BatchRequester<T>,
@@ -151,15 +143,11 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         let db_clone = db.clone();
         let batch_store = Self {
             epoch: OnceCell::with_value(epoch),
-            last_certified_round: AtomicU64::new(last_certified_round),
+            last_certified_timestamp: AtomicU64::new(last_certified_timestamp),
             db_cache: DashMap::new(),
             peer_quota: DashMap::new(),
-            expirations: Mutex::new(RoundExpirations::new()),
+            expirations: Mutex::new(TimeExpirations::new()),
             db,
-            batch_expiry_round_gap_when_init,
-            batch_expiry_round_gap_behind_latest_certified,
-            batch_expiry_round_gap_beyond_latest_certified,
-            expiry_grace_rounds,
             memory_quota,
             db_quota,
             batch_requester,
@@ -174,7 +162,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             "QS: Batchreader {} {} {}",
             db_content.len(),
             epoch,
-            last_certified_round
+            last_certified_timestamp
         );
         for (digest, value) in db_content {
             let expiration = value.expiration;
@@ -184,11 +172,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 expiration,
                 digest
             );
-            assert!(epoch >= expiration.epoch());
 
-            if epoch > expiration.epoch()
-                || last_certified_round >= expiration.round() + expiry_grace_rounds
-            {
+            if last_certified_timestamp >= expiration {
                 expired_keys.push(digest);
             } else {
                 batch_store
@@ -234,14 +219,14 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         mut value: PersistedValue,
     ) -> anyhow::Result<bool> {
         let author = value.author;
-        let expiration_round = value.expiration.round();
+        let expiration_time = value.expiration;
 
         {
             // Acquire dashmap internal lock on the entry corresponding to the digest.
             let cache_entry = self.db_cache.entry(digest);
 
             if let Occupied(entry) = &cache_entry {
-                if entry.get().expiration.round() >= value.expiration.round() {
+                if entry.get().expiration >= expiration_time {
                     debug!(
                         "QS: already have the digest with higher expiration {}",
                         digest
@@ -276,60 +261,30 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         self.expirations
             .lock()
             .unwrap()
-            .add_item(digest, expiration_round);
+            .add_item(digest, expiration_time);
         Ok(true)
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
-        if value.expiration.epoch() == self.epoch() {
-            // record the round gaps
-            if value.expiration.round() > self.last_certified_round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_HIGHER
-                    .observe((value.expiration.round() - self.last_certified_round()) as f64);
-            }
-            if value.expiration.round() < self.last_certified_round() {
-                counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_LAST_CERTIFIED_ROUND_LOWER
-                    .observe((self.last_certified_round() - value.expiration.round()) as f64);
-            }
+        if value.expiration >= self.last_certified_timestamp() {
+            fail_point!("quorum_store::save", |_| {
+                // Skip caching and storing value to the db
+                Ok(false)
+            });
 
-            if value.expiration.round() + self.batch_expiry_round_gap_behind_latest_certified
-                >= self.last_certified_round()
-                && value.expiration.round()
-                    <= self.last_certified_round()
-                        + self.batch_expiry_round_gap_beyond_latest_certified
-            {
-                fail_point!("quorum_store::save", |_| {
-                    // Skip caching and storing value to the db
-                    Ok(false)
-                });
-
-                return self.insert_to_cache(digest, value);
-            }
+            return self.insert_to_cache(digest, value);
         }
-        bail!("Incorrect expiration {:?} with init gap {} in epoch {}, last committed round {} and max behind gap {} max beyond gap {}",
+        bail!(
+            "Incorrect expiration {} in epoch {}, last committed timestamp {}",
             value.expiration,
-            self.batch_expiry_round_gap_when_init,
             self.epoch(),
-            self.last_certified_round(),
-            self.batch_expiry_round_gap_behind_latest_certified,
-            self.batch_expiry_round_gap_beyond_latest_certified);
+            self.last_certified_timestamp(),
+        );
     }
 
     // pub(crate) for testing
-    pub(crate) fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
-        assert_eq!(
-            certified_time.epoch(),
-            self.epoch(),
-            "Execution epoch inconsistent with BatchReader"
-        );
-
-        let expired_round = if certified_time.round() >= self.expiry_grace_rounds {
-            certified_time.round() - self.expiry_grace_rounds
-        } else {
-            0
-        };
-
-        let expired_digests = self.expirations.lock().unwrap().expire(expired_round);
+    pub(crate) fn clear_expired_payload(&self, certified_time: u64) -> Vec<HashValue> {
+        let expired_digests = self.expirations.lock().unwrap().expire(certified_time);
         let mut ret = Vec::new();
         for h in expired_digests {
             let removed_value = match self.db_cache.entry(h) {
@@ -337,7 +292,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     // We need to check up-to-date expiration again because receiving the same
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
-                    if entry.get().expiration.round() <= expired_round {
+                    if entry.get().expiration <= certified_time {
                         Some(entry.remove())
                     } else {
                         None
@@ -356,13 +311,6 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
     pub fn persist(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
         let expiration = persist_request.value.expiration;
-        // Network listener should filter messages with wrong expiration epoch.
-        assert_eq!(
-            expiration.epoch(),
-            self.epoch(),
-            "Persist Request for a batch with an incorrect epoch"
-        );
-
         match self.save(persist_request.digest, persist_request.value.clone()) {
             Ok(needs_db) => {
                 let num_txns = persist_request.value.maybe_payload.as_ref().unwrap().len() as u64;
@@ -401,26 +349,19 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     // batches with expiration in this round can be cleaned up. The parameter
     // expiry grace rounds just keeps the batches around for a little longer
     // for lagging nodes to be able to catch up (without state-sync).
-    pub async fn update_certified_round(&self, certified_time: LogicalTime) {
-        trace!("QS: batch reader updating time {:?}", certified_time);
-        assert_eq!(
-            self.epoch(),
-            certified_time.epoch(),
-            "QS: wrong epoch {} != {}",
-            self.epoch(),
-            certified_time.epoch()
-        );
+    pub async fn update_certified_timestamp(&self, certified_time: u64) {
+        trace!("QS: batch reader updating time {}", certified_time);
 
         let prev_round = self
-            .last_certified_round
-            .fetch_max(certified_time.round(), Ordering::SeqCst);
+            .last_certified_timestamp
+            .fetch_max(certified_time, Ordering::SeqCst);
         // Note: prev_round may be equal to certified_time round due to state-sync
         // at the epoch boundary.
         assert!(
-            prev_round <= certified_time.round(),
-            "Decreasing executed rounds reported to BatchReader {} {}",
+            prev_round <= certified_time,
+            "Decreasing block timestamp reported to BatchReader {} {}",
             prev_round,
-            certified_time.round(),
+            certified_time,
         );
 
         let expired_keys = self.clear_expired_payload(certified_time);
@@ -429,8 +370,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    fn last_certified_round(&self) -> Round {
-        self.last_certified_round.load(Ordering::Relaxed)
+    fn last_certified_timestamp(&self) -> Round {
+        self.last_certified_timestamp.load(Ordering::Relaxed)
     }
 
     fn get_batch_from_db(&self, digest: &HashValue) -> Result<PersistedValue, Error> {

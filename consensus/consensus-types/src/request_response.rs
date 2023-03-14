@@ -48,26 +48,6 @@ impl fmt::Display for GetPayloadCommand {
     }
 }
 
-pub enum CleanCommand {
-    CleanRequest(LogicalTime, Vec<HashValue>),
-}
-
-impl fmt::Display for CleanCommand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CleanCommand::CleanRequest(logical_time, digests) => {
-                write!(
-                    f,
-                    "CleanRequest [epoch: {}, round: {}, digests: {:?}]",
-                    logical_time.epoch(),
-                    logical_time.round(),
-                    digests
-                )
-            },
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum GetPayloadResponse {
     GetPayloadResponse(Payload),

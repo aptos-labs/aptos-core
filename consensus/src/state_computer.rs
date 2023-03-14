@@ -44,7 +44,7 @@ pub struct ExecutionProxy {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
     validators: Mutex<Vec<AccountAddress>>,
-    write_mutex: AsyncMutex<LogicalTime>,
+    write_mutex: AsyncMutex<u64>, // TODO: mutex needed?
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
 }
@@ -77,7 +77,7 @@ impl ExecutionProxy {
             state_sync_notifier,
             async_state_sync_notifier: tx,
             validators: Mutex::new(vec![]),
-            write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
+            write_mutex: AsyncMutex::new(0),
             payload_manager: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
         }
@@ -149,16 +149,13 @@ impl StateComputer for ExecutionProxy {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
-        let mut latest_logical_time = self.write_mutex.lock().await;
+        let mut latest_block_timestamp = self.write_mutex.lock().await;
 
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
         let mut payloads = Vec::new();
-        let logical_time = LogicalTime::new(
-            finality_proof.ledger_info().epoch(),
-            finality_proof.ledger_info().round(),
-        );
+        let block_timestamp = finality_proof.commit_info().timestamp_usecs();
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
@@ -200,26 +197,27 @@ impl StateComputer for ExecutionProxy {
             .await
             .expect("Failed to send async state sync notification");
 
-        *latest_logical_time = logical_time;
-        payload_manager.notify_commit(logical_time, payloads).await;
+        *latest_block_timestamp = block_timestamp;
+        payload_manager
+            .notify_commit(block_timestamp, payloads)
+            .await;
         Ok(())
     }
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
-        let mut latest_logical_time = self.write_mutex.lock().await;
-        let logical_time =
-            LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round());
+        let mut latest_block_timestamp = self.write_mutex.lock().await;
+        let block_timestamp = target.commit_info().timestamp_usecs();
 
         // Before the state synchronization, we have to call finish() to free the in-memory SMT
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
 
         // The pipeline phase already committed beyond the target synced round, just return.
-        if *latest_logical_time >= logical_time {
+        if *latest_block_timestamp >= block_timestamp {
             warn!(
-                "State sync target {:?} is lower than already committed logical time {:?}",
-                logical_time, *latest_logical_time
+                "State sync target {} is lower than already committed block time {}",
+                block_timestamp, *latest_block_timestamp
             );
             return Ok(());
         }
@@ -230,7 +228,7 @@ impl StateComputer for ExecutionProxy {
         let maybe_payload_manager = self.payload_manager.lock().as_ref().cloned();
         if let Some(payload_manager) = maybe_payload_manager {
             payload_manager
-                .notify_commit(logical_time, Vec::new())
+                .notify_commit(block_timestamp, Vec::new())
                 .await;
         }
 
@@ -246,7 +244,7 @@ impl StateComputer for ExecutionProxy {
             "sync_to",
             self.state_sync_notifier.sync_to_target(target).await
         );
-        *latest_logical_time = logical_time;
+        *latest_block_timestamp = block_timestamp;
 
         // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.

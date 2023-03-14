@@ -44,7 +44,7 @@ impl SerializedTransaction {
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
     pub maybe_payload: Option<Vec<SignedTransaction>>,
-    pub expiration: LogicalTime,
+    pub expiration: u64,
     pub author: PeerId,
     pub batch_id: BatchId,
     pub num_bytes: usize,
@@ -53,7 +53,7 @@ pub struct PersistedValue {
 impl PersistedValue {
     pub(crate) fn new(
         maybe_payload: Option<Vec<SignedTransaction>>,
-        expiration: LogicalTime,
+        expiration: u64,
         author: PeerId,
         batch_id: BatchId,
         num_bytes: usize,
@@ -78,7 +78,7 @@ pub struct FragmentInfo {
     batch_id: BatchId,
     fragment_id: usize,
     payload: Vec<SerializedTransaction>,
-    maybe_expiration: Option<LogicalTime>,
+    maybe_expiration: Option<u64>,
 }
 
 impl FragmentInfo {
@@ -87,7 +87,7 @@ impl FragmentInfo {
         batch_id: BatchId,
         fragment_id: usize,
         fragment_payload: Vec<SerializedTransaction>,
-        maybe_expiration: Option<LogicalTime>,
+        maybe_expiration: Option<u64>,
     ) -> Self {
         Self {
             epoch,
@@ -110,7 +110,7 @@ impl FragmentInfo {
         self.batch_id
     }
 
-    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
+    pub fn maybe_expiration(&self) -> Option<u64> {
         self.maybe_expiration
     }
 }
@@ -127,7 +127,7 @@ impl Fragment {
         batch_id: BatchId,
         fragment_id: usize,
         fragment_payload: Vec<SerializedTransaction>,
-        maybe_expiration: Option<LogicalTime>,
+        maybe_expiration: Option<u64>,
         peer_id: PeerId,
     ) -> Self {
         let fragment_info = FragmentInfo::new(
@@ -144,15 +144,6 @@ impl Fragment {
     }
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if let Some(expiration) = &self.fragment_info.maybe_expiration() {
-            if expiration.epoch() != self.fragment_info.epoch {
-                return Err(anyhow::anyhow!(
-                    "Epoch mismatch: info: {}, expiration: {}",
-                    expiration.epoch(),
-                    self.fragment_info.epoch
-                ));
-            }
-        }
         if self.source == peer_id {
             Ok(())
         } else {
@@ -184,7 +175,7 @@ impl Fragment {
         self.fragment_info.batch_id()
     }
 
-    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
+    pub fn maybe_expiration(&self) -> Option<u64> {
         self.fragment_info.maybe_expiration()
     }
 }

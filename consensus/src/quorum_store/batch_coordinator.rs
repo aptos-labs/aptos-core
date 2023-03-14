@@ -64,30 +64,20 @@ impl BatchCoordinator {
                 fragment.fragment_id(),
             );
             let batch_id = fragment.batch_id();
-            if expiration.epoch() == self.epoch {
-                match entry.end_batch(
-                    fragment.batch_id(),
-                    fragment.fragment_id(),
-                    fragment.into_transactions(),
-                ) {
-                    Ok((num_bytes, payload, digest)) => {
-                        let persist_request = PersistRequest::new(
-                            source, batch_id, payload, digest, num_bytes, expiration,
-                        );
-                        return Some(persist_request);
-                    },
-                    Err(e) => {
-                        debug!("Could not append batch from {:?}, error {:?}", source, e);
-                    },
-                }
-            }
-            // Malformed request with an inconsistent expiry epoch.
-            else {
-                trace!(
-                    "QS: got end batch message from different epoch {} != {}",
-                    expiration.epoch(),
-                    self.epoch
-                );
+            match entry.end_batch(
+                fragment.batch_id(),
+                fragment.fragment_id(),
+                fragment.into_transactions(),
+            ) {
+                Ok((num_bytes, payload, digest)) => {
+                    let persist_request = PersistRequest::new(
+                        source, batch_id, payload, digest, num_bytes, expiration,
+                    );
+                    return Some(persist_request);
+                },
+                Err(e) => {
+                    debug!("Could not append batch from {:?}, error {:?}", source, e);
+                },
             }
         } else if let Err(e) = entry.append_transactions(
             fragment.batch_id(),

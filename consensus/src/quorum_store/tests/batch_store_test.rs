@@ -177,7 +177,7 @@ async fn test_extend_expiration_vs_save() {
             }
 
             block_on(
-                batch_store_clone2.update_certified_round(LogicalTime::new(10, i as u64 + 30)),
+                batch_store_clone2.update_certified_timestamp(LogicalTime::new(10, i as u64 + 30)),
             );
             start_clone2.fetch_add(1, Ordering::Relaxed);
         }
@@ -211,7 +211,7 @@ async fn test_extend_expiration_vs_save() {
     // Expire everything, call for higher times as well.
     for i in 35..50 {
         batch_store
-            .update_certified_round(LogicalTime::new(10, (i + num_experiments) as u64))
+            .update_certified_timestamp(LogicalTime::new(10, (i + num_experiments) as u64))
             .await;
     }
 }

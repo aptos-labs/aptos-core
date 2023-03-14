@@ -7,7 +7,7 @@ use crate::{
         counters,
         quorum_store_db::QuorumStoreStorage,
         types::Fragment,
-        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+        utils::{BatchBuilder, MempoolProxy, TimeExpirations},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
@@ -29,7 +29,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(LogicalTime),
+    CommitNotification(u64),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -47,9 +47,9 @@ pub struct BatchGenerator {
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
-    batch_round_expirations: RoundExpirations<BatchId>,
+    batch_expirations: TimeExpirations<BatchId>,
     batch_builder: BatchBuilder,
-    latest_logical_time: LogicalTime,
+    block_timestamp: u64,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
     back_pressure: BackPressure,
@@ -88,9 +88,9 @@ impl BatchGenerator {
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
-            batch_round_expirations: RoundExpirations::new(),
+            batch_expirations: TimeExpirations::new(),
             batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
-            latest_logical_time: LogicalTime::new(epoch, 0),
+            block_timestamp: 0,
             last_end_batch_time: Instant::now(),
             back_pressure: BackPressure {
                 txn_count: false,
@@ -180,26 +180,23 @@ impl BatchGenerator {
             let mut incremented_batch_id = batch_id;
             incremented_batch_id.increment();
             self.db
-                .save_batch_id(self.latest_logical_time.epoch(), incremented_batch_id)
+                .save_batch_id(self.epoch, incremented_batch_id)
                 .expect("Could not save to db");
 
-            let expiry_round =
-                self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
-            let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
+            let expiry_time = self.block_timestamp + self.config.batch_expiry_gap_when_init_usecs;
 
             let fragment = Fragment::new(
                 self.epoch,
                 batch_id,
                 self.batch_builder.fetch_and_increment_fragment_id(),
                 serialized_txns,
-                Some(logical_time),
+                Some(expiry_time),
                 self.my_peer_id,
             );
 
             self.batches_in_progress
                 .insert(batch_id, self.batch_builder.take_summaries());
-            self.batch_round_expirations
-                .add_item(batch_id, expiry_round);
+            self.batch_expirations.add_item(batch_id, expiry_time);
 
             self.last_end_batch_time = Instant::now();
             return Some(fragment);
@@ -287,25 +284,19 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
-                        BatchGeneratorCommand::CommitNotification(logical_time) => {
+                        BatchGeneratorCommand::CommitNotification(block_timestamp) => {
                             trace!(
-                                "QS: got clean request from execution, epoch {}, round {}",
-                                logical_time.epoch(),
-                                logical_time.round()
-                            );
-                            assert_eq!(
-                                self.latest_logical_time.epoch(),
-                                logical_time.epoch(),
-                                "Wrong epoch"
+                                "QS: got clean request from execution, block timestamp {}",
+                                block_timestamp
                             );
                             assert!(
-                                self.latest_logical_time <= logical_time,
-                                "Decreasing logical time"
+                                self.block_timestamp <= block_timestamp,
+                                "Decreasing block timestamp"
                             );
-                            self.latest_logical_time = logical_time;
-                            // Cleans up all batches that expire in rounds <= logical_time.round(). This is
+                            self.block_timestamp = block_timestamp;
+                            // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
-                            for batch_id in self.batch_round_expirations.expire(logical_time.round()) {
+                            for batch_id in self.batch_expirations.expire(block_timestamp) {
                                 if self.batches_in_progress.remove(&batch_id).is_some() {
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",

@@ -4,6 +4,7 @@
 use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
 use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -55,6 +56,7 @@ pub struct QuorumStoreConfig {
     pub batch_expiry_round_gap_behind_latest_certified: Round,
     pub batch_expiry_round_gap_beyond_latest_certified: Round,
     pub batch_expiry_grace_rounds: Round,
+    pub batch_expiry_gap_when_init_usecs: u64,
     pub memory_quota: usize,
     pub db_quota: usize,
     pub mempool_txn_pull_max_bytes: u64,
@@ -79,6 +81,7 @@ impl Default for QuorumStoreConfig {
             batch_expiry_round_gap_behind_latest_certified: 500,
             batch_expiry_round_gap_beyond_latest_certified: 500,
             batch_expiry_grace_rounds: 5,
+            batch_expiry_gap_when_init_usecs: Duration::from_secs(60).as_micros() as u64,
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
