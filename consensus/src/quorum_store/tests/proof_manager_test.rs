@@ -4,24 +4,33 @@
 use crate::quorum_store::proof_manager::ProofManager;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo},
+    proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigestInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
+use move_core_types::account_address::AccountAddress;
 use std::collections::HashSet;
 
 #[tokio::test]
 async fn test_block_request() {
-    let mut proof_manager = ProofManager::new(0, 10, 10);
+    let mut proof_manager = ProofManager::new(0, AccountAddress::random(), 10, 10);
 
     let digest = HashValue::random();
+    let batch_id = BatchId::new_for_test(1);
     let proof = ProofOfStore::new(
-        SignedDigestInfo::new(PeerId::random(), digest, LogicalTime::new(0, 10), 1, 1),
+        SignedDigestInfo::new(
+            PeerId::random(),
+            batch_id,
+            digest,
+            LogicalTime::new(0, 10),
+            1,
+            1,
+        ),
         AggregateSignature::empty(),
     );
-    proof_manager.handle_remote_proof(proof.clone());
+    proof_manager.receive_proof(proof.clone());
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = GetPayloadCommand::GetPayloadRequest(

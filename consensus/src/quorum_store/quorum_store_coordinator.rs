@@ -25,7 +25,6 @@ pub enum CoordinatorCommand {
 pub struct QuorumStoreCoordinator {
     my_peer_id: PeerId,
     batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
-    batch_coordinator_cmd_tx: mpsc::Sender<BatchCoordinatorCommand>,
     remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
@@ -36,7 +35,6 @@ impl QuorumStoreCoordinator {
     pub(crate) fn new(
         my_peer_id: PeerId,
         batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
-        batch_coordinator_cmd_tx: mpsc::Sender<BatchCoordinatorCommand>,
         remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
@@ -45,7 +43,6 @@ impl QuorumStoreCoordinator {
         Self {
             my_peer_id,
             batch_generator_cmd_tx,
-            batch_coordinator_cmd_tx,
             remote_batch_coordinator_cmd_tx,
             proof_coordinator_cmd_tx,
             proof_manager_cmd_tx,
@@ -102,18 +99,6 @@ impl QuorumStoreCoordinator {
                         batch_generator_shutdown_rx
                             .await
                             .expect("Failed to stop BatchGenerator");
-
-                        let (batch_coordinator_shutdown_tx, batch_coordinator_shutdown_rx) =
-                            oneshot::channel();
-                        self.batch_coordinator_cmd_tx
-                            .send(BatchCoordinatorCommand::Shutdown(
-                                batch_coordinator_shutdown_tx,
-                            ))
-                            .await
-                            .expect("Failed to send to BatchCoordinator");
-                        batch_coordinator_shutdown_rx
-                            .await
-                            .expect("Failed to stop BatchCoordinator");
 
                         for remote_batch_coordinator_cmd_tx in self.remote_batch_coordinator_cmd_tx
                         {

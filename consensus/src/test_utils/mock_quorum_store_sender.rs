@@ -19,8 +19,8 @@ pub struct MockQuorumStoreSender {
 }
 
 impl MockQuorumStoreSender {
-    pub fn new(rx: Sender<(ConsensusMsg, Vec<Author>)>) -> Self {
-        Self { tx: rx }
+    pub fn new(tx: Sender<(ConsensusMsg, Vec<Author>)>) -> Self {
+        Self { tx }
     }
 }
 
@@ -63,7 +63,13 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         unimplemented!()
     }
 
-    async fn broadcast_proof_of_store(&mut self, _proof_of_store: ProofOfStore) {
-        unimplemented!()
+    async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore) {
+        self.tx
+            .send((
+                ConsensusMsg::ProofOfStoreMsg(Box::new(proof_of_store)),
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 }

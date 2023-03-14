@@ -8,7 +8,7 @@ use crate::{
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_consensus_types::proof_of_store::LogicalTime;
+use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
@@ -61,6 +61,7 @@ fn test_insert_expire() {
                 Some(Vec::new()),
                 LogicalTime::new(10, 15), // Expiration
                 AccountAddress::random(),
+                BatchId::new_for_test(1),
                 10,
             ),
         ),
@@ -74,6 +75,7 @@ fn test_insert_expire() {
                 Some(Vec::new()),
                 LogicalTime::new(10, 30), // Expiration
                 AccountAddress::random(),
+                BatchId::new_for_test(1),
                 10,
             ),
         ),
@@ -86,6 +88,7 @@ fn test_insert_expire() {
                 Some(Vec::new()),
                 LogicalTime::new(10, 25), // Expiration
                 AccountAddress::random(),
+                BatchId::new_for_test(1),
                 10,
             ),
         ),
@@ -121,6 +124,7 @@ async fn test_extend_expiration_vs_save() {
                             Some(Vec::new()),
                             LogicalTime::new(10, i as u64 + 30),
                             AccountAddress::random(),
+                            BatchId::new_for_test(1),
                             10,
                         ),
                     )
@@ -133,6 +137,7 @@ async fn test_extend_expiration_vs_save() {
                     Some(Vec::new()),
                     LogicalTime::new(10, i as u64 + 40),
                     AccountAddress::random(),
+                    BatchId::new_for_test(1),
                     10,
                 ),
             )
@@ -190,6 +195,7 @@ async fn test_extend_expiration_vs_save() {
                         Some(Vec::new()),
                         LogicalTime::new(10, i as u64 + 30),
                         AccountAddress::random(),
+                        BatchId::new_for_test(1),
                         10,
                     ),
                 )
