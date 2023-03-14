@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::traits::Checker;
+use super::{CheckerData, CheckerTrait};
 use crate::{
-    checkers::CheckerData,
     common::{AuthTokenManager, AuthTokenManagerConfig},
     endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
 };
@@ -28,7 +27,7 @@ impl AuthTokenChecker {
 }
 
 #[async_trait]
-impl Checker for AuthTokenChecker {
+impl CheckerTrait for AuthTokenChecker {
     async fn check(
         &self,
         data: CheckerData,

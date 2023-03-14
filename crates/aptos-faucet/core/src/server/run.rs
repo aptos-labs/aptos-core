@@ -4,7 +4,7 @@
 use super::server_args::ServerConfig;
 use crate::{
     bypasser::{Bypasser, BypasserConfig},
-    checkers::{CaptchaManager, Checker, CheckerConfig},
+    checkers::{CaptchaManager, Checker, CheckerConfig, CheckerTrait},
     endpoints::{
         build_openapi_service, convert_error, mint, BasicApi, CaptchaApi, FundApi,
         FundApiComponents,
@@ -85,7 +85,7 @@ impl RunConfig {
         // Build Funder.
         let funder = self
             .funder_config
-            .build_funder()
+            .build()
             .await
             .context("Failed to build Funder")?;
 
@@ -99,14 +99,11 @@ impl RunConfig {
         let captcha_manager = Arc::new(Mutex::new(CaptchaManager::new()));
 
         // Build Bypassers.
-        let mut bypassers: Vec<Box<dyn Bypasser>> = Vec::new();
+        let mut bypassers: Vec<Bypasser> = Vec::new();
         for bypasser_config in &self.bypasser_configs {
-            let bypasser = bypasser_config
-                .clone()
-                .try_into_boxed_bypasser()
-                .with_context(|| {
-                    format!("Failed to build Bypasser with args: {:?}", bypasser_config)
-                })?;
+            let bypasser = bypasser_config.clone().build().with_context(|| {
+                format!("Failed to build Bypasser with args: {:?}", bypasser_config)
+            })?;
             bypassers.push(bypasser);
         }
 
@@ -115,11 +112,11 @@ impl RunConfig {
 
         // Build Checkers and let them spawn tasks on the periodic task
         // manager if they want.
-        let mut checkers: Vec<Box<dyn Checker>> = Vec::new();
+        let mut checkers: Vec<Checker> = Vec::new();
         for checker_config in &self.checker_configs {
             let checker = checker_config
                 .clone()
-                .try_into_boxed_checker(captcha_manager.clone())
+                .build(captcha_manager.clone())
                 .await
                 .with_context(|| {
                     format!("Failed to build Checker with args: {:?}", checker_config)
