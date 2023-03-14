@@ -1,4 +1,4 @@
-import { AptosClient, Provider } from "../providers/";
+import { Provider } from "../providers/";
 import * as Gen from "../generated/index";
 import {AptosAccount} from "../account";
 import {AnyNumber} from "../bcs";
@@ -210,9 +210,5 @@ export class AnsClient {
       }
       throw new Error(error);
     }
-  }
-
-  async getAccountNames(): Promise<string[] | null> {
-    return null;
   }
 }
