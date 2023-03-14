@@ -169,7 +169,12 @@ import { NODE_URL, FAUCET_URL } from "./common";
   const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
   const fullNodeChainId = await provider.getChainId();
 
-  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) return;
+  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return;
+  }
 
   console.log("\n=== Getting Alices's NFTs ===");
   const aliceNfts = await provider.getAccountNFTs(alice.address().hex());

@@ -44,7 +44,11 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
   const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
   const fullNodeChainId = await provider.getChainId();
 
-  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) return;
+  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return;
+  }
 
   console.log("=== Creating account1's NFT Collection and Token ===");
 
