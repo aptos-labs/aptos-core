@@ -119,7 +119,6 @@ impl SignedDigest {
 pub enum SignedDigestError {
     WrongInfo,
     DuplicatedSignature,
-    InvalidAuthor,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
