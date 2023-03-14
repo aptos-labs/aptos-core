@@ -4,8 +4,6 @@
 
 pub(crate) mod vm_wrapper;
 
-use std::time::Instant;
-
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
@@ -33,6 +31,7 @@ use aptos_types::{
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
+use std::time::Instant;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -167,14 +166,13 @@ impl BlockAptosVM {
         );
 
         let timer = Instant::now();
-        let ret = executor
-            .execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         let exec_t = timer.elapsed();
 
         flush_speculative_logs();
 
         drop(ret);
 
-        (block_size * 1000 / exec_t.as_millis() as usize) as usize
+        block_size * 1000 / exec_t.as_millis() as usize
     }
 }

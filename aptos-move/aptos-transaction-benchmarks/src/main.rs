@@ -24,7 +24,7 @@ fn main() {
                 block_size,
                 num_warmups,
                 num_runs,
-                concurrency_level
+                concurrency_level,
             );
             times.sort();
             measurements.push(times);
@@ -40,19 +40,13 @@ fn main() {
                 "PARAMS: num_account = {}, block_size = {}",
                 num_accounts, block_size
             );
-            println!(
-                "TPS: {:?}",
-                measurements[i]
-            );
+            println!("TPS: {:?}", measurements[i]);
             let mut sum = 0;
             for m in &measurements[i] {
                 sum += m;
             }
-            println!(
-                "AVG TPS = {:?}",
-                sum / measurements[i].len()
-            );
-            i = i + 1;
+            println!("AVG TPS = {:?}", sum / measurements[i].len());
+            i += 1;
         }
         println!();
     }
