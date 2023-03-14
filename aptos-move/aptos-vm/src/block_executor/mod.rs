@@ -4,6 +4,8 @@
 
 pub(crate) mod vm_wrapper;
 
+use std::time::Instant;
+
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
@@ -137,5 +139,42 @@ impl BlockAptosVM {
             },
             Err(Error::UserError(err)) => Err(err),
         }
+    }
+
+    pub fn execute_block_benchmark<S: StateView + Sync>(
+        transactions: Vec<Transaction>,
+        state_view: &S,
+        concurrency_level: usize,
+    ) -> usize {
+        // Verify the signatures of all the transactions in parallel.
+        // This is time consuming so don't wait and do the checking
+        // sequentially while executing the transactions.
+        let signature_verified_block: Vec<PreprocessedTransaction> =
+            RAYON_EXEC_POOL.install(|| {
+                transactions
+                    .into_par_iter()
+                    .with_min_len(25)
+                    .map(preprocess_transaction::<AptosVM>)
+                    .collect()
+            });
+        let block_size = signature_verified_block.len();
+
+        init_speculative_logs(signature_verified_block.len());
+
+        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+            concurrency_level,
+        );
+
+        let timer = Instant::now();
+        let ret = executor
+            .execute_block(state_view, signature_verified_block, state_view);
+        let exec_t = timer.elapsed();
+
+        flush_speculative_logs();
+
+        drop(ret);
+
+        (block_size * 1000 / exec_t.as_millis() as usize) as usize
     }
 }
