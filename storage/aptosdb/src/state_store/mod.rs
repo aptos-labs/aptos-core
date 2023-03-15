@@ -10,6 +10,7 @@ use crate::{
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
+    state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
@@ -83,7 +84,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub state_kv_db: Arc<DB>,
+    pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -187,7 +188,11 @@ impl StateDb {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.state_kv_db.iter::<StateValueSchema>(read_opts)?;
+        // TODO(grao): Support sharding here.
+        let mut iter = self
+            .state_kv_db
+            .metadata_db()
+            .iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()
@@ -276,7 +281,7 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
-        state_kv_db: Arc<DB>,
+        state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         state_kv_pruner: StateKvPrunerManager,
@@ -321,7 +326,7 @@ impl StateStore {
     // commit progress.
     pub fn sync_commit_progress(
         ledger_db: Arc<DB>,
-        state_kv_db: Arc<DB>,
+        state_kv_db: Arc<StateKvDb>,
         crash_if_difference_is_too_large: bool,
     ) {
         if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
@@ -340,6 +345,7 @@ impl StateStore {
             assert_ge!(ledger_commit_progress, overall_commit_progress);
 
             let state_kv_commit_progress = state_kv_db
+                .metadata_db()
                 .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
                 .expect("Failed to read state K/V commit progress.")
                 .expect("State K/V commit progress cannot be None.")
@@ -390,6 +396,7 @@ impl StateStore {
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<DB>,
         state_merkle_db: DB,
+        state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
@@ -403,7 +410,6 @@ impl StateStore {
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
-        let state_kv_db = Arc::clone(&ledger_db);
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
@@ -553,8 +559,9 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
+        // TODO(grao): Support sharding here.
         PrefixedStateValueIterator::new(
-            &self.state_kv_db,
+            self.state_kv_db.metadata_db(),
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
@@ -882,7 +889,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.state_kv_db.write_schemas(batch)
+        // TODO(grao): Support sharding here.
+        self.state_kv_db.commit_raw_batch(batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -893,6 +901,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
             .state_kv_db
+            .metadata_db()
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }
