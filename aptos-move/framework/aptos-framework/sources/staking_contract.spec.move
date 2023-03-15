@@ -109,13 +109,13 @@ spec aptos_framework::staking_contract {
     }
 
     spec update_commision (staker: &signer, operator: address, new_commission_percentage: u64) {
-        // TODO: Call `distribute_internal` and Could not verify `update_distribution_pool`.
+        // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
     /// Only staker or operator can call this.
     spec request_commission(account: &signer, staker: address, operator: address) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
         let account_addr = signer::address_of(account);
         include ContractExistsAbortsIf{staker};
@@ -135,14 +135,14 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec unlock_rewards(staker: &signer, operator: address) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address};
     }
 
     spec unlock_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
@@ -152,7 +152,7 @@ spec aptos_framework::staking_contract {
         old_operator: address,
         new_operator: address,
     ) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address, operator: old_operator};
@@ -165,7 +165,7 @@ spec aptos_framework::staking_contract {
         new_operator: address,
         new_commission_percentage: u64,
     ) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address, operator: old_operator};
@@ -176,7 +176,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
-        // TODO: Call `distribute_internal` and Could not verify `update_distribution_pool`.
+        // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         include ContractExistsAbortsIf;
     }
@@ -189,7 +189,7 @@ spec aptos_framework::staking_contract {
         staking_contract: &mut StakingContract,
         distribute_events: &mut EventHandle<DistributeEvent>,
     ) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
         let stake_pool = borrow_global<stake::StakePool>(pool_address);
@@ -210,7 +210,7 @@ spec aptos_framework::staking_contract {
         coins_amount: u64,
         add_distribution_events: &mut EventHandle<AddDistributionEvent>,
     ) {
-        // TODO: Call `update_distribution_pool` and Could not verify `update_distribution_pool`.
+        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
     }
 
@@ -225,7 +225,7 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
-        // TODO: Could not verify `initialize_stake_owner` because can't get `stake_pool_signer` and `stake_pool_signer_cap` from 'account::create_resource_account' function.
+        // TODO: could not verify `initialize_stake_owner` because can't get `stake_pool_signer` and `stake_pool_signer_cap` from 'account::create_resource_account' function.
         pragma verify = false;
     }
 
