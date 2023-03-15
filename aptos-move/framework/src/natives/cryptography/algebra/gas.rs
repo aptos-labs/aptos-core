@@ -3,7 +3,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::cryptography::algebra::{Structure, SerializationFormat, HashToStructureSuite};
+use crate::natives::cryptography::algebra::{HashToStructureSuite, SerializationFormat, Structure};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 
 #[derive(Debug, Clone)]
@@ -92,16 +92,16 @@ impl GasParameters {
             (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLsb) => {
                 self.ark_bls12_381_fq12_deser * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
+            (Structure::BLS12381G1Affine, SerializationFormat::BLS12381G1AffineUncompressed) => {
                 self.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
+            (Structure::BLS12381G1Affine, SerializationFormat::BLS12381G1AffineCompressed) => {
                 self.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUncompressed) => {
+            (Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineUncompressed) => {
                 self.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
+            (Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineCompressed) => {
                 self.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
             },
             (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
@@ -115,8 +115,8 @@ impl GasParameters {
         match structure {
             Structure::BLS12381Fr => self.ark_bls12_381_fr_eq * NumArgs::one(),
             Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_eq * NumArgs::one(),
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_eq * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_eq * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_eq * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_eq * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_eq * NumArgs::one(),
         }
     }
@@ -219,8 +219,8 @@ impl GasParameters {
 
     pub fn group_add(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_add * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_add * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_add * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_add * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_mul * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -228,8 +228,8 @@ impl GasParameters {
 
     pub fn group_double(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_double * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_double * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_double * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_double * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_square * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -237,8 +237,8 @@ impl GasParameters {
 
     pub fn group_identity(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_infinity * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_infinity * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_infinity * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_infinity * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_one * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -246,8 +246,8 @@ impl GasParameters {
 
     pub fn group_is_identity(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_is_zero * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_is_zero * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_is_zero * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_is_zero * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_is_one * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -255,8 +255,8 @@ impl GasParameters {
 
     pub fn group_generator(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_generator * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_generator * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_generator * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_generator * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_clone * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -264,16 +264,22 @@ impl GasParameters {
 
     pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
+            Structure::BLS12381G1Affine => {
+                self.ark_bls12_381_g1_affine_msm_base * NumArgs::one()
+                    + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64)
+            },
+            Structure::BLS12381G2Affine => {
+                self.ark_bls12_381_g2_affine_msm_base * NumArgs::one()
+                    + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64)
+            },
             _ => unreachable!(),
         }
     }
 
     pub fn group_neg(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_neg * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_neg * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_neg * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_neg * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_inv * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -281,8 +287,8 @@ impl GasParameters {
 
     pub fn group_scalar_mul(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_pow_u256 * NumArgs::one(),
             _ => unreachable!(),
         }
@@ -290,30 +296,46 @@ impl GasParameters {
 
     pub fn group_sub(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_proj_sub * NumArgs::one(),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_proj_sub * NumArgs::one(),
+            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_sub * NumArgs::one(),
+            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_sub * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_div * NumArgs::one(),
             _ => unreachable!(),
         }
     }
 
-    pub fn hash_to(&self, suite: HashToStructureSuite, _dst_len: usize, msg_len: usize) -> InternalGas {
+    pub fn hash_to(
+        &self,
+        suite: HashToStructureSuite,
+        _dst_len: usize,
+        msg_len: usize,
+    ) -> InternalGas {
         match suite {
             HashToStructureSuite::Bls12381g1XmdSha256SswuRo => {
                 // Simplified formula, by fixing `dst_len` to be its maximum value (255).
-                self.ark_h2c_bls12381g1_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
-            }
+                self.ark_h2c_bls12381g1_xmd_sha256_sswu_base * NumArgs::one()
+                    + self.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte
+                        * NumArgs::from(msg_len as u64)
+            },
             HashToStructureSuite::Bls12381g2XmdSha256SswuRo => {
                 // Simplified formula, by fixing `dst_len` to be its maximum value (255).
-                self.ark_h2c_bls12381g2_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
-            }
+                self.ark_h2c_bls12381g2_xmd_sha256_sswu_base * NumArgs::one()
+                    + self.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte
+                        * NumArgs::from(msg_len as u64)
+            },
         }
     }
 
-    pub fn multi_pairing(&self, g1: Structure, g2: Structure, g3: Structure, num_pairs: usize) -> InternalGas {
+    pub fn multi_pairing(
+        &self,
+        g1: Structure,
+        g2: Structure,
+        g3: Structure,
+        num_pairs: usize,
+    ) -> InternalGas {
         match (g1, g2, g3) {
-            (Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt) => {
-                self.ark_bls12_381_multi_pairing_base * NumArgs::one() + self.ark_bls12_381_multi_pairing_per_pair * NumArgs::from(num_pairs as u64)
+            (Structure::BLS12381G1Affine, Structure::BLS12381G2Affine, Structure::BLS12381Gt) => {
+                self.ark_bls12_381_multi_pairing_base * NumArgs::one()
+                    + self.ark_bls12_381_multi_pairing_per_pair * NumArgs::from(num_pairs as u64)
             },
             _ => unreachable!(),
         }
@@ -321,7 +343,7 @@ impl GasParameters {
 
     pub fn pairing(&self, g1: Structure, g2: Structure, g3: Structure) -> InternalGas {
         match (g1, g2, g3) {
-            (Structure::BLS12381G1, Structure::BLS12381G2, Structure::BLS12381Gt) => {
+            (Structure::BLS12381G1Affine, Structure::BLS12381G2Affine, Structure::BLS12381Gt) => {
                 (self.ark_bls12_381_pairing) * NumArgs::one()
                     + self.ark_bls12_381_g1_proj_to_affine * NumArgs::one()
                     + self.ark_bls12_381_g2_proj_to_affine * NumArgs::one()
@@ -335,16 +357,16 @@ impl GasParameters {
             (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLsb) => {
                 self.ark_bls12_381_fq12_serialize * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
+            (Structure::BLS12381G1Affine, SerializationFormat::BLS12381G1AffineUncompressed) => {
                 self.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
+            (Structure::BLS12381G1Affine, SerializationFormat::BLS12381G1AffineCompressed) => {
                 self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUncompressed) => {
+            (Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineUncompressed) => {
                 self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
+            (Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineCompressed) => {
                 self.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
             },
             (Structure::BLS12381Gt, SerializationFormat::BLS12381Gt) => {
