@@ -184,7 +184,9 @@ macro_rules! ark_serialize_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
-        element.$ark_ser_func(&mut buf).unwrap();
+        if element.$ark_ser_func(&mut buf).is_err() {
+            abort_invariant_violated();
+        }
         buf
     }};
 }
@@ -208,7 +210,7 @@ fn serialize_internal(
                 Structure::BLS12381Fr,
                 SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                serialize_uncompressed //A serialize function defined in arkworks library.
+                serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
