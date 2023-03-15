@@ -85,6 +85,7 @@ impl QuotaManager {
 
     pub(crate) fn update_quota(&mut self, num_bytes: usize) -> anyhow::Result<StorageMode> {
         if self.batch_balance + 1 > self.batch_quota {
+            counters::EXCEEDED_BATCH_QUOTA_COUNT.inc();
             bail!("Batch quota exceeded ");
         }
 
