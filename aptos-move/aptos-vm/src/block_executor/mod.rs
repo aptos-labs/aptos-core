@@ -152,20 +152,21 @@ impl BlockAptosVM {
         // sequentially while executing the transactions.
         let signature_verified_block: Vec<PreprocessedTransaction> =
             RAYON_EXEC_POOL.install(|| {
-                transactions.clone()
+                transactions
+                    .clone()
                     .into_par_iter()
                     .with_min_len(25)
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
-        let signature_verified_block_for_seq: Vec<PreprocessedTransaction> =
-        RAYON_EXEC_POOL.install(|| {
-            transactions
-                .into_par_iter()
-                .with_min_len(25)
-                .map(preprocess_transaction::<AptosVM>)
-                .collect()
-        });
+        let signature_verified_block_for_seq: Vec<PreprocessedTransaction> = RAYON_EXEC_POOL
+            .install(|| {
+                transactions
+                    .into_par_iter()
+                    .with_min_len(25)
+                    .map(preprocess_transaction::<AptosVM>)
+                    .collect()
+            });
         let block_size = signature_verified_block.len();
 
         init_speculative_logs(signature_verified_block.len());
@@ -183,10 +184,13 @@ impl BlockAptosVM {
 
         if check_correctness {
             // sequentially execute the block and check if the results match
-            let seq_executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
-                1,
+            let seq_executor =
+                BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
+            let seq_ret = seq_executor.execute_block(
+                state_view,
+                signature_verified_block_for_seq,
+                state_view,
             );
-            let seq_ret = seq_executor.execute_block(state_view, signature_verified_block_for_seq, state_view);
             assert_eq!(ret, seq_ret);
             drop(seq_ret);
         }

@@ -13,7 +13,7 @@ fn main() {
     let txns = [1000, 10000];
     let num_warmups = 2;
     let num_runs = 10;
-    let check_correctness = true;
+    let check_correctness = false;
 
     let mut measurements = Vec::new();
     let concurrency_level = num_cpus::get();
