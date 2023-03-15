@@ -240,8 +240,8 @@ impl ProofQueue {
             {
                 if *expiration >= current_time {
                     // non-committed proof that has not expired
-                    cur_bytes += proof.info().num_bytes;
-                    cur_txns += proof.info().num_txns;
+                    cur_bytes += proof.num_bytes();
+                    cur_txns += proof.num_txns();
                     if cur_bytes > max_bytes || cur_txns > max_txns {
                         // Exceeded the limit for requested bytes or number of transactions.
                         full = true;
@@ -294,7 +294,7 @@ impl ProofQueue {
             if *expiration >= current_time {
                 // Not committed
                 if let Some(Some(proof)) = self.digest_proof.get(digest) {
-                    remaining_txns += proof.info().num_txns;
+                    remaining_txns += proof.num_txns();
                     remaining_proofs += 1;
                 }
             }

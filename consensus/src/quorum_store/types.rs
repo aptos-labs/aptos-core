@@ -12,11 +12,18 @@ use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
-    pub info: BatchInfo,
-    pub maybe_payload: Option<Vec<SignedTransaction>>,
+    info: BatchInfo,
+    maybe_payload: Option<Vec<SignedTransaction>>,
+}
+
+#[derive(PartialEq)]
+pub enum StorageMode {
+    PersistedOnly,
+    MemoryAndPersisted,
 }
 
 impl PersistedValue {
@@ -27,8 +34,31 @@ impl PersistedValue {
         }
     }
 
+    pub fn payload_storage_mode(&self) -> StorageMode {
+        match self.maybe_payload {
+            Some(_) => StorageMode::MemoryAndPersisted,
+            None => StorageMode::PersistedOnly,
+        }
+    }
+
+    pub fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
+        self.maybe_payload.take()
+    }
+
     pub(crate) fn remove_payload(&mut self) {
         self.maybe_payload = None;
+    }
+
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
+}
+
+impl Deref for PersistedValue {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
 
@@ -118,49 +148,33 @@ impl Batch {
 
     pub fn verify(&self) -> anyhow::Result<()> {
         ensure!(
-            self.payload.hash() == self.batch_info.digest,
+            self.payload.hash() == *self.digest(),
             "Payload hash doesn't match the digest"
         );
         ensure!(
-            self.payload.num_txns() as u64 == self.batch_info.num_txns,
+            self.payload.num_txns() as u64 == self.num_txns(),
             "Payload num txns doesn't match batch info"
         );
         ensure!(
-            self.payload.num_bytes() as u64 == self.batch_info.num_bytes,
+            self.payload.num_bytes() as u64 == self.num_bytes(),
             "Payload num bytes doesn't match batch info"
         );
         Ok(())
-    }
-
-    pub fn digest(&self) -> HashValue {
-        self.batch_info.digest
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.batch_info.expiration.epoch()
     }
 
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
         self.payload.txns
     }
 
-    pub fn author(&self) -> PeerId {
-        self.batch_info.author
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.batch_info
     }
+}
 
-    pub fn batch_id(&self) -> BatchId {
-        self.batch_info.batch_id
-    }
+impl Deref for Batch {
+    type Target = BatchInfo;
 
-    pub fn num_bytes(&self) -> usize {
-        self.payload.num_bytes()
-    }
-
-    pub fn expiration(&self) -> LogicalTime {
-        self.batch_info.expiration
-    }
-
-    pub fn info(&self) -> &BatchInfo {
+    fn deref(&self) -> &Self::Target {
         &self.batch_info
     }
 }
@@ -213,7 +227,7 @@ impl From<Batch> for PersistRequest {
             payload,
         } = value;
         Self {
-            digest: batch_info.digest,
+            digest: *batch_info.digest(),
             value: PersistedValue::new(batch_info, Some(payload.into_transactions())),
         }
     }
@@ -231,7 +245,7 @@ impl BatchMsg {
 
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         ensure!(
-            self.batch.batch_info.author == peer_id,
+            self.batch.author() == peer_id,
             "Batch author doesn't match sender"
         );
         self.batch.verify()
