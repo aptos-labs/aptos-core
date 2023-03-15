@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from "../../providers/aptos_client";
+import { AptosClient, Transaction } from "../../providers/aptos_client";
 import * as Gen from "../../generated/index";
 import { AptosAccount } from "../../account/aptos_account";
 import {
@@ -630,7 +630,11 @@ test.only("submit batch transactions", async () => {
     ),
   );
 
-  // const transactions = await client.batchTransactionsFromDifferentSenders(account1, [entryFunctionPayload, entryFunctionPayload1]);
-  // await client.submitBatchTransactions(transactions);
-  // console.log(transactions);
+  const transactions: Transaction[] = [
+    { sender: account1, payload: entryFunctionPayload },
+    { sender: account1, payload: entryFunctionPayload1 },
+  ];
+
+  const response = await client.batchTransactionsFromDifferentSenders(transactions);
+  console.log(response);
 });

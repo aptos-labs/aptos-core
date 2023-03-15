@@ -48,7 +48,7 @@ interface PaginationArgs {
 }
 
 //array of transactions
-type Transaction = {
+export type Transaction = {
   sender: AptosAccount;
   payload: TxnBuilderTypes.TransactionPayload;
   extraArgs?: OptionalTransactionArgs;
