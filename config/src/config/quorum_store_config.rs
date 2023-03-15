@@ -67,7 +67,7 @@ impl Default for QuorumStoreConfig {
         QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
-            batch_request_num_peers: 2,
+            batch_request_num_peers: 5,
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 100,
             batch_generation_max_interval_ms: 250,
