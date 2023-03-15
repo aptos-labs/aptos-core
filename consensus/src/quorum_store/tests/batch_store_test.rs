@@ -43,6 +43,7 @@ fn batch_store_for_test_no_db(memory_quota: usize) -> Arc<BatchStore<MockQuorumS
         0,            // grace period rounds
         memory_quota, // memory_quota
         1000,         // db quota
+        1000,         //batch quota
         requester,
         signers[0].clone(),
         validator_verifier,
