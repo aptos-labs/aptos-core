@@ -214,7 +214,7 @@ Lifetime: transient
 
 Whether during upgrade compatibility checking, friend functions should be treated similar like
 private functions.
-Lifetime: ephemeral
+Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;

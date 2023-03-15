@@ -253,12 +253,14 @@ export class AptosClient {
     return txnBuilder.sign(rawTxn);
   }
 
-  /** Generates a transaction request that can be submitted to produce a raw transaction that
+  /** Generates an entry function transaction request that can be submitted to produce a raw transaction that
    * can be signed, which upon being signed can be submitted to the blockchain
+   * This function fetches the remote ABI and uses it to serialized the data, therefore
+   * users don't need to handle serialization by themselves.
    * @param sender Hex-encoded 32 byte Aptos account address of transaction sender
-   * @param payload Transaction payload. It depends on transaction type you want to send
+   * @param payload Entry function transaction payload type
    * @param options Options allow to overwrite default transaction options.
-   * @returns A transaction object
+   * @returns A raw transaction object
    */
   async generateTransaction(
     sender: MaybeHexString,
@@ -687,7 +689,7 @@ export class AptosClient {
    * @param accountFrom
    * @param payload
    * @param extraArgs
-   * @returns
+   * @returns A raw transaction object
    */
   async generateRawTransaction(
     accountFrom: HexString,

@@ -15,6 +15,8 @@ APTs
 AUTH
 AWS
 Ait
+AlertManager
+Ansible
 ApiExplorer
 Aptos
 AptosAccount
@@ -122,7 +124,6 @@ Homebrew
 HotStuff
 IDE
 IDEs
-ide
 IMCODING
 IOPS
 IPFS
@@ -158,6 +159,7 @@ NPM
 NetworkAddress
 Newtonsoft
 NoAvailablePeers
+NodeExporter
 ORM
 Octa
 Octas
@@ -280,6 +282,7 @@ bool
 boolean
 broadcasted
 bytecode
+cAdvisor
 cancelled
 cfg
 changeset
@@ -334,6 +337,7 @@ haproxy
 hardcoded
 href
 http
+ide
 ie
 img
 init
@@ -383,9 +387,9 @@ npm
 npmjs
 octa
 octas
+offchain
 on-chain
 onboarding
-offchain
 onchain
 onwards
 orderbook

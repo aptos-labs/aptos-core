@@ -227,7 +227,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         cmd.arg(&w.to_string());
     });
 
-    let status = cmd
+    let replay = cmd
         .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
@@ -239,9 +239,13 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
             backup_path.to_str().unwrap(),
         ])
         .current_dir(workspace_root())
-        .status()
+        .output()
         .unwrap();
-    assert!(status.success(), "{}", status);
+    assert!(
+        replay.status.success(),
+        "{}",
+        std::str::from_utf8(&replay.stderr).unwrap()
+    );
 
     info!(
         "Backup replay-verified in {} seconds.",
@@ -368,6 +372,33 @@ pub(crate) fn db_backup(
         metadata_cache_path2.path(),
         backup_path.path(),
         trusted_waypoints,
+    );
+
+    // start the backup compaction
+    let compaction = Command::new(bin_path.as_path())
+        .current_dir(workspace_root())
+        .args([
+            "backup-maintenance",
+            "compact",
+            "--epoch-ending-file-compact-factor",
+            "2",
+            "--state-snapshot-file-compact-factor",
+            "2",
+            "--transaction-file-compact-factor",
+            "2",
+            "--metadata-cache-dir",
+            metadata_cache_path1.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
+            backup_path.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        compaction.status.success(),
+        "{}",
+        std::str::from_utf8(&compaction.stderr).unwrap()
     );
     backup_coordinator.kill().unwrap();
     wait_res.unwrap();

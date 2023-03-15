@@ -1253,7 +1253,8 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
 ## Function `update_commision`
 
-Convenience function to allow a staker to update the commision percentage paid to the operator.
+Convenience function to allow a staker to update the commission percentage paid to the operator.
+TODO: fix the typo in function name. commision -> commission
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)

@@ -414,9 +414,14 @@ pub struct TestPackage {
         long = "instructions"
     )]
     pub instruction_execution_bound: u64,
+
     /// Collect coverage information for later use with the various `aptos move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
+
+    /// Dump storage state on failure.
+    #[clap(long = "dump")]
+    pub dump_state: bool,
 }
 
 #[async_trait]
@@ -457,6 +462,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter.clone(),
                 report_stacktrace_on_abort: true,
+                report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
