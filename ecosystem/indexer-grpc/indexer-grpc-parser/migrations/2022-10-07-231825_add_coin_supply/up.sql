@@ -6,9 +6,8 @@ CREATE TABLE coin_supply (
   coin_type_hash VARCHAR(64) NOT NULL,
   coin_type VARCHAR(5000) NOT NULL,
   supply NUMERIC NOT NULL,
-  transaction_timestamp TIMESTAMP NOT NULL,
+  transaction_timestamp BIGINT NOT NULL,
   transaction_epoch BIGINT NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, coin_type_hash)
 );

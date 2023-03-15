@@ -36,7 +36,6 @@ pub struct EventQuery {
     pub transaction_block_height: i64,
     pub type_: String,
     pub data: serde_json::Value,
-    pub inserted_at: chrono::NaiveDateTime,
     pub event_index: Option<i64>,
 }
 

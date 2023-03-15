@@ -70,7 +70,6 @@ pub struct TransactionQuery {
     pub accumulator_root_hash: String,
     pub num_events: i64,
     pub num_write_set_changes: i64,
-    pub inserted_at: chrono::NaiveDateTime,
     pub epoch: i64,
 }
 

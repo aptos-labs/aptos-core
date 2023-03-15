@@ -11,12 +11,10 @@ CREATE TABLE proposal_votes (
   staking_pool_address VARCHAR(66) NOT NULL,
   num_votes NUMERIC NOT NULL,
   should_pass BOOLEAN NOT NULL,
-  transaction_timestamp TIMESTAMP NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  transaction_timestamp BIGINT NOT NULL,
   -- Constraints
   PRIMARY KEY (transaction_version, proposal_id, voter_address)
 );
 CREATE INDEX pv_pi_va_index ON proposal_votes (proposal_id, voter_address);
 CREATE INDEX pv_va_index ON proposal_votes (voter_address);
 CREATE INDEX pv_spa_index ON proposal_votes (staking_pool_address);
-CREATE INDEX pv_ia_index ON proposal_votes (inserted_at);

@@ -24,7 +24,7 @@ pub struct ProposalVote {
     pub staking_pool_address: String,
     pub num_votes: BigDecimal,
     pub should_pass: bool,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
 }
 
 impl ProposalVote {
@@ -35,7 +35,10 @@ impl ProposalVote {
             .as_ref()
             .expect("Txn Data doesn't exit!");
         let txn_version = transaction.version as i64;
-
+        let timestamp = transaction
+            .timestamp
+            .as_ref()
+            .expect("Timestamp doesn't exist!");
         if let TxnData::User(user_txn) = txn_data {
             for event in &user_txn.events {
                 if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
@@ -48,10 +51,11 @@ impl ProposalVote {
                         staking_pool_address: standardize_address(&ev.stake_pool),
                         num_votes: ev.num_votes.clone(),
                         should_pass: ev.should_pass,
-                        transaction_timestamp: parse_timestamp(
-                            transaction.timestamp.as_ref().unwrap(),
-                            txn_version,
-                        ),
+                        transaction_timestamp: chrono::NaiveDateTime::from_timestamp_opt(
+                            timestamp.seconds,
+                            timestamp.nanos as u32,
+                        ).map(|t| t.timestamp_micros())
+                            .unwrap_or(0),
                     });
                 }
             }

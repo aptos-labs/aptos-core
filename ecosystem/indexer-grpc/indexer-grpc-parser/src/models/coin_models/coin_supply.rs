@@ -21,7 +21,7 @@ pub struct CoinSupply {
     pub coin_type_hash: String,
     pub coin_type: String,
     pub supply: BigDecimal,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
     pub transaction_epoch: i64,
 }
 
@@ -32,7 +32,7 @@ impl CoinSupply {
         write_table_item: &WriteTableItem,
         maybe_aptos_coin_info: &Option<CoinInfoQuery>,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         txn_epoch: i64,
     ) -> anyhow::Result<Option<Self>> {
         if let Some(aptos_coin_info) = maybe_aptos_coin_info {

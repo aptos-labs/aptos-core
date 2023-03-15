@@ -40,7 +40,7 @@ pub struct TokenActivity {
     pub coin_type: Option<String>,
     pub coin_amount: Option<BigDecimal>,
     pub collection_data_id_hash: String,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
     pub event_index: Option<i64>,
 }
 
@@ -77,7 +77,11 @@ impl TokenActivity {
                         event,
                         &token_event,
                         txn_version,
-                        parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version),
+                        chrono::NaiveDateTime::from_timestamp_opt(
+                            transaction.timestamp.as_ref().unwrap().seconds,
+                            transaction.timestamp.as_ref().unwrap().nanos as u32,
+                        ).map(|t| t.timestamp_micros())
+                            .unwrap_or(0),
                         index as i64,
                     ))
                 }
@@ -91,7 +95,7 @@ impl TokenActivity {
         event: &Event,
         token_event: &TokenEvent,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         event_index: i64,
     ) -> Self {
         let event_account_address =

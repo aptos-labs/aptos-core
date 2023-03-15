@@ -18,6 +18,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use bigdecimal::ToPrimitive;
 
 type Domain = String;
 type Subdomain = String;
@@ -33,7 +34,7 @@ pub struct CurrentAnsLookup {
     pub subdomain: String,
     pub registered_address: Option<String>,
     pub last_transaction_version: i64,
-    pub expiration_timestamp: chrono::NaiveDateTime,
+    pub expiration_timestamp: i64,
     pub token_name: String,
 }
 
@@ -120,10 +121,8 @@ impl CurrentAnsLookup {
                     if let Some(ans_event) = maybe_ans_event {
                         let current_ans_lookup = match ans_event {
                             ANSEvent::SetNameAddressEventV1(inner) => {
-                                let expiration_timestamp = parse_timestamp_secs(
-                                    bigdecimal_to_u64(&inner.expiration_time_secs),
-                                    txn_version,
-                                );
+                                let expiration_timestamp = inner.expiration_time_secs.to_i64().unwrap();
+
                                 let subdomain =
                                     inner.subdomain_name.get_string().unwrap_or_default();
                                 let mut token_name = format!("{}.apt", &inner.domain_name);
@@ -143,10 +142,7 @@ impl CurrentAnsLookup {
                                 }
                             },
                             ANSEvent::RegisterNameEventV1(inner) => {
-                                let expiration_timestamp = parse_timestamp_secs(
-                                    bigdecimal_to_u64(&inner.expiration_time_secs),
-                                    txn_version,
-                                );
+                                let expiration_timestamp = inner.expiration_time_secs.to_i64().unwrap();
                                 let subdomain =
                                     inner.subdomain_name.get_string().unwrap_or_default();
                                 let mut token_name = format!("{}.apt", &inner.domain_name);

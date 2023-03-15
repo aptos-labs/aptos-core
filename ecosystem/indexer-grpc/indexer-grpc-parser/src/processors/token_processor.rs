@@ -180,7 +180,6 @@ fn insert_tokens(
                 .do_update()
                 .set((
                     token_properties.eq(excluded(token_properties)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
         )?;
@@ -232,7 +231,6 @@ fn insert_token_datas(
                 .do_update()
                 .set((
                     default_properties.eq(excluded(default_properties)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
         )?;
@@ -287,7 +285,6 @@ fn insert_current_token_ownerships(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     table_type.eq(excluded(table_type)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -330,7 +327,6 @@ fn insert_current_token_datas(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                     description.eq(excluded(description)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -365,7 +361,6 @@ fn insert_current_collection_datas(
                     description_mutable.eq(excluded(description_mutable)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     table_handle.eq(excluded(table_handle)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -394,7 +389,6 @@ fn insert_token_activities(
                 ))
                 .do_update()
                 .set((
-                    inserted_at.eq(excluded(inserted_at)),
                     event_index.eq(excluded(event_index)),
                 )),
             None,
@@ -430,7 +424,6 @@ fn insert_current_token_claims(
                     amount.eq(excluded(amount)),
                     table_handle.eq(excluded(table_handle)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -457,7 +450,6 @@ fn insert_current_ans_lookups(
                     registered_address.eq(excluded(registered_address)),
                     expiration_timestamp.eq(excluded(expiration_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                     token_name.eq(excluded(token_name)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),

@@ -27,7 +27,7 @@ pub struct CurrentTokenPendingClaim {
     pub amount: BigDecimal,
     pub table_handle: String,
     pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
 }
 
 impl CurrentTokenPendingClaim {
@@ -36,7 +36,7 @@ impl CurrentTokenPendingClaim {
     pub fn from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<Self>> {
         let table_item_data = table_item.data.as_ref().unwrap();
@@ -108,7 +108,7 @@ impl CurrentTokenPendingClaim {
     pub fn from_delete_table_item(
         table_item: &DeleteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<Self>> {
         let table_item_data = table_item.data.as_ref().unwrap();

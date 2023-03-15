@@ -38,9 +38,9 @@ pub struct UserTransaction {
     pub sender: String,
     pub sequence_number: i64,
     pub max_gas_amount: BigDecimal,
-    pub expiration_timestamp_secs: chrono::NaiveDateTime,
+    pub expiration_timestamp_secs: i64,
     pub gas_unit_price: BigDecimal,
-    pub timestamp: chrono::NaiveDateTime,
+    pub timestamp: i64,
     pub entry_function_id_str: String,
     pub epoch: i64,
 }
@@ -57,11 +57,10 @@ pub struct UserTransactionQuery {
     pub sender: String,
     pub sequence_number: i64,
     pub max_gas_amount: BigDecimal,
-    pub expiration_timestamp_secs: chrono::NaiveDateTime,
+    pub expiration_timestamp_secs: i64,
     pub gas_unit_price: BigDecimal,
-    pub timestamp: chrono::NaiveDateTime,
+    pub timestamp: i64,
     pub entry_function_id_str: String,
-    pub inserted_at: chrono::NaiveDateTime,
     pub epoch: i64,
 }
 
@@ -92,15 +91,13 @@ impl UserTransaction {
                 sender: standardize_address(&user_request.sender),
                 sequence_number: user_request.sequence_number as i64,
                 max_gas_amount: u64_to_bigdecimal(user_request.max_gas_amount),
-                expiration_timestamp_secs: parse_timestamp(
-                    user_request
-                        .expiration_timestamp_secs
-                        .as_ref()
-                        .expect("Expiration timestamp is not present in user txn"),
-                    version,
-                ),
+                expiration_timestamp_secs: user_request.expiration_timestamp_secs.as_ref().expect("Expiration timestamp is not present in user txn").seconds,
                 gas_unit_price: u64_to_bigdecimal(user_request.gas_unit_price),
-                timestamp: parse_timestamp(timestamp, version),
+                timestamp: chrono::NaiveDateTime::from_timestamp_opt(
+                    timestamp.seconds,
+                    timestamp.nanos as u32,
+                ).map(|t| t.timestamp_micros())
+                    .unwrap_or(0),
                 entry_function_id_str: get_entry_function_from_user_request(user_request)
                     .unwrap_or_default(),
                 epoch,

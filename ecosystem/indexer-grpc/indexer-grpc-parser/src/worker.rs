@@ -107,7 +107,7 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Running migrations"
         );
-        self.run_migrations();
+        // self.run_migrations();
         info!(
             processor_name = processor_name,
             "[Parser] Finished migrations"

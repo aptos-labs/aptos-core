@@ -38,7 +38,7 @@ pub struct CollectionData {
     pub uri_mutable: bool,
     pub description_mutable: bool,
     pub table_handle: String,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -57,7 +57,7 @@ pub struct CurrentCollectionData {
     pub description_mutable: bool,
     pub last_transaction_version: i64,
     pub table_handle: String,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -76,16 +76,15 @@ pub struct CurrentCollectionDataQuery {
     pub uri_mutable: bool,
     pub description_mutable: bool,
     pub last_transaction_version: i64,
-    pub inserted_at: chrono::NaiveDateTime,
     pub table_handle: String,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
 }
 
 impl CollectionData {
     pub fn from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {

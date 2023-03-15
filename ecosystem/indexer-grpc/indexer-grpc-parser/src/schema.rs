@@ -12,8 +12,7 @@ diesel::table! {
         previous_block_votes_bitvec -> Jsonb,
         proposer -> Varchar,
         failed_proposer_indices -> Jsonb,
-        timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        timestamp -> Int8,
     }
 }
 
@@ -31,8 +30,7 @@ diesel::table! {
         is_transaction_success -> Bool,
         entry_function_id_str -> Nullable<Varchar>,
         block_height -> Int8,
-        transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        transaction_timestamp -> Int8,
         event_index -> Nullable<Int8>,
     }
 }
@@ -44,8 +42,7 @@ diesel::table! {
         coin_type_hash -> Varchar,
         coin_type -> Varchar,
         amount -> Numeric,
-        transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        transaction_timestamp -> Int8,
     }
 }
 
@@ -58,8 +55,7 @@ diesel::table! {
         name -> Varchar,
         symbol -> Varchar,
         decimals -> Int4,
-        transaction_created_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        transaction_created_timestamp -> Int8,
         supply_aggregator_table_handle -> Nullable<Varchar>,
         supply_aggregator_table_key -> Nullable<Text>,
     }
@@ -71,9 +67,8 @@ diesel::table! {
         coin_type_hash -> Varchar,
         coin_type -> Varchar,
         supply -> Numeric,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
         transaction_epoch -> Int8,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -90,9 +85,8 @@ diesel::table! {
         maximum_mutable -> Bool,
         uri_mutable -> Bool,
         description_mutable -> Bool,
-        inserted_at -> Timestamp,
         table_handle -> Varchar,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
     }
 }
 
@@ -101,9 +95,8 @@ diesel::table! {
         domain -> Varchar,
         subdomain -> Varchar,
         registered_address -> Nullable<Varchar>,
-        expiration_timestamp -> Timestamp,
+        expiration_timestamp -> Int8,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
         token_name -> Varchar,
     }
 }
@@ -115,8 +108,7 @@ diesel::table! {
         coin_type -> Varchar,
         amount -> Numeric,
         last_transaction_version -> Int8,
-        last_transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        last_transaction_timestamp -> Int8,
     }
 }
 
@@ -133,9 +125,8 @@ diesel::table! {
         uri_mutable -> Bool,
         description_mutable -> Bool,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
         table_handle -> Varchar,
-        last_transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Int8,
     }
 }
 
@@ -147,7 +138,6 @@ diesel::table! {
         table_handle -> Varchar,
         amount -> Numeric,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -156,7 +146,6 @@ diesel::table! {
         staking_pool_address -> Varchar,
         voter_address -> Varchar,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -169,7 +158,6 @@ diesel::table! {
         decoded_value -> Nullable<Jsonb>,
         is_deleted -> Bool,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -193,9 +181,8 @@ diesel::table! {
         royalty_mutable -> Bool,
         default_properties -> Jsonb,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
-        last_transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Int8,
         description -> Text,
     }
 }
@@ -211,10 +198,9 @@ diesel::table! {
         amount -> Numeric,
         token_properties -> Jsonb,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
         table_type -> Text,
-        last_transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Int8,
     }
 }
 
@@ -231,8 +217,7 @@ diesel::table! {
         amount -> Numeric,
         table_handle -> Varchar,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-        last_transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Int8,
     }
 }
 
@@ -244,7 +229,6 @@ diesel::table! {
         pool_address -> Varchar,
         event_type -> Text,
         amount -> Numeric,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -258,7 +242,6 @@ diesel::table! {
         #[sql_name = "type"]
         type_ -> Text,
         data -> Jsonb,
-        inserted_at -> Timestamp,
         event_index -> Nullable<Int8>,
     }
 }
@@ -267,7 +250,6 @@ diesel::table! {
     indexer_status (db) {
         db -> Varchar,
         is_indexer_up -> Bool,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -289,7 +271,6 @@ diesel::table! {
         exposed_functions -> Nullable<Jsonb>,
         structs -> Nullable<Jsonb>,
         is_deleted -> Bool,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -306,7 +287,6 @@ diesel::table! {
         generic_type_params -> Nullable<Jsonb>,
         data -> Nullable<Jsonb>,
         is_deleted -> Bool,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -314,7 +294,7 @@ diesel::table! {
     processor_status (processor) {
         processor -> Varchar,
         last_success_version -> Int8,
-        last_updated -> Timestamp,
+        last_updated -> Int8,
     }
 }
 
@@ -326,8 +306,7 @@ diesel::table! {
         staking_pool_address -> Varchar,
         num_votes -> Numeric,
         should_pass -> Bool,
-        transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
+        transaction_timestamp -> Int8,
     }
 }
 
@@ -345,7 +324,6 @@ diesel::table! {
         signature -> Varchar,
         threshold -> Int8,
         public_key_indices -> Jsonb,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -359,7 +337,6 @@ diesel::table! {
         decoded_key -> Jsonb,
         decoded_value -> Nullable<Jsonb>,
         is_deleted -> Bool,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -368,7 +345,6 @@ diesel::table! {
         handle -> Varchar,
         key_type -> Text,
         value_type -> Text,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -390,8 +366,7 @@ diesel::table! {
         token_amount -> Numeric,
         coin_type -> Nullable<Text>,
         coin_amount -> Nullable<Numeric>,
-        inserted_at -> Timestamp,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
         event_index -> Nullable<Int8>,
     }
 }
@@ -416,9 +391,8 @@ diesel::table! {
         properties_mutable -> Bool,
         royalty_mutable -> Bool,
         default_properties -> Jsonb,
-        inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
         description -> Text,
     }
 }
@@ -435,9 +409,8 @@ diesel::table! {
         owner_address -> Nullable<Varchar>,
         amount -> Numeric,
         table_type -> Nullable<Text>,
-        inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
     }
 }
 
@@ -450,9 +423,8 @@ diesel::table! {
         collection_name -> Varchar,
         name -> Varchar,
         token_properties -> Jsonb,
-        inserted_at -> Timestamp,
         collection_data_id_hash -> Varchar,
-        transaction_timestamp -> Timestamp,
+        transaction_timestamp -> Int8,
     }
 }
 
@@ -473,7 +445,6 @@ diesel::table! {
         accumulator_root_hash -> Varchar,
         num_events -> Int8,
         num_write_set_changes -> Int8,
-        inserted_at -> Timestamp,
         epoch -> Int8,
     }
 }
@@ -486,11 +457,10 @@ diesel::table! {
         sender -> Varchar,
         sequence_number -> Int8,
         max_gas_amount -> Numeric,
-        expiration_timestamp_secs -> Timestamp,
+        expiration_timestamp_secs -> Int8,
         gas_unit_price -> Numeric,
-        timestamp -> Timestamp,
+        timestamp -> Int8,
         entry_function_id_str -> Text,
-        inserted_at -> Timestamp,
         epoch -> Int8,
     }
 }
@@ -504,7 +474,6 @@ diesel::table! {
         #[sql_name = "type"]
         type_ -> Text,
         address -> Varchar,
-        inserted_at -> Timestamp,
     }
 }
 

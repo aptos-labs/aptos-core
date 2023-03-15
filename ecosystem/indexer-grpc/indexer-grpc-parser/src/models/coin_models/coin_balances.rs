@@ -28,7 +28,7 @@ pub struct CoinBalance {
     pub coin_type_hash: String,
     pub coin_type: String,
     pub amount: BigDecimal,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -40,7 +40,7 @@ pub struct CurrentCoinBalance {
     pub coin_type: String,
     pub amount: BigDecimal,
     pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
 }
 
 impl CoinBalance {
@@ -48,7 +48,7 @@ impl CoinBalance {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
     ) -> anyhow::Result<Option<(Self, CurrentCoinBalance, EventToCoinType)>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinStoreResource(inner)) => {

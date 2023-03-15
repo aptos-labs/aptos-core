@@ -21,7 +21,6 @@ use aptos_protos::transaction::testing1::v1::{
 };
 use aptos_types::APTOS_COIN_TYPE;
 use bigdecimal::BigDecimal;
-use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -58,7 +57,7 @@ pub struct CoinActivity {
     pub is_transaction_success: bool,
     pub entry_function_id_str: Option<String>,
     pub block_height: i64,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
     pub event_index: Option<i64>,
 }
 
@@ -113,7 +112,6 @@ impl CoinActivity {
             .as_ref()
             .expect("Transaction timestamp doesn't exist!")
             .seconds;
-        let txn_timestamp = NaiveDateTime::from_timestamp(txn_timestamp, 0);
 
         // Handling gas first
         let mut entry_function_id_str = None;
@@ -219,7 +217,7 @@ impl CoinActivity {
         event_to_coin_type: &EventToCoinType,
         block_height: i64,
         entry_function_id_str: &Option<String>,
-        transaction_timestamp: chrono::NaiveDateTime,
+        transaction_timestamp: i64,
         event_index: i64,
     ) -> Self {
         let amount = match coin_event {
@@ -265,7 +263,7 @@ impl CoinActivity {
         user_transaction_request: &UserTransactionRequest,
         entry_function_id_str: &Option<String>,
         transaction_version: i64,
-        transaction_timestamp: chrono::NaiveDateTime,
+        transaction_timestamp: i64,
         block_height: i64,
     ) -> Self {
         let aptos_coin_burned =

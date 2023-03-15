@@ -41,7 +41,6 @@ pub struct WriteSetChangeQuery {
     transaction_block_height: i64,
     pub type_: String,
     pub address: String,
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl WriteSetChange {

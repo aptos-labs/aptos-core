@@ -19,7 +19,7 @@ pub struct ProcessorStatus {
 pub struct ProcessorStatusQuery {
     pub processor: String,
     pub last_success_version: i64,
-    pub last_updated: chrono::NaiveDateTime,
+    pub last_updated: i64,
 }
 
 impl ProcessorStatusQuery {

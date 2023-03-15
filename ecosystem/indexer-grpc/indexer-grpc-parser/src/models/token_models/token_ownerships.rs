@@ -37,7 +37,7 @@ pub struct TokenOwnership {
     pub amount: BigDecimal,
     pub table_type: Option<String>,
     pub collection_data_id_hash: String,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -55,7 +55,7 @@ pub struct CurrentTokenOwnership {
     pub last_transaction_version: i64,
     pub collection_data_id_hash: String,
     pub table_type: String,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
 }
 
 impl TokenOwnership {

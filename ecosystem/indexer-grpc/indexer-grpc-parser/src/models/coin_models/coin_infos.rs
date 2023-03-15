@@ -26,7 +26,7 @@ pub struct CoinInfo {
     pub name: String,
     pub symbol: String,
     pub decimals: i32,
-    pub transaction_created_timestamp: chrono::NaiveDateTime,
+    pub transaction_created_timestamp: i64,
     pub supply_aggregator_table_handle: Option<String>,
     pub supply_aggregator_table_key: Option<String>,
 }
@@ -42,8 +42,7 @@ pub struct CoinInfoQuery {
     pub name: String,
     pub symbol: String,
     pub decimals: i32,
-    pub transaction_created_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub transaction_created_timestamp: i64,
     pub supply_aggregator_table_handle: Option<String>,
     pub supply_aggregator_table_key: Option<String>,
 }
@@ -53,7 +52,7 @@ impl CoinInfo {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
     ) -> anyhow::Result<Option<Self>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinInfoResource(inner)) => {

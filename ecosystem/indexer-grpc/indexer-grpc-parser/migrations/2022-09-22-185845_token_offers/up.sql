@@ -30,7 +30,6 @@ CREATE TABLE token_activities (
   token_amount NUMERIC NOT NULL,
   coin_type TEXT,
   coin_amount NUMERIC,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (
     transaction_version,
@@ -49,7 +48,6 @@ CREATE INDEX ta_addr_coll_name_pv_index ON token_activities (
 );
 CREATE INDEX ta_tdih_pv_index ON token_activities (token_data_id_hash, property_version);
 CREATE INDEX ta_version_index ON token_activities (transaction_version);
-CREATE INDEX ta_insat_index ON token_activities (inserted_at);
 -- Tracks current pending claims
 CREATE TABLE current_token_pending_claims (
   token_data_id_hash VARCHAR(64) NOT NULL,
@@ -64,7 +62,6 @@ CREATE TABLE current_token_pending_claims (
   amount NUMERIC NOT NULL,
   table_handle VARCHAR(66) NOT NULL,
   last_transaction_version BIGINT NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (
     -- This is basically the token offer id
@@ -77,4 +74,3 @@ CREATE TABLE current_token_pending_claims (
 CREATE INDEX ctpc_th_index ON current_token_pending_claims (table_handle);
 CREATE INDEX ctpc_from_am_index ON current_token_pending_claims (from_address, amount);
 CREATE INDEX ctpc_to_am_index ON current_token_pending_claims (to_address, amount);
-CREATE INDEX ctpc_insat_index ON current_token_pending_claims (inserted_at);

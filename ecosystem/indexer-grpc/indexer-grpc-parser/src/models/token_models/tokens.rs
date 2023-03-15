@@ -53,7 +53,7 @@ pub struct Token {
     pub name: String,
     pub token_properties: serde_json::Value,
     pub collection_data_id_hash: String,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
 }
 
 #[derive(Debug)]
@@ -106,8 +106,11 @@ impl Token {
             > = HashMap::new();
 
             let txn_version = transaction.version as i64;
-            let txn_timestamp =
-                parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version);
+            let txn_timestamp =  chrono::NaiveDateTime::from_timestamp_opt(
+                transaction.timestamp.as_ref().unwrap().seconds,
+                transaction.timestamp.as_ref().unwrap().nanos as u32,
+            ).map(|t| t.timestamp_micros())
+                .unwrap_or(0);
             let transaction_info = transaction
                 .info
                 .as_ref()
@@ -246,7 +249,7 @@ impl Token {
     pub fn from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, Option<TokenOwnership>, Option<CurrentTokenOwnership>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
@@ -304,7 +307,7 @@ impl Token {
     pub fn from_delete_table_item(
         table_item: &DeleteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
         table_handle_to_owner: &TableHandleToOwner,
     ) -> anyhow::Result<Option<(Self, Option<TokenOwnership>, Option<CurrentTokenOwnership>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();

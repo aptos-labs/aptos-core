@@ -125,7 +125,6 @@ fn insert_current_stake_pool_voter(
                     staking_pool_address.eq(excluded(staking_pool_address)),
                     voter_address.eq(excluded(voter_address)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(
                 " WHERE current_staking_pool_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
@@ -196,7 +195,6 @@ fn insert_delegator_balances(
                     table_handle.eq(excluded(table_handle)),
                     amount.eq(excluded(amount)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(
                 " WHERE current_delegator_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",

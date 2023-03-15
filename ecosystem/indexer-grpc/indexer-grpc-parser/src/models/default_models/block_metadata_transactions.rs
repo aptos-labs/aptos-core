@@ -29,7 +29,7 @@ pub struct BlockMetadataTransaction {
     pub previous_block_votes_bitvec: serde_json::Value,
     pub proposer: String,
     pub failed_proposer_indices: serde_json::Value,
-    pub timestamp: chrono::NaiveDateTime,
+    pub timestamp: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -48,8 +48,7 @@ pub struct BlockMetadataTransactionQuery {
     pub previous_block_votes_bitvec: serde_json::Value,
     pub proposer: String,
     pub failed_proposer_indices: serde_json::Value,
-    pub timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
+    pub timestamp: i64,
 }
 
 impl BlockMetadataTransaction {
@@ -71,7 +70,11 @@ impl BlockMetadataTransaction {
             previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
                 .unwrap(),
             // time is in microseconds
-            timestamp: parse_timestamp(timestamp, version),
+            timestamp: chrono::NaiveDateTime::from_timestamp_opt(
+                timestamp.seconds,
+                timestamp.nanos as u32,
+            ).map(|t| t.timestamp_micros())
+                .unwrap_or(0),
         }
     }
 }

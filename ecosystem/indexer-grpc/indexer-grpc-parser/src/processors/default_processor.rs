@@ -275,7 +275,6 @@ fn insert_events(
                 .on_conflict((account_address, creation_number, sequence_number))
                 .do_update()
                 .set((
-                    inserted_at.eq(excluded(inserted_at)),
                     event_index.eq(excluded(event_index)),
                 )),
             None,
@@ -379,7 +378,6 @@ fn insert_current_table_items(
                     decoded_value.eq(excluded(decoded_value)),
                     is_deleted.eq(excluded(is_deleted)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
         )?;

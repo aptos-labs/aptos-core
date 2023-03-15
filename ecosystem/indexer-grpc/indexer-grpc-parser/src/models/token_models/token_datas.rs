@@ -38,7 +38,7 @@ pub struct TokenData {
     pub royalty_mutable: bool,
     pub default_properties: serde_json::Value,
     pub collection_data_id_hash: String,
-    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub transaction_timestamp: i64,
     pub description: String,
 }
 
@@ -65,7 +65,7 @@ pub struct CurrentTokenData {
     pub default_properties: serde_json::Value,
     pub last_transaction_version: i64,
     pub collection_data_id_hash: String,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: i64,
     pub description: String,
 }
 
@@ -73,7 +73,7 @@ impl TokenData {
     pub fn from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
+        txn_timestamp: i64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
