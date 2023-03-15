@@ -9,7 +9,7 @@ This page shows the key updates to the developer documentation on this site. Not
 
 ## 15 March 2023
 
-- Published a [PowerShell script](../../scripts/windows_dev_setup.ps1) to streamline the Aptos development environment setup process on Windows. The script uses WinGet (Microsoft’s official package manager, included in Windows 10 and 11 by default) to install the necessary dependencies and keep them up-to-date.
+- Published a [PowerShell script](../../scripts/windows_dev_setup.ps1) to streamline the Aptos [development environment setup](../docs/guides/getting-started.md#set-up-build-dependencies) process on Windows. The script uses WinGet (Microsoft’s official package manager, included in Windows 10 and 11 by default) to install the necessary dependencies and keep them up-to-date.
 
 ## 08 March 2023
 
