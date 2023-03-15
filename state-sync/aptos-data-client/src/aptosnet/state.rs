@@ -55,8 +55,8 @@ impl From<ResponseError> for ErrorType {
     }
 }
 
-#[derive(Debug)]
-struct PeerState {
+#[derive(Clone, Debug)]
+pub struct PeerState {
     /// The latest observed advertised data for this peer, or `None` if we
     /// haven't polled them yet.
     storage_summary: Option<StorageServerSummary>,
@@ -105,7 +105,6 @@ impl PeerState {
 
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
 /// advertisements and data-client internal metadata for scoring.
-// TODO(philiphayes): this map needs to be garbage collected
 #[derive(Debug)]
 pub(crate) struct PeerStates {
     base_config: BaseConfig,
@@ -296,6 +295,12 @@ impl PeerStates {
             .update_storage_summary(summary);
     }
 
+    /// Garbage collects the peer states to remove data for disconnected peers
+    pub fn garbage_collect_peer_states(&mut self, connected_peers: Vec<PeerNetworkId>) {
+        self.peer_to_state
+            .retain(|peer_network_id, _| connected_peers.contains(peer_network_id));
+    }
+
     /// Calculates a global data summary using all known storage summaries
     pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
         // Only include likely-not-malicious peers in the data summary aggregation
@@ -362,6 +367,12 @@ impl PeerStates {
             advertised_data,
             optimal_chunk_sizes,
         }
+    }
+
+    #[cfg(test)]
+    /// Returns a copy of the peer to states map for test purposes
+    pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {
+        self.peer_to_state.clone()
     }
 }
 

@@ -51,9 +51,6 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-// TODO(joshlind): this code needs to be restructured. There are no clear APIs
-// and little separation between components.
-
 // Useful constants for the Aptos Data Client
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 10;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
@@ -142,10 +139,30 @@ impl AptosNetDataClient {
         self.peer_states.write().update_summary(peer, summary)
     }
 
-    /// Recompute and update the global data summary cache.
-    fn update_global_summary_cache(&self) {
+    /// Recompute and update the global data summary cache
+    fn update_global_summary_cache(&self) -> Result<(), Error> {
+        // Before calculating the summary, we should garbage collect
+        // the peer states (to handle disconnected peers).
+        self.garbage_collect_peer_states()?;
+
+        // Calculate the aggregate data summary
         let aggregate = self.peer_states.read().calculate_aggregate_summary();
         *self.global_summary_cache.write() = aggregate;
+
+        Ok(())
+    }
+
+    /// Garbage collects the peer states to remove data for disconnected peers
+    fn garbage_collect_peer_states(&self) -> Result<(), Error> {
+        // Get all connected peers
+        let all_connected_peers = self.get_all_connected_peers()?;
+
+        // Garbage collect the disconnected peers
+        self.peer_states
+            .write()
+            .garbage_collect_peer_states(all_connected_peers);
+
+        Ok(())
     }
 
     /// Choose a connected peer that can service the given request.
@@ -703,7 +720,17 @@ impl DataSummaryPoller {
             ticker.next().await;
 
             // Update the global storage summary
-            self.data_client.update_global_summary_cache();
+            if let Err(error) = self.data_client.update_global_summary_cache() {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
+                    warn!(
+                        (LogSchema::new(LogEntry::DataSummaryPoller)
+                            .event(LogEvent::AggregateSummary)
+                            .message("Unable to update global summary cache!")
+                            .error(&error))
+                    );
+                );
+            }
 
             // Fetch the prioritized and regular peers to poll (if any)
             let prioritized_peer = self.try_fetch_peer(true);
@@ -714,7 +741,7 @@ impl DataSummaryPoller {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
                     debug!(
-                        (LogSchema::new(LogEntry::StorageSummaryRequest)
+                        (LogSchema::new(LogEntry::DataSummaryPoller)
                             .event(LogEvent::NoPeersToPoll)
                             .message("No prioritized or regular peers to poll this round!"))
                     );
