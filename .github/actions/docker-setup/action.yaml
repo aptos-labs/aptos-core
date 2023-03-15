@@ -47,6 +47,8 @@ runs:
         keep-state: true
 
     - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
+      with:
+        version: v3.6.0
 
     - id: auth
       name: "Authenticate to Google Cloud"
