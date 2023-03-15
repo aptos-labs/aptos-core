@@ -17,6 +17,7 @@ mod tests;
 
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_build_info::build_information;
 use aptos_config::config::{NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
@@ -45,7 +46,13 @@ const EPOCH_LENGTH_SECS: u64 = 60;
 #[clap(name = "Aptos Node", author, version)]
 pub struct AptosNodeArgs {
     /// Path to node configuration file (or template for local test mode).
-    #[clap(short = 'f', long, parse(from_os_str), required_unless = "test")]
+    #[clap(
+        short = 'f',
+        long,
+        parse(from_os_str),
+        required_unless = "test",
+        required_unless = "info"
+    )]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
@@ -76,11 +83,25 @@ pub struct AptosNodeArgs {
     /// only commit a block when there are user transactions in mempool.
     #[clap(long, requires("test"))]
     lazy: bool,
+
+    /// Display information about the build of this node
+    #[clap(long)]
+    info: bool,
 }
 
 impl AptosNodeArgs {
     /// Runs an Aptos node based on the given command line arguments and config flags
     pub fn run(self) {
+        if self.info {
+            let build_information = build_information!();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&build_information)
+                    .expect("Failed to print build information")
+            );
+            return;
+        }
+
         if self.test {
             println!("WARNING: Entering test mode! This should never be used in production!");
 
