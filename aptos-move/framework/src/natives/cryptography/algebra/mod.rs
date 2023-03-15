@@ -8,7 +8,7 @@ use ark_ec::{CurveGroup, Group};
 use ark_ec::pairing::Pairing;
 use ark_ec::short_weierstrass::Projective;
 use ark_ec::hashing::HashToCurve;
-use ark_ff::{Field, PrimeField};
+use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
@@ -22,7 +22,6 @@ use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
-    pop_arg,
     values::{Value, VectorRef},
 };
 use num_traits::{One, Zero};
@@ -34,11 +33,8 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
     rc::Rc,
 };
-use std::cmp::{max, min};
 use std::hash::Hash;
 use std::sync::Arc;
-use itertools::Itertools;
-use move_compiler::parser::lexer::Tok::Native;
 use move_core_types::vm_status::StatusCode;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
 use crate::natives::helpers::{make_safe_native, make_test_only_native_from_func, SafeNativeContext, SafeNativeError, SafeNativeResult};
@@ -1147,7 +1143,7 @@ macro_rules! ark_multi_scalar_mul_internal {
                 safe_borrow_element!($context, handle as usize, $scalar_typ, scalar_ptr, scalar);
                 scalars.push(scalar.clone());
             }
-            $context.charge($gas_params.group_multi_scalar_mul_typed($structure, num_elements))?;
+            $context.charge($gas_params.group_multi_scalar_mul($structure, num_elements))?;
             let new_element: $element_typ = ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
             let new_handle = store_element!($context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])

@@ -262,15 +262,7 @@ impl GasParameters {
         }
     }
 
-    pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize, scalar_bit_len: usize) -> InternalGas {
-        match structure {
-            Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
-            Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn group_multi_scalar_mul_typed(&self, structure: Structure, num_entries: usize) -> InternalGas {
+    pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
         match structure {
             Structure::BLS12381G1 => self.ark_bls12_381_g1_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64),
             Structure::BLS12381G2 => self.ark_bls12_381_g2_affine_msm_base * NumArgs::one() + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64),
