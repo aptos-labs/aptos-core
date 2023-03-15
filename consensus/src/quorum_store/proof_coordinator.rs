@@ -3,9 +3,9 @@
 
 use crate::{
     monitor,
+    network::QuorumStoreSender,
     quorum_store::{
-        batch_generator::ProofError, counters, proof_manager::ProofManagerCommand, types::BatchId,
-        utils::DigestTimeouts,
+        batch_generator::BatchGeneratorCommand, batch_store::BatchReader, counters, utils::Timeouts,
     },
 };
 use aptos_consensus_types::proof_of_store::{
@@ -16,42 +16,32 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
-use futures::channel::oneshot;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
-    sync::{
-        mpsc::{Receiver, Sender},
-        oneshot as TokioOneshot,
-    },
+    sync::{mpsc::Receiver, oneshot as TokioOneshot},
     time,
 };
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
-    InitProof(SignedDigestInfo, BatchId, ProofReturnChannel),
     AppendSignature(SignedDigest),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
-pub(crate) type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, BatchId), ProofError>>;
-
 struct IncrementalProofState {
     info: SignedDigestInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
-    batch_id: BatchId,
-    ret_tx: ProofReturnChannel,
 }
 
 impl IncrementalProofState {
-    fn new(info: SignedDigestInfo, batch_id: BatchId, ret_tx: ProofReturnChannel) -> Self {
+    fn new(info: SignedDigestInfo) -> Self {
         Self {
             info,
             aggregated_signature: BTreeMap::new(),
-            batch_id,
-            ret_tx,
         }
     }
 
@@ -72,34 +62,20 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
-        self.aggregated_signature.contains_key(&my_peer_id)
-            && validator_verifier
-                .check_voting_power(self.aggregated_signature.keys())
-                .is_ok()
+    fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
+        validator_verifier
+            .check_voting_power(self.aggregated_signature.keys())
+            .is_ok()
     }
 
-    fn take(
-        self,
-        validator_verifier: &ValidatorVerifier,
-    ) -> (ProofOfStore, BatchId, ProofReturnChannel) {
+    fn take(self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
         let proof = match validator_verifier
             .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature))
         {
             Ok(sig) => ProofOfStore::new(self.info, sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
-        (proof, self.batch_id, self.ret_tx)
-    }
-
-    fn send_timeout(self) {
-        if self
-            .ret_tx
-            .send(Err(ProofError::Timeout(self.batch_id)))
-            .is_err()
-        {
-            debug!("Failed to send timeout for batch {}", self.batch_id);
-        }
+        proof
     }
 }
 
@@ -109,30 +85,53 @@ pub(crate) struct ProofCoordinator {
     digest_to_proof: HashMap<HashValue, IncrementalProofState>,
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
-    timeouts: DigestTimeouts,
+    timeouts: Timeouts<SignedDigestInfo>,
+    batch_reader: Arc<dyn BatchReader>,
+    batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
 impl ProofCoordinator {
-    pub fn new(proof_timeout_ms: usize, peer_id: PeerId) -> Self {
+    pub fn new(
+        proof_timeout_ms: usize,
+        peer_id: PeerId,
+        batch_reader: Arc<dyn BatchReader>,
+        batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+    ) -> Self {
         Self {
             peer_id,
             proof_timeout_ms,
             digest_to_proof: HashMap::new(),
             digest_to_time: HashMap::new(),
-            timeouts: DigestTimeouts::new(),
+            timeouts: Timeouts::new(),
+            batch_reader,
+            batch_generator_cmd_tx,
         }
     }
 
-    fn init_proof(&mut self, info: SignedDigestInfo, batch_id: BatchId, tx: ProofReturnChannel) {
-        self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
+    fn init_proof(&mut self, signed_digest: &SignedDigest) -> Result<(), SignedDigestError> {
+        // Check if the signed digest corresponding to our batch
+        if signed_digest.info().batch_author != self.peer_id {
+            return Err(SignedDigestError::WrongAuthor);
+        }
+        let batch_author = self
+            .batch_reader
+            .exists(&signed_digest.digest())
+            .ok_or(SignedDigestError::WrongAuthor)?;
+        if batch_author != signed_digest.info().batch_author {
+            return Err(SignedDigestError::WrongAuthor);
+        }
+
+        self.timeouts
+            .add(signed_digest.info().clone(), self.proof_timeout_ms);
         self.digest_to_proof.insert(
-            info.digest,
-            IncrementalProofState::new(info.clone(), batch_id, tx),
+            signed_digest.digest(),
+            IncrementalProofState::new(signed_digest.info().clone()),
         );
         self.digest_to_time
-            .entry(info.digest)
+            .entry(signed_digest.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+        Ok(())
     }
 
     fn add_signature(
@@ -141,58 +140,53 @@ impl ProofCoordinator {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<Option<ProofOfStore>, SignedDigestError> {
         if !self.digest_to_proof.contains_key(&signed_digest.digest()) {
-            return Err(SignedDigestError::WrongInfo);
+            self.init_proof(&signed_digest)?;
         }
-        let mut ret = Ok(());
-        let mut proof_changed_to_completed = false;
         let digest = signed_digest.digest();
-        let my_id = self.peer_id;
-        self.digest_to_proof
-            .entry(signed_digest.digest())
-            .and_modify(|state| {
-                ret = state.add_signature(signed_digest);
-                if ret.is_ok() {
-                    proof_changed_to_completed = state.ready(validator_verifier, my_id);
+
+        match self.digest_to_proof.entry(signed_digest.digest()) {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().add_signature(signed_digest)?;
+                if entry.get_mut().ready(validator_verifier) {
+                    let (_, state) = entry.remove_entry();
+                    let proof = state.take(validator_verifier);
+                    // quorum store measurements
+                    let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
+                        - self
+                            .digest_to_time
+                            .remove(&digest)
+                            .expect("Batch created without recording the time!");
+                    counters::BATCH_TO_POS_DURATION
+                        .observe_duration(Duration::from_micros(duration));
+                    return Ok(Some(proof));
                 }
-            });
-        if proof_changed_to_completed {
-            let (proof, batch_id, tx) = self
-                .digest_to_proof
-                .remove(&digest)
-                .unwrap()
-                .take(validator_verifier);
-
-            // quorum store measurements
-            let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                - self
-                    .digest_to_time
-                    .get(&digest)
-                    .expect("Batch created without recording the time!");
-            counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
-
-            // TODO: just send back an ack
-            if tx.send(Ok((proof.clone(), batch_id))).is_err() {
-                debug!("Failed to send back completion for batch {}", batch_id);
-            }
-
-            Ok(Some(proof))
-        } else {
-            Ok(None)
+            },
+            Entry::Vacant(_) => (),
         }
+        Ok(None)
     }
 
-    fn expire(&mut self) {
-        for digest in self.timeouts.expire() {
-            if let Some(state) = self.digest_to_proof.remove(&digest) {
-                state.send_timeout();
-            }
+    async fn expire(&mut self) {
+        let mut batch_ids = vec![];
+        for signed_digest_info in self.timeouts.expire() {
+            counters::TIMEOUT_BATCHES_COUNT.inc();
+            self.digest_to_proof.remove(&signed_digest_info.digest);
+            batch_ids.push(signed_digest_info.batch_id);
+        }
+        if self
+            .batch_generator_cmd_tx
+            .send(BatchGeneratorCommand::ProofExpiration(batch_ids))
+            .await
+            .is_err()
+        {
+            warn!("Failed to send proof expiration to batch generator");
         }
     }
 
     pub async fn start(
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
-        tx: Sender<ProofManagerCommand>,
+        mut network_sender: impl QuorumStoreSender,
         validator_verifier: ValidatorVerifier,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
@@ -206,10 +200,6 @@ impl ProofCoordinator {
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
-                        ProofCoordinatorCommand::InitProof(info, batch_id, tx) => {
-                            debug!("QS: init proof, batch_id {}, digest {}", batch_id, info.digest);
-                            self.init_proof(info, batch_id, tx);
-                        },
                         ProofCoordinatorCommand::AppendSignature(signed_digest) => {
                             let peer_id = signed_digest.signer();
                             let digest = signed_digest.digest();
@@ -217,7 +207,7 @@ impl ProofCoordinator {
                                 Ok(result) => {
                                     if let Some(proof) = result {
                                         debug!("QS: received quorum of signatures, digest {}", digest);
-                                        tx.send(ProofManagerCommand::LocalProof(proof)).await.unwrap();
+                                        network_sender.broadcast_proof_of_store(proof).await;
                                     }
                                 },
                                 Err(e) => {
@@ -232,7 +222,7 @@ impl ProofCoordinator {
                     }
                 }),
                 _ = interval.tick() => {
-                    monitor!("proof_coordinator_handle_tick", self.expire());
+                    monitor!("proof_coordinator_handle_tick", self.expire().await);
                 }
             }
         }

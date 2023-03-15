@@ -16,13 +16,12 @@ The current required minimum for staking is 1M APT tokens.
 Before joining the network, make sure the validator node is bootstrapped with the correct genesis blob and waypoint for corresponding network. To bootstrap your node, first you need to know the pool address to use:
 
 :::tip 
-See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
+The command below uses the network you set for the account when [initializing the CLI](../../../nodes/validator-node/owner/index.md#initialize-cli).
 :::
 
 ```bash
 aptos node get-stake-pool \
   --owner-address <owner_address> 
-  --url https://fullnode.mainnet.aptoslabs.com/v1
 ```
 
 ### Using source code
