@@ -25,17 +25,23 @@ impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
         ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+        max_num_retry: usize,
     ) -> Self {
         Self {
             signers,
             next_index: 0,
             ret_tx,
             num_retries: 0,
-            max_num_retry: 5, // TODO: get it from config.
+            max_num_retry,
         }
     }
 
     fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
+        if self.num_retries == 0 {
+            counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
+        } else {
+            counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
+        }
         if self.num_retries < self.max_num_retry {
             self.num_retries += 1;
             let ret = self
@@ -84,6 +90,7 @@ pub(crate) struct BatchRequester<T> {
     epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,
+    max_num_retry: usize,
     request_timeout_ms: usize,
     network_sender: T,
 }
@@ -94,6 +101,7 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
         my_peer_id: PeerId,
         request_num_peers: usize,
         request_timeout_ms: usize,
+        max_num_retry: usize,
         network_sender: T,
     ) -> Self {
         Self {
@@ -101,6 +109,7 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
             my_peer_id,
             request_num_peers,
             request_timeout_ms,
+            max_num_retry,
             network_sender,
         }
     }
@@ -111,7 +120,7 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
         signers: Vec<PeerId>,
         ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, Error>>,
     ) {
-        let mut request_state = BatchRequesterState::new(signers, ret_tx);
+        let mut request_state = BatchRequesterState::new(signers, ret_tx, self.max_num_retry);
         let network_sender = self.network_sender.clone();
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;
@@ -124,7 +133,6 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
                 trace!("QS: requesting from {:?}", request_peers);
                 let request = BatchRequest::new(my_peer_id, epoch, digest);
                 for peer in request_peers {
-                    counters::SENT_BATCH_REQUEST_COUNT.inc();
                     futures.push(network_sender.request_batch(request.clone(), peer, timeout));
                 }
                 while let Some(response) = futures.next().await {
@@ -138,7 +146,6 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
                         }
                     }
                 }
-                counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc();
             }
             request_state.serve_request(digest, None);
         });
