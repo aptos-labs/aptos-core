@@ -993,7 +993,7 @@ async fn bad_peer_is_eventually_banned_internal() {
     client.update_summary(good_peer, mock_storage_summary(100));
     // Bad peer advertises txns 0 -> 200 (but can't actually service).
     client.update_summary(bad_peer, mock_storage_summary(200));
-    client.update_global_summary_cache();
+    client.update_global_summary_cache().unwrap();
 
     // The global summary should contain the bad peer's advertisement.
     let global_summary = client.get_global_data_summary();
@@ -1046,7 +1046,7 @@ async fn bad_peer_is_eventually_banned_internal() {
     assert!(seen_data_unavailable_err);
 
     // The global summary should no longer contain the bad peer's advertisement.
-    client.update_global_summary_cache();
+    client.update_global_summary_cache().unwrap();
     let global_summary = client.get_global_data_summary();
     assert!(!global_summary
         .advertised_data
@@ -1071,7 +1071,7 @@ async fn bad_peer_is_eventually_banned_callback() {
     // Bypass poller and just add the storage summaries directly.
     // Bad peer advertises txns 0 -> 200 (but can't actually service).
     client.update_summary(bad_peer, mock_storage_summary(200));
-    client.update_global_summary_cache();
+    client.update_global_summary_cache().unwrap();
 
     // Spawn a handler for both peers.
     tokio::spawn(async move {
@@ -1119,7 +1119,7 @@ async fn bad_peer_is_eventually_banned_callback() {
     assert!(seen_data_unavailable_err);
 
     // The global summary should no longer contain the bad peer's advertisement.
-    client.update_global_summary_cache();
+    client.update_global_summary_cache().unwrap();
     let global_summary = client.get_global_data_summary();
     assert!(!global_summary
         .advertised_data
@@ -1304,6 +1304,54 @@ async fn disable_compression() {
     assert_eq!(response.payload, TransactionListWithProof::new_empty());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn disconnected_peers_garbage_collection() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
+
+    // Connect several peers
+    let priority_peer_1 = mock_network.add_peer(true);
+    let priority_peer_2 = mock_network.add_peer(true);
+    let priority_peer_3 = mock_network.add_peer(true);
+
+    // Poll all of the peers to initialize the peer states
+    let all_peers = vec![priority_peer_1, priority_peer_2, priority_peer_3];
+    poll_peers(&mut mock_network, &client, all_peers.clone()).await;
+
+    // Verify we have peer states for all peers
+    verify_peer_states(&client, all_peers.clone());
+
+    // Disconnect priority peer 1 and update the global data summary
+    mock_network.disconnect_peer(priority_peer_1);
+    client.update_global_summary_cache().unwrap();
+
+    // Verify we have peer states for only the remaining peers
+    verify_peer_states(&client, vec![priority_peer_2, priority_peer_3]);
+
+    // Disconnect priority peer 2 and update the global data summary
+    mock_network.disconnect_peer(priority_peer_2);
+    client.update_global_summary_cache().unwrap();
+
+    // Verify we have peer states for only priority peer 3
+    verify_peer_states(&client, vec![priority_peer_3]);
+
+    // Reconnect priority peer 1, poll it and update the global data summary
+    mock_network.reconnect_peer(priority_peer_1);
+    poll_peers(&mut mock_network, &client, vec![priority_peer_1]).await;
+    client.update_global_summary_cache().unwrap();
+
+    // Verify we have peer states for priority peer 1 and 3
+    verify_peer_states(&client, vec![priority_peer_1, priority_peer_3]);
+
+    // Reconnect priority peer 2, poll it and update the global data summary
+    mock_network.reconnect_peer(priority_peer_2);
+    poll_peers(&mut mock_network, &client, vec![priority_peer_2]).await;
+    client.update_global_summary_cache().unwrap();
+
+    // Verify we have peer states for all peers
+    verify_peer_states(&client, all_peers);
+}
+
 #[tokio::test]
 async fn bad_peer_is_eventually_added_back() {
     ::aptos_logger::Logger::init_for_testing();
@@ -1377,7 +1425,7 @@ async fn bad_peer_is_eventually_added_back() {
     }
 
     // Peer is eventually ignored and this request range unserviceable.
-    client.update_global_summary_cache();
+    client.update_global_summary_cache().unwrap();
     let global_summary = client.get_global_data_summary();
     assert!(!global_summary
         .advertised_data
@@ -1483,4 +1531,36 @@ fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -
     } else {
         client.peer_states.read().num_in_flight_regular_polls()
     }
+}
+
+/// A simple helper function that polls all the specified peers
+/// and returns storage server summaries for each.
+async fn poll_peers(
+    mock_network: &mut MockNetwork,
+    client: &AptosNetDataClient,
+    all_peers: Vec<PeerNetworkId>,
+) {
+    for peer in all_peers {
+        // Poll the peer
+        let handle = poll_peer(client.clone(), peer, None);
+
+        // Respond to the poll request
+        let network_request = mock_network.next_request().await.unwrap();
+        let data_response = DataResponse::StorageServerSummary(StorageServerSummary::default());
+        network_request
+            .response_sender
+            .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
+
+        // Wait for the poll to complete
+        handle.await.unwrap();
+    }
+}
+
+/// Verifies the exclusive existence of peer states for all the specified peers
+fn verify_peer_states(client: &AptosNetDataClient, all_peers: Vec<PeerNetworkId>) {
+    let peer_to_states = client.peer_states.read().get_peer_to_states();
+    for peer in &all_peers {
+        assert!(peer_to_states.contains_key(peer));
+    }
+    assert_eq!(peer_to_states.len(), all_peers.len());
 }
