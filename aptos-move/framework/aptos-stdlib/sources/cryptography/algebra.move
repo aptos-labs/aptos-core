@@ -27,11 +27,11 @@ module aptos_std::algebra {
         }
     }
 
-    /// Try deserializing a byte array to an element of an algebraic structure `S` using a given `format`.
+    /// Try deserializing a byte array to an element of an algebraic structure `S` using a given serialization format `F`.
     /// Return none if the deserialization failed.
-    public fun deserialize<S>(format: u64, bytes: &vector<u8>): Option<Element<S>> {
+    public fun deserialize<S, F>(bytes: &vector<u8>): Option<Element<S>> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        let (succeeded, handle) = deserialize_internal<S>(format, bytes);
+        let (succeeded, handle) = deserialize_internal<S, F>(bytes);
         if (succeeded) {
             some(Element<S> { handle })
         } else {
@@ -39,10 +39,10 @@ module aptos_std::algebra {
         }
     }
 
-    /// Serialize an element of an algebraic structure `S` to a byte array using a given `format`.
-    public fun serialize<S>(format: u64, element: &Element<S>): vector<u8> {
+    /// Serialize an element of an algebraic structure `S` to a byte array using a given serialization format `F`.
+    public fun serialize<S, F>(element: &Element<S>): vector<u8> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        serialize_internal<S>(format, element.handle)
+        serialize_internal<S, F>(element.handle)
     }
 
     //
@@ -50,9 +50,9 @@ module aptos_std::algebra {
     // Native functions begin.
     //
 
-    native fun deserialize_internal<G>(format: u64, bytes: &vector<u8>): (bool, u64);
+    native fun deserialize_internal<G, F>(bytes: &vector<u8>): (bool, u64);
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
-    native fun serialize_internal<G>(format: u64, h: u64): vector<u8>;
+    native fun serialize_internal<G, F>(handle: u64): vector<u8>;
 
     //
     // (Native functions end here.)

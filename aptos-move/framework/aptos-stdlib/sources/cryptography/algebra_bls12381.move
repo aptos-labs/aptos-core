@@ -12,11 +12,11 @@ module aptos_std::algebra_bls12381 {
     /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
     struct Fr {}
 
-    /// A serialization scheme for `Fr` elements,
+    /// A serialization format for `Fr` elements,
     /// where an element is represented by a byte array `b[]` of size 32 with the least significant byte coming first.
     ///
     /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
-    public fun format_bls12381fr_lsb(): u64 { 0x0a00000000000000 }
+    struct FrFormatLsb {}
 
     //
     // (Marker types and their serialization schemes end here).
@@ -34,12 +34,12 @@ module aptos_std::algebra_bls12381 {
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
-        let val_0 = std::option::extract(&mut deserialize<Fr>(
-            format_bls12381fr_lsb(), &BLS12_381_FR_VAL_0_SERIALIZED_LSB));
-        let val_1 = std::option::extract(&mut deserialize<Fr>(
-            format_bls12381fr_lsb(), &BLS12_381_FR_VAL_1_SERIALIZED_LSB));
+        let val_0 = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(
+            &BLS12_381_FR_VAL_0_SERIALIZED_LSB));
+        let val_1 = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(
+            &BLS12_381_FR_VAL_1_SERIALIZED_LSB));
         let sum = field_add(&val_0, &val_1);
-        assert!(BLS12_381_FR_VAL_1_SERIALIZED_LSB == serialize(format_bls12381fr_lsb(), &sum), 1);
+        assert!(BLS12_381_FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&sum), 1);
     }
 
     //

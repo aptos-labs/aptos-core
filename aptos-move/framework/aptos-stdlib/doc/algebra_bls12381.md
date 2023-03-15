@@ -11,7 +11,7 @@ Below are the BLS12-381 structures currently supported.
 
 
 -  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
--  [Function `format_bls12381fr_lsb`](#0x1_algebra_bls12381_format_bls12381fr_lsb)
+-  [Struct `FrFormatLsb`](#0x1_algebra_bls12381_FrFormatLsb)
 
 
 <pre><code></code></pre>
@@ -47,28 +47,33 @@ for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 </details>
 
-<a name="0x1_algebra_bls12381_format_bls12381fr_lsb"></a>
+<a name="0x1_algebra_bls12381_FrFormatLsb"></a>
 
-## Function `format_bls12381fr_lsb`
+## Struct `FrFormatLsb`
 
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the least significant byte coming first.
 
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FrFormatLsb">FrFormatLsb</a>
 </code></pre>
 
 
 
 <details>
-<summary>Implementation</summary>
+<summary>Fields</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64 { 0x0a00000000000000 }
-</code></pre>
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
 
+</dd>
+</dl>
 
 
 </details>

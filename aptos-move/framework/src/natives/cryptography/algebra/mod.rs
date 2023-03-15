@@ -33,12 +33,14 @@ pub enum Structure {
     BLS12381Fr,
 }
 
-impl Structure {
-    pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
-        match type_tag.to_string().as_str() {
+impl TryFrom<TypeTag> for Structure {
+    type Error = ();
+
+    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
+        match value.to_string().as_str() {
             // Should match the full path to struct `Fr` in `algebra_bls12381.move`.
-            "0x1::algebra_bls12381::Fr" => Some(Structure::BLS12381Fr),
-            _ => None,
+            "0x1::algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
+            _ => Err(()),
         }
     }
 }
@@ -50,13 +52,13 @@ pub enum SerializationFormat {
     BLS12381FrLsb,
 }
 
-impl TryFrom<u64> for SerializationFormat {
+impl TryFrom<TypeTag> for SerializationFormat {
     type Error = ();
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match value {
+    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
+        match value.to_string().as_str() {
             // Should match `format_bls12381fr_lsb()` in `algebra_bls12381.move`.
-            0x0a00000000000000 => Ok(SerializationFormat::BLS12381FrLsb),
+            "0x1::algebra_bls12381::FrFormatLsb" => Ok(SerializationFormat::BLS12381FrLsb),
             _ => Err(()),
         }
     }
@@ -76,7 +78,14 @@ impl AlgebraContext {
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ)?;
-        Structure::from_type_tag(&type_tag)
+        Structure::try_from(type_tag)
+    }};
+}
+
+macro_rules! format_from_ty_arg {
+    ($context:expr, $typ:expr) => {{
+        let type_tag = $context.type_to_type_tag($typ)?;
+        SerializationFormat::try_from(type_tag)
     }};
 }
 
@@ -106,33 +115,22 @@ macro_rules! get_element_pointer {
 }
 
 /// Macros that implements `serialize_internal()` using arkworks libraries.
-///
-/// Example expansion follows for `BLS12381Fr` structure and `bls12381fr_lsb` format.
-/// ```
-/// {
-///     let element_ptr = get_element_pointer!(context, handle);
-///     let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
-///     context.charge(gas_params.placeholder)?;
-///     let mut buf = Vec::new();
-///     element.serialize_uncompressed(&mut buf).unwrap();
-///     buf
-/// }
-/// ```
 macro_rules! ark_serialize_internal {
     (
         $gas_params:expr,
         $context:expr,
+        $args:ident,
         $structure:expr,
-        $handle:expr,
         $format:expr,
-        $typ:ty,
-        $ser_func:ident
+        $ark_type:ty,
+        $ark_ser_func:ident
     ) => {{
-        let element_ptr = get_element_pointer!($context, $handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let handle = safely_pop_arg!($args, u64) as usize;
+        let element_ptr = get_element_pointer!($context, handle);
+        let element = element_ptr.downcast_ref::<$ark_type>().unwrap();
         $context.charge($gas_params.placeholder)?;
-        let mut buf = Vec::new();
-        element.$ser_func(&mut buf).unwrap();
+        let mut buf = vec![];
+        element.$ark_ser_func(&mut buf).unwrap();
         buf
     }};
 }
@@ -143,21 +141,20 @@ fn serialize_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let handle = safely_pop_arg!(args, u64) as usize;
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
+    assert_eq!(2, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     match (structure_opt, format_opt) {
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381Fr,
-                handle,
                 SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                serialize_uncompressed
+                serialize_uncompressed //A serialize function defined in arkworks library.
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -167,18 +164,19 @@ fn serialize_internal(
     }
 }
 
+/// Macros that implements `deserialize_internal()` using arkworks libraries.
 macro_rules! ark_deserialize_internal {
     (
         $gas_params:expr,
         $context:expr,
-        $bytes:expr,
         $structure:expr,
+        $bytes:expr,
         $format:expr,
-        $typ:ty,
-        $deser_func:ident
+        $ark_typ:ty,
+        $ark_deser_func:ident
     ) => {{
         $context.charge($gas_params.placeholder)?;
-        match <$typ>::$deser_func($bytes) {
+        match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
                 let handle = store_element!($context, element);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
@@ -194,25 +192,25 @@ fn deserialize_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure = structure_from_ty_arg!(context, &ty_args[0]);
+    assert_eq!(2, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
-    match (structure, format_opt) {
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+    match (structure_opt, format_opt) {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_deserialize_internal!(
                 gas_params,
                 context,
-                bytes,
                 Structure::BLS12381Fr,
+                bytes,
                 SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                deserialize_uncompressed
+                deserialize_uncompressed //A deserialize function defined in arkworks library.
             )
         },
         _ => Err(SafeNativeError::Abort {
@@ -244,7 +242,7 @@ fn field_add_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => {
+        Ok(Structure::BLS12381Fr) => {
             abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             ark_field_add_internal!(
                 gas_params,
