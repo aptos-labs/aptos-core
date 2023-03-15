@@ -17,6 +17,7 @@ use move_core_types::language_storage::TypeTag;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    natives::function::{PartialVMError, StatusCode},
     values::{Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -108,10 +109,26 @@ macro_rules! abort_unless_feature_enabled {
     };
 }
 
-macro_rules! get_element_pointer {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions_mut().get_mut::<AlgebraContext>().objs[$handle].clone()
-    }};
+fn abort_invariant_violated() -> PartialVMError {
+    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+}
+
+/// Try getting a pointer to the `handle`-th elements in `context` and assign it to a local variable `ptr_out`.
+/// Then try casting it to a reference of `typ` and assign it in a local variable `ref_out`.
+/// Abort the VM execution with invariant violation if anything above fails.
+macro_rules! safe_borrow_element {
+    ($context:expr, $handle:expr, $typ:ty, $ptr_out:ident, $ref_out:ident) => {
+        let $ptr_out = $context
+            .extensions()
+            .get::<AlgebraContext>()
+            .objs
+            .get($handle)
+            .ok_or_else(abort_invariant_violated)?
+            .clone();
+        let $ref_out = $ptr_out
+            .downcast_ref::<$typ>()
+            .ok_or_else(abort_invariant_violated)?;
+    };
 }
 
 /// Macros that implements `serialize_internal()` using arkworks libraries.
@@ -125,10 +142,9 @@ macro_rules! ark_serialize_internal {
         $ark_type:ty,
         $ark_ser_func:ident
     ) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_element_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$ark_type>().unwrap();
         $context.charge($gas_params.placeholder)?;
+        let handle = safely_pop_arg!($args, u64) as usize;
+        safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
         element.$ark_ser_func(&mut buf).unwrap();
         buf
@@ -220,14 +236,12 @@ fn deserialize_internal(
 }
 
 macro_rules! ark_field_add_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $ark_type:ty) => {{
+        $context.charge($gas_params.placeholder)?;
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_element_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_element_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
-        $context.charge($gas_params.placeholder)?;
+        safe_borrow_element!($context, handle_1, $ark_type, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $ark_type, element_2_ptr, element_2);
         let new_element = element_1.add(element_2);
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
