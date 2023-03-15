@@ -101,14 +101,14 @@ impl SchemaBatch {
 /// [`Schema`]s.
 #[derive(Debug)]
 pub struct DB {
-    name: &'static str, // for logging
+    name: String, // for logging
     inner: rocksdb::DB,
 }
 
 impl DB {
     pub fn open(
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         column_families: Vec<ColumnFamilyName>,
         db_opts: &rocksdb::Options,
     ) -> Result<Self> {
@@ -131,7 +131,7 @@ impl DB {
     pub fn open_cf(
         db_opts: &rocksdb::Options,
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
     ) -> Result<DB> {
         let inner = rocksdb::DB::open_cf_descriptors(db_opts, path, cfds)?;
@@ -144,7 +144,7 @@ impl DB {
     pub fn open_cf_readonly(
         opts: &rocksdb::Options,
         path: impl AsRef<Path>,
-        name: &'static str,
+        name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
@@ -157,16 +157,19 @@ impl DB {
         opts: &rocksdb::Options,
         primary_path: P,
         secondary_path: P,
-        name: &'static str,
+        name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, cfs)?;
         Ok(Self::log_construct(name, inner))
     }
 
-    fn log_construct(name: &'static str, inner: rocksdb::DB) -> DB {
+    fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
         info!(rocksdb_name = name, "Opened RocksDB.");
-        DB { name, inner }
+        DB {
+            name: name.to_string(),
+            inner,
+        }
     }
 
     /// Reads single record by key.
@@ -221,7 +224,7 @@ impl DB {
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
-            .with_label_values(&[self.name])
+            .with_label_values(&[&self.name])
             .start_timer();
         let rows_locked = batch.rows.lock();
 
@@ -255,7 +258,7 @@ impl DB {
             }
         }
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES
-            .with_label_values(&[self.name])
+            .with_label_values(&[&self.name])
             .observe(serialized_size as f64);
 
         Ok(())
