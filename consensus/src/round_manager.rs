@@ -72,6 +72,11 @@ pub enum UnverifiedEvent {
     FragmentMsg(Box<Fragment>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
+    NodeMsg(Box<Node>),
+    SignedNodeDigestMsg(Box<SignedNodeDigest>),
+    CertifiedNodeMsg(Box<CertifiedNode>, bool),
+    CertifiedNodeAckMsg(Box<CertifiedNodeAck>),
+    CertifiedNodeRequestMsg(Box<CertifiedNodeRequest>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -114,6 +119,26 @@ impl UnverifiedEvent {
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 p.verify(validator)?;
                 VerifiedEvent::ProofOfStoreMsg(p)
+            },
+            UnverifiedEvent::NodeMsg(n) => {
+                n.verify(validator, peer_id)?;
+                VerifiedEvent::NodeMsg(n)
+            },
+            UnverifiedEvent::SignedNodeDigestMsg(sd) => {
+                sd.verify(validator)
+                VerifiedEvent::SignedNodeDigestMsg(sd)
+            },
+            UnverifiedEvent::CertifiedNodeMsg(cn, b) => {
+                n.verify
+                VerifiedEvent::CertifiedNodeMsg(cn, b)
+            },
+            UnverifiedEvent::CertifiedNodeAckMsg(cna) => {
+                n.verify
+                VerifiedEvent::CertifiedNodeAckMsg(cna)
+            },
+            UnverifiedEvent::CertifiedNodeRequestMsg(cnr) => {
+                n.verify
+                VerifiedEvent::CertifiedNodeRequestMsg(cnr)
             },
         })
     }

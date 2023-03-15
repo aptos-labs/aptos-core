@@ -14,7 +14,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::{block_info::Round, transaction::SignedTransaction};
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -93,8 +93,13 @@ impl PayloadManager {
     }
 
     /// Called from consensus to pre-fetch the transaction behind the batches in the block.
-    pub async fn prefetch_payload_data(&self, block: &Block) {
-        let payload = match block.payload() {
+    pub async fn prefetch_payload_data(
+        &self,
+        epoch: u64,
+        round: Round,
+        maybe_payload: Option<&Payload>,
+    ) {
+        let payload = match maybe_payload {
             Some(p) => p,
             None => return,
         };
@@ -105,7 +110,7 @@ impl PayloadManager {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
-                            LogicalTime::new(block.epoch(), block.round()),
+                            LogicalTime::new(epoch, round),
                             batch_store,
                         )
                         .await;

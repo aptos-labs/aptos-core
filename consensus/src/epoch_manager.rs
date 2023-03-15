@@ -56,11 +56,13 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::SafetyRulesManager;
+use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -69,6 +71,7 @@ use aptos_types::{
         LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
         ProposerElectionType, ValidatorSet,
     },
+    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
@@ -88,9 +91,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_global_constants::CONSENSUS_KEY;
-use aptos_secure_storage::{KVStorage, Storage};
-use aptos_types::validator_signer::ValidatorSigner;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -107,6 +107,7 @@ pub enum LivenessStorageData {
 
 // Manager the components that shared across epoch and spawn per-epoch RoundManager with
 // epoch-specific input.
+#[allow(dead_code)]
 pub struct EpochManager {
     author: Author,
     config: ConsensusConfig,
@@ -127,8 +128,8 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
-    rb_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>,>,
-    dag_driver_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>,>,
+    rb_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
+    dag_driver_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<EpochState>,
     block_retrieval_tx:
@@ -140,6 +141,7 @@ pub struct EpochManager {
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
 }
 
+#[allow(dead_code)]
 impl EpochManager {
     pub(crate) fn new(
         node_config: &NodeConfig,
@@ -600,152 +602,154 @@ impl EpochManager {
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
-        onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
     ) {
-            let epoch = epoch_state.epoch;
-            counters::EPOCH.set(epoch_state.epoch as i64);
-            counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
-            info!(
+        let epoch = epoch_state.epoch;
+        counters::EPOCH.set(epoch_state.epoch as i64);
+        counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
+        info!(
             epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
             root_block = %recovery_data.root_block(),
             "Starting new epoch",
         );
 
-        info!(epoch = epoch, "Creating QuorumStore");
-
-
-            // Start QuorumStore
-            let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
-                mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-
-            let mut quorum_store_builder = if self.quorum_store_enabled {
-                info!("Building QuorumStore");
-                QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
-                    self.epoch(),
-                    self.author,
-                    self.config.quorum_store_configs.clone(),
-                    consensus_to_quorum_store_rx,
-                    self.quorum_store_to_mempool_sender.clone(),
-                    self.config.mempool_txn_pull_timeout_ms,
-                    self.storage.aptos_db().clone(),
-                    network_sender.clone(),
-                    epoch_state.verifier.clone(),
-                    self.config.safety_rules.backend.clone(),
-                    self.quorum_store_storage.clone(),
-                ))
-            } else {
-                info!("Building DirectMempool");
-                QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
-                    consensus_to_quorum_store_rx,
-                    self.quorum_store_to_mempool_sender.clone(),
-                    self.config.mempool_txn_pull_timeout_ms,
-                ))
-            };
-
-            let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
-            let transaction_shuffler =
-                create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-            self.quorum_store_msg_tx = quorum_store_msg_tx;
-
-            let payload_client = Arc::new(QuorumStoreClient::new(
-                consensus_to_quorum_store_tx,
-                self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
-                self.config.quorum_store_pull_timeout_ms,
-                self.config.wait_for_full_blocks_above_recent_fill_threshold,
-                self.config.wait_for_full_blocks_above_pending_blocks,
-            ));
-
-            self.commit_state_computer.new_epoch(
-                &epoch_state,
-                payload_manager.clone(),
-                transaction_shuffler,
-            );
-            let state_computer = if onchain_consensus_config.decoupled_execution() {
-                Arc::new(self.spawn_decoupled_execution(
-                    safety_rules_container.clone(),
-                    epoch_state.verifier.clone(),
-                ))
-            } else {
-                self.commit_state_computer.clone()
-            };
-
-
-            if let Some((quorum_store_coordinator_tx, batch_retrieval_rx)) =
-            quorum_store_builder.start()
-            {
-                self.quorum_store_coordinator_tx = Some(quorum_store_coordinator_tx);
-                self.batch_retrieval_tx = Some(batch_retrieval_rx);
-            }
-
-
-
-            counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
-            counters::VALIDATOR_VOTING_POWER.set(
-                epoch_state
-                    .verifier
-                    .get_voting_power(&self.author)
-                    .unwrap_or(0) as f64,
-            );
-            epoch_state
-                .verifier
-                .get_ordered_account_addresses_iter()
-                .for_each(|peer_id| {
-                    counters::ALL_VALIDATORS_VOTING_POWER
-                        .with_label_values(&[&peer_id.to_string()])
-                        .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
-                });
-
-
-        //    tokio::spawn(round_manager.start(round_manager_rx, close_rx));
-
-
-            // Start DagDriver.
-
-            let backend = &self.config.safety_rules.backend;
-            let storage: Storage = backend.try_into().expect("Unable to initialize storage");
-            if let Err(error) = storage.available() {
-                panic!("Storage is not available: {:?}", error);
-            }
-            let private_key = storage
-                .get(CONSENSUS_KEY)
-                .map(|v| v.value)
-                .expect("Unable to get private key");
-            let signer = ValidatorSigner::new(self.author, private_key);
-
-            let (dag_driver_msg_tx, dag_driver_msg_rx) =
-                aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                    QueueStyle::FIFO,
-                    self.config.channel_size,
-                    None,
-                );
-            let (rb_msg_tx, rb_msg_rx) =
-                aptos_channel::new::<AccountAddress, VerifiedEvent>(
-                    QueueStyle::FIFO,
-                    self.config.channel_size,
-                    None,
-                );
-
-            self.dag_driver_tx = Some(dag_driver_msg_tx);
-            self.rb_tx = Some(rb_msg_tx);
-
-
-            //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
-            let dag_driver = DagDriver::new(
-                self.epoch(),
-                self.author,
-                self.config.dag_config.clone(),
-                payload_client,
-                network_sender,
-                epoch_state.verifier.clone(),
-                Arc::new(signer),
-                rb_msg_rx,
-                dag_driver_msg_rx,
-                payload_manager,
-                state_computer,
+        let mut safety_rules =
+            MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
+        if let Err(error) = safety_rules.perform_initialize() {
+            error!(
+                epoch = epoch,
+                error = error,
+                "Unable to initialize safety rules.",
             );
         }
+        let safety_rules_container = Arc::new(Mutex::new(safety_rules));
+
+        info!(epoch = epoch, "Creating QuorumStore");
+
+        let network_sender = NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            epoch_state.verifier.clone(),
+        );
+
+        // Start QuorumStore
+        let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
+            mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+
+        let mut quorum_store_builder = if self.quorum_store_enabled {
+            info!("Building QuorumStore");
+            QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
+                self.epoch(),
+                self.author,
+                self.config.quorum_store_configs.clone(),
+                consensus_to_quorum_store_rx,
+                self.quorum_store_to_mempool_sender.clone(),
+                self.config.mempool_txn_pull_timeout_ms,
+                self.storage.aptos_db().clone(),
+                network_sender.clone(),
+                epoch_state.verifier.clone(),
+                self.config.safety_rules.backend.clone(),
+                self.quorum_store_storage.clone(),
+            ))
+        } else {
+            info!("Building DirectMempool");
+            QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
+                consensus_to_quorum_store_rx,
+                self.quorum_store_to_mempool_sender.clone(),
+                self.config.mempool_txn_pull_timeout_ms,
+            ))
+        };
+
+        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
+        let transaction_shuffler =
+            create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
+        self.quorum_store_msg_tx = quorum_store_msg_tx;
+
+        let payload_client = Arc::new(QuorumStoreClient::new(
+            consensus_to_quorum_store_tx,
+            self.config.quorum_store_poll_count, // TODO: consider moving it to a quorum store config in later PRs.
+            self.config.quorum_store_pull_timeout_ms,
+            self.config.wait_for_full_blocks_above_recent_fill_threshold,
+            self.config.wait_for_full_blocks_above_pending_blocks,
+        ));
+
+        self.commit_state_computer.new_epoch(
+            &epoch_state,
+            payload_manager.clone(),
+            transaction_shuffler,
+        );
+        let state_computer = Arc::new(self.spawn_decoupled_execution(
+            safety_rules_container.clone(),
+            epoch_state.verifier.clone(),
+        ));
+
+        if let Some((quorum_store_coordinator_tx, batch_retrieval_rx)) =
+            quorum_store_builder.start()
+        {
+            self.quorum_store_coordinator_tx = Some(quorum_store_coordinator_tx);
+            self.batch_retrieval_tx = Some(batch_retrieval_rx);
+        }
+
+        counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
+        counters::VALIDATOR_VOTING_POWER.set(
+            epoch_state
+                .verifier
+                .get_voting_power(&self.author)
+                .unwrap_or(0) as f64,
+        );
+        epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .for_each(|peer_id| {
+                counters::ALL_VALIDATORS_VOTING_POWER
+                    .with_label_values(&[&peer_id.to_string()])
+                    .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
+            });
+
+        let backend = &self.config.safety_rules.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        let private_key = storage
+            .get(CONSENSUS_KEY)
+            .map(|v| v.value)
+            .expect("Unable to get private key");
+        let signer = ValidatorSigner::new(self.author, private_key);
+
+        let (dag_driver_msg_tx, dag_driver_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+        let (rb_msg_tx, rb_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
+            QueueStyle::FIFO,
+            self.config.channel_size,
+            None,
+        );
+
+        self.dag_driver_tx = Some(dag_driver_msg_tx);
+        self.rb_tx = Some(rb_msg_tx);
+
+        //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
+        let dag_driver = DagDriver::new(
+            self.epoch(),
+            self.author,
+            self.config.dag_config.clone(),
+            payload_client,
+            network_sender,
+            epoch_state.verifier.clone(),
+            Arc::new(signer),
+            rb_msg_rx,
+            dag_driver_msg_rx,
+            payload_manager,
+            state_computer,
+        );
+
+        tokio::spawn(dag_driver.start());
     }
 
     async fn start_round_manager(
@@ -858,7 +862,7 @@ impl EpochManager {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             onchain_consensus_config.back_pressure_limit(),
-            payload_manager.clone(),
+            payload_manager,
         ));
 
         if let Some((quorum_store_coordinator_tx, batch_retrieval_rx)) =
@@ -928,7 +932,6 @@ impl EpochManager {
         tokio::spawn(round_manager.start(round_manager_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
-
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
@@ -956,14 +959,15 @@ impl EpochManager {
                 if self.quorum_store_enabled {
                     self.config.apply_quorum_store_overrides();
                 }
-                self.start_round_manager(
-                    initial_data,
-                    epoch_state,
-                    consensus_config,
-                    execution_config,
-                )
-                .await
-                // TODO: start dag_river here and eventually move important parts from start_round_manager and delete.
+                // self.start_round_manager(
+                //     initial_data,
+                //     epoch_state,
+                //     consensus_config,
+                //     execution_config,
+                // )
+                // .await
+                self.start_dag_driver(initial_data, epoch_state, execution_config)
+                    .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.start_recovery_manager(ledger_data, epoch_state).await
@@ -1039,7 +1043,12 @@ impl EpochManager {
             | ConsensusMsg::BatchRequestMsg(_)
             | ConsensusMsg::BatchMsg(_)
             | ConsensusMsg::SignedDigestMsg(_)
-            | ConsensusMsg::ProofOfStoreMsg(_) => {
+            | ConsensusMsg::ProofOfStoreMsg(_)
+            | ConsensusMsg::NodeMsg(_)
+            | ConsensusMsg::SignedNodeDigestMsg(_)
+            | ConsensusMsg::CertifiedNodeMsg(_, _)
+            | ConsensusMsg::CertifiedNodeAckMsg(_)
+            | ConsensusMsg::CertifiedNodeRequestMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));
@@ -1119,6 +1128,21 @@ impl EpochManager {
             );
         }
         match event {
+            dag_driver_event @ (VerifiedEvent::CertifiedNodeMsg(_, _)
+            | VerifiedEvent::CertifiedNodeRequestMsg(_)) => {
+                if let Some(sender) = &mut self.dag_driver_tx {
+                    sender.push(peer_id, dag_driver_event)?;
+                }
+            },
+
+            rb_event @ (VerifiedEvent::NodeMsg(_)
+            | VerifiedEvent::SignedNodeDigestMsg(_)
+            | VerifiedEvent::CertifiedNodeAckMsg(_)) => {
+                if let Some(sender) = &mut self.rb_tx {
+                    sender.push(peer_id, rb_event)?;
+                }
+            },
+
             quorum_store_event @ (VerifiedEvent::SignedDigestMsg(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::FragmentMsg(_)) => {

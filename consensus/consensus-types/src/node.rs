@@ -19,7 +19,7 @@ pub enum SignedNodeDigestError {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct SignedNodeDigestInfo {
     digest: HashValue,
@@ -110,7 +110,7 @@ impl NodeCertificate {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
 pub struct NodeMetaData {
-    epoch: u64, // to make sure rounds from previous epochs cannot be reused
+    epoch: u64,
     round: u64,
     source: PeerId,
     digest: HashValue,
@@ -189,6 +189,28 @@ impl Node {
         }
     }
 
+    pub fn verify(&self, validator: &ValidatorVerifier, peer_id: PeerId) -> anyhow::Result<()> {
+
+        TODO: think about this.
+
+        if self.source() != peer_id {
+            Err(anyhow::anyhow!(
+                "Sender mismatch: peer_id: {}, source: {}",
+                self.source(),
+                peer_id
+            ))
+        }
+
+        if self.round() == 0 {
+            Ok(())
+        } else {
+            let strong_parents_peer_id = self.parents.iter().filter(|md| md.round == self.round() - 1).map(|md| md.source);
+            validator
+                .check_voting_power(strong_parents_peer_id)
+                .context("Failed to verify Node")
+        }
+    }
+
     pub fn digest(&self) -> HashValue {
         self.metadata.digest()
     }
@@ -211,6 +233,10 @@ impl Node {
 
     pub fn parents(&self) -> &HashSet<NodeMetaData> {
         &self.parents
+    }
+
+    pub fn payload(&self) -> Option<&Payload> {
+        Some(&self.consensus_payload)
     }
 }
 

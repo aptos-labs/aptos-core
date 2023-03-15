@@ -1,12 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::anchor_election::{AnchorElection, RoundRobinAnchorElection};
+use crate::{
+    dag::anchor_election::{AnchorElection, RoundRobinAnchorElection},
+    payload_manager::PayloadManager,
+};
 use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
 use aptos_crypto::HashValue;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
 use async_recursion::async_recursion;
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    sync::Arc,
+};
 use tokio::sync::mpsc::Sender;
 
 #[allow(dead_code)]
@@ -322,12 +328,13 @@ pub(crate) struct Dag {
     // starts from 0, which is genesys
     front: WeakLinksCreator,
     dag: Vec<HashMap<PeerId, CertifiedNode>>,
-    // TODO: add genesys nodes.
+    // TODO: protect from DDoS - currently validators can add unbounded number of entries
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
     // Arc to something that returns the anchors
     proposer_election: Box<dyn AnchorElection>,
     bullshark_tx: Sender<CertifiedNode>,
     verifier: ValidatorVerifier,
+    payload_manager: Arc<PayloadManager>,
 }
 
 #[allow(dead_code)]
@@ -336,6 +343,7 @@ impl Dag {
         epoch: u64,
         bullshark_tx: Sender<CertifiedNode>,
         verifier: ValidatorVerifier,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         let mut dag = Vec::new();
         dag.push(HashMap::new());
@@ -349,6 +357,7 @@ impl Dag {
             proposer_election: Box::new(RoundRobinAnchorElection::new(&verifier)),
             bullshark_tx,
             verifier,
+            payload_manager,
         }
     }
 
@@ -438,6 +447,14 @@ impl Dag {
             .update_peer_latest_node(certified_node.node().metadata().clone());
 
         // TODO persist!
+
+        self.payload_manager
+            .prefetch_payload_data(
+                self.epoch,
+                self.current_round,
+                certified_node.node().payload(),
+            )
+            .await;
 
         self.bullshark_tx
             .send(certified_node)

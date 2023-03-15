@@ -7,7 +7,9 @@ use crate::{
         dag::Dag,
         reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
     },
+    experimental::ordering_state_computer::OrderingStateComputer,
     network::{DagSender, NetworkSender},
+    payload_manager::PayloadManager,
     round_manager::VerifiedEvent,
     state_replication::PayloadClient,
 };
@@ -52,13 +54,11 @@ impl DagDriver {
         validator_signer: Arc<ValidatorSigner>,
         rb_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+        payload_manager: Arc<PayloadManager>,
+        state_computer: Arc<OrderingStateComputer>,
     ) -> Self {
-        // TODO: should basically replace round manager. Spawns Bullshark and RB and pass channels around
-
         let (dag_bullshark_tx, dag_bullshark_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
-
-        // TODO: Spawn from epoch_manager.rs
 
         let rb = ReliableBroadcast::new(
             author,
@@ -67,7 +67,7 @@ impl DagDriver {
             validator_signer,
         );
 
-        let bullshark = Bullshark::new();
+        let bullshark = Bullshark::new(state_computer);
 
         spawn_named!("reliable_broadcast", rb.start(rb_network_msg_rx, rb_rx));
         spawn_named!("bullshark", bullshark.start(dag_bullshark_rx));
@@ -80,7 +80,7 @@ impl DagDriver {
             payload_client,
             timeout: false,
             network_sender,
-            dag: Dag::new(epoch, dag_bullshark_tx, verifier.clone()),
+            dag: Dag::new(epoch, dag_bullshark_tx, verifier.clone(), payload_manager),
             rb_tx,
             network_msg_rx,
         }

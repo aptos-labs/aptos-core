@@ -386,7 +386,11 @@ impl BlockStore {
             self.time_service.wait_until(block_time).await;
         }
         self.payload_manager
-            .prefetch_payload_data(executed_block.block())
+            .prefetch_payload_data(
+                executed_block.block().epoch(),
+                executed_block.block().round(),
+                executed_block.block().payload(),
+            )
             .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
