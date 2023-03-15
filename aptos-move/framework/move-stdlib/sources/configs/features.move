@@ -143,10 +143,10 @@ module std::features {
     /// Whether generic algebra basic operation support in `algebra.move` are enabled.
     ///
     /// Lifetime: transient
-    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 12;
-    public fun get_generic_agebraic_structures_basic_operations_feature(): u64 { GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS }
-    public fun generic_algebraic_structures_basic_operations_enabled(): bool acquires Features {
-        is_enabled(GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS)
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+    public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+    public fun cryptogtaphy_algebra_enabled(): bool acquires Features {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
 
     /// Whether the generic algebra implementation for BLS12381 operations are enabled.

@@ -29,8 +29,8 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
 -  [Function `get_delegation_pools_feature`](#0x1_features_get_delegation_pools_feature)
 -  [Function `delegation_pools_enabled`](#0x1_features_delegation_pools_enabled)
--  [Function `get_generic_agebraic_structures_basic_operations_feature`](#0x1_features_get_generic_agebraic_structures_basic_operations_feature)
--  [Function `generic_algebraic_structures_basic_operations_enabled`](#0x1_features_generic_algebraic_structures_basic_operations_enabled)
+-  [Function `get_cryptography_algebra_natives_feature`](#0x1_features_get_cryptography_algebra_natives_feature)
+-  [Function `cryptogtaphy_algebra_enabled`](#0x1_features_cryptogtaphy_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -143,6 +143,18 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
+
+Whether generic algebra basic operation support in <code>algebra.<b>move</b></code> are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
+</code></pre>
+
+
+
 <a name="0x1_features_DELEGATION_POOLS"></a>
 
 Whether delegation pools are enabled.
@@ -160,18 +172,6 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS"></a>
-
-Whether generic algebra basic operation support in <code>algebra.<b>move</b></code> are enabled.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>: u64 = 12;
 </code></pre>
 
 
@@ -706,13 +706,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_generic_agebraic_structures_basic_operations_feature"></a>
+<a name="0x1_features_get_cryptography_algebra_natives_feature"></a>
 
-## Function `get_generic_agebraic_structures_basic_operations_feature`
+## Function `get_cryptography_algebra_natives_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64
 </code></pre>
 
 
@@ -721,20 +721,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_generic_agebraic_structures_basic_operations_feature">get_generic_agebraic_structures_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64 { <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_generic_algebraic_structures_basic_operations_enabled"></a>
+<a name="0x1_features_cryptogtaphy_algebra_enabled"></a>
 
-## Function `generic_algebraic_structures_basic_operations_enabled`
+## Function `cryptogtaphy_algebra_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptogtaphy_algebra_enabled">cryptogtaphy_algebra_enabled</a>(): bool
 </code></pre>
 
 
@@ -743,8 +743,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_generic_algebraic_structures_basic_operations_enabled">generic_algebraic_structures_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS">GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptogtaphy_algebra_enabled">cryptogtaphy_algebra_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>)
 }
 </code></pre>
 

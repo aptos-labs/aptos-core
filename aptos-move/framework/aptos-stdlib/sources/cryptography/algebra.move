@@ -8,7 +8,7 @@
 ///   - Addition.
 module aptos_std::algebra {
     use std::option::{Option, some, none};
-    use std::features::generic_algebraic_structures_basic_operations_enabled;
+    use std::features::cryptogtaphy_algebra_enabled;
 
     /// This struct represents an element of an algebraic structure `S`.
     struct Element<phantom S> has copy, drop {
@@ -60,13 +60,13 @@ module aptos_std::algebra {
     //
 
     fun abort_unless_generic_algebraic_structures_basic_operations_enabled() {
-        if (generic_algebraic_structures_basic_operations_enabled()) return;
+        if (cryptogtaphy_algebra_enabled()) return;
         abort(std::error::not_implemented(0))
     }
 
     #[test_only]
     public fun enable_initial_generic_algebraic_operations(fx: &signer) {
-        std::features::change_feature_flags(fx, vector[std::features::get_generic_agebraic_structures_basic_operations_feature()], vector[]);
+        std::features::change_feature_flags(fx, vector[std::features::get_cryptography_algebra_natives_feature()], vector[]);
     }
 
     //
