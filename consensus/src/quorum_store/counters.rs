@@ -362,7 +362,7 @@ pub static EXCEEDED_BATCH_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
         "quorum_store_exceeded_batch_quota_count",
         "Count of the exceeded batch quota."
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Count of the number of batch request sent to other nodes.
