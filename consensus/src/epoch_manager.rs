@@ -613,18 +613,8 @@ impl EpochManager {
             "Starting new epoch",
         );
 
-            
-            let proposer_election =
-                self.create_proposer_election(&epoch_state, &onchain_consensus_config);
-            let network_sender = NetworkSender::new(
-                self.author,
-                self.network_sender.clone(),
-                self.self_sender.clone(),
-                epoch_state.verifier.clone(),
-            );
-            let chain_health_backoff_config =
-                ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
-            let safety_rules_container = Arc::new(Mutex::new(safety_rules));
+        info!(epoch = epoch, "Creating QuorumStore");
+
 
             // Start QuorumStore
             let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
@@ -681,16 +671,6 @@ impl EpochManager {
                 self.commit_state_computer.clone()
             };
 
-            info!(epoch = epoch, "Create BlockStore");
-            let block_store = Arc::new(BlockStore::new(
-                Arc::clone(&self.storage),
-                recovery_data,
-                state_computer,
-                self.config.max_pruned_blocks_in_mem,
-                Arc::clone(&self.time_service),
-                onchain_consensus_config.back_pressure_limit(),
-                payload_manager.clone(),
-            ));
 
             if let Some((quorum_store_coordinator_tx, batch_retrieval_rx)) =
             quorum_store_builder.start()
@@ -699,28 +679,7 @@ impl EpochManager {
                 self.batch_retrieval_tx = Some(batch_retrieval_rx);
             }
 
-            info!(epoch = epoch, "Create ProposalGenerator");
-            // txn manager is required both by proposal generator (to pull the proposers)
-            // and by event processor (to update their status).
-            let proposal_generator = ProposalGenerator::new(
-                self.author,
-                block_store.clone(),
-                payload_client.clone(),
-                self.time_service.clone(),
-                self.config.max_sending_block_txns,
-                self.config.max_sending_block_bytes,
-                onchain_consensus_config.max_failed_authors_to_store(),
-                chain_health_backoff_config,
-                self.quorum_store_enabled,
-            );
 
-            let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-                QueueStyle::LIFO,
-                1,
-                Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
-            );
-
-            self.round_manager_tx = Some(round_manager_tx.clone());
 
             counters::TOTAL_VOTING_POWER.set(epoch_state.verifier.total_voting_power() as f64);
             counters::VALIDATOR_VOTING_POWER.set(
@@ -738,27 +697,9 @@ impl EpochManager {
                         .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
                 });
 
-            let mut round_manager = RoundManager::new(
-                epoch_state.clone(),
-                block_store.clone(),
-                round_state,
-                proposer_election,
-                proposal_generator,
-                safety_rules_container,
-                network_sender.clone(),
-                self.storage.clone(),
-                onchain_consensus_config,
-                round_manager_tx,
-                self.config.clone(),
-            );
 
-            round_manager.init(last_vote).await;
+        //    tokio::spawn(round_manager.start(round_manager_rx, close_rx));
 
-            let (close_tx, close_rx) = oneshot::channel();
-            self.round_manager_close_tx = Some(close_tx);
-            tokio::spawn(round_manager.start(round_manager_rx, close_rx));
-
-            self.spawn_block_retrieval_task(epoch, block_store);
 
             // Start DagDriver.
 
@@ -801,6 +742,8 @@ impl EpochManager {
                 Arc::new(signer),
                 rb_msg_rx,
                 dag_driver_msg_rx,
+                payload_manager,
+                state_computer,
             );
         }
     }
