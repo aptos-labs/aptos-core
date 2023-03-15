@@ -257,6 +257,7 @@ impl InnerBuilder {
             self.config.batch_expiry_grace_rounds,
             self.config.memory_quota,
             self.config.db_quota,
+            self.config.batch_quota,
             batch_requester,
             signer,
             self.verifier.clone(),
