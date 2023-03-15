@@ -65,6 +65,25 @@ impl TryFrom<TypeTag> for SerializationFormat {
     }
 }
 
+fn feature_flag_of_single_type_basic_op(structure_opt: Option<Structure>) -> Option<FeatureFlag> {
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => Some(FeatureFlag::BLS12_381_STRUCTURES),
+        _ => None,
+    }
+}
+
+fn feature_flag_of_serialization_format(
+    structure_opt: Option<Structure>,
+    format_opt: Option<SerializationFormat>,
+) -> Option<FeatureFlag> {
+    match (structure_opt, format_opt) {
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
+            Some(FeatureFlag::BLS12_381_STRUCTURES)
+        },
+        _ => None,
+    }
+}
+
 #[derive(Tid, Default)]
 pub struct AlgebraContext {
     objs: Vec<Rc<dyn Any>>,
@@ -79,14 +98,14 @@ impl AlgebraContext {
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ)?;
-        Structure::try_from(type_tag)
+        Structure::try_from(type_tag).ok()
     }};
 }
 
 macro_rules! format_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ)?;
-        SerializationFormat::try_from(type_tag)
+        SerializationFormat::try_from(type_tag).ok()
     }};
 }
 
@@ -99,13 +118,32 @@ macro_rules! store_element {
     }};
 }
 
-macro_rules! abort_unless_feature_enabled {
-    ($context:ident, $feature:expr) => {
-        if !$context.get_feature_flags().is_enabled($feature) {
-            return Err(SafeNativeError::Abort {
-                abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-            });
+macro_rules! abort_unless_feature_flag_enabled {
+    ($context:ident, $flag_opt:expr) => {
+        match $flag_opt {
+            Some(flag) if $context.get_feature_flags().is_enabled(flag) => {
+                // Continue.
+            },
+            _ => {
+                return Err(SafeNativeError::Abort {
+                    abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+                });
+            },
         }
+    };
+}
+
+macro_rules! abort_unless_single_type_basic_op_enabled {
+    ($context:ident, $structure_opt:expr) => {
+        let flag_opt = feature_flag_of_single_type_basic_op($structure_opt);
+        abort_unless_feature_flag_enabled!($context, flag_opt);
+    };
+}
+
+macro_rules! abort_unless_serialization_format_enabled {
+    ($context:ident, $structure_opt:expr, $format_opt:expr) => {
+        let flag_opt = feature_flag_of_serialization_format($structure_opt, $format_opt);
+        abort_unless_feature_flag_enabled!($context, flag_opt);
     };
 }
 
@@ -160,9 +198,9 @@ fn serialize_internal(
     assert_eq!(2, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let format_opt = format_from_ty_arg!(context, &ty_args[1]);
+    abort_unless_serialization_format_enabled!(context, structure_opt, format_opt);
     match (structure_opt, format_opt) {
-        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
-            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
@@ -211,11 +249,12 @@ fn deserialize_internal(
     assert_eq!(2, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let format_opt = format_from_ty_arg!(context, &ty_args[1]);
+    abort_unless_serialization_format_enabled!(context, structure_opt, format_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
     match (structure_opt, format_opt) {
-        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+        (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -255,9 +294,10 @@ fn field_add_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
-    match structure_from_ty_arg!(context, &ty_args[0]) {
-        Ok(Structure::BLS12381Fr) => {
-            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => {
             ark_field_add_internal!(
                 gas_params,
                 context,
