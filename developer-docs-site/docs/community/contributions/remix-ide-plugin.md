@@ -40,7 +40,7 @@ width= "80%"
 
 ## Step 2: Select a Chain
 
-Click the newly created icon at the bottom of the left menu. Then, select Aptos (MoveVM) from the chain list.
+Click the newly created icon at the bottom of the left menu. Then, select **Aptos (MoveVM)** from the chain list.
 
 <center>
 <ThemedImage
