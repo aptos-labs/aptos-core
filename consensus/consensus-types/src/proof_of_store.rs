@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    hash::Hash,
+    ops::Deref,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
@@ -87,12 +89,12 @@ impl Display for BatchId {
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct BatchInfo {
-    pub author: PeerId,
-    pub batch_id: BatchId,
-    pub expiration: LogicalTime,
-    pub digest: HashValue,
-    pub num_txns: u64,
-    pub num_bytes: u64,
+    author: PeerId,
+    batch_id: BatchId,
+    expiration: LogicalTime,
+    digest: HashValue,
+    num_txns: u64,
+    num_bytes: u64,
 }
 
 impl BatchInfo {
@@ -117,12 +119,36 @@ impl BatchInfo {
     pub fn epoch(&self) -> u64 {
         self.expiration.epoch
     }
+
+    pub fn author(&self) -> PeerId {
+        self.author
+    }
+
+    pub fn batch_id(&self) -> BatchId {
+        self.batch_id
+    }
+
+    pub fn expiration(&self) -> LogicalTime {
+        self.expiration
+    }
+
+    pub fn digest(&self) -> &HashValue {
+        &self.digest
+    }
+
+    pub fn num_txns(&self) -> u64 {
+        self.num_txns
+    }
+
+    pub fn num_bytes(&self) -> u64 {
+        self.num_bytes
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedBatchInfo {
-    signer: PeerId,
     info: BatchInfo,
+    signer: PeerId,
     signature: bls12381::Signature,
 }
 
@@ -134,18 +160,14 @@ impl SignedBatchInfo {
         let signature = validator_signer.sign(&batch_info)?;
 
         Ok(Self {
-            signer: validator_signer.author(),
             info: batch_info,
+            signer: validator_signer.author(),
             signature,
         })
     }
 
     pub fn signer(&self) -> PeerId {
         self.signer
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.info.epoch()
     }
 
     pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -156,16 +178,20 @@ impl SignedBatchInfo {
         }
     }
 
-    pub fn info(&self) -> &BatchInfo {
-        &self.info
-    }
-
     pub fn signature(self) -> bls12381::Signature {
         self.signature
     }
 
-    pub fn digest(&self) -> HashValue {
-        self.info.digest
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
+}
+
+impl Deref for SignedBatchInfo {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
 
@@ -191,18 +217,6 @@ impl ProofOfStore {
         }
     }
 
-    pub fn info(&self) -> &BatchInfo {
-        &self.info
-    }
-
-    pub fn digest(&self) -> &HashValue {
-        &self.info.digest
-    }
-
-    pub fn expiration(&self) -> LogicalTime {
-        self.info.expiration
-    }
-
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
@@ -216,8 +230,12 @@ impl ProofOfStore {
         ret.shuffle(&mut thread_rng());
         ret
     }
+}
 
-    pub fn epoch(&self) -> u64 {
-        self.info.expiration.epoch
+impl Deref for ProofOfStore {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }

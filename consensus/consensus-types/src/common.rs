@@ -98,7 +98,7 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => proof_with_status
                 .proofs
                 .iter()
-                .map(|proof| proof.info().num_txns as usize)
+                .map(|proof| proof.num_txns() as usize)
                 .sum(),
         }
     }
@@ -125,7 +125,7 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => proof_with_status
                 .proofs
                 .iter()
-                .map(|proof| proof.info().num_bytes as usize)
+                .map(|proof| proof.num_bytes() as usize)
                 .sum(),
         }
     }
