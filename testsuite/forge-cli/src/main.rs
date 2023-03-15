@@ -1475,15 +1475,15 @@ fn consensus_only_multi_region_simulation_test(
                 (5 * 60 * 60).into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
                 (5 * 60 * 60_000).into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                30000.into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-                (3 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
-            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
-                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+            // helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            // helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+            //     30000.into();
+            // helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+            //     (3 * 1024 * 1024).into();
+            // helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+            //     ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            // helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+            //     ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
