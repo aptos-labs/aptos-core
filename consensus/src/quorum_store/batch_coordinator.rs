@@ -25,7 +25,7 @@ pub struct BatchCoordinator {
     my_peer_id: PeerId,
     network_sender: NetworkSender,
     batch_store: Arc<BatchStore<NetworkSender>>,
-    max_batch_bytes: usize,
+    max_batch_bytes: u64,
 }
 
 impl BatchCoordinator {
@@ -34,7 +34,7 @@ impl BatchCoordinator {
         my_peer_id: PeerId,
         network_sender: NetworkSender,
         batch_store: Arc<BatchStore<NetworkSender>>,
-        max_batch_bytes: usize,
+        max_batch_bytes: u64,
     ) -> Self {
         Self {
             epoch,
@@ -83,7 +83,7 @@ impl BatchCoordinator {
         let network_sender = self.network_sender.clone();
         let my_peer_id = self.my_peer_id;
         tokio::spawn(async move {
-            let peer_id = persist_request.value.info.author;
+            let peer_id = persist_request.value.author();
             if let Some(signed_batch_info) = batch_store.persist(persist_request) {
                 if my_peer_id != peer_id {
                     counters::RECEIVED_REMOTE_BATCHES_COUNT.inc();

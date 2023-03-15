@@ -54,7 +54,7 @@ impl IncrementalProofState {
         signed_batch_info: SignedBatchInfo,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
-        if signed_batch_info.info() != &self.info {
+        if signed_batch_info.batch_info() != &self.info {
             return Err(SignedBatchInfoError::WrongInfo);
         }
 
@@ -156,25 +156,27 @@ impl ProofCoordinator {
         signed_batch_info: &SignedBatchInfo,
     ) -> Result<(), SignedBatchInfoError> {
         // Check if the signed digest corresponding to our batch
-        if signed_batch_info.info().author != self.peer_id {
+        if signed_batch_info.author() != self.peer_id {
             return Err(SignedBatchInfoError::WrongAuthor);
         }
         let batch_author = self
             .batch_reader
-            .exists(&signed_batch_info.digest())
+            .exists(signed_batch_info.digest())
             .ok_or(SignedBatchInfoError::WrongAuthor)?;
-        if batch_author != signed_batch_info.info().author {
+        if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
         }
 
-        self.timeouts
-            .add(signed_batch_info.info().clone(), self.proof_timeout_ms);
+        self.timeouts.add(
+            signed_batch_info.batch_info().clone(),
+            self.proof_timeout_ms,
+        );
         self.digest_to_proof.insert(
-            signed_batch_info.digest(),
-            IncrementalProofState::new(signed_batch_info.info().clone()),
+            *signed_batch_info.digest(),
+            IncrementalProofState::new(signed_batch_info.batch_info().clone()),
         );
         self.digest_to_time
-            .entry(signed_batch_info.digest())
+            .entry(*signed_batch_info.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
         Ok(())
     }
@@ -186,12 +188,12 @@ impl ProofCoordinator {
     ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
         if !self
             .digest_to_proof
-            .contains_key(&signed_batch_info.digest())
+            .contains_key(signed_batch_info.digest())
         {
             self.init_proof(&signed_batch_info)?;
         }
-        let digest = signed_batch_info.digest();
-        if let Some(value) = self.digest_to_proof.get_mut(&signed_batch_info.digest()) {
+        let digest = *signed_batch_info.digest();
+        if let Some(value) = self.digest_to_proof.get_mut(signed_batch_info.digest()) {
             value.add_signature(signed_batch_info, validator_verifier)?;
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
@@ -211,7 +213,7 @@ impl ProofCoordinator {
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
-            if let Some(state) = self.digest_to_proof.remove(&signed_batch_info_info.digest) {
+            if let Some(state) = self.digest_to_proof.remove(signed_batch_info_info.digest()) {
                 counters::BATCH_RECEIVED_REPLIES_COUNT
                     .observe(state.aggregated_signature.len() as f64);
                 counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
@@ -219,7 +221,7 @@ impl ProofCoordinator {
                 counters::BATCH_SUCCESSFUL_CREATION.observe(u64::from(state.completed));
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
-                    batch_ids.push(signed_batch_info_info.batch_id);
+                    batch_ids.push(signed_batch_info_info.batch_id());
                 }
             }
         }
@@ -252,7 +254,7 @@ impl ProofCoordinator {
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_batch_info) => {
                             let peer_id = signed_batch_info.signer();
-                            let digest = signed_batch_info.digest();
+                            let digest = *signed_batch_info.digest();
                             match self.add_signature(signed_batch_info, &validator_verifier) {
                                 Ok(result) => {
                                     if let Some(proof) = result {

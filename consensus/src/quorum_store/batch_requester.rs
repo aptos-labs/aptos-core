@@ -131,7 +131,7 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
                     match response {
                         Ok(batch) => {
                             counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
-                            let digest = batch.digest();
+                            let digest = *batch.digest();
                             let payload = batch.into_transactions();
                             request_state.serve_request(digest, Some(payload));
                             return;
