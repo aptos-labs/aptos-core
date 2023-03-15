@@ -168,7 +168,7 @@ impl PeerState {
     }
 
     /// Returns the peer state value associated with the given key
-    fn get_peer_state_value(
+    pub(crate) fn get_peer_state_value(
         &self,
         peer_state_key: &PeerStateKey,
     ) -> Result<Arc<RwLock<PeerStateValue>>, Error> {
@@ -182,7 +182,7 @@ impl PeerState {
     }
 
     /// Returns a copy of the latency ping state
-    fn get_latency_info_state(&self) -> Result<LatencyInfoState, Error> {
+    pub(crate) fn get_latency_info_state(&self) -> Result<LatencyInfoState, Error> {
         let peer_state_value = self
             .get_peer_state_value(&PeerStateKey::LatencyInfo)?
             .read()
@@ -197,7 +197,7 @@ impl PeerState {
     }
 
     /// Returns a copy of the network info state
-    fn get_network_info_state(&self) -> Result<NetworkInfoState, Error> {
+    pub(crate) fn get_network_info_state(&self) -> Result<NetworkInfoState, Error> {
         let peer_state_value = self
             .get_peer_state_value(&PeerStateKey::NetworkInfo)?
             .read()

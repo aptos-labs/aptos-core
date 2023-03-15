@@ -43,7 +43,7 @@ For running an Aptos **validator node and validator fullnode** we recommend the 
 
 Hardware requirements depend on the transaction rate and storage demands. The amount of data stored by the Aptos blockchain depends on the ledger history (the number of transactions) of the blockchain and the number of on-chain states (e.g., accounts and resources). Ledger history and the number of on-chain states depend on several factors: the age of the blockchain, the average transaction rate, and the configuration of the ledger pruner.
 
-The current hardware requirements are set considering the estimated growth over the period ending in Q1-2023.
+The current hardware requirements are set considering the estimated growth over the period ending in Q1-2023. Note that we cannot provide a recommendation for archival node storage size as that is an ever-growing number.
 
 **Local SSD vs. network storage**
 
@@ -55,11 +55,14 @@ On the one hand, network storage requires additional CPU support to scale IOPS, 
 
 When you are running a validator node, you are required to open network ports on your node to allow other nodes to connect to you. For fullnodes this is optional.
 
-There are three types of Aptos networks. Your node can be configured so that each of these networks can connect to your node using a different port on your node.
+### Network types
 
-1. **The validator network:** A validator node connects to this network.
-2. **The public network:** A public fullnode connects to this network.
-3. **The validator fullnode network (VFN network):** A validator fullnode connects to this network. The VFN network allows the validator fullnode to connect to the specific validator.
+Your node can be configured so that each of these networks can connect using a different port on your node.
+
+There are three types of Aptos networks:
+1. **Validator network:** A validator node connects to this network.
+2. **Public network:** A public fullnode connects to this network.
+3. **Validator fullnode network:** A validator fullnode (VFN) connects to this network. The VFN network allows the validator fullnode to connect to a specific validator.
 
 You can configure the port settings on your node using the configuration YAML file. See the [example configuration YAML here](https://github.com/aptos-labs/aptos-core/blob/4ce85456853c7b19b0a751fb645abd2971cc4c0c/docker/compose/aptos-node/fullnode.yaml#L10-L9). With this configuration YAML on your node, the public network connects to your node on port 6182 and the VFN network on 6181. Because these port settings are configurable, we don't explicitly say port X is for network Y.
 
@@ -70,12 +73,10 @@ For the validator:
 - Open the TCP port 6180, to enable the validators to talk to each other.
 - Open the TCP port 6181, to enable validator fullnode to connect.
 - Open the TCP port 9101, to send the validator metrics to validate the health stats.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
 
 For the public fullnode:
 
 - Open the TCP port 6182, to enable the fullnodes to talk to each other.
 - Open the TCP port 9101, to send the fullnode metrics to validate the health stats (only needed during registration stage).
 - Open the TCP port 80/8080, for the REST API access.
-- Make sure to keep the TCP port 6186 open for the local backup storage service. 
 
