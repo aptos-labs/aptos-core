@@ -40,7 +40,7 @@ use std::{sync::{
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3000;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
@@ -209,14 +209,12 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
-        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
+        let mut item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
         let item_hash = item.get_hash();
-        self.buffer.push_back(item);
 
         // Disseminate the VRF shares for the ordered blocks
         // Happy path: each validator sends its VRF shares to the leader
-        // Unhappy path 1: if no leader (NIL block, broadcast the randomness share)
-        // todo: Unhappy path 2: if the leader timeout, broadcast the randomness share
+        // Unhappy path: if the leader timeout, broadcast the randomness share
         for block in ordered_blocks {
             self.block_to_buffer_map.insert(block.id(), Some(item_hash));
 
@@ -224,13 +222,19 @@ impl BufferManager {
             let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
 
             if let Some(proposer) = maybe_proposer {
+                // Proposal block, send the randomness shares through the proposer
                 self.rand_msg_tx
                     .send_rand_share(rand_share, proposer)
                     .await;
             } else {
-                self.rand_msg_tx.broadcast_rand_share(rand_share).await;
+                // Non-proposal block (genesis or Nil block),
+                // this block can move to execution-ready
+                // No need to send randomness shares
+                item.increment_rand();
             }
         }
+
+        self.buffer.push_back(item);
     }
 
     /// process the VRF share messages
@@ -247,10 +251,10 @@ impl BufferManager {
                 let target_block_id = rand_share.block_info().id();
                 debug!("Receive random share from author {:?} for block {:?}", author, target_block_id);
 
-                // todo: ignore the rand message if the round is execution already or beyond
-
+                // todo: verify rand message, ignore invalid ones
                 // todo: aggregate the randomness shares
-                // should insert the new aggregated randomness share
+
+                // todo: insert the new aggregated randomness share
                 self.block_to_rand_share_map.insert(target_block_id, *rand_share.clone());
                 let authors = self.block_to_rand_authors_map.entry(target_block_id).or_default();
                 (*authors).insert(author);
@@ -326,7 +330,7 @@ impl BufferManager {
                 }
             },
             _ => {
-                unreachable!();
+                unreachable!("[Buffer Manager] Processing randomness message of wrong format");
             },
         }
         None
@@ -383,7 +387,7 @@ impl BufferManager {
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
-        self.print_buffer();
+        // self.print_buffer();
 
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
@@ -677,7 +681,7 @@ impl BufferManager {
                 }
             },
             _ => {
-                unreachable!();
+                unreachable!("[Buffer Manager] Processing commit message of wrong format");
             },
         }
         None
@@ -842,9 +846,11 @@ impl BufferManager {
                     });
                 },
                 rand_msg = self.rand_msg_rx.select_next_some() => {
-                    if (self.process_rand_message(rand_msg).await).is_some() && self.execution_root.is_none() {
-                        self.advance_execution_root().await;
-                    }
+                    monitor!("buffer_manager_process_rand", {
+                        if (self.process_rand_message(rand_msg).await).is_some() && self.execution_root.is_none() {
+                            self.advance_execution_root().await;
+                        }
+                    });
                 },
                 reset_event = self.reset_rx.select_next_some() => {
                     monitor!("buffer_manager_process_reset",
@@ -877,14 +883,18 @@ impl BufferManager {
                     });
                 },
                 _ = interval.tick().fuse() => {
-                    monitor!("buffer_manager_process_interval_tick", {
+                    monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     // self.print_buffer();
                     self.update_buffer_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await
                     });
+                    monitor!("buffer_manager_process_rebroadcast_rand_share", {
                     // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
                     self.rebroadcast_rand_share_if_needed().await;
+                    });
+                    monitor!("buffer_manager_process_rebroadcast_rand_decision", {
                     self.rebroadcast_rand_decision_if_needed().await;
+                    });
                 },
                 // no else branch here because interval.tick will always be available
             }

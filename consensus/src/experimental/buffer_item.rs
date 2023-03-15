@@ -532,6 +532,12 @@ impl BufferItem {
         }
     }
 
+    pub fn increment_rand(&mut self) {
+        if let Self::Ordered(ref mut ordered_item) = *self {
+            ordered_item.num_rand_ready += 1;
+        }
+    }
+
     // return the index of the block if the randomness is successfully updated
     pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) -> Option<usize> {
         if let Some(idx) = self.find_block_idx_from_ordered(block_id) {
