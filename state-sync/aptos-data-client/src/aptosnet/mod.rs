@@ -14,7 +14,7 @@ use crate::{
     ResponseError, ResponseId, Result,
 };
 use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig, StorageServiceConfig},
+    config::{AptosDataClientConfig, BaseConfig},
     network_id::PeerNetworkId,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
@@ -98,7 +98,6 @@ impl AptosNetDataClient {
     pub fn new(
         data_client_config: AptosDataClientConfig,
         base_config: BaseConfig,
-        storage_service_config: StorageServiceConfig,
         time_service: TimeService,
         storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
         runtime: Option<Handle>,
@@ -108,7 +107,7 @@ impl AptosNetDataClient {
             storage_service_client: storage_service_client.clone(),
             peer_states: Arc::new(RwLock::new(PeerStates::new(
                 base_config,
-                storage_service_config,
+                data_client_config,
                 storage_service_client.get_peers_and_metadata(),
             ))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
