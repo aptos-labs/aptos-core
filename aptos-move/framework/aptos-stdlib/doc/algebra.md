@@ -14,11 +14,11 @@ Below are the operations currently supported.
 
 
 -  [Struct `Element`](#0x1_algebra_Element)
--  [Function `field_add`](#0x1_algebra_field_add)
+-  [Function `add`](#0x1_algebra_add)
 -  [Function `deserialize`](#0x1_algebra_deserialize)
 -  [Function `serialize`](#0x1_algebra_serialize)
 -  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
--  [Function `field_add_internal`](#0x1_algebra_field_add_internal)
+-  [Function `add_internal`](#0x1_algebra_add_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
 -  [Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`](#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled)
 
@@ -58,14 +58,14 @@ This struct represents an element of an algebraic structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_add"></a>
+<a name="0x1_algebra_add"></a>
 
-## Function `field_add`
+## Function `add`
 
-Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a field <code>S</code>.
+Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of an algebraic structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add">add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -74,10 +74,10 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add">add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;S&gt;(x.handle, y.handle)
+        handle: <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -166,13 +166,13 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 </details>
 
-<a name="0x1_algebra_field_add_internal"></a>
+<a name="0x1_algebra_add_internal"></a>
 
-## Function `field_add_internal`
+## Function `add_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
 </code></pre>
 
 
@@ -181,7 +181,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64;
 </code></pre>
 
 

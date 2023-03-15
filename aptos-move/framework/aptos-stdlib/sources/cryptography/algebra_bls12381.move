@@ -24,7 +24,7 @@ module aptos_std::algebra_bls12381 {
     //
 
     #[test_only]
-    use aptos_std::algebra::{deserialize, serialize, field_add, enable_initial_generic_algebraic_operations};
+    use aptos_std::algebra::{deserialize, serialize, add, enable_initial_generic_algebraic_operations};
 
     #[test_only]
     const BLS12_381_FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -38,7 +38,7 @@ module aptos_std::algebra_bls12381 {
             &BLS12_381_FR_VAL_0_SERIALIZED_LSB));
         let val_1 = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(
             &BLS12_381_FR_VAL_1_SERIALIZED_LSB));
-        let sum = field_add(&val_0, &val_1);
+        let sum = add(&val_0, &val_1);
         assert!(BLS12_381_FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&sum), 1);
     }
 

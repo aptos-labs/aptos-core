@@ -274,7 +274,7 @@ fn deserialize_internal(
     }
 }
 
-macro_rules! ark_field_add_internal {
+macro_rules! ark_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $ark_type:ty) => {{
         $context.charge($gas_params.placeholder)?;
         let handle_2 = safely_pop_arg!($args, u64) as usize;
@@ -287,7 +287,7 @@ macro_rules! ark_field_add_internal {
     }};
 }
 
-fn field_add_internal(
+fn add_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -298,7 +298,7 @@ fn field_add_internal(
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr) => {
-            ark_field_add_internal!(
+            ark_add_internal!(
                 gas_params,
                 context,
                 args,
@@ -331,12 +331,12 @@ pub fn make_all(
             ),
         ),
         (
-            "field_add_internal",
+            "add_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_add_internal,
+                add_internal,
             ),
         ),
         (
