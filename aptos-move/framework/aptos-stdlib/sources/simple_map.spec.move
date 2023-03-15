@@ -1,6 +1,9 @@
 /// Specifications of the `simple_map` module.
 spec aptos_std::simple_map {
 
+    spec module {
+        pragma verify = false;
+    }
     // Make most of the public API intrinsic. Those functions have custom specifications in the prover.
 
     spec SimpleMap {

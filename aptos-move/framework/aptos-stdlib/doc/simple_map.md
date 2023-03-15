@@ -470,6 +470,12 @@ Primarily used to destroy a map
 ## Specification
 
 
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_SimpleMap"></a>
 
 ### Struct `SimpleMap`

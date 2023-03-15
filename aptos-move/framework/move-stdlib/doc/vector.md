@@ -840,11 +840,6 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 
-<pre><code><b>pragma</b> intrinsic = <b>true</b>;
-</code></pre>
-
-
-
 <a name="@Specification_1_append"></a>
 
 ### Function `append`

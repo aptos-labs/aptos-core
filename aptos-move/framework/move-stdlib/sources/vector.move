@@ -85,7 +85,7 @@ module std::vector {
         }
     }
     spec reverse_slice {
-        pragma intrinsic = true;
+        // pragma intrinsic = true;
     }
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
