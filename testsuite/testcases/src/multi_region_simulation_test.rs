@@ -3,8 +3,8 @@
 
 use crate::{three_region_simulation_test::ExecutionDelayConfig, LoadDestination, NetworkLoadTest};
 use aptos_forge::{
-    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmExt,
-    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
+    SwarmExt, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
@@ -30,69 +30,92 @@ impl Test for MultiRegionSimulationTest {
     }
 }
 
-fn get_latency_table() -> BTreeMap<String, BTreeMap<String, u64>> {
-    let mut latency_table = BTreeMap::new();
+fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, u64)>> {
+    let mut stats_table = BTreeMap::new();
 
     let mut rdr = Reader::from_reader(include_bytes!(LATENCY_TABLE_CSV!()).as_slice());
     for result in rdr.deserialize() {
-        if let Ok((from, to, latency)) = result {
+        if let Ok((from, to, bitrate, latency)) = result {
             let from: String = from;
             let to: String = to;
             let latency: f64 = latency;
-            latency_table
+            stats_table
                 .entry(from)
                 .or_insert_with(BTreeMap::new)
-                .insert(to, latency as u64);
+                .insert(to, (bitrate, latency as u64));
         }
     }
 
-    latency_table
+    stats_table
 }
 
 /// Creates a SwarmNetworkDelay
-fn create_multi_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDelay {
-    let latency_table = get_latency_table();
+fn create_multi_region_swarm_network_chaos(
+    all_validators: Vec<PeerId>,
+) -> (SwarmNetworkDelay, SwarmNetworkBandwidth) {
+    let link_stats_table = get_link_stats_table();
 
-    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-    assert!(all_validators.len() > latency_table.len());
+    assert!(all_validators.len() >= link_stats_table.len());
 
-    let number_of_regions = latency_table.len();
+    let number_of_regions = link_stats_table.len();
     let approx_validators_per_region = all_validators.len() / number_of_regions;
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
     let mut group_network_delays: Vec<GroupNetworkDelay> = validator_chunks
         .clone()
-        .zip(latency_table)
+        .zip(link_stats_table.iter().clone())
         .combinations(2)
-        .map(|perm| {
-            let (from_chunk, (from_region, to_latencies)) = &perm[0];
-            let (to_chunk, (to_region, _)) = &perm[1];
+        .map(|comb| {
+            let (from_chunk, (from_region, stats)) = &comb[0];
+            let (to_chunk, (to_region, _)) = &comb[1];
 
-            let latency = to_latencies[to_region];
+            let (_, latency) = stats.get(*to_region).unwrap();
             let delay = [
                 GroupNetworkDelay {
-                    name: format!("{}-to-{}", from_region.clone(), to_region.clone()),
+                    name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
                     source_nodes: from_chunk.to_vec(),
                     target_nodes: to_chunk.to_vec(),
-                    latency_ms: latency,
+                    latency_ms: *latency,
                     jitter_ms: 5,
                     correlation_percentage: 50,
                 },
                 GroupNetworkDelay {
-                    name: format!("{}-to-{}", to_region.clone(), from_region.clone()),
+                    name: format!("{}-to-{}-delay", to_region.clone(), from_region.clone()),
                     source_nodes: to_chunk.to_vec(),
                     target_nodes: from_chunk.to_vec(),
-                    latency_ms: latency,
+                    latency_ms: *latency,
                     jitter_ms: 5,
                     correlation_percentage: 50,
                 },
             ];
-            info!("{:?}", delay);
-
+            info!("delay {:?}", delay);
             delay
         })
         .flatten()
+        .collect();
+
+    let mut group_network_bandwidth: Vec<GroupNetworkBandwidth> = validator_chunks
+        .clone()
+        .zip(link_stats_table.iter())
+        .combinations(2)
+        .map(|comb| {
+            let (from_chunk, (from_region, stats)) = &comb[0];
+            let (to_chunk, (to_region, _)) = &comb[1];
+
+            let (bitrate, latency) = stats.get(*to_region).unwrap();
+            let bandwidth = GroupNetworkBandwidth {
+                name: format!("{}-to-{}-bandwidth", from_region.clone(), to_region.clone()),
+                source_nodes: from_chunk.to_vec(),
+                target_nodes: to_chunk.to_vec(),
+                rate: (bitrate / 1000_000) as u64,
+                limit: 2 * (bitrate / 8) * (latency / 1000),
+                buffer: bitrate / 8,
+            };
+            info!("bandwidth {:?}", bandwidth);
+
+            bandwidth
+        })
         .collect();
 
     let remainder = validator_chunks.remainder();
@@ -110,31 +133,19 @@ fn create_multi_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
         group_network_delays[1]
             .target_nodes
             .append(remaining_validators.to_vec().as_mut());
+        group_network_bandwidth[0]
+            .source_nodes
+            .append(remaining_validators.to_vec().as_mut());
     }
 
-    assert_eq!(
-        group_network_delays.len(),
-        number_of_regions * number_of_regions - number_of_regions
-    );
-
-    info!(
-        "network_delays {}: {:?}",
-        group_network_delays.len(),
-        group_network_delays
-    );
-
-    SwarmNetworkDelay {
-        group_network_delays,
-    }
-}
-
-// 1 Gbps
-fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
-    SwarmNetworkBandwidth {
-        rate: 1000,
-        limit: 20971520,
-        buffer: 10000,
-    }
+    (
+        SwarmNetworkDelay {
+            group_network_delays,
+        },
+        SwarmNetworkBandwidth {
+            group_network_bandwidth,
+        },
+    )
 }
 
 fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> anyhow::Result<()> {
@@ -203,13 +214,19 @@ fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
 
 impl NetworkLoadTest for MultiRegionSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+
+        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+
         // inject network delay
-        let delay = create_multi_region_swarm_network_delay(ctx.swarm());
         let chaos = SwarmChaos::Delay(delay);
         ctx.swarm().inject_chaos(chaos)?;
 
         // inject bandwidth limit
-        let bandwidth = create_bandwidth_limit();
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
@@ -235,13 +252,29 @@ impl NetworkTest for MultiRegionSimulationTest {
     }
 }
 
-// #[test]
-// fn test_my_func() {
-//     let mut logger = aptos_logger::Logger::new();
-//     logger
-//         .channel_size(1000)
-//         .is_async(false)
-//         .level(aptos_logger::Level::Info);
-//     logger.build();
-//     create_multi_region_swarm_network_delay2();
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_multi_region_swarm_network_chaos() {
+        let all_validators = (0..20).map(|_| PeerId::random()).collect();
+        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+
+        assert_eq!(delay.group_network_delays.len(), 380);
+        assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
+
+        let all_validators = (0..24).map(|_| PeerId::random()).collect();
+        let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
+
+        assert_eq!(delay.group_network_delays.len(), 380);
+        assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
+        assert_eq!(delay.group_network_delays[0].source_nodes.len(), 5);
+        assert_eq!(delay.group_network_delays[0].target_nodes.len(), 1);
+        assert_eq!(delay.group_network_delays[1].target_nodes.len(), 5);
+        assert_eq!(delay.group_network_delays[1].source_nodes.len(), 1);
+        assert_eq!(delay.group_network_delays[2].source_nodes.len(), 1);
+        assert_eq!(bandwidth.group_network_bandwidth[0].source_nodes.len(), 5);
+        assert_eq!(bandwidth.group_network_bandwidth[1].source_nodes.len(), 1);
+    }
+}

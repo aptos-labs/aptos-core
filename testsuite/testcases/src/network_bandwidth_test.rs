@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, Test};
+use aptos_forge::{
+    GroupNetworkBandwidth, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth,
+    Test,
+};
 
 pub struct NetworkBandwidthTest;
 
@@ -22,11 +25,21 @@ impl Test for NetworkBandwidthTest {
 
 impl NetworkLoadTest for NetworkBandwidthTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
         ctx.swarm()
             .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-                rate: RATE_MBPS,
-                limit: LIMIT_BYTES,
-                buffer: BUFFER_BYTES,
+                group_network_bandwidth: vec![GroupNetworkBandwidth {
+                    name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                    source_nodes: all_validators.clone(),
+                    target_nodes: all_validators,
+                    rate: RATE_MBPS,
+                    limit: LIMIT_BYTES,
+                    buffer: BUFFER_BYTES,
+                }],
             }))?;
         let msg = format!(
             "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
@@ -38,10 +51,16 @@ impl NetworkLoadTest for NetworkBandwidthTest {
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-            rate: RATE_MBPS,
-            limit: LIMIT_BYTES,
-            buffer: BUFFER_BYTES,
+            group_network_bandwidth: vec![GroupNetworkBandwidth {
+                name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                source_nodes: all_validators.clone(),
+                target_nodes: all_validators,
+                rate: RATE_MBPS,
+                limit: LIMIT_BYTES,
+                buffer: BUFFER_BYTES,
+            }],
         }))
     }
 }

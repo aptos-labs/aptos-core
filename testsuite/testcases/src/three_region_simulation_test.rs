@@ -3,8 +3,8 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
-    GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmExt,
-    SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+    GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkTest, Swarm, SwarmChaos,
+    SwarmExt, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
 use rand::Rng;
@@ -110,11 +110,17 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
 }
 
 // 1 Gbps
-fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
+fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
+    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     SwarmNetworkBandwidth {
-        rate: 1000,
-        limit: 20971520,
-        buffer: 10000,
+        group_network_bandwidth: vec![GroupNetworkBandwidth {
+            name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+            source_nodes: all_validators.clone(),
+            target_nodes: all_validators,
+            rate: 1000,
+            limit: 20971520,
+            buffer: 10000,
+        }],
     }
 }
 
@@ -190,7 +196,7 @@ impl NetworkLoadTest for ThreeRegionSimulationTest {
         ctx.swarm().inject_chaos(chaos)?;
 
         // inject bandwidth limit
-        let bandwidth = create_bandwidth_limit();
+        let bandwidth = create_bandwidth_limit(ctx.swarm());
         let chaos = SwarmChaos::Bandwidth(bandwidth);
         ctx.swarm().inject_chaos(chaos)?;
 
