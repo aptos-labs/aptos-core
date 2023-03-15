@@ -118,6 +118,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use arr_macro::arr;
 use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
@@ -137,6 +138,14 @@ pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_KV_DB_NAME: &str = "state_kv_db";
 
 pub(crate) const NUM_STATE_SHARDS: usize = 256;
+
+static COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("commit_{}", index))
+        .build()
+        .unwrap()
+});
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -816,7 +825,7 @@ impl AptosDB {
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
         ledger_batch: &SchemaBatch,
-        state_kv_batch: &SchemaBatch,
+        sharded_state_kv_batches: &[SchemaBatch; NUM_STATE_SHARDS],
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
@@ -840,7 +849,7 @@ impl AptosDB {
                     first_version,
                     expected_state_db_usage,
                     ledger_batch,
-                    state_kv_batch,
+                    sharded_state_kv_batches,
                 )
             });
 
@@ -1705,14 +1714,14 @@ impl DbWriter for AptosDB {
 
             // Gather db mutations to `batch`.
             let ledger_batch = SchemaBatch::new();
-            let state_kv_batch = SchemaBatch::new();
+            let sharded_state_kv_batches = arr![SchemaBatch::new(); 256];
 
             let new_root_hash = self.save_transactions_impl(
                 txns_to_commit,
                 first_version,
                 latest_in_memory_state.current.usage(),
                 &ledger_batch,
-                &state_kv_batch,
+                &sharded_state_kv_batches,
             )?;
 
             ensure!(Some(last_version) == latest_in_memory_state.current_version,
@@ -1761,11 +1770,24 @@ impl DbWriter for AptosDB {
                         &DbMetadataValue::Version(last_version),
                     )?;
 
-                    thread::scope(|s| {
-                        let t0 = s.spawn(|| self.state_kv_db.commit(last_version, state_kv_batch));
-                        let t1 = s.spawn(|| self.ledger_db.write_schemas(ledger_batch));
-                        t0.join().unwrap().unwrap();
-                        t1.join().unwrap().unwrap();
+                    COMMIT_POOL.scope(|s| {
+                        // TODO(grao): Consider propagating the error instead of panic, if necessary.
+                        s.spawn(|_| {
+                            let _timer = OTHER_TIMERS_SECONDS
+                                .with_label_values(&["save_transactions_commit___state_kv_commit"])
+                                .start_timer();
+                            self.state_kv_db
+                                .commit(last_version, sharded_state_kv_batches)
+                                .unwrap();
+                        });
+                        // To the best of our current understanding, these tasks are scheduled in
+                        // LIFO order, so put the ledger commit at the end since it's slower.
+                        s.spawn(|_| {
+                            let _timer = OTHER_TIMERS_SECONDS
+                                .with_label_values(&["save_transactions_commit___ledger_commit"])
+                                .start_timer();
+                            self.ledger_db.write_schemas(ledger_batch).unwrap();
+                        });
                     });
 
                     let ledger_batch = SchemaBatch::new();
@@ -1982,7 +2004,9 @@ impl DbWriter for AptosDB {
             self.state_merkle_db
                 .clone()
                 .write_schemas(state_merkle_batch)?;
-            self.state_kv_db.clone().commit(version, state_kv_batch)?;
+            self.state_kv_db
+                .clone()
+                .commit_nonsharded(version, state_kv_batch)?;
             self.ledger_db.clone().write_schemas(batch)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
