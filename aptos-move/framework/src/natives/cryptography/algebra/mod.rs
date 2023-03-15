@@ -184,8 +184,12 @@ macro_rules! ark_serialize_internal {
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
-        if element.$ark_ser_func(&mut buf).is_err() {
-            abort_invariant_violated();
+        match element.$ark_ser_func(&mut buf) {
+            Ok(_) => {},
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
         }
         buf
     }};
@@ -237,7 +241,14 @@ macro_rules! ark_deserialize_internal {
                 let handle = store_element!($context, element);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
-            _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
+            Err(ark_serialize::SerializationError::InvalidData)
+            | Err(ark_serialize::SerializationError::UnexpectedFlags) => {
+                Ok(smallvec![Value::bool(false), Value::u64(0)])
+            },
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
         }
     }};
 }
@@ -267,7 +278,7 @@ fn deserialize_internal(
                 bytes,
                 SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                deserialize_uncompressed //A deserialize function defined in arkworks library.
+                deserialize_uncompressed
             )
         },
         _ => Err(SafeNativeError::Abort {
