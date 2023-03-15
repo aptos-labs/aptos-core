@@ -25,40 +25,29 @@ use std::{any::Any, collections::VecDeque, hash::Hash, ops::Add, rc::Rc, sync::A
 pub mod gas;
 
 /// Equivalent to `std::error::not_implemented(0)` in Move.
-const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C0000;
+const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0000;
 
+/// This encodes an algebraic structure defined in `algebra_*.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
-    BLS12381Fq12,
-    BLS12381G1Affine,
-    BLS12381G2Affine,
-    BLS12381Gt,
     BLS12381Fr,
 }
 
 impl Structure {
     pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
         match type_tag.to_string().as_str() {
+            // Should match the full path to struct `Fr` in `algebra_bls12381.move`.
             "0x1::algebra_bls12381::Fr" => Some(Structure::BLS12381Fr),
-            "0x1::algebra_bls12381::Fq12" => Some(Structure::BLS12381Fq12),
-            "0x1::algebra_bls12381::G1Affine" => Some(Structure::BLS12381G1Affine),
-            "0x1::algebra_bls12381::G2Affine" => Some(Structure::BLS12381G2Affine),
-            "0x1::algebra_bls12381::Gt" => Some(Structure::BLS12381Gt),
             _ => None,
         }
     }
 }
 
+/// This encodes a supported serialization formats defined in `algebra_*.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum SerializationFormat {
-    BLS12381Fq12LscLscLscLsb,
-    BLS12381G1AffineCompressed,
-    BLS12381G1AffineUncompressed,
-    BLS12381G2AffineCompressed,
-    BLS12381G2AffineUnompressed,
-    BLS12381Gt,
+    /// This refers to `format_bls12381fr_lsb()` in `algebra_bls12381.move`.
     BLS12381FrLsb,
-    BLS12381FrMsb,
 }
 
 impl TryFrom<u64> for SerializationFormat {
@@ -66,32 +55,8 @@ impl TryFrom<u64> for SerializationFormat {
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
-            0x0400000000000000 => Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb),
-            0x0600000000000000 => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
-            0x0601000000000000 => Ok(SerializationFormat::BLS12381G1AffineCompressed),
-            0x0800000000000000 => Ok(SerializationFormat::BLS12381G2AffineUnompressed),
-            0x0801000000000000 => Ok(SerializationFormat::BLS12381G2AffineCompressed),
-            0x0900000000000000 => Ok(SerializationFormat::BLS12381Gt),
-            0x0A00000000000000 => Ok(SerializationFormat::BLS12381FrLsb),
-            0x0A01000000000000 => Ok(SerializationFormat::BLS12381FrMsb),
-            _ => Err(()),
-        }
-    }
-}
-
-/// Hash-to-structure suites.
-pub enum HashToStructureSuite {
-    Bls12381g1XmdSha256SswuRo,
-    Bls12381g2XmdSha256SswuRo,
-}
-
-impl TryFrom<u64> for HashToStructureSuite {
-    type Error = ();
-
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match value {
-            0x0001000000000000 => Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo),
-            0x0002000000000000 => Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo),
+            // Should match `format_bls12381fr_lsb()` in `algebra_bls12381.move`.
+            0x0a00000000000000 => Ok(SerializationFormat::BLS12381FrLsb),
             _ => Err(()),
         }
     }
@@ -115,7 +80,7 @@ macro_rules! structure_from_ty_arg {
     }};
 }
 
-macro_rules! store_obj {
+macro_rules! store_element {
     ($context:expr, $obj:expr) => {{
         let target_vec = &mut $context.extensions_mut().get_mut::<AlgebraContext>().objs;
         let ret = target_vec.len();
@@ -134,12 +99,25 @@ macro_rules! abort_unless_feature_enabled {
     };
 }
 
-macro_rules! get_obj_pointer {
+macro_rules! get_element_pointer {
     ($context:expr, $handle:expr) => {{
         $context.extensions_mut().get_mut::<AlgebraContext>().objs[$handle].clone()
     }};
 }
 
+/// Macros that implements `serialize_internal()` using arkworks libraries.
+///
+/// Example expansion follows for `BLS12381Fr` structure and `bls12381fr_lsb` format.
+/// ```
+/// {
+///     let element_ptr = get_element_pointer!(context, handle);
+///     let element = element_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+///     context.charge(gas_params.placeholder)?;
+///     let mut buf = Vec::new();
+///     element.serialize_uncompressed(&mut buf).unwrap();
+///     buf
+/// }
+/// ```
 macro_rules! ark_serialize_internal {
     (
         $gas_params:expr,
@@ -150,10 +128,10 @@ macro_rules! ark_serialize_internal {
         $typ:ty,
         $ser_func:ident
     ) => {{
-        let element_ptr = get_obj_pointer!($context, $handle);
+        let element_ptr = get_element_pointer!($context, $handle);
         let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        let mut buf = Vec::new();
         $context.charge($gas_params.placeholder)?;
+        let mut buf = Vec::new();
         element.$ser_func(&mut buf).unwrap();
         buf
     }};
@@ -202,7 +180,7 @@ macro_rules! ark_deserialize_internal {
         $context.charge($gas_params.placeholder)?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
-                let handle = store_obj!($context, element);
+                let handle = store_element!($context, element);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
             _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
@@ -247,13 +225,13 @@ macro_rules! ark_field_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
+        let element_1_ptr = get_element_pointer!($context, handle_1);
         let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
+        let element_2_ptr = get_element_pointer!($context, handle_2);
         let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
         $context.charge($gas_params.placeholder)?;
         let new_element = element_1.add(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }

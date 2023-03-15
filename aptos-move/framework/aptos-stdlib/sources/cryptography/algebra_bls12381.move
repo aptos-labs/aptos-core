@@ -4,7 +4,9 @@
 /// Below are the BLS12-381 structures currently supported.
 /// - Field `Fr`.
 module aptos_std::algebra_bls12381 {
-    // Marker types (and their serialization schemes) begin.
+    //
+    // Marker types and their serialization schemes begin.
+    //
 
     /// The finite field $F_r$ that can be used as the scalar fields
     /// for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
@@ -16,9 +18,11 @@ module aptos_std::algebra_bls12381 {
     /// NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
     public fun format_bls12381fr_lsb(): u64 { 0x0a00000000000000 }
 
-    // Marker types (and their serialization schemes) end.
-
+    //
+    // (Marker types and their serialization schemes end here).
     // Tests begin.
+    //
+
     #[test_only]
     use aptos_std::algebra::{deserialize, serialize, field_add, enable_initial_generic_algebraic_operations};
 
@@ -38,5 +42,7 @@ module aptos_std::algebra_bls12381 {
         assert!(BLS12_381_FR_VAL_1_SERIALIZED_LSB == serialize(format_bls12381fr_lsb(), &sum), 1);
     }
 
-    // Tests end.
+    //
+    // (Tests end here.)
+    //
 }

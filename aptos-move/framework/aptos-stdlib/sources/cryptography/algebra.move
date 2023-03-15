@@ -15,7 +15,9 @@ module aptos_std::algebra {
         handle: u64
     }
 
+    //
     // Public functions begin.
+    //
 
     /// Compute `x + y` for elements `x` and `y` of a field `S`.
     public fun field_add<S>(x: &Element<S>, y: &Element<S>): Element<S> {
@@ -43,17 +45,19 @@ module aptos_std::algebra {
         serialize_internal<S>(format, element.handle)
     }
 
-    // Public functions end.
-
+    //
+    // (Public functions end here.)
     // Native functions begin.
+    //
 
     native fun deserialize_internal<G>(format: u64, bytes: &vector<u8>): (bool, u64);
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun serialize_internal<G>(format: u64, h: u64): vector<u8>;
 
-    // Native functions end.
-
-    // private functions begin.
+    //
+    // (Native functions end here.)
+    // Private functions begin.
+    //
 
     fun abort_unless_generic_algebraic_structures_basic_operations_enabled() {
         if (generic_algebraic_structures_basic_operations_enabled()) return;
@@ -65,5 +69,7 @@ module aptos_std::algebra {
         std::features::change_feature_flags(fx, vector[std::features::get_generic_agebraic_structures_basic_operations_feature()], vector[]);
     }
 
-    // Private functions end.
+    //
+    // (Private functions end here.)
+    //
 }
