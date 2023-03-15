@@ -356,6 +356,15 @@ pub static EXCEEDED_STORAGE_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the exceeded batch quota.
+pub static EXCEEDED_BATCH_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_exceeded_batch_quota_count",
+        "Count of the exceeded batch quota."
+    )
+    .unwrap()
+});
+
 /// Count of the number of batch request sent to other nodes.
 pub static GET_BATCH_FROM_DB_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

@@ -64,28 +64,39 @@ enum StorageMode {
 struct QuotaManager {
     memory_balance: usize,
     db_balance: usize,
+    batch_balance: usize,
     memory_quota: usize,
     db_quota: usize,
+    batch_quota: usize,
 }
 
 impl QuotaManager {
-    fn new(max_db_balance: usize, max_memory_balance: usize) -> Self {
-        assert!(max_db_balance >= max_memory_balance);
+    fn new(db_quota: usize, memory_quota: usize, batch_quota: usize) -> Self {
+        assert!(db_quota >= memory_quota);
         Self {
             memory_balance: 0,
             db_balance: 0,
-            memory_quota: max_memory_balance,
-            db_quota: max_db_balance,
+            batch_balance: 0,
+            memory_quota,
+            db_quota,
+            batch_quota,
         }
     }
 
     pub(crate) fn update_quota(&mut self, num_bytes: usize) -> anyhow::Result<StorageMode> {
+        if self.batch_balance + 1 > self.batch_quota {
+            counters::EXCEEDED_BATCH_QUOTA_COUNT.inc();
+            bail!("Batch quota exceeded ");
+        }
+
         if self.memory_balance + num_bytes <= self.memory_quota {
             self.memory_balance += num_bytes;
             self.db_balance += num_bytes;
+            self.batch_balance += 1;
             Ok(StorageMode::MemoryAndPersisted)
         } else if self.db_balance + num_bytes <= self.db_quota {
             self.db_balance += num_bytes;
+            self.batch_balance += 1;
             Ok(StorageMode::PersistedOnly)
         } else {
             counters::EXCEEDED_STORAGE_QUOTA_COUNT.inc();
@@ -94,13 +105,12 @@ impl QuotaManager {
     }
 
     pub(crate) fn free_quota(&mut self, num_bytes: usize, storage_mode: StorageMode) {
+        self.db_balance -= num_bytes;
+        self.batch_balance -= 1;
         match storage_mode {
-            StorageMode::PersistedOnly => {
-                self.db_balance -= num_bytes;
-            },
+            StorageMode::PersistedOnly => {},
             StorageMode::MemoryAndPersisted => {
                 self.memory_balance -= num_bytes;
-                self.db_balance -= num_bytes;
             },
         }
     }
@@ -128,6 +138,7 @@ pub struct BatchStore<T> {
     expiry_grace_rounds: Round,
     memory_quota: usize,
     db_quota: usize,
+    batch_quota: usize,
     batch_requester: BatchRequester<T>,
     validator_signer: ValidatorSigner,
     validator_verifier: ValidatorVerifier,
@@ -144,6 +155,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         expiry_grace_rounds: Round,
         memory_quota: usize,
         db_quota: usize,
+        batch_quota: usize,
         batch_requester: BatchRequester<T>,
         validator_signer: ValidatorSigner,
         validator_verifier: ValidatorVerifier,
@@ -162,6 +174,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             expiry_grace_rounds,
             memory_quota,
             db_quota,
+            batch_quota,
             batch_requester,
             validator_signer,
             validator_verifier,
@@ -253,7 +266,11 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             if self
                 .peer_quota
                 .entry(author)
-                .or_insert(QuotaManager::new(self.db_quota, self.memory_quota))
+                .or_insert(QuotaManager::new(
+                    self.db_quota,
+                    self.memory_quota,
+                    self.batch_quota,
+                ))
                 .update_quota(value.num_bytes)?
                 == StorageMode::PersistedOnly
             {
