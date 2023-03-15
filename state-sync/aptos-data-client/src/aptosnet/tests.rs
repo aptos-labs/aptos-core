@@ -5,7 +5,7 @@ use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
 use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig, RoleType, StorageServiceConfig},
+    config::{AptosDataClientConfig, BaseConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
@@ -117,7 +117,6 @@ impl MockNetwork {
         let (client, poller) = AptosNetDataClient::new(
             data_client_config,
             base_config,
-            StorageServiceConfig::default(),
             mock_time.clone(),
             storage_service_client,
             None,
@@ -1405,22 +1404,17 @@ async fn optimal_chunk_size_calculations() {
     let max_state_chunk_size = 500;
     let max_transaction_chunk_size = 700;
     let max_transaction_output_chunk_size = 800;
-    let storage_service_config = StorageServiceConfig {
-        max_concurrent_requests: 0,
+    let data_client_config = AptosDataClientConfig {
         max_epoch_chunk_size,
-        max_lru_cache_size: 0,
-        max_network_channel_size: 0,
-        max_network_chunk_bytes: 0,
         max_state_chunk_size,
-        max_subscription_period_ms: 0,
         max_transaction_chunk_size,
         max_transaction_output_chunk_size,
-        storage_summary_refresh_interval_ms: 0,
+        ..Default::default()
     };
 
     // Test median calculations
     let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
-        &storage_service_config,
+        &data_client_config,
         vec![7, 5, 6, 8, 10],
         vec![100, 200, 300, 100],
         vec![900, 700, 500],
@@ -1433,7 +1427,7 @@ async fn optimal_chunk_size_calculations() {
 
     // Test no advertised data
     let optimal_chunk_sizes =
-        calculate_optimal_chunk_sizes(&storage_service_config, vec![], vec![], vec![], vec![]);
+        calculate_optimal_chunk_sizes(&data_client_config, vec![], vec![], vec![], vec![]);
     assert_eq!(max_state_chunk_size, optimal_chunk_sizes.state_chunk_size);
     assert_eq!(max_epoch_chunk_size, optimal_chunk_sizes.epoch_chunk_size);
     assert_eq!(
@@ -1447,7 +1441,7 @@ async fn optimal_chunk_size_calculations() {
 
     // Verify the config caps the amount of chunks
     let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
-        &storage_service_config,
+        &data_client_config,
         vec![70, 50, 60, 80, 100],
         vec![1000, 1000, 2000, 3000],
         vec![9000, 7000, 5000],
