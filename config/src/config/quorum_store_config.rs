@@ -21,7 +21,7 @@ impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
-            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 8,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
@@ -57,6 +57,7 @@ pub struct QuorumStoreConfig {
     pub batch_expiry_grace_rounds: Round,
     pub memory_quota: usize,
     pub db_quota: usize,
+    pub batch_quota: usize,
     pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_fragments: usize,
@@ -81,6 +82,7 @@ impl Default for QuorumStoreConfig {
             batch_expiry_grace_rounds: 5,
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
+            batch_quota: 300_000,
             mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS Fragment messages, should be >= 1
