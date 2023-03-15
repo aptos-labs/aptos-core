@@ -243,6 +243,7 @@ impl InnerBuilder {
             self.epoch,
             self.author,
             self.config.batch_request_num_peers,
+            self.config.batch_request_num_retry,
             self.config.batch_request_timeout_ms,
             self.network_sender.clone(),
         );
