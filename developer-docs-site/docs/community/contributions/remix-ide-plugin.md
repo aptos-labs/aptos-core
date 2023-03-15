@@ -37,7 +37,7 @@ width= "80%"
 
 ## Step 2: Select a Chain
 
-Click on Aptos(MoveVM) in the list of chains.
+Click on the newly created icon in the left-hand side icon menu. Then, select Aptos (MoveVM) from the chain list.
 
 If you click the `Documentation` button, go to WELL DONE Docs, and if you find a problem or have any questions while using it, click the `Make an issue` button to go to the [Github Repository](https://github.com/welldonestudio/welldonestudio.github.io) and feel free to create an issue.
 
@@ -48,7 +48,7 @@ sources={{
     light: useBaseUrl('/img/docs/remix-select-chain.png'),
     dark: useBaseUrl('/img/docs/remix-select-chain.png'),
   }}
-width="50%"
+width="80%"
 />
 </center>
 
