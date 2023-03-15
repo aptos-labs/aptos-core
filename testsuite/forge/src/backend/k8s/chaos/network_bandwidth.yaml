@@ -2,16 +2,29 @@ kind: NetworkChaos
 apiVersion: chaos-mesh.org/v1alpha1
 metadata:
   namespace: {namespace}
-  name: forge-namespace-{rate}mbps-bandwidth
+  name: {name}
 spec:
   action: bandwidth
   mode: all
   selector:
     namespaces:
       - {namespace}
-    labelSelectors:
-      app.kubernetes.io/name: validator
+    expressionSelectors:
+      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
   bandwidth:
     rate: "{rate}mbps"
     limit: {limit}
     buffer: {buffer}
+  direction: both
+  target:
+    # For delay NetworkChaos, always use "from" direction and always target an entire namespace
+    # This is because Forge submits API requests to k8s Services, whereas Chaos Mesh applies the chaos
+    # via netem on the PodIP directly.
+    # This also hinges on the fact that the Forge workloads (txn-emitter and overall test runner) exist
+    # in a separate k8s Namespace, so they are not affected by the below selector.
+    selector:
+      namespaces:
+        - {namespace}
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
+    mode: all

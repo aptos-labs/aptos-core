@@ -139,13 +139,48 @@ impl K8sSwarm {
         &self,
         swarm_network_bandwidth: &SwarmNetworkBandwidth,
     ) -> Result<String> {
-        Ok(format!(
-            include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
-            namespace = self.kube_namespace,
-            rate = swarm_network_bandwidth.rate,
-            limit = swarm_network_bandwidth.limit,
-            buffer = swarm_network_bandwidth.buffer
-        ))
+        let mut network_chaos_specs = vec![];
+
+        for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidth {
+            let source_instance_labels = group_network_bandwidth
+                .source_nodes
+                .iter()
+                .map(|node| {
+                    if let Some(v) = self.validator(*node) {
+                        v.name()
+                    } else {
+                        "invalid-node"
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+
+            let target_instance_labels = group_network_bandwidth
+                .target_nodes
+                .iter()
+                .map(|node| {
+                    if let Some(v) = self.validator(*node) {
+                        v.name()
+                    } else {
+                        "invalid-node"
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+
+            network_chaos_specs.push(format!(
+                include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
+                name = &group_network_bandwidth.name,
+                namespace = self.kube_namespace,
+                rate = group_network_bandwidth.rate,
+                limit = group_network_bandwidth.limit,
+                buffer = group_network_bandwidth.buffer,
+                instance_labels = &source_instance_labels,
+                target_instance_labels = &target_instance_labels,
+            ));
+        }
+
+        Ok(network_chaos_specs.join("\n---\n"))
     }
 
     fn create_network_loss_template(
