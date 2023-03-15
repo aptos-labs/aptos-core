@@ -7,10 +7,7 @@ This module provides generic structs/functions for operations of algebraic struc
 which can be used to build generic cryptographic schemes atop.
 See <code>algebra_*.<b>move</b></code> for currently implemented algebraic structures.
 
-Below are the operations currently supported.
-- Element serialization/deserialization.
-- Field operations.
-- Addition.
+Currently supported operations include element serialization/deserialization and addition.
 
 
 -  [Struct `Element`](#0x1_algebra_Element)
@@ -20,7 +17,7 @@ Below are the operations currently supported.
 -  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
 -  [Function `add_internal`](#0x1_algebra_add_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
--  [Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`](#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled)
+-  [Function `abort_unless_cryptography_algebra_natives_enabled`](#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -75,7 +72,7 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of an 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add">add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
         handle: <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
@@ -104,7 +101,7 @@ Return none if the deserialization failed.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize">deserialize</a>&lt;S, F&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S, F&gt;(bytes);
     <b>if</b> (succeeded) {
         some(<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle })
@@ -135,7 +132,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize">serialize</a>&lt;S, F&gt;(element: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
+    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S, F&gt;(element.handle)
 }
 </code></pre>
@@ -210,13 +207,13 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 </details>
 
-<a name="0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled"></a>
+<a name="0x1_algebra_abort_unless_cryptography_algebra_natives_enabled"></a>
 
-## Function `abort_unless_generic_algebraic_structures_basic_operations_enabled`
+## Function `abort_unless_cryptography_algebra_natives_enabled`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>()
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>()
 </code></pre>
 
 
@@ -225,7 +222,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>() {
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>() {
     <b>if</b> (cryptogtaphy_algebra_enabled()) <b>return</b>;
     <b>abort</b>(std::error::not_implemented(0))
 }

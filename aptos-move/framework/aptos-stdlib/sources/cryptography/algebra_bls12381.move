@@ -1,8 +1,7 @@
 /// This module defines marker types, constants and test cases for working with BLS12-381 curves
 /// using generic API defined in `algebra.move`.
 ///
-/// Below are the BLS12-381 structures currently supported.
-/// - Field `Fr`.
+/// Currently supported BLS12-381 structures include field `Fr`.
 module aptos_std::algebra_bls12381 {
     //
     // Marker types and their serialization schemes begin.
@@ -24,7 +23,7 @@ module aptos_std::algebra_bls12381 {
     //
 
     #[test_only]
-    use aptos_std::algebra::{deserialize, serialize, add, enable_initial_generic_algebraic_operations};
+    use aptos_std::algebra::{deserialize, serialize, add, enable_cryptography_algebra_natives};
 
     #[test_only]
     const BLS12_381_FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -33,7 +32,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
         let val_0 = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(
             &BLS12_381_FR_VAL_0_SERIALIZED_LSB));
         let val_1 = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(

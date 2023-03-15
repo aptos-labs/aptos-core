@@ -6,8 +6,7 @@
 This module defines marker types, constants and test cases for working with BLS12-381 curves
 using generic API defined in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code>.
 
-Below are the BLS12-381 structures currently supported.
-- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>.
+Currently supported BLS12-381 structures include field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>.
 
 
 -  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
