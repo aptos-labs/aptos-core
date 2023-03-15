@@ -75,7 +75,7 @@ impl AlgebraContext {
 
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        let type_tag = $context.type_to_type_tag($typ)?;
         Structure::from_type_tag(&type_tag)
     }};
 }
