@@ -13,7 +13,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, NumArgs},
     language_storage::TypeTag,
@@ -39,7 +39,8 @@ use std::hash::Hash;
 use std::sync::Arc;
 use itertools::Itertools;
 use move_compiler::parser::lexer::Tok::Native;
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use move_core_types::vm_status::StatusCode;
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
 use crate::natives::helpers::{make_safe_native, make_test_only_native_from_func, SafeNativeContext, SafeNativeError, SafeNativeResult};
 use crate::safely_pop_arg;
 
@@ -157,7 +158,7 @@ macro_rules! suite_from_ty_arg {
     }};
 }
 
-macro_rules! store_obj {
+macro_rules! store_element {
     ($context:expr, $obj:expr) => {{
         let target_vec = &mut $context.extensions_mut().get_mut::<AlgebraContext>().objs;
         let ret = target_vec.len();
@@ -166,27 +167,53 @@ macro_rules! store_obj {
     }};
 }
 
-macro_rules! get_obj_pointer {
-    ($context:expr, $handle:expr) => {{
-        $context.extensions_mut().get_mut::<AlgebraContext>().objs[$handle].clone()
-    }};
+macro_rules! abort_unless_feature_enabled {
+    ($context:ident, $feature:expr) => {
+        if !$context.get_feature_flags().is_enabled($feature) {
+            return Err(SafeNativeError::Abort {
+                abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            });
+        }
+    };
+}
+
+fn abort_invariant_violated() -> PartialVMError {
+    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+}
+
+/// Try getting a pointer to the `handle`-th elements in `context` and assign it to a local variable `ptr_out`.
+/// Then try casting it to a reference of `typ` and assign it in a local variable `ref_out`.
+/// Abort the VM execution with invariant violation if anything above fails.
+macro_rules! safe_borrow_element {
+    ($context:expr, $handle:expr, $typ:ty, $ptr_out:ident, $ref_out:ident) => {
+        let $ptr_out = $context
+            .extensions()
+            .get::<AlgebraContext>()
+            .objs
+            .get($handle)
+            .ok_or_else(abort_invariant_violated)?
+            .clone();
+        let $ref_out = $ptr_out
+            .downcast_ref::<$typ>()
+            .ok_or_else(abort_invariant_violated)?;
+    };
 }
 
 macro_rules! ark_serialize_internal {
     (
         $gas_params:expr,
         $context:expr,
+        $args:ident,
         $structure:expr,
-        $handle:expr,
         $format:expr,
-        $typ:ty,
-        $ser_func:ident
+        $ark_type:ty,
+        $ark_ser_func:ident
     ) => {{
-        let element_ptr = get_obj_pointer!($context, $handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
-        let mut buf = Vec::new();
+        let handle = safely_pop_arg!($args, u64) as usize;
+        safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
+        let mut buf = vec![];
         $context.charge($gas_params.serialize($structure, $format))?;
-        element.$ser_func(&mut buf).unwrap();
+        element.$ark_ser_func(&mut buf).unwrap();
         buf
     }};
 }
@@ -195,18 +222,18 @@ macro_rules! ark_ec_point_serialize_internal {
     (
         $gas_params:expr,
         $context:expr,
+        $args:ident,
         $structure:expr,
-        $handle:expr,
         $format:expr,
-        $typ:ty,
-        $ser_func:ident
+        $ark_type:ty,
+        $ark_ser_func:ident
     ) => {{
-        let element_ptr = get_obj_pointer!($context, $handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        let handle = safely_pop_arg!($args, u64) as usize;
+        safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
         $context.charge($gas_params.serialize($structure, $format))?;
-        element_affine.$ser_func(&mut buf).unwrap();
+        element_affine.$ark_ser_func(&mut buf).unwrap();
         buf
     }};
 }
@@ -218,16 +245,16 @@ fn serialize_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let handle = safely_pop_arg!(args, u64) as usize;
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     match (structure_opt, format_opt) {
         (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381Fr,
-                handle,
                 SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
                 serialize_uncompressed
@@ -235,11 +262,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let mut buf = ark_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381Fr,
-                handle,
                 SerializationFormat::BLS12381FrMsb,
                 ark_bls12_381::Fr,
                 serialize_uncompressed
@@ -248,11 +276,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLsb)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381Fq12,
-                handle,
                 SerializationFormat::BLS12381Fq12LscLsb,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
@@ -260,11 +289,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381G1,
-                handle,
                 SerializationFormat::BLS12381G1AffineUncompressed,
                 ark_bls12_381::G1Projective,
                 serialize_uncompressed
@@ -272,11 +302,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381G1,
-                handle,
                 SerializationFormat::BLS12381G1AffineCompressed,
                 ark_bls12_381::G1Projective,
                 serialize_compressed
@@ -284,11 +315,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUncompressed)) => {
-            let buf = ark_ec_point_serialize_internal!(
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
+           let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381G2,
-                handle,
                 SerializationFormat::BLS12381G2AffineUncompressed,
                 ark_bls12_381::G2Projective,
                 serialize_uncompressed
@@ -296,11 +328,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381G2,
-                handle,
                 SerializationFormat::BLS12381G2AffineCompressed,
                 ark_bls12_381::G2Projective,
                 serialize_compressed
@@ -308,11 +341,12 @@ fn serialize_internal(
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Ok(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
+            abort_unless_feature_enabled!(context, FeatureFlag::BLS12_381_STRUCTURES);
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
+                args,
                 Structure::BLS12381Gt,
-                handle,
                 SerializationFormat::BLS12381Gt,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
@@ -336,7 +370,7 @@ macro_rules! ark_deserialize_internal {
         $context.charge($gas_params.deserialize($structure, $format))?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
-                let handle = store_obj!($context, element);
+                let handle = store_element!($context, element);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
             _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
@@ -358,7 +392,7 @@ macro_rules! ark_ec_point_deserialize_internal {
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = Projective::from(element);
-                let handle = store_obj!($context, element_proj);
+                let handle = store_element!($context, element_proj);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
             _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
@@ -488,7 +522,7 @@ fn deserialize_internal(
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
-                        let handle = store_obj!(context, element);
+                        let handle = store_element!(context, element);
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {
                         Ok(smallvec![Value::bool(false), Value::u64(0)])
@@ -506,7 +540,7 @@ macro_rules! from_u64_internal {
         let value = safely_pop_arg!($args, u64);
         $context.charge($gas_params.from_u128($structure))?;
         let element = <$typ>::from(value as u128);
-        let handle = store_obj!($context, element);
+        let handle = store_element!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
@@ -541,13 +575,11 @@ macro_rules! ark_field_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.field_add($structure))?;
         let new_element = element_1.add(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -582,13 +614,11 @@ macro_rules! ark_field_sub_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.field_sub($structure))?;
         let new_element = element_1.sub(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -623,13 +653,11 @@ macro_rules! ark_field_mul_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.field_mul($structure))?;
         let new_element = element_1.mul(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -664,16 +692,14 @@ macro_rules! ark_field_div_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         if element_2.is_zero() {
             return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
         }
         $context.charge($gas_params.field_div($structure))?;
         let new_element = element_1.div(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
     }};
 }
@@ -707,11 +733,10 @@ fn field_div_internal(
 macro_rules! ark_neg_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.field_neg($structure))?;
         let new_element = element.neg();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -745,12 +770,11 @@ fn field_neg_internal(
 macro_rules! ark_field_inv_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.field_inv($structure))?;
         match element.inverse() {
             Some(new_element) => {
-                let new_handle = store_obj!($context, new_element);
+                let new_handle = store_element!($context, new_element);
                 Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
             },
             None => Ok(smallvec![Value::bool(false), Value::u64(0)]),
@@ -786,11 +810,10 @@ fn field_inv_internal(
 macro_rules! ark_field_sqr_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.field_sqr($structure))?;
         let new_element = element.square();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -824,7 +847,7 @@ macro_rules! ark_field_zero_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         $context.charge($gas_params.field_zero($structure))?;
         let new_element = <$typ>::zero();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -858,7 +881,7 @@ macro_rules! ark_field_one_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         $context.charge($gas_params.field_one($structure))?;
         let new_element = <$typ>::one();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -891,8 +914,7 @@ fn field_one_internal(
 macro_rules! ark_field_is_one_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.field_is_one($structure))?;
         let result = element.is_one();
         Ok(smallvec![Value::bool(result)])
@@ -927,8 +949,7 @@ fn field_is_one_internal(
 macro_rules! ark_field_is_zero_internal {
     ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.field_is_zero($structure))?;
         let result = element.is_zero();
         Ok(smallvec![Value::bool(result)])
@@ -964,10 +985,8 @@ macro_rules! ark_eq_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.eq($structure))?;
         let result = element_1 == element_2;
         Ok(smallvec![Value::bool(result)])
@@ -1025,7 +1044,7 @@ macro_rules! ark_group_identity_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty, $func:ident) => {{
         $context.charge($gas_params.group_identity($structure))?;
         let element = <$typ>::$func();
-        let handle = store_obj!($context, element);
+        let handle = store_element!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
@@ -1066,8 +1085,7 @@ fn group_identity_internal(
 macro_rules! ark_group_is_identity_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.group_is_identity($structure))?;
         let result = element.$op();
         Ok(smallvec![Value::bool(result)])
@@ -1119,25 +1137,19 @@ macro_rules! ark_multi_scalar_mul_internal {
             if num_elements != num_scalars {
                 return Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING });
             }
-            let bases = element_handles
-                .iter()
-                .map(|&handle|{
-                    let element_ptr = get_obj_pointer!($context, handle as usize);
-                    let element = element_ptr.downcast_ref::<$element_typ>().unwrap();
-                    element.into_affine()
-                })
-                .collect::<Vec<_>>();
-            let scalars = scalar_handles
-                .iter()
-                .map(|&handle|{
-                    let scalar_ptr = get_obj_pointer!($context, handle as usize);
-                    let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap().clone();
-                    scalar
-                })
-                .collect::<Vec<_>>();
+            let mut bases = Vec::with_capacity(num_elements);
+            for handle in element_handles {
+                safe_borrow_element!($context, handle as usize, $element_typ, element_ptr, element);
+                bases.push(element.into_affine());
+            }
+            let mut scalars = Vec::with_capacity(num_scalars);
+            for handle in scalar_handles {
+                safe_borrow_element!($context, handle as usize, $scalar_typ, scalar_ptr, scalar);
+                scalars.push(scalar.clone());
+            }
             $context.charge($gas_params.group_multi_scalar_mul_typed($structure, num_elements))?;
             let new_element: $element_typ = ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
-            let new_handle = store_obj!($context, new_element);
+            let new_handle = store_element!($context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1189,7 +1201,7 @@ macro_rules! ark_group_generator_internal {
     ($gas_params:expr, $context:expr, $structure:expr, $typ:ty) => {{
         $context.charge($gas_params.group_generator($structure))?;
         let element = <$typ>::generator();
-        let handle = store_obj!($context, element);
+        let handle = store_element!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
     }};
 }
@@ -1217,7 +1229,7 @@ fn group_generator_internal(
         Ok(Structure::BLS12381Gt) => {
             context.charge(gas_params.group_generator(Structure::BLS12381Gt))?;
             let element = BLS12381_GT_GENERATOR.add(ark_bls12_381::Fq12::zero());
-            let handle = store_obj!(context, element);
+            let handle = store_element!(context, element);
             Ok(smallvec![Value::u64(handle as u64)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1243,7 +1255,7 @@ fn group_order_internal(
 macro_rules! ark_insecure_random_element_internal {
     ($context:expr, $typ:ty) => {{
         let element = <$typ>::rand(&mut test_rng());
-        let handle = store_obj!($context, element);
+        let handle = store_element!($context, element);
         Ok(NativeResult::ok(InternalGas::zero(), smallvec![
             Value::u64(handle as u64)
         ]))
@@ -1274,7 +1286,7 @@ fn insecure_random_element_internal(
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
             let element = BLS12381_GT_GENERATOR.pow(k_bigint);
-            let handle = store_obj!(context, element);
+            let handle = store_element!(context, element);
             Ok(NativeResult::ok(InternalGas::zero(), smallvec![
                 Value::u64(handle as u64)
             ]))
@@ -1287,14 +1299,12 @@ macro_rules! ark_group_add_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.group_add($structure))?;
 
         let new_element = element_1.$op(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1339,13 +1349,11 @@ macro_rules! ark_group_sub_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        let element_1_ptr = get_obj_pointer!($context, handle_1);
-        let element_1 = element_1_ptr.downcast_ref::<$typ>().unwrap();
-        let element_2_ptr = get_obj_pointer!($context, handle_2);
-        let element_2 = element_2_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
         $context.charge($gas_params.group_sub($structure))?;
         let new_element = element_1.$op(element_2);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1399,14 +1407,12 @@ macro_rules! ark_group_scalar_mul_internal {
     ) => {{
         let scalar_handle = safely_pop_arg!($args, u64) as usize;
         let element_handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, element_handle);
-        let element = element_ptr.downcast_ref::<$group_typ>().unwrap();
-        let scalar_ptr = get_obj_pointer!($context, scalar_handle);
-        let scalar = scalar_ptr.downcast_ref::<$scalar_typ>().unwrap();
+        safe_borrow_element!($context, element_handle, $group_typ, element_ptr, element);
+        safe_borrow_element!($context, scalar_handle, $scalar_typ, scalar_ptr, scalar);
         let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
         $context.charge($gas_params.group_scalar_mul($group_structure))?;
         let new_element = element.$op(scalar_bigint);
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1448,14 +1454,12 @@ fn group_scalar_mul_internal(
         (Ok(Structure::BLS12381Gt), Ok(Structure::BLS12381Fr)) => {
             let scalar_handle = safely_pop_arg!( args , u64 ) as usize;
             let element_handle = safely_pop_arg!( args , u64 ) as usize;
-            let element_ptr = get_obj_pointer!( context , element_handle );
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
-            let scalar_ptr = get_obj_pointer!( context , scalar_handle );
-            let scalar = scalar_ptr.downcast_ref::<ark_bls12_381::Fr>().unwrap();
+            safe_borrow_element!( context , element_handle , ark_bls12_381::Fq12, element_ptr, element);
+            safe_borrow_element!( context , scalar_handle , ark_bls12_381::Fr, scalar_ptr, scalar);
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
             context.charge(gas_params.group_scalar_mul(Structure::BLS12381Gt))?;
             let new_element = element.pow(scalar_bigint);
-            let new_handle = store_obj!( context , new_element );
+            let new_handle = store_element!( context , new_element );
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1478,7 +1482,7 @@ macro_rules! ark_bls12381gx_xmd_sha_256_sswu_ro_internal {
             ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
             ark_ec::hashing::curve_maps::wb::WBMap<$config_type>>::new($dst).unwrap();
         let new_element = <$target_type>::from(mapper.hash($msg).unwrap());
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }}
 }
@@ -1508,11 +1512,10 @@ fn hash_to_internal(
 macro_rules! ark_group_double_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.group_double($structure))?;
         let new_element = element.$op();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1556,11 +1559,10 @@ fn group_double_internal(
 macro_rules! ark_group_neg_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        let element_ptr = get_obj_pointer!($context, handle);
-        let element = element_ptr.downcast_ref::<$typ>().unwrap();
+        safe_borrow_element!($context, handle, $typ, element_ptr, element);
         $context.charge($gas_params.group_neg($structure))?;
         let new_element = element.$op();
-        let new_handle = store_obj!($context, new_element);
+        let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -1591,11 +1593,10 @@ fn group_neg_internal(
         ),
         Ok(Structure::BLS12381Gt) => {
             let handle = safely_pop_arg!(args, u64) as usize;
-            let element_ptr = get_obj_pointer!(context, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
             context.charge(gas_params.group_neg(Structure::BLS12381Gt))?;
             let new_element = element.inverse().unwrap();
-            let new_handle = store_obj!(context, new_element);
+            let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1616,7 +1617,8 @@ fn multi_pairing_internal(
         (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Gt)) => {
             let g2_element_handles = safely_pop_arg!(args, Vec<u64>);
             let g1_element_handles = safely_pop_arg!(args, Vec<u64>);
-            if g1_element_handles.len() != g2_element_handles.len() {
+            let num_entries = g1_element_handles.len();
+            if  num_entries != g2_element_handles.len() {
                 return Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING });
             }
             context.charge(gas_params.multi_pairing(
@@ -1625,23 +1627,19 @@ fn multi_pairing_internal(
                 Structure::BLS12381Gt,
                 g1_element_handles.len()
             ))?;
-            let g1_elements_affine = g1_element_handles.iter().map(|&handle|{
-                let ptr = get_obj_pointer!(context, handle as usize);
-                let element = ptr
-                    .downcast_ref::<ark_bls12_381::G1Projective>()
-                    .unwrap();
-                element.into_affine()
-            }).collect::<Vec<_>>();
-            let g2_elements_affine = g2_element_handles.iter().map(|&handle|{
-                let ptr = get_obj_pointer!(context, handle as usize);
-                let element = ptr
-                    .downcast_ref::<ark_bls12_381::G2Projective>()
-                    .unwrap();
-                element.into_affine()
-            }).collect::<Vec<_>>();
+            let mut g1_elements_affine = Vec::with_capacity(num_entries);
+            for handle in g1_element_handles {
+                safe_borrow_element!(context, handle as usize, ark_bls12_381::G1Projective, ptr, element);
+                g1_elements_affine.push(element.into_affine());
+            }
+            let mut g2_elements_affine = Vec::with_capacity(num_entries);
+            for handle in g2_element_handles {
+                safe_borrow_element!(context, handle as usize, ark_bls12_381::G2Projective, ptr, element);
+                g2_elements_affine.push(element.into_affine());
+            }
             let new_element =
                 ark_bls12_381::Bls12_381::multi_pairing(g1_elements_affine, g2_elements_affine).0;
-            let new_handle = store_obj!(context, new_element);
+            let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1662,15 +1660,9 @@ fn pairing_internal(
         (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Gt)) => {
             let g2_element_handle = safely_pop_arg!(args, u64) as usize;
             let g1_element_handle = safely_pop_arg!(args, u64) as usize;
-            let g1_element_ptr = get_obj_pointer!(context, g1_element_handle);
-            let g2_element_ptr = get_obj_pointer!(context, g2_element_handle);
-            let g1_element = g1_element_ptr
-                .downcast_ref::<ark_bls12_381::G1Projective>()
-                .unwrap();
-            let g2_element = g2_element_ptr
-                .downcast_ref::<ark_bls12_381::G2Projective>()
-                .unwrap();
+            safe_borrow_element!(context, g1_element_handle, ark_bls12_381::G1Projective, g1_element_ptr, g1_element);
             let g1_element_affine = g1_element.into_affine();
+            safe_borrow_element!(context, g2_element_handle, ark_bls12_381::G2Projective, g2_element_ptr, g2_element);
             let g2_element_affine = g2_element.into_affine();
             context.charge(gas_params.pairing(
                 Structure::BLS12381G1,
@@ -1679,7 +1671,7 @@ fn pairing_internal(
             ))?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
-            let new_handle = store_obj!(context, new_element);
+            let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1698,8 +1690,7 @@ fn downcast_internal(
     match (parent_opt, child_opt) {
         (Ok(Structure::BLS12381Fq12), Ok(Structure::BLS12381Gt)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
-            let element_ptr = get_obj_pointer!(context, handle);
-            let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
+            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
             context.charge(gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one())?;
             if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
