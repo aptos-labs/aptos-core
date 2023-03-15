@@ -319,7 +319,7 @@ impl InnerBuilder {
                 self.author,
                 self.network_sender.clone(),
                 self.batch_store.clone().unwrap(),
-                self.config.max_batch_bytes,
+                self.config.max_batch_bytes as u64,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i).as_str();

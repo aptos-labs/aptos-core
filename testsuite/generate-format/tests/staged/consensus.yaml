@@ -419,10 +419,10 @@ Signature:
   NEWTYPESTRUCT: BYTES
 SignedBatchInfo:
   STRUCT:
-    - signer:
-        TYPENAME: AccountAddress
     - info:
         TYPENAME: BatchInfo
+    - signer:
+        TYPENAME: AccountAddress
     - signature:
         TYPENAME: Signature
 SignedTransaction:

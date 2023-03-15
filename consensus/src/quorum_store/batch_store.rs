@@ -4,8 +4,11 @@
 use crate::{
     network::QuorumStoreSender,
     quorum_store::{
-        batch_requester::BatchRequester, counters, quorum_store_db::QuorumStoreStorage,
-        types::PersistedValue, utils::RoundExpirations,
+        batch_requester::BatchRequester,
+        counters,
+        quorum_store_db::QuorumStoreStorage,
+        types::{PersistedValue, StorageMode},
+        utils::RoundExpirations,
     },
 };
 use anyhow::bail;
@@ -38,13 +41,6 @@ pub struct PersistRequest {
     pub digest: HashValue,
     pub value: PersistedValue,
 }
-
-#[derive(PartialEq)]
-enum StorageMode {
-    PersistedOnly,
-    MemoryAndPersisted,
-}
-
 struct QuotaManager {
     memory_balance: usize,
     db_balance: usize,
@@ -97,13 +93,6 @@ impl QuotaManager {
                 self.memory_balance -= num_bytes;
             },
         }
-    }
-}
-
-fn payload_storage_mode(persisted_value: &PersistedValue) -> StorageMode {
-    match persisted_value.maybe_payload {
-        Some(_) => StorageMode::MemoryAndPersisted,
-        None => StorageMode::PersistedOnly,
     }
 }
 
@@ -174,7 +163,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
             last_certified_round
         );
         for (digest, value) in db_content {
-            let expiration = value.info.expiration;
+            let expiration = value.expiration();
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
@@ -209,11 +198,11 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     fn free_quota(&self, persisted_value: PersistedValue) {
         let mut quota_manager = self
             .peer_quota
-            .get_mut(&persisted_value.info.author)
+            .get_mut(&persisted_value.author())
             .expect("No QuotaManager for batch author");
         quota_manager.free_quota(
-            persisted_value.info.num_bytes as usize,
-            payload_storage_mode(&persisted_value),
+            persisted_value.num_bytes() as usize,
+            persisted_value.payload_storage_mode(),
         );
     }
 
@@ -230,15 +219,15 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         digest: HashValue,
         mut value: PersistedValue,
     ) -> anyhow::Result<bool> {
-        let author = value.info.author;
-        let expiration_round = value.info.expiration.round();
+        let author = value.author();
+        let expiration_round = value.expiration().round();
 
         {
             // Acquire dashmap internal lock on the entry corresponding to the digest.
             let cache_entry = self.db_cache.entry(digest);
 
             if let Occupied(entry) = &cache_entry {
-                if entry.get().info.expiration.round() >= value.info.expiration.round() {
+                if entry.get().expiration().round() >= value.expiration().round() {
                     debug!(
                         "QS: already have the digest with higher expiration {}",
                         digest
@@ -255,7 +244,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     self.memory_quota,
                     self.batch_quota,
                 ))
-                .update_quota(value.info.num_bytes as usize)?
+                .update_quota(value.num_bytes() as usize)?
                 == StorageMode::PersistedOnly
             {
                 value.remove_payload();
@@ -282,7 +271,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
-        let expiration = value.info.expiration;
+        let expiration = value.expiration();
         if expiration.epoch() == self.epoch() {
             // record the round gaps
             if expiration.round() > self.last_certified_round() {
@@ -339,7 +328,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     // We need to check up-to-date expiration again because receiving the same
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
-                    if entry.get().info.expiration.round() <= expired_round {
+                    if entry.get().expiration().round() <= expired_round {
                         Some(entry.remove())
                     } else {
                         None
@@ -357,7 +346,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     }
 
     pub fn persist(&self, persist_request: PersistRequest) -> Option<SignedBatchInfo> {
-        let expiration = persist_request.value.info.expiration;
+        let expiration = persist_request.value.expiration();
         // Network listener should filter messages with wrong expiration epoch.
         assert_eq!(
             expiration.epoch(),
@@ -367,7 +356,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
         match self.save(persist_request.digest, persist_request.value.clone()) {
             Ok(needs_db) => {
-                let batch_info = persist_request.value.info.clone();
+                let batch_info = persist_request.value.batch_info().clone();
                 trace!("QS: sign digest {}", persist_request.digest);
                 if needs_db {
                     self.db
@@ -436,11 +425,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
 
     pub fn get_batch_from_local(&self, digest: &HashValue) -> Result<PersistedValue, Error> {
         if let Some(value) = self.db_cache.get(digest) {
-            if payload_storage_mode(&value) == StorageMode::PersistedOnly {
-                assert!(
-                    value.maybe_payload.is_none(),
-                    "BatchReader payload and storage kind mismatch"
-                );
+            if value.payload_storage_mode() == StorageMode::PersistedOnly {
                 self.get_batch_from_db(digest)
             } else {
                 // Available in memory.
@@ -464,9 +449,7 @@ pub trait BatchReader: Send + Sync {
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for BatchStore<T> {
     fn exists(&self, digest: &HashValue) -> Option<PeerId> {
-        self.get_batch_from_local(digest)
-            .map(|v| v.info.author)
-            .ok()
+        self.get_batch_from_local(digest).map(|v| v.author()).ok()
     }
 
     fn get_batch(
@@ -475,8 +458,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
     ) -> oneshot::Receiver<Result<Vec<SignedTransaction>, Error>> {
         let (tx, rx) = oneshot::channel();
 
-        if let Ok(value) = self.get_batch_from_local(proof.digest()) {
-            tx.send(Ok(value.maybe_payload.expect("Must have payload")))
+        if let Ok(mut value) = self.get_batch_from_local(proof.digest()) {
+            tx.send(Ok(value.take_payload().expect("Must have payload")))
                 .unwrap();
         } else {
             // Quorum store metrics

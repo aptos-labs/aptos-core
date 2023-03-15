@@ -59,7 +59,7 @@ async fn test_proof_coordinator_basic() {
     let digest = batch.digest();
 
     for signer in &signers {
-        let signed_batch_info = SignedBatchInfo::new(batch.info().clone(), signer).unwrap();
+        let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer).unwrap();
         assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(signed_batch_info))
             .await
@@ -71,6 +71,6 @@ async fn test_proof_coordinator_basic() {
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
-    assert_eq!(proof.digest().clone(), digest);
+    assert_eq!(proof.digest(), digest);
     assert!(proof.verify(&verifier).is_ok());
 }
