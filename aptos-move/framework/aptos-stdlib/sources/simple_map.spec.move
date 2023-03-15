@@ -56,6 +56,14 @@ spec aptos_std::simple_map {
         pragma verify=false;
     }
 
+    spec to_vec_pair {
+        pragma verify=false;
+    }
+
+    spec upsert {
+        pragma verify=false;
+    }
+
     // Specification functions for tables
     spec native fun spec_len<K, V>(t: SimpleMap<K, V>): num;
     spec native fun spec_contains_key<K, V>(t: SimpleMap<K, V>, k: K): bool;
