@@ -115,7 +115,7 @@ jobs:
       # Wait for the API and faucet to startup.
       - run: npm install -g wait-on
       - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
-      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
+      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081
 
       # Confirm the Rust API client examples pass.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

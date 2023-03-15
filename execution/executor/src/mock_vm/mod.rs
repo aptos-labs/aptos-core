@@ -112,7 +112,7 @@ impl VMExecutor for MockVM {
                 read_state_value_from_storage(
                     state_view,
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
-                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES))?,
+                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
                 read_state_value_from_storage(
                     state_view,
