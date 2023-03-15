@@ -9,12 +9,12 @@ use crate::{
     },
     safely_pop_arg,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun create_address
@@ -62,6 +62,7 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
         (
@@ -69,6 +70,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.create_address,
                 timed_features.clone(),
+                features.clone(),
                 native_create_address,
             ),
         ),
@@ -79,6 +81,7 @@ pub fn make_all(
             make_safe_native(
                 gas_params.create_signer,
                 timed_features,
+                features,
                 create_signer::native_create_signer,
             ),
         ),

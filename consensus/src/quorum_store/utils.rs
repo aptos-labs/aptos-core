@@ -3,14 +3,11 @@
 
 use crate::{
     monitor,
-    quorum_store::{
-        counters,
-        types::{BatchId, SerializedTransaction},
-    },
+    quorum_store::{counters, types::SerializedTransaction},
 };
 use aptos_consensus_types::{
     common::{Round, TransactionSummary},
-    proof_of_store::{LogicalTime, ProofOfStore},
+    proof_of_store::{BatchId, LogicalTime, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -32,6 +29,7 @@ use tokio::time::timeout;
 
 pub(crate) struct BatchBuilder {
     id: BatchId,
+    fragment_id: usize,
     summaries: Vec<TransactionSummary>,
     data: Vec<SerializedTransaction>,
     num_txns: usize,
@@ -44,6 +42,7 @@ impl BatchBuilder {
     pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
         Self {
             id: batch_id,
+            fragment_id: 0,
             summaries: Vec::new(),
             data: Vec::new(),
             num_txns: 0,
@@ -52,29 +51,30 @@ impl BatchBuilder {
         }
     }
 
-    pub(crate) fn append_transaction(
+    pub(crate) fn append_transactions(
         &mut self,
-        txn: &SignedTransaction,
+        txns: &[SignedTransaction],
         max_txns_override: usize,
     ) -> bool {
-        let serialized_txn = SerializedTransaction::from_signed_txn(txn);
+        for txn in txns {
+            let serialized_txn = SerializedTransaction::from_signed_txn(txn);
 
-        if self.num_bytes + serialized_txn.len() <= self.max_bytes
-            && self.num_txns < max_txns_override
-        {
-            self.num_txns += 1;
-            self.num_bytes += serialized_txn.len();
+            if self.num_bytes + serialized_txn.len() <= self.max_bytes
+                && self.num_txns < max_txns_override
+            {
+                self.num_txns += 1;
+                self.num_bytes += serialized_txn.len();
 
-            self.summaries.push(TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
-            });
-            self.data.push(serialized_txn);
-
-            self.num_txns < max_txns_override && self.num_bytes < self.max_bytes
-        } else {
-            false
+                self.summaries.push(TransactionSummary {
+                    sender: txn.sender(),
+                    sequence_number: txn.sequence_number(),
+                });
+                self.data.push(serialized_txn);
+            } else {
+                return false;
+            }
         }
+        true
     }
 
     pub(crate) fn take_serialized_txns(&mut self) -> Vec<SerializedTransaction> {
@@ -89,11 +89,19 @@ impl BatchBuilder {
         self.id
     }
 
+    pub(crate) fn fetch_and_increment_fragment_id(&mut self) -> usize {
+        let id = self.fragment_id;
+        self.fragment_id += 1;
+        id
+    }
+
     /// Clears the state, increments (batch) id.
     pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
         assert!(self.data.is_empty());
+        counters::NUM_FRAGMENT_PER_BATCH.observe((self.fragment_id + 1) as f64);
 
         self.id.increment();
+        self.fragment_id = 0;
         self.num_bytes = 0;
         self.num_txns = 0;
         mem::take(&mut self.summaries)
@@ -104,23 +112,23 @@ impl BatchBuilder {
     }
 }
 
-pub(crate) struct DigestTimeouts {
-    timeouts: VecDeque<(i64, HashValue)>,
+pub(crate) struct Timeouts<T> {
+    timeouts: VecDeque<(i64, T)>,
 }
 
-impl DigestTimeouts {
+impl<T> Timeouts<T> {
     pub(crate) fn new() -> Self {
         Self {
             timeouts: VecDeque::new(),
         }
     }
 
-    pub(crate) fn add_digest(&mut self, digest: HashValue, timeout: usize) {
+    pub(crate) fn add(&mut self, value: T, timeout: usize) {
         let expiry = Utc::now().naive_utc().timestamp_millis() + timeout as i64;
-        self.timeouts.push_back((expiry, digest));
+        self.timeouts.push_back((expiry, value));
     }
 
-    pub(crate) fn expire(&mut self) -> Vec<HashValue> {
+    pub(crate) fn expire(&mut self) -> Vec<T> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
         trace!(
             "QS: expire cur time {} timeouts len {}",
@@ -260,8 +268,11 @@ impl ProofQueue {
             },
         }
         if local {
+            counters::LOCAL_POS_COUNT.inc();
             self.local_digest_queue
                 .push_back((*proof.digest(), proof.expiration()));
+        } else {
+            counters::REMOTE_POS_COUNT.inc();
         }
     }
 
@@ -344,7 +355,7 @@ impl ProofQueue {
             // before non full check
             byte_size = cur_bytes,
             block_size = cur_txns,
-            batch_count = ret,
+            batch_count = ret.len(),
             remaining_proof_num = size,
             initial_remaining_proof_num = initial_size,
             full = full,
