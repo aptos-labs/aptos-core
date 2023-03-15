@@ -46,11 +46,12 @@ use crate::safely_pop_arg;
 pub mod gas;
 
 /// Equivalent to `std::error::invalid_argument(0)` in Move.
-const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x010000;
+const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0000;
 
 /// Equivalent to `std::error::not_implemented(0)` in Move.
-const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c0000;
+const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0c_0000;
 
+/// This encodes an algebraic structure defined in `algebra_*.move`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12381Fq12,
@@ -60,61 +61,65 @@ pub enum Structure {
     BLS12381Fr,
 }
 
-impl Structure {
-    pub fn from_type_tag(type_tag: &TypeTag) -> Option<Structure> {
-        match type_tag.to_string().as_str() {
-            "0x1::algebra_bls12381::Fr" => Some(Structure::BLS12381Fr),
-            "0x1::algebra_bls12381::Fq12" => Some(Structure::BLS12381Fq12),
-            "0x1::algebra_bls12381::G1Affine" => Some(Structure::BLS12381G1),
-            "0x1::algebra_bls12381::G2Affine" => Some(Structure::BLS12381G2),
-            "0x1::algebra_bls12381::Gt" => Some(Structure::BLS12381Gt),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub enum SerializationFormat {
-    BLS12381Fq12LscLscLscLsb,
-    BLS12381G1AffineCompressed,
-    BLS12381G1AffineUncompressed,
-    BLS12381G2AffineCompressed,
-    BLS12381G2AffineUnompressed,
-    BLS12381Gt,
-    BLS12381FrLsb,
-    BLS12381FrMsb,
-}
-
-impl TryFrom<u64> for SerializationFormat {
+impl TryFrom<TypeTag> for Structure {
     type Error = ();
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match value {
-            0x0400000000000000 => Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb),
-            0x0600000000000000 => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
-            0x0601000000000000 => Ok(SerializationFormat::BLS12381G1AffineCompressed),
-            0x0800000000000000 => Ok(SerializationFormat::BLS12381G2AffineUnompressed),
-            0x0801000000000000 => Ok(SerializationFormat::BLS12381G2AffineCompressed),
-            0x0900000000000000 => Ok(SerializationFormat::BLS12381Gt),
-            0x0a00000000000000 => Ok(SerializationFormat::BLS12381FrLsb),
-            0x0a01000000000000 => Ok(SerializationFormat::BLS12381FrMsb),
+
+    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
+        match value.to_string().as_str() {
+            "0x1::algebra_bls12381::Fr" => Ok(Structure::BLS12381Fr),
+            "0x1::algebra_bls12381::Fq12" => Ok(Structure::BLS12381Fq12),
+            "0x1::algebra_bls12381::G1Affine" => Ok(Structure::BLS12381G1),
+            "0x1::algebra_bls12381::G2Affine" => Ok(Structure::BLS12381G2),
+            "0x1::algebra_bls12381::Gt" => Ok(Structure::BLS12381Gt),
             _ => Err(()),
         }
     }
 }
 
-/// Hash-to-structure suites.
-pub enum HashToStructureSuite {
-    BLS12381G1_XMD_SHA_256_SSWU_RO_,
-    BLS12381G2_XMD_SHA_256_SSWU_RO_,
+/// This encodes a supported serialization format defined in `algebra_*.move`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum SerializationFormat {
+    BLS12381Fq12LscLsb,
+    BLS12381G1AffineCompressed,
+    BLS12381G1AffineUncompressed,
+    BLS12381G2AffineCompressed,
+    BLS12381G2AffineUncompressed,
+    BLS12381Gt,
+    BLS12381FrLsb,
+    BLS12381FrMsb,
 }
 
-impl TryFrom<u64> for HashToStructureSuite {
+impl TryFrom<TypeTag> for SerializationFormat {
     type Error = ();
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        match value {
-            0x0001000000000000 => Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_),
-            0x0002000000000000 => Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_),
+    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
+        match value.to_string().as_str() {
+            "0x1::algebra_bls12381::Fq12FormatLscLsb" => Ok(SerializationFormat::BLS12381Fq12LscLsb),
+            "0x1::algebra_bls12381::G1AffineFormatUncompressed" => Ok(SerializationFormat::BLS12381G1AffineUncompressed),
+            "0x1::algebra_bls12381::G1AffineFormatCompressed" => Ok(SerializationFormat::BLS12381G1AffineCompressed),
+            "0x1::algebra_bls12381::G2AffineFormatUncompressed" => Ok(SerializationFormat::BLS12381G2AffineUncompressed),
+            "0x1::algebra_bls12381::G2AffineFormatCompressed" => Ok(SerializationFormat::BLS12381G2AffineCompressed),
+            "0x1::algebra_bls12381::GtFormat" => Ok(SerializationFormat::BLS12381Gt),
+            "0x1::algebra_bls12381::FrFormatLsb" => Ok(SerializationFormat::BLS12381FrLsb),
+            "0x1::algebra_bls12381::FrFormatMsb" => Ok(SerializationFormat::BLS12381FrMsb),
+            _ => Err(()),
+        }
+    }
+}
+
+/// This encodes a supported hash-to-structure suite defined in `algebra_*.move`.
+pub enum HashToStructureSuite {
+    Bls12381g1XmdSha256SswuRo,
+    Bls12381g2XmdSha256SswuRo,
+}
+
+impl TryFrom<TypeTag> for HashToStructureSuite {
+    type Error = ();
+
+    fn try_from(value: TypeTag) -> Result<Self, Self::Error> {
+        match value.to_string().as_str() {
+            "0x1::algebra_bls12381::H2SSuiteBls12381g1XmdSha256SswuRo" => Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo),
+            "0x1::algebra_bls12381::H2SSuiteBls12381g2XmdSha256SswuRo" => Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo),
             _ => Err(())
         }
     }
@@ -134,21 +139,21 @@ impl AlgebraContext {
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
-        Structure::from_type_tag(&type_tag)
+        Structure::try_from(type_tag)
     }};
 }
 
 macro_rules! format_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
-        SerializationFormat::from_type_tag(&type_tag)
+        SerializationFormat::try_from(type_tag)
     }};
 }
 
 macro_rules! suite_from_ty_arg {
     ($context:expr, $typ:expr) => {{
         let type_tag = $context.type_to_type_tag($typ).unwrap();
-        HashToStructureSuite::from_type_tag(&type_tag)
+        HashToStructureSuite::try_from(type_tag)
     }};
 }
 
@@ -212,12 +217,12 @@ fn serialize_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
+    assert_eq!(2, ty_args.len());
     let handle = safely_pop_arg!(args, u64) as usize;
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     match (structure_opt, format_opt) {
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
@@ -229,7 +234,7 @@ fn serialize_internal(
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
             let mut buf = ark_serialize_internal!(
                 gas_params,
                 context,
@@ -242,19 +247,19 @@ fn serialize_internal(
             buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb)) => {
+        (Ok(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLsb)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381Fq12,
                 handle,
-                SerializationFormat::BLS12381Fq12LscLscLscLsb,
+                SerializationFormat::BLS12381Fq12LscLsb,
                 ark_bls12_381::Fq12,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
+        (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
@@ -266,7 +271,7 @@ fn serialize_internal(
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
+        (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
@@ -278,19 +283,19 @@ fn serialize_internal(
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUnompressed)) => {
+        (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUncompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
                 Structure::BLS12381G2,
                 handle,
-                SerializationFormat::BLS12381G2AffineUnompressed,
+                SerializationFormat::BLS12381G2AffineUncompressed,
                 ark_bls12_381::G2Projective,
                 serialize_uncompressed
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
+        (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
             let buf = ark_ec_point_serialize_internal!(
                 gas_params,
                 context,
@@ -302,7 +307,7 @@ fn serialize_internal(
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
-        (Some(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
+        (Ok(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
             let buf = ark_serialize_internal!(
                 gas_params,
                 context,
@@ -367,14 +372,14 @@ fn deserialize_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure = structure_from_ty_arg!(context, &ty_args[0]);
+    assert_eq!(2, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let bytes = bytes_ref.as_slice();
-    let format_opt = SerializationFormat::try_from(safely_pop_arg!(args, u64));
-    match (structure, format_opt) {
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
+    match (structure_opt, format_opt) {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrLsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -388,7 +393,7 @@ fn deserialize_internal(
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
+        (Ok(Structure::BLS12381Fr), Ok(SerializationFormat::BLS12381FrMsb)) => {
             if bytes.len() != 32 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -405,7 +410,7 @@ fn deserialize_internal(
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLscLscLsb)) => {
+        (Ok(Structure::BLS12381Fq12), Ok(SerializationFormat::BLS12381Fq12LscLsb)) => {
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -414,12 +419,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381Fq12,
-                SerializationFormat::BLS12381Fq12LscLscLscLsb,
+                SerializationFormat::BLS12381Fq12LscLsb,
                 ark_bls12_381::Fq12,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
+        (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineUncompressed)) => {
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -433,7 +438,7 @@ fn deserialize_internal(
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
+        (Ok(Structure::BLS12381G1), Ok(SerializationFormat::BLS12381G1AffineCompressed)) => {
             if bytes.len() != 48 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -447,7 +452,7 @@ fn deserialize_internal(
                 deserialize_compressed
             )
         },
-        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUnompressed)) => {
+        (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineUncompressed)) => {
             if bytes.len() != 192 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -456,12 +461,12 @@ fn deserialize_internal(
                 context,
                 bytes,
                 Structure::BLS12381G2,
-                SerializationFormat::BLS12381G2AffineUnompressed,
+                SerializationFormat::BLS12381G2AffineUncompressed,
                 ark_bls12_381::G2Affine,
                 deserialize_uncompressed
             )
         },
-        (Some(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
+        (Ok(Structure::BLS12381G2), Ok(SerializationFormat::BLS12381G2AffineCompressed)) => {
             if bytes.len() != 96 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -475,7 +480,7 @@ fn deserialize_internal(
                 deserialize_compressed
             )
         },
-        (Some(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
+        (Ok(Structure::BLS12381Gt), Ok(SerializationFormat::BLS12381Gt)) => {
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
@@ -514,14 +519,14 @@ fn from_u64_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => from_u64_internal!(
+        Ok(Structure::BLS12381Fr) => from_u64_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => from_u64_internal!(
+        Ok(Structure::BLS12381Fq12) => from_u64_internal!(
             gas_params,
             context,
             args,
@@ -555,14 +560,14 @@ fn field_add_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_add_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_add_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_add_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_add_internal!(
             gas_params,
             context,
             args,
@@ -596,14 +601,14 @@ fn field_sub_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_sub_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_sub_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_sub_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_sub_internal!(
             gas_params,
             context,
             args,
@@ -637,14 +642,14 @@ fn field_mul_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_mul_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_mul_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_mul_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_mul_internal!(
             gas_params,
             context,
             args,
@@ -681,14 +686,14 @@ fn field_div_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_div_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_div_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_div_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_div_internal!(
             gas_params,
             context,
             args,
@@ -719,14 +724,14 @@ fn field_neg_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_neg_internal!(
+        Ok(Structure::BLS12381Fr) => ark_neg_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_neg_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_neg_internal!(
             gas_params,
             context,
             args,
@@ -760,14 +765,14 @@ fn field_inv_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_inv_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_inv_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_inv_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_inv_internal!(
             gas_params,
             context,
             args,
@@ -797,14 +802,14 @@ fn field_sqr_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_sqr_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_sqr_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_sqr_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_sqr_internal!(
             gas_params,
             context,
             args,
@@ -831,14 +836,14 @@ fn field_zero_internal(
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_zero_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_zero_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_zero_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_zero_internal!(
             gas_params,
             context,
             args,
@@ -865,14 +870,14 @@ fn field_one_internal(
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_one_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_one_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_one_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_one_internal!(
             gas_params,
             context,
             args,
@@ -901,14 +906,14 @@ fn field_is_one_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_is_one_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_is_one_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_is_one_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_is_one_internal!(
             gas_params,
             context,
             args,
@@ -937,14 +942,14 @@ fn field_is_zero_internal(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_field_is_zero_internal!(
+        Ok(Structure::BLS12381Fr) => ark_field_is_zero_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_is_zero_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_field_is_zero_internal!(
             gas_params,
             context,
             args,
@@ -977,35 +982,35 @@ fn eq_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => ark_eq_internal!(
+        Ok(Structure::BLS12381Fr) => ark_eq_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fr,
             ark_bls12_381::Fr
         ),
-        Some(Structure::BLS12381Fq12) => ark_eq_internal!(
+        Ok(Structure::BLS12381Fq12) => ark_eq_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381Fq12,
             ark_bls12_381::Fq12
         ),
-        Some(Structure::BLS12381G1) => ark_eq_internal!(
+        Ok(Structure::BLS12381G1) => ark_eq_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381G1,
             ark_bls12_381::G1Projective
         ),
-        Some(Structure::BLS12381G2) => ark_eq_internal!(
+        Ok(Structure::BLS12381G2) => ark_eq_internal!(
             gas_params,
             context,
             args,
             Structure::BLS12381G2,
             ark_bls12_381::G2Projective
         ),
-        Some(Structure::BLS12381Gt) => ark_eq_internal!(
+        Ok(Structure::BLS12381Gt) => ark_eq_internal!(
             gas_params,
             context,
             args,
@@ -1033,21 +1038,21 @@ fn group_identity_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_identity_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_identity_internal!(
             gas_params,
             context,
             Structure::BLS12381G1,
             ark_bls12_381::G1Projective,
             zero
         ),
-        Some(Structure::BLS12381G2) => ark_group_identity_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_identity_internal!(
             gas_params,
             context,
             Structure::BLS12381G2,
             ark_bls12_381::G2Projective,
             zero
         ),
-        Some(Structure::BLS12381Gt) => ark_group_identity_internal!(
+        Ok(Structure::BLS12381Gt) => ark_group_identity_internal!(
             gas_params,
             context,
             Structure::BLS12381Gt,
@@ -1077,7 +1082,7 @@ fn group_is_identity_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_is_identity_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_is_identity_internal!(
             gas_params,
             context,
             args,
@@ -1085,7 +1090,7 @@ fn group_is_identity_internal(
             ark_bls12_381::G1Projective,
             is_zero
         ),
-        Some(Structure::BLS12381G2) => ark_group_is_identity_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_is_identity_internal!(
             gas_params,
             context,
             args,
@@ -1093,7 +1098,7 @@ fn group_is_identity_internal(
             ark_bls12_381::G2Projective,
             is_zero
         ),
-        Some(Structure::BLS12381Gt) => ark_group_is_identity_internal!(
+        Ok(Structure::BLS12381Gt) => ark_group_is_identity_internal!(
             gas_params,
             context,
             args,
@@ -1147,7 +1152,7 @@ fn group_multi_scalar_mul_internal(
     let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (group_opt, scalar_opt) {
-        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => ark_multi_scalar_mul_internal!(
+        (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381Fr)) => ark_multi_scalar_mul_internal!(
             gas_params,
             context,
             args,
@@ -1155,7 +1160,7 @@ fn group_multi_scalar_mul_internal(
             ark_bls12_381::G1Projective,
             ark_bls12_381::Fr
         ),
-        (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => ark_multi_scalar_mul_internal!(
+        (Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Fr)) => ark_multi_scalar_mul_internal!(
             gas_params,
             context,
             args,
@@ -1197,19 +1202,19 @@ fn group_generator_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_generator_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_generator_internal!(
             gas_params,
             context,
             Structure::BLS12381G1,
             ark_bls12_381::G1Projective
         ),
-        Some(Structure::BLS12381G2) => ark_group_generator_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_generator_internal!(
             gas_params,
             context,
             Structure::BLS12381G2,
             ark_bls12_381::G2Projective
         ),
-        Some(Structure::BLS12381Gt) => {
+        Ok(Structure::BLS12381Gt) => {
             context.charge(gas_params.group_generator(Structure::BLS12381Gt))?;
             let element = BLS12381_GT_GENERATOR.add(ark_bls12_381::Fq12::zero());
             let handle = store_obj!(context, element);
@@ -1227,7 +1232,7 @@ fn group_order_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) | Some(Structure::BLS12381G2) | Some(Structure::BLS12381Gt) => {
+        Ok(Structure::BLS12381G1) | Ok(Structure::BLS12381G2) | Ok(Structure::BLS12381Gt) => {
             Ok(smallvec![Value::vector_u8(BLS12381_R_LENDIAN.clone())])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
@@ -1253,19 +1258,19 @@ fn insecure_random_element_internal(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381Fr) => {
+        Ok(Structure::BLS12381Fr) => {
             ark_insecure_random_element_internal!(context, ark_bls12_381::Fr)
         },
-        Some(Structure::BLS12381Fq12) => {
+        Ok(Structure::BLS12381Fq12) => {
             ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12)
         },
-        Some(Structure::BLS12381G1) => {
+        Ok(Structure::BLS12381G1) => {
             ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective)
         },
-        Some(Structure::BLS12381G2) => {
+        Ok(Structure::BLS12381G2) => {
             ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective)
         },
-        Some(Structure::BLS12381Gt) => {
+        Ok(Structure::BLS12381Gt) => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
             let element = BLS12381_GT_GENERATOR.pow(k_bigint);
@@ -1302,7 +1307,7 @@ fn group_add_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_add_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_add_internal!(
             gas_params,
             context,
             args,
@@ -1310,7 +1315,7 @@ fn group_add_internal(
             ark_bls12_381::G1Projective,
             add
         ),
-        Some(Structure::BLS12381G2) => ark_group_add_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_add_internal!(
             gas_params,
             context,
             args,
@@ -1318,7 +1323,7 @@ fn group_add_internal(
             ark_bls12_381::G2Projective,
             add
         ),
-        Some(Structure::BLS12381Gt) => ark_group_add_internal!(
+        Ok(Structure::BLS12381Gt) => ark_group_add_internal!(
             gas_params,
             context,
             args,
@@ -1353,7 +1358,7 @@ fn group_sub_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_sub_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_sub_internal!(
             gas_params,
             context,
             args,
@@ -1361,7 +1366,7 @@ fn group_sub_internal(
             ark_bls12_381::G1Projective,
             sub
         ),
-        Some(Structure::BLS12381G2) => ark_group_sub_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_sub_internal!(
             gas_params,
             context,
             args,
@@ -1369,7 +1374,7 @@ fn group_sub_internal(
             ark_bls12_381::G2Projective,
             sub
         ),
-        Some(Structure::BLS12381Gt) => ark_group_sub_internal!(
+        Ok(Structure::BLS12381Gt) => ark_group_sub_internal!(
             gas_params,
             context,
             args,
@@ -1416,7 +1421,7 @@ fn group_scalar_mul_internal(
     let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (group_opt, scalar_field_opt) {
-        (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {
+        (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381Fr)) => {
             ark_group_scalar_mul_internal!(
                 gas_params,
                 context,
@@ -1428,7 +1433,7 @@ fn group_scalar_mul_internal(
                 mul_bigint
             )
         },
-        (Some(Structure::BLS12381G2), Some(Structure::BLS12381Fr)) => {
+        (Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Fr)) => {
             ark_group_scalar_mul_internal!(
                 gas_params,
                 context,
@@ -1440,7 +1445,7 @@ fn group_scalar_mul_internal(
                 mul_bigint
             )
         },
-        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
+        (Ok(Structure::BLS12381Gt), Ok(Structure::BLS12381Fr)) => {
             let scalar_handle = safely_pop_arg!( args , u64 ) as usize;
             let element_handle = safely_pop_arg!( args , u64 ) as usize;
             let element_ptr = get_obj_pointer!( context , element_handle );
@@ -1484,18 +1489,18 @@ fn hash_to_internal(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
+    assert_eq!(2, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let suite_opt = suite_from_ty_arg!(context, &ty_args[1]);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();
     let msg = bytes_ref.as_slice();
     let tag_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = tag_ref.as_bytes_ref();
     let dst = bytes_ref.as_slice();
-    let suite_opt = HashToStructureSuite::try_from(safely_pop_arg!(args, u64));
     match (structure_opt, suite_opt) {
-        (Some(Structure::BLS12381G1), Ok(HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G1Projective, ark_bls12_381::g1::Config),
-        (Some(Structure::BLS12381G2), Ok(HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
+        (Ok(Structure::BLS12381G1), Ok(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::Bls12381g1XmdSha256SswuRo, ark_bls12_381::G1Projective, ark_bls12_381::g1::Config),
+        (Ok(Structure::BLS12381G2), Ok(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)) => ark_bls12381gx_xmd_sha_256_sswu_ro_internal!(gas_params, context, dst, msg, HashToStructureSuite::Bls12381g2XmdSha256SswuRo, ark_bls12_381::G2Projective, ark_bls12_381::g2::Config),
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),
     }
 }
@@ -1520,7 +1525,7 @@ fn group_double_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_double_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_double_internal!(
             gas_params,
             context,
             args,
@@ -1528,7 +1533,7 @@ fn group_double_internal(
             ark_bls12_381::G1Projective,
             double
         ),
-        Some(Structure::BLS12381G2) => ark_group_double_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_double_internal!(
             gas_params,
             context,
             args,
@@ -1536,7 +1541,7 @@ fn group_double_internal(
             ark_bls12_381::G2Projective,
             double
         ),
-        Some(Structure::BLS12381Gt) => ark_group_double_internal!(
+        Ok(Structure::BLS12381Gt) => ark_group_double_internal!(
             gas_params,
             context,
             args,
@@ -1568,7 +1573,7 @@ fn group_neg_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     match structure_from_ty_arg!(context, &ty_args[0]) {
-        Some(Structure::BLS12381G1) => ark_group_neg_internal!(
+        Ok(Structure::BLS12381G1) => ark_group_neg_internal!(
             gas_params,
             context,
             args,
@@ -1576,7 +1581,7 @@ fn group_neg_internal(
             ark_bls12_381::G1Projective,
             neg
         ),
-        Some(Structure::BLS12381G2) => ark_group_neg_internal!(
+        Ok(Structure::BLS12381G2) => ark_group_neg_internal!(
             gas_params,
             context,
             args,
@@ -1584,7 +1589,7 @@ fn group_neg_internal(
             ark_bls12_381::G2Projective,
             neg
         ),
-        Some(Structure::BLS12381Gt) => {
+        Ok(Structure::BLS12381Gt) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
@@ -1608,7 +1613,7 @@ fn multi_pairing_internal(
     let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     match (g1_opt, g2_opt, gt_opt) {
-        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
+        (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Gt)) => {
             let g2_element_handles = safely_pop_arg!(args, Vec<u64>);
             let g1_element_handles = safely_pop_arg!(args, Vec<u64>);
             if g1_element_handles.len() != g2_element_handles.len() {
@@ -1654,7 +1659,7 @@ fn pairing_internal(
     let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
     match (g1_opt, g2_opt, gt_opt) {
-        (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
+        (Ok(Structure::BLS12381G1), Ok(Structure::BLS12381G2), Ok(Structure::BLS12381Gt)) => {
             let g2_element_handle = safely_pop_arg!(args, u64) as usize;
             let g1_element_handle = safely_pop_arg!(args, u64) as usize;
             let g1_element_ptr = get_obj_pointer!(context, g1_element_handle);
@@ -1691,7 +1696,7 @@ fn downcast_internal(
     let parent_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let child_opt = structure_from_ty_arg!(context, &ty_args[1]);
     match (parent_opt, child_opt) {
-        (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
+        (Ok(Structure::BLS12381Fq12), Ok(Structure::BLS12381Gt)) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             let element_ptr = get_obj_pointer!(context, handle);
             let element = element_ptr.downcast_ref::<ark_bls12_381::Fq12>().unwrap();
@@ -1717,7 +1722,7 @@ fn upcast_internal(
     let parent_opt = structure_from_ty_arg!(context, &ty_args[1]);
     let handle = safely_pop_arg!(args, u64);
     match (child_opt, parent_opt) {
-        (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {
+        (Ok(Structure::BLS12381Gt), Ok(Structure::BLS12381Fq12)) => {
             Ok(smallvec![Value::u64(handle)])
         },
         _ => Err(SafeNativeError::Abort { abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED }),

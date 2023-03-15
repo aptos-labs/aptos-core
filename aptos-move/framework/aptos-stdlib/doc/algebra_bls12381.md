@@ -15,34 +15,34 @@ Below are the BLS12-381 structures currently supported.
 
 
 -  [Struct `Fq`](#0x1_algebra_bls12381_Fq)
+-  [Struct `FqFormatLsb`](#0x1_algebra_bls12381_FqFormatLsb)
+-  [Struct `FqFormatMsb`](#0x1_algebra_bls12381_FqFormatMsb)
 -  [Struct `Fq2`](#0x1_algebra_bls12381_Fq2)
+-  [Struct `Fq2FormatLscLsb`](#0x1_algebra_bls12381_Fq2FormatLscLsb)
+-  [Struct `Fq2FormatMscMsb`](#0x1_algebra_bls12381_Fq2FormatMscMsb)
 -  [Struct `Fq6`](#0x1_algebra_bls12381_Fq6)
+-  [Struct `Fq6FormatLscLsb`](#0x1_algebra_bls12381_Fq6FormatLscLsb)
 -  [Struct `Fq12`](#0x1_algebra_bls12381_Fq12)
+-  [Struct `Fq12FormatLscLsb`](#0x1_algebra_bls12381_Fq12FormatLscLsb)
 -  [Struct `G1AffineParent`](#0x1_algebra_bls12381_G1AffineParent)
+-  [Struct `G1AffineParentFormatUncompressed`](#0x1_algebra_bls12381_G1AffineParentFormatUncompressed)
+-  [Struct `G1AffineParentFormatCompressed`](#0x1_algebra_bls12381_G1AffineParentFormatCompressed)
 -  [Struct `G1Affine`](#0x1_algebra_bls12381_G1Affine)
+-  [Struct `G1AffineFormatUncompressed`](#0x1_algebra_bls12381_G1AffineFormatUncompressed)
+-  [Struct `G1AffineFormatCompressed`](#0x1_algebra_bls12381_G1AffineFormatCompressed)
 -  [Struct `G2AffineParent`](#0x1_algebra_bls12381_G2AffineParent)
+-  [Struct `G2AffineParentFormatUncompressed`](#0x1_algebra_bls12381_G2AffineParentFormatUncompressed)
+-  [Struct `G2AffineParentFormatCompressed`](#0x1_algebra_bls12381_G2AffineParentFormatCompressed)
 -  [Struct `G2Affine`](#0x1_algebra_bls12381_G2Affine)
+-  [Struct `G2AffineFormatUncompressed`](#0x1_algebra_bls12381_G2AffineFormatUncompressed)
+-  [Struct `G2AffineFormatCompressed`](#0x1_algebra_bls12381_G2AffineFormatCompressed)
 -  [Struct `Gt`](#0x1_algebra_bls12381_Gt)
+-  [Struct `GtFormat`](#0x1_algebra_bls12381_GtFormat)
 -  [Struct `Fr`](#0x1_algebra_bls12381_Fr)
--  [Function `format_bls12381fq_lsb`](#0x1_algebra_bls12381_format_bls12381fq_lsb)
--  [Function `format_bls12381fq_msb`](#0x1_algebra_bls12381_format_bls12381fq_msb)
--  [Function `format_bls12381fq2_lsc_lsb`](#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb)
--  [Function `format_bls12381fq2_msc_msb`](#0x1_algebra_bls12381_format_bls12381fq2_msc_msb)
--  [Function `format_bls12381fq6_lsc_lsc_lsb`](#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb)
--  [Function `format_bls12381fq12_lsc_lsc_lsc_lsb`](#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb)
--  [Function `format_bls12381g1_affine_parent_uncompressed`](#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed)
--  [Function `format_bls12381g1_affine_parent_compressed`](#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed)
--  [Function `format_bls12381g1_affine_uncompressed`](#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed)
--  [Function `format_bls12381g1_affine_compressed`](#0x1_algebra_bls12381_format_bls12381g1_affine_compressed)
--  [Function `format_bls12381g2_affine_parent_uncompressed`](#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed)
--  [Function `format_bls12381g2_affine_parent_compressed`](#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed)
--  [Function `format_bls12381g2_affine_uncompressed`](#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed)
--  [Function `format_bls12381g2_affine_compressed`](#0x1_algebra_bls12381_format_bls12381g2_affine_compressed)
--  [Function `format_bls12381gt`](#0x1_algebra_bls12381_format_bls12381gt)
--  [Function `format_bls12381fr_lsb`](#0x1_algebra_bls12381_format_bls12381fr_lsb)
--  [Function `format_bls12381fr_msb`](#0x1_algebra_bls12381_format_bls12381fr_msb)
--  [Function `h2s_suite_bls12381g1_xmd_sha_256_sswu_ro`](#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro)
--  [Function `h2s_suite_bls12381g2_xmd_sha_256_sswu_ro`](#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro)
+-  [Struct `FrFormatLsb`](#0x1_algebra_bls12381_FrFormatLsb)
+-  [Struct `FrFormatMsb`](#0x1_algebra_bls12381_FrFormatMsb)
+-  [Struct `H2SSuiteBls12381g1XmdSha256SswuRo`](#0x1_algebra_bls12381_H2SSuiteBls12381g1XmdSha256SswuRo)
+-  [Struct `H2SSuiteBls12381g2XmdSha256SswuRo`](#0x1_algebra_bls12381_H2SSuiteBls12381g2XmdSha256SswuRo)
 
 
 <pre><code></code></pre>
@@ -60,6 +60,68 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_FqFormatLsb"></a>
+
+## Struct `FqFormatLsb`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
+where an element is represented by a byte array <code>b[]</code> of size 48 with the least signature byte coming first.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatLsb">FqFormatLsb</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_FqFormatMsb"></a>
+
+## Struct `FqFormatMsb`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
+where an element is represented by a byte array <code>b[]</code> of size 48 with the most significant byte coming first.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a>
 </code></pre>
 
 
@@ -111,6 +173,74 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
+<a name="0x1_algebra_bls12381_Fq2FormatLscLsb"></a>
+
+## Struct `Fq2FormatLscLsb`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements.
+where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96
+with the following rules.
+- <code>b[0..48]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatLsb">FqFormatLsb</a></code>.
+- <code>b[48..96]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatLsb">FqFormatLsb</a></code>.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatLscLsb">Fq2FormatLscLsb</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_Fq2FormatMscMsb"></a>
+
+## Struct `Fq2FormatMscMsb`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements,
+where an element in the form $(c_1\cdot u+c_0)$ is represented by a byte array <code>b[]</code> of size 96,
+with the following rules.
+- <code>b[0..48]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a></code>.
+- <code>b[48..96]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a></code>.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatMscMsb">Fq2FormatMscMsb</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_bls12381_Fq6"></a>
 
 ## Struct `Fq6`
@@ -142,6 +272,41 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
+<a name="0x1_algebra_bls12381_Fq6FormatLscLsb"></a>
+
+## Struct `Fq6FormatLscLsb`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6">Fq6</a></code> elements,
+where an element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 288,
+with the following rules.
+- <code>b[0..96]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatLscLsb">Fq2FormatLscLsb</a></code>.
+- <code>b[96..192]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatLscLsb">Fq2FormatLscLsb</a></code>.
+- <code>b[192..288]</code> is $c_2$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatLscLsb">Fq2FormatLscLsb</a></code>.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6FormatLscLsb">Fq6FormatLscLsb</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_bls12381_Fq12"></a>
 
 ## Struct `Fq12`
@@ -151,6 +316,39 @@ It is an extension field of <code><a href="algebra_bls12381.md#0x1_algebra_bls12
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_Fq12FormatLscLsb"></a>
+
+## Struct `Fq12FormatLscLsb`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> elements,
+where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
+<code>b[0..288]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6FormatLscLsb">Fq6FormatLscLsb</a></code>.
+<code>b[288..576]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6FormatLscLsb">Fq6FormatLscLsb</a></code>.
+
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12FormatLscLsb">Fq12FormatLscLsb</a>
 </code></pre>
 
 
@@ -204,6 +402,87 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
+<a name="0x1_algebra_bls12381_G1AffineParentFormatUncompressed"></a>
+
+## Struct `G1AffineParentFormatUncompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
+where an element is represented by a byte array <code>b[]</code> of size 96,
+with the following rules deseribed from the perspective of deserialization.
+1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
+1. Read <code>b[0] & 0x40</code> as the infinity flag.
+1. Read <code>b[0] & 0x20</code> as the lexicographical flag. This is ignored.
+1. If the infinity flag is 1, return the point at infinity.
+1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[47]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a></code>. Abort if this failed.
+1. Deserialize $y$ from <code>[b[48], ..., b[95]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a></code>. Abort if this failed.
+1. Abort if point $(x,y)$ is not on curve $E(F_q)$.
+1. Return $(x,y)$.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParentFormatUncompressed">G1AffineParentFormatUncompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G1AffineParentFormatCompressed"></a>
+
+## Struct `G1AffineParentFormatCompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
+where an element is represented by a byte array <code>b[]</code> of size 48,
+with the following rules deseribed from the perspective of deserialization.
+1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
+1. Read <code>b[0] & 0x40</code> as the infinity flag.
+1. Read <code>b[0] & 0x20</code> as the lexicographical flag.
+1. If the infinity flag is 1, return the point at infinity.
+1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[47]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_FqFormatMsb">FqFormatMsb</a></code>. Abort if this failed.
+1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_q)$. Abort if there is no such $y$.
+1. Let $\overline{y}=-y$.
+1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
+1. Return $(x,y)$.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParentFormatCompressed">G1AffineParentFormatCompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_bls12381_G1Affine"></a>
 
 ## Struct `G1Affine`
@@ -215,6 +494,70 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G1AffineFormatUncompressed"></a>
+
+## Struct `G1AffineFormatUncompressed`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
+essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParentFormatUncompressed">G1AffineParentFormatUncompressed</a></code>
+but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
+
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineFormatUncompressed">G1AffineFormatUncompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G1AffineFormatCompressed"></a>
+
+## Struct `G1AffineFormatCompressed`
+
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
+essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParentFormatCompressed">G1AffineParentFormatCompressed</a></code>
+but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
+
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineFormatCompressed">G1AffineFormatCompressed</a>
 </code></pre>
 
 
@@ -267,6 +610,87 @@ NOTE: currently information-only and no operations are implemented for this stru
 
 </details>
 
+<a name="0x1_algebra_bls12381_G2AffineParentFormatUncompressed"></a>
+
+## Struct `G2AffineParentFormatUncompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParent">G2AffineParent</a></code> elements.
+where an element is represented by a byte array <code>b[]</code> of size 192,
+with the following rules deseribed from the perspective of deserialization.
+1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
+1. Read <code>b[0] & 0x40</code> as the infinity flag.
+1. Read <code>b[0] & 0x20</code> as the lexicographical flag. This is ignored.
+1. If the infinity flag is 1, return the point at infinity.
+1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[95]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatMscMsb">Fq2FormatMscMsb</a></code>. Abort if this failed.
+1. Deserialize $y$ from <code>[b[96], ..., b[191]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatMscMsb">Fq2FormatMscMsb</a></code>. Abort if this failed.
+1. Abort if point $(x,y)$ is not on curve $E'(F_{q^2})$.
+1. Return $(x,y)$.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParentFormatUncompressed">G2AffineParentFormatUncompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G2AffineParentFormatCompressed"></a>
+
+## Struct `G2AffineParentFormatCompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
+where an element is represented by a byte array <code>b[]</code> of size 96,
+with the following rules deseribed from the perspective of deserialization.
+1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
+1. Read <code>b[0] & 0x40</code> as the infinity flag.
+1. Read <code>b[0] & 0x20</code> as the lexicographical flag.
+1. If the infinity flag is 1, return the point at infinity.
+1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[96]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2FormatMscMsb">Fq2FormatMscMsb</a></code>. Abort if this failed.
+1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_{q^2})$. Abort if there is no such $y$.
+1. Let $\overline{y}=-y$.
+1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
+1. Return $(x,y)$.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParentFormatCompressed">G2AffineParentFormatCompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_bls12381_G2Affine"></a>
 
 ## Struct `G2Affine`
@@ -278,6 +702,68 @@ It has a prime order $r$ equal to 0x73eda753299d7d483339d80809a1d80553bda402fffe
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G2AffineFormatUncompressed"></a>
+
+## Struct `G2AffineFormatUncompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParentFormatUncompressed">G2AffineParentFormatUncompressed</a></code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineFormatUncompressed">G2AffineFormatUncompressed</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_algebra_bls12381_G2AffineFormatCompressed"></a>
+
+## Struct `G2AffineFormatCompressed`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParentFormatCompressed">G2AffineParentFormatCompressed</a></code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
+
+NOTE: currently information-only, not implemented.
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineFormatCompressed">G2AffineFormatCompressed</a>
 </code></pre>
 
 
@@ -330,6 +816,37 @@ The identity of <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</
 
 </details>
 
+<a name="0x1_algebra_bls12381_GtFormat"></a>
+
+## Struct `GtFormat`
+
+A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements,
+essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12FormatLscLsb">Fq12FormatLscLsb</a></code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements.
+
+NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
+
+
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_GtFormat">GtFormat</a>
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_algebra_bls12381_Fr"></a>
 
 ## Struct `Fr`
@@ -359,477 +876,40 @@ for the groups $G_1$, $G_2$, $G_t$ in BLS12-381-based pairing.
 
 </details>
 
-<a name="0x1_algebra_bls12381_format_bls12381fq_lsb"></a>
+<a name="0x1_algebra_bls12381_FrFormatLsb"></a>
 
-## Function `format_bls12381fq_lsb`
+## Struct `FrFormatLsb`
 
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
-where an element is represented by a byte array <code>b[]</code> of size 48 with the least signature byte coming first.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>(): u64 { 0x0100000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fq_msb"></a>
-
-## Function `format_bls12381fq_msb`
-
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq">Fq</a></code> elements,
-where an element is represented by a byte array <code>b[]</code> of size 48 with the most significant byte coming first.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>(): u64 { 0x0101000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb"></a>
-
-## Function `format_bls12381fq2_lsc_lsb`
-
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements.
-where an element in the form $(c_0+c_1\cdot u)$ is represented by a byte array <code>b[]</code> of size 96
-with the following rules.
-- <code>b[0..48]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>()</code>.
-- <code>b[48..96]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_lsb">format_bls12381fq_lsb</a>()</code>.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>(): u64 { 0x0200000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fq2_msc_msb"></a>
-
-## Function `format_bls12381fq2_msc_msb`
-
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq2">Fq2</a></code> elements,
-where an element in the form $(c_1\cdot u+c_0)$ is represented by a byte array <code>b[]</code> of size 96,
-with the following rules.
-- <code>b[0..48]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>.
-- <code>b[48..96]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>(): u64 { 0x0201000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb"></a>
-
-## Function `format_bls12381fq6_lsc_lsc_lsb`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq6">Fq6</a></code> elements,
-where an element $(c_0+c_1\cdot v+c_2\cdot v^2)$ is represented by a byte array <code>b[]</code> of size 288,
-with the following rules.
-- <code>b[0..96]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>()</code>.
-- <code>b[96..192]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>()</code>.
-- <code>b[192..288]</code> is $c_2$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_lsc_lsb">format_bls12381fq2_lsc_lsb</a>()</code>.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>(): u64 { 0x0300000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb"></a>
-
-## Function `format_bls12381fq12_lsc_lsc_lsc_lsb`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code> elements,
-where an element $(c_0+c_1\cdot w)$ is represented by a byte array <code>b[]</code> of size 576.
-<code>b[0..288]</code> is $c_0$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>()</code>.
-<code>b[288..576]</code> is $c_1$ serialized using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq6_lsc_lsc_lsb">format_bls12381fq6_lsc_lsc_lsb</a>()</code>.
-
-NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>(): u64 { 0x0400000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed"></a>
-
-## Function `format_bls12381g1_affine_parent_uncompressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
-where an element is represented by a byte array <code>b[]</code> of size 96,
-with the following rules deseribed from the perspective of deserialization.
-1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
-1. Read <code>b[0] & 0x40</code> as the infinity flag.
-1. Read <code>b[0] & 0x20</code> as the lexicographical flag. This is ignored.
-1. If the infinity flag is 1, return the point at infinity.
-1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[47]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>. Abort if this failed.
-1. Deserialize $y$ from <code>[b[48], ..., b[95]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>. Abort if this failed.
-1. Abort if point $(x,y)$ is not on curve $E(F_q)$.
-1. Return $(x,y)$.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>(): u64 { 0x0500000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed"></a>
-
-## Function `format_bls12381g1_affine_parent_compressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
-where an element is represented by a byte array <code>b[]</code> of size 48,
-with the following rules deseribed from the perspective of deserialization.
-1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
-1. Read <code>b[0] & 0x40</code> as the infinity flag.
-1. Read <code>b[0] & 0x20</code> as the lexicographical flag.
-1. If the infinity flag is 1, return the point at infinity.
-1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[47]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq_msb">format_bls12381fq_msb</a>()</code>. Abort if this failed.
-1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_q)$. Abort if there is no such $y$.
-1. Let $\overline{y}=-y$.
-1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
-1. Return $(x,y)$.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>(): u64 { 0x0501000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed"></a>
-
-## Function `format_bls12381g1_affine_uncompressed`
-
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
-essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_uncompressed">format_bls12381g1_affine_parent_uncompressed</a>()</code>
-but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
-
-NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_uncompressed">format_bls12381g1_affine_uncompressed</a>(): u64 { 0x0600000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g1_affine_compressed"></a>
-
-## Function `format_bls12381g1_affine_compressed`
-
-A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements,
-essentially the format represented by <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_parent_compressed">format_bls12381g1_affine_parent_compressed</a>()</code>
-but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
-
-NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g1_affine_compressed">format_bls12381g1_affine_compressed</a>(): u64 { 0x0601000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed"></a>
-
-## Function `format_bls12381g2_affine_parent_uncompressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2AffineParent">G2AffineParent</a></code> elements.
-where an element is represented by a byte array <code>b[]</code> of size 192,
-with the following rules deseribed from the perspective of deserialization.
-1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 1.
-1. Read <code>b[0] & 0x40</code> as the infinity flag.
-1. Read <code>b[0] & 0x20</code> as the lexicographical flag. This is ignored.
-1. If the infinity flag is 1, return the point at infinity.
-1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[95]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>()</code>. Abort if this failed.
-1. Deserialize $y$ from <code>[b[96], ..., b[191]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>()</code>. Abort if this failed.
-1. Abort if point $(x,y)$ is not on curve $E'(F_{q^2})$.
-1. Return $(x,y)$.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>(): u64 { 0x0700000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed"></a>
-
-## Function `format_bls12381g2_affine_parent_compressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1AffineParent">G1AffineParent</a></code> elements,
-where an element is represented by a byte array <code>b[]</code> of size 96,
-with the following rules deseribed from the perspective of deserialization.
-1. Read <code>b[0] & 0x80</code> as the compression flag. Abort if it is 0.
-1. Read <code>b[0] & 0x40</code> as the infinity flag.
-1. Read <code>b[0] & 0x20</code> as the lexicographical flag.
-1. If the infinity flag is 1, return the point at infinity.
-1. Deserialize $x$ from <code>[b[0] & 0x1f, ..., b[96]]</code> using <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq2_msc_msb">format_bls12381fq2_msc_msb</a>()</code>. Abort if this failed.
-1. Try computing $y$ such that point $(x,y)$ is on the curve $E(F_{q^2})$. Abort if there is no such $y$.
-1. Let $\overline{y}=-y$.
-1. Set $y$ as $\min(y,\overline{y})$ if the the lexicographical flag is 0, or $\max(y,\overline{y})$ otherwise.
-1. Return $(x,y)$.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>(): u64 { 0x0701000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed"></a>
-
-## Function `format_bls12381g2_affine_uncompressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_uncompressed">format_bls12381g2_affine_parent_uncompressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_uncompressed">format_bls12381g2_affine_uncompressed</a>(): u64 { 0x0800000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381g2_affine_compressed"></a>
-
-## Function `format_bls12381g2_affine_compressed`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_parent_compressed">format_bls12381g2_affine_parent_compressed</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> elements.
-
-NOTE: currently information-only, not implemented.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381g2_affine_compressed">format_bls12381g2_affine_compressed</a>(): u64 { 0x0801000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381gt"></a>
-
-## Function `format_bls12381gt`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements,
-essentially <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fq12_lsc_lsc_lsc_lsb">format_bls12381fq12_lsc_lsc_lsc_lsb</a>()</code> but only applicable to <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code> elements.
-
-NOTE: the same scheme is also used in other implementations (e.g. ark-bls12-381-0.4.0).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381gt">format_bls12381gt</a>(): u64 { 0x0900000000000000 }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_bls12381_format_bls12381fr_lsb"></a>
-
-## Function `format_bls12381fr_lsb`
-
-A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
+A serialization format for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the least significant byte coming first.
 
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FrFormatLsb">FrFormatLsb</a>
 </code></pre>
 
 
 
 <details>
-<summary>Implementation</summary>
+<summary>Fields</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_lsb">format_bls12381fr_lsb</a>(): u64 { 0x0a00000000000000 }
-</code></pre>
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
 
+</dd>
+</dl>
 
 
 </details>
 
-<a name="0x1_algebra_bls12381_format_bls12381fr_msb"></a>
+<a name="0x1_algebra_bls12381_FrFormatMsb"></a>
 
-## Function `format_bls12381fr_msb`
+## Struct `FrFormatMsb`
 
 A serialization scheme for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code> elements,
 where an element is represented by a byte array <code>b[]</code> of size 32 with the most significant byte coming first.
@@ -837,66 +917,81 @@ where an element is represented by a byte array <code>b[]</code> of size 32 with
 NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381-0.4.0, blst-0.3.7).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): u64
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_FrFormatMsb">FrFormatMsb</a>
 </code></pre>
 
 
 
 <details>
-<summary>Implementation</summary>
+<summary>Fields</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_format_bls12381fr_msb">format_bls12381fr_msb</a>(): u64 { 0x0a01000000000000 }
-</code></pre>
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
 
+</dd>
+</dl>
 
 
 </details>
 
-<a name="0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro"></a>
+<a name="0x1_algebra_bls12381_H2SSuiteBls12381g1XmdSha256SswuRo"></a>
 
-## Function `h2s_suite_bls12381g1_xmd_sha_256_sswu_ro`
+## Struct `H2SSuiteBls12381g1XmdSha256SswuRo`
 
 The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code>
 defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): u64
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_H2SSuiteBls12381g1XmdSha256SswuRo">H2SSuiteBls12381g1XmdSha256SswuRo</a>
 </code></pre>
 
 
 
 <details>
-<summary>Implementation</summary>
+<summary>Fields</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g1_xmd_sha_256_sswu_ro">h2s_suite_bls12381g1_xmd_sha_256_sswu_ro</a>(): u64 { 0x0001000000000000 }
-</code></pre>
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
 
+</dd>
+</dl>
 
 
 </details>
 
-<a name="0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro"></a>
+<a name="0x1_algebra_bls12381_H2SSuiteBls12381g2XmdSha256SswuRo"></a>
 
-## Function `h2s_suite_bls12381g2_xmd_sha_256_sswu_ro`
+## Struct `H2SSuiteBls12381g2XmdSha256SswuRo`
 
 The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code>
 defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): u64
+<pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_H2SSuiteBls12381g2XmdSha256SswuRo">H2SSuiteBls12381g2XmdSha256SswuRo</a>
 </code></pre>
 
 
 
 <details>
-<summary>Implementation</summary>
+<summary>Fields</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_h2s_suite_bls12381g2_xmd_sha_256_sswu_ro">h2s_suite_bls12381g2_xmd_sha_256_sswu_ro</a>(): u64 { 0x0002000000000000 }
-</code></pre>
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
 
+</dd>
+</dl>
 
 
 </details>

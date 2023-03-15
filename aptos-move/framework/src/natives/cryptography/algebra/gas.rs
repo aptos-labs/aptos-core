@@ -89,7 +89,7 @@ impl GasParameters {
             | (Structure::BLS12381Fr, SerializationFormat::BLS12381FrMsb) => {
                 self.ark_bls12_381_fr_deser * NumArgs::one()
             },
-            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLscLscLsb) => {
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLsb) => {
                 self.ark_bls12_381_fq12_deser * NumArgs::one()
             },
             (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
@@ -98,7 +98,7 @@ impl GasParameters {
             (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
                 self.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUnompressed) => {
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUncompressed) => {
                 self.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
             },
             (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
@@ -307,11 +307,11 @@ impl GasParameters {
 
     pub fn hash_to(&self, suite: HashToStructureSuite, _dst_len: usize, msg_len: usize) -> InternalGas {
         match suite {
-            HashToStructureSuite::BLS12381G1_XMD_SHA_256_SSWU_RO_ => {
+            HashToStructureSuite::Bls12381g1XmdSha256SswuRo => {
                 // Simplified formula, by fixing `dst_len` to be its maximum value (255).
                 self.ark_h2c_bls12381g1_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
             }
-            HashToStructureSuite::BLS12381G2_XMD_SHA_256_SSWU_RO_ => {
+            HashToStructureSuite::Bls12381g2XmdSha256SswuRo => {
                 // Simplified formula, by fixing `dst_len` to be its maximum value (255).
                 self.ark_h2c_bls12381g2_xmd_sha256_sswu_base * NumArgs::one() + self.ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte * NumArgs::from(msg_len as u64)
             }
@@ -340,7 +340,7 @@ impl GasParameters {
 
     pub fn serialize(&self, structure: Structure, format: SerializationFormat) -> InternalGas {
         match (structure, format) {
-            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLscLscLsb) => {
+            (Structure::BLS12381Fq12, SerializationFormat::BLS12381Fq12LscLsb) => {
                 self.ark_bls12_381_fq12_serialize * NumArgs::one()
             },
             (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineUncompressed) => {
@@ -349,7 +349,7 @@ impl GasParameters {
             (Structure::BLS12381G1, SerializationFormat::BLS12381G1AffineCompressed) => {
                 self.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
             },
-            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUnompressed) => {
+            (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineUncompressed) => {
                 self.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
             },
             (Structure::BLS12381G2, SerializationFormat::BLS12381G2AffineCompressed) => {
