@@ -113,6 +113,10 @@ impl FragmentInfo {
     pub fn maybe_expiration(&self) -> Option<LogicalTime> {
         self.maybe_expiration
     }
+
+    pub fn len(&self) -> usize {
+        self.payload.len()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -182,6 +186,10 @@ impl Fragment {
 
     pub fn batch_id(&self) -> BatchId {
         self.fragment_info.batch_id()
+    }
+
+    pub fn len(&self) -> usize {
+        self.fragment_info.len()
     }
 
     pub fn maybe_expiration(&self) -> Option<LogicalTime> {
