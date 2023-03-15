@@ -13,6 +13,7 @@ fn main() {
     let txns = [1000, 10000];
     let num_warmups = 2;
     let num_runs = 10;
+    let check_correctness = true;
 
     let mut measurements = Vec::new();
     let concurrency_level = num_cpus::get();
@@ -25,13 +26,16 @@ fn main() {
                 num_warmups,
                 num_runs,
                 concurrency_level,
+                check_correctness,
             );
             times.sort();
             measurements.push(times);
         }
     }
-
-    println!("\nconcurrency_level = {}", concurrency_level);
+    if check_correctness {
+        println!("\nParallel execution output same as sequential!\n");
+    }
+    println!("concurrency_level = {}", concurrency_level);
 
     let mut i = 0;
     for block_size in txns {
