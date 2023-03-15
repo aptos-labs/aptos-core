@@ -8,7 +8,7 @@ module fungible_asset::managed_fungible_asset {
     use std::signer::address_of;
     use fungible_asset::fungible_source;
     #[test_only]
-    use fungible_asset::fungible_asset::{create_test_token, balance_of, is_frozen};
+    use fungible_asset::fungible_asset::{create_test_token, balance, is_frozen};
     #[test_only]
     use std::signer;
     #[test_only]
@@ -185,7 +185,7 @@ module fungible_asset::managed_fungible_asset {
         assert!(owner_can_burn(&asset), 3);
 
         mint_by_asset_owner(creator, &asset, 100, creator_address);
-        assert!(balance_of(creator_address, &asset) == 100, 4);
+        assert!(balance(creator_address, &asset) == 100, 4);
         freeze_by_asset_owner(creator, &asset, creator_address);
         assert!(is_frozen(creator_address, &asset), 5);
         unfreeze_by_asset_owner(creator, &asset, creator_address);

@@ -54,7 +54,7 @@ module fungible_asset::fungible_asset {
     // ================================================================================================================
 
     /// Check the amount of an account.
-    public fun balance_of<T: key>(
+    public fun balance<T: key>(
         fungible_asset_owner: address,
         fungible_source: &Object<T>
     ): u64 acquires FungibleAssetStore, FungibleAsset {
@@ -330,16 +330,16 @@ module fungible_asset::fungible_asset {
 
         // Transfer
         transfer(creator, &asset, 90, aaron_address);
-        assert!(balance_of(creator_address, &asset) == 10, 1);
-        assert!(balance_of(aaron_address, &asset) == 90, 2);
+        assert!(balance(creator_address, &asset) == 10, 1);
+        assert!(balance(aaron_address, &asset) == 90, 2);
 
         let fa = withdraw(aaron, &asset, 60);
         deposit(fa, creator_address);
-        assert!(balance_of(creator_address, &asset) == 70, 3);
+        assert!(balance(creator_address, &asset) == 70, 3);
 
         let fa_to_burn = withdraw_internal(creator_address, &asset, 70);
         burn(fa_to_burn);
-        assert!(balance_of(creator_address, &asset) == 0, 4);
+        assert!(balance(creator_address, &asset) == 0, 4);
 
         // Freeze
         set_frozen_flag(creator_address, &asset, true);
@@ -349,7 +349,7 @@ module fungible_asset::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x10007, location = Self)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_failed_withdraw_from_frozen_account(
         creator: &signer,
     ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
@@ -364,7 +364,7 @@ module fungible_asset::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x10007, location = Self)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_failed_deposit_to_frozen_account(
         creator: &signer,
     ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
@@ -381,7 +381,7 @@ module fungible_asset::fungible_asset {
     ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
         let (_, asset) = create_test_token(creator);
         let creator_address = signer::address_of(creator);
-        assert!(balance_of(creator_address, &asset) == 0, 1);
+        assert!(balance(creator_address, &asset) == 0, 1);
         assert!(!is_frozen(creator_address, &asset), 2);
         assert!(option::is_none(&get_fungible_asset_object(creator_address, object_address(&asset), false)), 3);
         assert!(option::is_some(&get_fungible_asset_object(creator_address, object_address(&asset), true)), 3);
