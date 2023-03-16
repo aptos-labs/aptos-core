@@ -15,6 +15,7 @@ To add your own resource, click **Edit this page** at the bottom, add your resou
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
+| [Ansible playbook for Node Management (Docker)](https://github.com/LavenderFive/aptos-ansible) | This Ansible Playbook is intended for node management, including initial launch and handling upgrades of nodes. | [Lavender.Five Nodes](https://github.com/LavenderFive) | 2023-03-13 |
 | [Write Your First Smart Contract On Aptos](https://medium.com/mokshyaprotocol/write-your-first-smart-contract-on-aptos-a-step-by-step-guide-e16a6f5c2be6) | This blog is created to help you start writing smart contracts in Aptos Blockchain. | [Samundra Karki](https://medium.com/@samundrakarki56), [MokshyaProtocol](https://mokshya.io/) | 2023-02-27 |
 | [Transfer validator node to other server (no FN required)](https://forum.aptoslabs.com/t/transfer-validator-node-to-other-server-no-fn-required/194629/1) | Shows how to transfer a validator node to another server without using an intermediate full node server. | [p1xel32](https://forum.aptoslabs.com/u/p1xel32) | 2023-02-03 |
 | [Failover and migrate Validator Nodes for less downtime](https://forum.aptoslabs.com/t/failover-and-migrate-validator-nodes-for-less-downtime/144846) | Explains how to hot swap a validator node with a validator full node with Docker setup and inspired the generic [Update Aptos Validator Node via Failover](../nodes/validator-node/operator/update-validator-node.md). | [guguru](https://forum.aptoslabs.com/u/guguru) | 2022-11-22 |
