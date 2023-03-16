@@ -454,7 +454,14 @@ async fn test_account_balance() {
     .await
     .unwrap();
 
-    unlock_stake(&swarm.aptos_public_info(), &mut account_4, account_1, 1_000, 2).await;
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
 
     // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
     account_has_balance(
