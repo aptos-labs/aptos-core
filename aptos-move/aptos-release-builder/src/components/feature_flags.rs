@@ -131,7 +131,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
             FeatureFlag::Bls12381BasicOperations => AptosFeatureFlag::BLS12381_BASIC_OPERATIONS,
-            FeatureFlag::PubkeyValidateReturnFalseWrongLength => {
+            FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength => {
                 AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
             },
         }
