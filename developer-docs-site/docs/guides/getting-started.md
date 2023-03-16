@@ -156,21 +156,18 @@ Optionally, check out a release branch to install an Aptos node. We suggest you 
 <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
 
-    ```
     git checkout --track origin/devnet
-    ```
+
 </TabItem>
     <TabItem value="testnet" label="Testnet" default>
 
-    ```
     git checkout --track origin/testnet
-    ```
+
 </TabItem>
 <TabItem value="mainnet" label="Mainnet">
 
-    ```
     git checkout --track origin/mainnet
-    ```
+
 </TabItem>
 </Tabs>
 
