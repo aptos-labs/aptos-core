@@ -20,7 +20,7 @@ pub enum FeatureFlag {
     MULTISIG_ACCOUNTS = 10,
     DELEGATION_POOLS = 11,
     BLS12381_BASIC_OPERATIONS = 12,
-    ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH = 13,
+    PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH = 13,
 }
 
 /// Representation of features on chain as a bitset.

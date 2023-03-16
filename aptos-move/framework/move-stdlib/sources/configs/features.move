@@ -154,12 +154,12 @@ module std::features {
 
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
-    const ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH: u64 = 13;
+    const PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 13;
 
-    public fun get_pubkey_validate_aborts_wrong_length(): u64 { ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH }
+    public fun get_pubkey_validate_returns_false_wrong_length(): u64 { PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH }
 
     public fun pubkey_validate_aborts_wrong_length_enabled(): bool acquires Features {
-	is_enabled(ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
+	is_enabled(PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH)
     } 
 
 

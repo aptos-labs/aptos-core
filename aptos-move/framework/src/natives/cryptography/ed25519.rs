@@ -61,7 +61,7 @@ fn native_public_key_validate(
         Err(_) => {
             if context
                 .get_feature_flags()
-                .is_enabled(FeatureFlag::ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
+                .is_enabled(FeatureFlag::PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH)
             {
                 return Ok(smallvec![Value::bool(false)]);
             } else {

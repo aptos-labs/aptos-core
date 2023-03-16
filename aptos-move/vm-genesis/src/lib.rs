@@ -419,7 +419,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
         FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH,
+        FeatureFlag::PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
     ]
 }
 
