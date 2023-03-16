@@ -156,13 +156,6 @@ module std::features {
     /// Lifetime: ephemeral
     const PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 13;
 
-    public fun get_pubkey_validate_returns_false_wrong_length(): u64 { PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH }
-
-    public fun pubkey_validate_aborts_wrong_length_enabled(): bool acquires Features {
-	is_enabled(PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH)
-    } 
-
-
     // ============================================================================================
     // Feature Flag Implementation
 
