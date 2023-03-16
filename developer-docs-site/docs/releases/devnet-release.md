@@ -13,6 +13,10 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 [Aptos Framework Release v1.2.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.2.0)
 
+## Aptos SDK
+
+Aptos SDK Release v1.7.2
+
 ## Aptos CLI
 
 |Release | Git Tag | Commit Hash|
@@ -21,6 +25,6 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos Node
 
-|Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob sha256 | Chain ID|
-|---|---|---|---|---|
-|d883a7c1449b77688d2818cec20707ce4511c59b| `devnet_d883a7c1449b77688d2818cec20707ce4511c59b` | `sha256:dc06009f046efdf47d4ecd9d69012196c3a41e3e37f89839145714a97a804c01` | `2cca824bcb2094d03d22444a8ba5bc7c33e59b7fbf6b74012827d7f1bd70304f`| 45 |
+|Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob sha256 | Waypoint | Chain ID|
+|---|---|---|---|---|---|
+|1d0dc2c75da1e397effc8bcfa14114652462654d| `devnet_1d0dc2c75da1e397effc8bcfa14114652462654d` | `sha256:4ca5a5fb54d37b411898e9adf932e4ef60d52ad70318f156c2b5cd8fb3f2735c` | `sha256: e946ee09c06809ad13a9ae5b1f1bf9a0470e284d524ebc18fa08275b8620aa62`| `0:523a997cc51a2a8b291fcd675188de65699d91230a96916de2263be1532b1036` | 46 |
