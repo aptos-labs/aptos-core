@@ -94,29 +94,6 @@ fn create_multi_region_swarm_network_chaos(
         .flatten()
         .collect();
 
-    let mut group_network_bandwidth: Vec<GroupNetworkBandwidth> = validator_chunks
-        .clone()
-        .zip(link_stats_table.iter())
-        .combinations(2)
-        .map(|comb| {
-            let (from_chunk, (from_region, stats)) = &comb[0];
-            let (to_chunk, (to_region, _)) = &comb[1];
-
-            let (bitrate, latency) = stats.get(*to_region).unwrap();
-            let bandwidth = GroupNetworkBandwidth {
-                name: format!("{}-to-{}-bandwidth", from_region.clone(), to_region.clone()),
-                source_nodes: from_chunk.to_vec(),
-                target_nodes: to_chunk.to_vec(),
-                rate: bitrate / 1000_000,
-                limit: (2f64 * (*bitrate as f64 / 8f64) * (latency / 1000f64)) as u64,
-                buffer: bitrate / 8,
-            };
-            info!("bandwidth {:?}", bandwidth);
-
-            bandwidth
-        })
-        .collect();
-
     let remainder = validator_chunks.remainder();
     let remaining_validators: Vec<PeerId> = validator_chunks
         .skip(number_of_regions)
@@ -132,9 +109,6 @@ fn create_multi_region_swarm_network_chaos(
         group_network_delays[1]
             .target_nodes
             .append(remaining_validators.to_vec().as_mut());
-        group_network_bandwidth[0]
-            .source_nodes
-            .append(remaining_validators.to_vec().as_mut());
     }
 
     (
@@ -142,7 +116,14 @@ fn create_multi_region_swarm_network_chaos(
             group_network_delays,
         },
         SwarmNetworkBandwidth {
-            group_network_bandwidth,
+            group_network_bandwidth: vec![GroupNetworkBandwidth {
+                name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+                source_nodes: all_validators.clone(),
+                target_nodes: all_validators,
+                rate: 1000 / 8,
+                limit: 20971520,
+                buffer: 10000,
+            }],
         },
     )
 }
@@ -263,35 +244,29 @@ mod tests {
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
         assert_eq!(delay.group_network_delays.len(), 380);
-        assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
+        // assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
 
         let all_validators: Vec<PeerId> = (0..24).map(|_| PeerId::random()).collect();
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators.clone());
 
         assert_eq!(delay.group_network_delays.len(), 380);
-        assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
+        // assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
         assert_eq!(delay.group_network_delays[0].source_nodes.len(), 5);
         assert_eq!(delay.group_network_delays[0].target_nodes.len(), 1);
         assert_eq!(delay.group_network_delays[1].target_nodes.len(), 5);
         assert_eq!(delay.group_network_delays[1].source_nodes.len(), 1);
         assert_eq!(delay.group_network_delays[2].source_nodes.len(), 1);
-        assert_eq!(bandwidth.group_network_bandwidth[0].source_nodes.len(), 5);
-        assert_eq!(bandwidth.group_network_bandwidth[1].source_nodes.len(), 1);
+        // assert_eq!(bandwidth.group_network_bandwidth[0].source_nodes.len(), 5);
+        // assert_eq!(bandwidth.group_network_bandwidth[1].source_nodes.len(), 1);
         assert_eq!(
             bandwidth.group_network_bandwidth[0],
             GroupNetworkBandwidth {
-                name: "aws--ap-northeast-1-to-aws--ap-southeast-1-bandwidth".to_owned(),
-                source_nodes: vec![
-                    all_validators[0],
-                    all_validators[20],
-                    all_validators[21],
-                    all_validators[22],
-                    all_validators[23]
-                ],
-                target_nodes: vec![all_validators[1]],
-                rate: 118,
-                limit: 2165768,
-                buffer: 14860288
+                name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+                source_nodes: all_validators.clone(),
+                target_nodes: all_validators,
+                rate: 125,
+                limit: 20971520,
+                buffer: 10000
             }
         )
     }
