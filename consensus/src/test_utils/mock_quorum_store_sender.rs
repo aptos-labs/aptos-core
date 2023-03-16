@@ -42,6 +42,15 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         unimplemented!();
     }
 
+    async fn request_batch_multi(
+        &self,
+        _request: BatchRequest,
+        _recipients: Vec<Author>,
+        _timeout: Duration,
+    ) -> anyhow::Result<Batch> {
+        unimplemented!();
+    }
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         self.tx
             .send((ConsensusMsg::BatchMsg(Box::new(batch)), recipients))

@@ -9,30 +9,29 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use futures::{stream::FuturesUnordered, StreamExt};
 use std::time::Duration;
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, time};
 
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
     ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     num_retries: usize,
-    max_num_retry: usize,
+    request_retry_limit: usize,
 }
 
 impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
         ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
-        max_num_retry: usize,
+        request_retry_limit: usize,
     ) -> Self {
         Self {
             signers,
             next_index: 0,
             ret_tx,
             num_retries: 0,
-            max_num_retry,
+            request_retry_limit,
         }
     }
 
@@ -42,7 +41,7 @@ impl BatchRequesterState {
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
         }
-        if self.num_retries < self.max_num_retry {
+        if self.num_retries < self.request_retry_limit {
             self.num_retries += 1;
             let ret = self
                 .signers
@@ -90,8 +89,9 @@ pub(crate) struct BatchRequester<T> {
     epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,
-    max_num_retry: usize,
-    request_timeout_ms: usize,
+    request_retry_limit: usize,
+    request_retry_timeout_ms: usize,
+    request_rpc_timeout_ms: usize,
     network_sender: T,
 }
 
@@ -100,20 +100,23 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
         epoch: u64,
         my_peer_id: PeerId,
         request_num_peers: usize,
-        request_timeout_ms: usize,
-        max_num_retry: usize,
+        request_retry_limit: usize,
+        request_retry_timeout_ms: usize,
+        request_rpc_timeout_ms: usize,
         network_sender: T,
     ) -> Self {
         Self {
             epoch,
             my_peer_id,
             request_num_peers,
-            request_timeout_ms,
-            max_num_retry,
+            request_retry_limit,
+            request_retry_timeout_ms,
+            request_rpc_timeout_ms,
             network_sender,
         }
     }
 
+/*
     pub(crate) fn request_batch(
         &self,
         digest: HashValue,
@@ -145,6 +148,45 @@ impl<T: QuorumStoreSender + 'static> BatchRequester<T> {
                             return;
                         }
                     }
+                }
+            }
+            request_state.serve_request(digest, None);
+        });
+    }
+*/
+
+    pub(crate) fn request_batch(
+        &self,
+        digest: HashValue,
+        signers: Vec<PeerId>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, Error>>,
+    ) {
+        let mut request_state = BatchRequesterState::new(signers, ret_tx, self.request_retry_limit);
+        let network_sender = self.network_sender.clone();
+        let request_num_peers = self.request_num_peers;
+        let my_peer_id = self.my_peer_id;
+        let epoch = self.epoch;
+        let retry_timout = Duration::from_millis(self.request_retry_timeout_ms as u64);
+        let rpc_timeout = Duration::from_millis(self.request_rpc_timeout_ms as u64);
+
+        tokio::spawn(async move {
+            while let Some(request_peers) = request_state.next_request_peers(request_num_peers) {
+                let batch_request = BatchRequest::new(my_peer_id, epoch, digest);
+                let request = network_sender.request_batch_multi(batch_request.clone(),request_peers, rpc_timeout);
+
+                let delayed_future = time::timeout(retry_timout, request).await;
+
+                match delayed_future {
+                    Ok(Ok(batch)) => {
+                        counters::RECEIVED_BATCH_COUNT.inc();
+                        if batch.verify().is_ok() {
+                            let digest = batch.digest();
+                            let payload = batch.into_payload();
+                            request_state.serve_request(digest, Some(payload));
+                            return;
+                        }
+                    }
+                    _ => ()
                 }
             }
             request_state.serve_request(digest, None);

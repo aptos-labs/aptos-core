@@ -92,6 +92,13 @@ pub trait QuorumStoreSender: Send + Clone {
         timeout: Duration,
     ) -> anyhow::Result<Batch>;
 
+    async fn request_batch_multi(
+        &self,
+        request: BatchRequest,
+        recipients: Vec<Author>,
+        timeout: Duration,
+    ) -> anyhow::Result<Batch>;
+
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
@@ -337,6 +344,19 @@ impl QuorumStoreSender for NetworkSender {
             ConsensusMsg::BatchMsg(batch) => Ok(*batch),
             _ => Err(anyhow!("Invalid batch response")),
         }
+    }
+
+    async fn request_batch_multi(&self, request: BatchRequest, peers: Vec<Author>, timeout: Duration) -> anyhow::Result<Batch> {
+        let mut futures = futures::stream::FuturesUnordered::new();
+        for peer in peers {
+            futures.push(self.request_batch(request.clone(), peer, timeout));
+        }
+        while let Some(response) = futures.next().await {
+            if let Ok(data) = response {
+                return Ok(data);
+            }
+        }
+        Err(anyhow!("Invalid batch response"))
     }
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {

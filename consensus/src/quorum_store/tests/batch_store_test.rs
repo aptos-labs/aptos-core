@@ -30,6 +30,7 @@ fn batch_store_for_test_no_db(memory_quota: usize) -> Arc<BatchStore<MockQuorumS
         1,
         1,
         1,
+        1,
         MockQuorumStoreSender::new(tx),
     );
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
