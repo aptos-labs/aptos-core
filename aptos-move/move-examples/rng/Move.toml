@@ -1,0 +1,11 @@
+[package]
+name = "Rng"
+version = "0.0.0"
+
+[addresses]
+RngAddress = "_"
+
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/aptos-framework'
