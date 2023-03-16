@@ -8,19 +8,62 @@ use crate::{
     instance::Instance,
     EntryPoints, TransactionType, TransactionTypeArg,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use rand::{rngs::StdRng, SeedableRng};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
 ) -> Result<TxnStats> {
-    let cluster = Cluster::try_from_cluster_args(cluster_args)
-        .await
-        .context("Failed to build cluster")?;
-    emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts).await
+    if emit_args.coordination_delay_between_instances.is_none() {
+        let cluster = Cluster::try_from_cluster_args(cluster_args)
+            .await
+            .context("Failed to build cluster")?;
+        return emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts)
+            .await;
+    } else {
+        let initial_delay_after_minting = emit_args.coordination_delay_between_instances.unwrap();
+        let start_time = Instant::now();
+        let mut i = 0;
+        loop {
+            let cluster = Cluster::try_from_cluster_args(cluster_args)
+                .await
+                .context("Failed to build cluster")?;
+
+            let cur_emit_args = if i > 0 {
+                let mut cur_emit_args = emit_args.clone();
+                cur_emit_args.coordination_delay_between_instances =
+                    initial_delay_after_minting.checked_sub(start_time.elapsed().as_secs());
+                if cur_emit_args.coordination_delay_between_instances.is_none() {
+                    bail!("txn_emitter couldn't succeed after {} runs", i);
+                }
+                info!(
+                    "Reduced coordination_delay_between_instances to {} for run {}",
+                    cur_emit_args.coordination_delay_between_instances.unwrap(),
+                    i
+                );
+                cur_emit_args
+            } else {
+                emit_args.clone()
+            };
+            let result = emit_transactions_with_cluster(
+                &cluster,
+                &cur_emit_args,
+                cluster_args.reuse_accounts,
+            )
+            .await;
+            match result {
+                Ok(value) => return Ok(value),
+                Err(e) => {
+                    error!("Couldn't run txn emitter: {:?}, retrying", e)
+                },
+            }
+            i += 1;
+        }
+    }
 }
 
 pub async fn emit_transactions_with_cluster(
@@ -126,7 +169,9 @@ pub async fn emit_transactions_with_cluster(
             .mode(emitter_mode)
             .transaction_mix_per_phase(transaction_mix_per_phase)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
-            .delay_after_minting(Duration::from_secs(args.delay_after_minting.unwrap_or(0)));
+            .coordination_delay_between_instances(Duration::from_secs(
+                args.coordination_delay_between_instances.unwrap_or(0),
+            ));
     if reuse_accounts {
         emit_job_request = emit_job_request.reuse_accounts();
     }

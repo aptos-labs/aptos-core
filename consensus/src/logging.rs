@@ -22,6 +22,7 @@ pub enum LogEvent {
     NewEpoch,
     NewRound,
     Propose,
+    ReceiveBatchRetrieval,
     ReceiveBlockRetrieval,
     ReceiveEpochChangeProof,
     ReceiveEpochRetrieval,

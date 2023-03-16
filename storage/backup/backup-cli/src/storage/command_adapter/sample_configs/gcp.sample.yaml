@@ -26,3 +26,6 @@ commands:
     # list files under the metadata folder
     (gsutil -q ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) \
     | sed -ne "s#gs://.*/metadata/#metadata/#p"
+  backup_metadata_file: |
+    # move metadata file to a metadata_backup folder
+    gsutil mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME
