@@ -121,6 +121,7 @@ Grafana
 GraphQL
 HSM
 Homebrew
+hotfix
 HotStuff
 IDE
 IDEs
@@ -397,6 +398,7 @@ overline
 parallelizable
 parallelization
 param
+Paymagic
 pdf
 performant
 permissioned
