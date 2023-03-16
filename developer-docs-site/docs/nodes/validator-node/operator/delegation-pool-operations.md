@@ -16,61 +16,12 @@ The operator address will receive the pool commission that was set at the initia
 
 ## Prerequisites
 
-[Install](../../../cli-tools/aptos-cli-tool/index.md) and [use the Aptos CLI](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md). If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
+1. [Install](../../../cli-tools/aptos-cli-tool/index.md) and [configure](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
+2. [Initialize local configuration and create an account](../../../cli-tools/aptos-cli-tool/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
 
-## Initialize local configuration and create an account
+## Connect to Aptos network
 
-Follow the steps below to [start Aptos and create an account](../../../guides/get-test-funds.md) on the blockchain. Once done, you will have a local `.aptos/` directory containing a `config.yaml` configuration file that is used to store configurations between CLI runs. This is local to your run, so you will need to continue running the Aptos CLI from this directory or reinitialize in another directory.
-
-### Step 1: Run Aptos init
-
-The `aptos init` command initializes the configuration with the private key you provide or generates anew if not given:
-
-```bash
-$ aptos init
-Configuring for profile default
-Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com]
-
-No rest url given, using https://fullnode.devnet.aptoslabs.com...
-Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com]
-
-No faucet url given, using https://faucet.devnet.aptoslabs.com...
-Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
-
-No key given, generating key...
-Account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696 does not exist, creating it and funding it with 10000 coins
-Aptos is now set up for account 00f1f20ddd0b0dd2291b6e42c97274668c479bca70f07c6b6a80b99720779696!  Run `aptos help` for more information about commands
-
-{
-  "Result": "Success"
-}
-  ```
-### Stept 2: Create other profiles
-
-You can also create other profiles for different endpoints and different keys. Do this by including the `--profile` argument and the value of your choosing to the `aptos init` command as shown below. Note that argument can be used in most other commands to replace command line arguments.
-
-```bash
-$ aptos init --profile superuser
-Configuring for profile superuser
-Enter your rest endpoint [Current: None | No input: https://fullnode.devnet.aptoslabs.com]
-
-No rest url given, using https://fullnode.devnet.aptoslabs.com...
-Enter your faucet endpoint [Current: None | No input: https://faucet.devnet.aptoslabs.com]
-
-No faucet url given, using https://faucet.devnet.aptoslabs.com...
-Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]
-
-No key given, generating key...
-Account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04 does not exist, creating it and funding it with 10000 coins
-Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04!  Run `aptos help` for more information about commands
-{
-  "Result": "Success"
-}
-```
-
-### Stept 3: Connect to Aptos network
-
-To create a delegation pool and obtain information about it, connect to the [Aptos Network](./connect-to-aptos-network.md) and launch your own Aptos node.
+To create a delegation pool and obtain information about it, [connect to the Aptos Network](./connect-to-aptos-network.md) and launch your own Aptos node.
 
 ## Initialize a delegation pool
 
