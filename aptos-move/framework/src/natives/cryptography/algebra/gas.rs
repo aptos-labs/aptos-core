@@ -12,27 +12,22 @@ pub struct GasParameters {
     pub ark_bls12_381_fr_deser: InternalGasPerArg,
     pub ark_bls12_381_fr_div: InternalGasPerArg,
     pub ark_bls12_381_fr_eq: InternalGasPerArg,
-    pub ark_bls12_381_fr_from_u128: InternalGasPerArg,
+    pub ark_bls12_381_fr_from_u64: InternalGasPerArg,
     pub ark_bls12_381_fr_inv: InternalGasPerArg,
-    pub ark_bls12_381_fr_is_one: InternalGasPerArg,
-    pub ark_bls12_381_fr_is_zero: InternalGasPerArg,
     pub ark_bls12_381_fr_mul: InternalGasPerArg,
     pub ark_bls12_381_fr_neg: InternalGasPerArg,
     pub ark_bls12_381_fr_one: InternalGasPerArg,
     pub ark_bls12_381_fr_serialize: InternalGasPerArg,
     pub ark_bls12_381_fr_square: InternalGasPerArg,
     pub ark_bls12_381_fr_sub: InternalGasPerArg,
-    pub ark_bls12_381_fr_to_repr: InternalGasPerArg,
     pub ark_bls12_381_fr_zero: InternalGasPerArg,
     pub ark_bls12_381_fq12_add: InternalGasPerArg,
     pub ark_bls12_381_fq12_clone: InternalGasPerArg,
     pub ark_bls12_381_fq12_deser: InternalGasPerArg,
     pub ark_bls12_381_fq12_div: InternalGasPerArg,
     pub ark_bls12_381_fq12_eq: InternalGasPerArg,
-    pub ark_bls12_381_fq12_from_u128: InternalGasPerArg,
+    pub ark_bls12_381_fq12_from_u64: InternalGasPerArg,
     pub ark_bls12_381_fq12_inv: InternalGasPerArg,
-    pub ark_bls12_381_fq12_is_one: InternalGasPerArg,
-    pub ark_bls12_381_fq12_is_zero: InternalGasPerArg,
     pub ark_bls12_381_fq12_mul: InternalGasPerArg,
     pub ark_bls12_381_fq12_neg: InternalGasPerArg,
     pub ark_bls12_381_fq12_one: InternalGasPerArg,
@@ -52,7 +47,6 @@ pub struct GasParameters {
     pub ark_bls12_381_g1_proj_eq: InternalGasPerArg,
     pub ark_bls12_381_g1_proj_generator: InternalGasPerArg,
     pub ark_bls12_381_g1_proj_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g1_proj_is_zero: InternalGasPerArg,
     pub ark_bls12_381_g1_proj_neg: InternalGasPerArg,
     pub ark_bls12_381_g1_proj_scalar_mul: InternalGasPerArg,
     pub ark_bls12_381_g1_proj_sub: InternalGasPerArg,
@@ -68,7 +62,6 @@ pub struct GasParameters {
     pub ark_bls12_381_g2_proj_eq: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_generator: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_infinity: InternalGasPerArg,
-    pub ark_bls12_381_g2_proj_is_zero: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_neg: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_scalar_mul: InternalGasPerArg,
     pub ark_bls12_381_g2_proj_sub: InternalGasPerArg,
@@ -121,10 +114,10 @@ impl GasParameters {
         }
     }
 
-    pub fn from_u128(&self, structure: Structure) -> InternalGas {
+    pub fn from_u64(&self, structure: Structure) -> InternalGas {
         match structure {
-            Structure::BLS12381Fr => self.ark_bls12_381_fr_from_u128 * NumArgs::one(),
-            Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_from_u128 * NumArgs::one(),
+            Structure::BLS12381Fr => self.ark_bls12_381_fr_from_u64 * NumArgs::one(),
+            Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_from_u64 * NumArgs::one(),
             _ => unreachable!(),
         }
     }
@@ -149,22 +142,6 @@ impl GasParameters {
         match structure {
             Structure::BLS12381Fr => self.ark_bls12_381_fr_inv * NumArgs::one(),
             Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_inv * NumArgs::one(),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn field_is_one(&self, structure: Structure) -> InternalGas {
-        match structure {
-            Structure::BLS12381Fr => self.ark_bls12_381_fr_is_one * NumArgs::one(),
-            Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_is_one * NumArgs::one(),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn field_is_zero(&self, structure: Structure) -> InternalGas {
-        match structure {
-            Structure::BLS12381Fr => self.ark_bls12_381_fr_is_zero * NumArgs::one(),
-            Structure::BLS12381Fq12 => self.ark_bls12_381_fq12_is_zero * NumArgs::one(),
             _ => unreachable!(),
         }
     }
@@ -240,15 +217,6 @@ impl GasParameters {
             Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_infinity * NumArgs::one(),
             Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_infinity * NumArgs::one(),
             Structure::BLS12381Gt => self.ark_bls12_381_fq12_one * NumArgs::one(),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn group_is_identity(&self, structure: Structure) -> InternalGas {
-        match structure {
-            Structure::BLS12381G1Affine => self.ark_bls12_381_g1_proj_is_zero * NumArgs::one(),
-            Structure::BLS12381G2Affine => self.ark_bls12_381_g2_proj_is_zero * NumArgs::one(),
-            Structure::BLS12381Gt => self.ark_bls12_381_fq12_is_one * NumArgs::one(),
             _ => unreachable!(),
         }
     }

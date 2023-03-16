@@ -726,8 +726,8 @@ fn deserialize_internal(
 macro_rules! from_u64_internal {
     ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
         let value = safely_pop_arg!($args, u64);
-        $context.charge($gas_params.from_u128($structure))?;
-        let element = <$typ>::from(value as u128);
+        $context.charge($gas_params.from_u64($structure))?;
+        let element = <$typ>::from(value as u64);
         let handle = store_element!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
     }};
@@ -1139,84 +1139,6 @@ fn field_one_internal(
     }
 }
 
-macro_rules! ark_field_is_one_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.field_is_one($structure))?;
-        let result = element.is_one();
-        Ok(smallvec![Value::bool(result)])
-    }};
-}
-
-fn field_is_one_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_is_one_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_is_one_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_field_is_zero_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.field_is_zero($structure))?;
-        let result = element.is_zero();
-        Ok(smallvec![Value::bool(result)])
-    }};
-}
-
-fn field_is_zero_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_is_zero_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_is_zero_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
 macro_rules! ark_eq_internal {
     ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
@@ -1319,56 +1241,6 @@ fn group_identity_internal(
             Structure::BLS12381Gt,
             ark_bls12_381::Fq12,
             one
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_is_identity_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.group_is_identity($structure))?;
-        let result = element.$op();
-        Ok(smallvec![Value::bool(result)])
-    }};
-}
-
-fn group_is_identity_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_is_identity_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            is_zero
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_is_identity_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            is_zero
-        ),
-        Some(Structure::BLS12381Gt) => ark_group_is_identity_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Gt,
-            ark_bls12_381::Fq12,
-            is_one
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -2170,24 +2042,6 @@ pub fn make_all(
             ),
         ),
         (
-            "field_is_one_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                field_is_one_internal,
-            ),
-        ),
-        (
-            "field_is_zero_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                field_is_zero_internal,
-            ),
-        ),
-        (
             "field_mul_internal",
             make_safe_native(
                 gas_params.clone(),
@@ -2284,15 +2138,6 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 group_identity_internal,
-            ),
-        ),
-        (
-            "group_is_identity_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_is_identity_internal,
             ),
         ),
         (

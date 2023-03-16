@@ -62,8 +62,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `field_div`](#0x1_algebra_field_div)
 -  [Function `field_sqr`](#0x1_algebra_field_sqr)
 -  [Function `field_inv`](#0x1_algebra_field_inv)
--  [Function `field_is_one`](#0x1_algebra_field_is_one)
--  [Function `field_is_zero`](#0x1_algebra_field_is_zero)
 -  [Function `group_add`](#0x1_algebra_group_add)
 -  [Function `group_double`](#0x1_algebra_group_double)
 -  [Function `group_generator`](#0x1_algebra_group_generator)
@@ -78,7 +76,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `deserialize`](#0x1_algebra_deserialize)
 -  [Function `serialize`](#0x1_algebra_serialize)
 -  [Function `group_order`](#0x1_algebra_group_order)
--  [Function `group_is_identity`](#0x1_algebra_group_is_identity)
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
 -  [Function `hash_to`](#0x1_algebra_hash_to)
@@ -88,8 +85,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `field_add_internal`](#0x1_algebra_field_add_internal)
 -  [Function `field_div_internal`](#0x1_algebra_field_div_internal)
 -  [Function `field_inv_internal`](#0x1_algebra_field_inv_internal)
--  [Function `field_is_one_internal`](#0x1_algebra_field_is_one_internal)
--  [Function `field_is_zero_internal`](#0x1_algebra_field_is_zero_internal)
 -  [Function `field_mul_internal`](#0x1_algebra_field_mul_internal)
 -  [Function `field_neg_internal`](#0x1_algebra_field_neg_internal)
 -  [Function `field_one_internal`](#0x1_algebra_field_one_internal)
@@ -101,7 +96,6 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Function `group_double_internal`](#0x1_algebra_group_double_internal)
 -  [Function `group_generator_internal`](#0x1_algebra_group_generator_internal)
 -  [Function `group_identity_internal`](#0x1_algebra_group_identity_internal)
--  [Function `group_is_identity_internal`](#0x1_algebra_group_is_identity_internal)
 -  [Function `group_multi_scalar_mul_internal`](#0x1_algebra_group_multi_scalar_mul_internal)
 -  [Function `group_neg_internal`](#0x1_algebra_group_neg_internal)
 -  [Function `group_order_internal`](#0x1_algebra_group_order_internal)
@@ -458,58 +452,6 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
     } <b>else</b> {
         none()
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_is_one"></a>
-
-## Function `field_is_one`
-
-Check if an element <code>x</code> is the multiplicative identity of field <code>S</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one">field_is_one</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one">field_is_one</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
-    <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;S&gt;(x.handle)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_is_zero"></a>
-
-## Function `field_is_zero`
-
-Check if an element <code>x</code> is the aditive identity of field <code>S</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero">field_is_zero</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero">field_is_zero</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): bool {
-    <a href="algebra.md#0x1_algebra_abort_unless_generic_algebraic_structures_basic_operations_enabled">abort_unless_generic_algebraic_structures_basic_operations_enabled</a>();
-    <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;S&gt;(x.handle)
 }
 </code></pre>
 
@@ -926,31 +868,6 @@ Get the order of group <code>G</code>, a big integer little-endian encoded as a 
 
 </details>
 
-<a name="0x1_algebra_group_is_identity"></a>
-
-## Function `group_is_identity`
-
-Check if an element <code>x</code> is the identity of its group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_is_identity">group_is_identity</a>&lt;G&gt;(element_x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_is_identity">group_is_identity</a>&lt;G&gt;(element_x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): bool {
-    <a href="algebra.md#0x1_algebra_group_is_identity_internal">group_is_identity_internal</a>&lt;G&gt;(element_x.handle)
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_algebra_upcast"></a>
 
 ## Function `upcast`
@@ -1170,50 +1087,6 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64);
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_is_one_internal"></a>
-
-## Function `field_is_one_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;F&gt;(handle: u64): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_one_internal">field_is_one_internal</a>&lt;F&gt;(handle: u64): bool;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_is_zero_internal"></a>
-
-## Function `field_is_zero_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;F&gt;(handle: u64): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_is_zero_internal">field_is_zero_internal</a>&lt;F&gt;(handle: u64): bool;
 </code></pre>
 
 
@@ -1456,28 +1329,6 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_is_identity_internal"></a>
-
-## Function `group_is_identity_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_is_identity_internal">group_is_identity_internal</a>&lt;G&gt;(handle: u64): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_is_identity_internal">group_is_identity_internal</a>&lt;G&gt;(handle: u64): bool;
 </code></pre>
 
 

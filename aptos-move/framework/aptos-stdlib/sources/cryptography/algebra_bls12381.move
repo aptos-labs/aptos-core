@@ -244,6 +244,10 @@ module aptos_std::algebra_bls12381 {
     //
 
     #[test_only]
+    const FQ12_VAL_0_SERIALIZED: vector<u8> = x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FQ12_VAL_1_SERIALIZED: vector<u8> = x"010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
     const FQ12_VAL_7_SERIALIZED: vector<u8> = x"070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
     const FQ12_VAL_7_NEG_SERIALIZED: vector<u8> = x"a4aafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764d7ac4b43b6a71b4b9ae67f39ea11011a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -252,15 +256,11 @@ module aptos_std::algebra_bls12381 {
     fun test_fq12(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
-        // Special elements and checks.
+        // Serialization/deserialization.
         let val_0 = field_zero<Fq12>();
         let val_1 = field_one<Fq12>();
-        assert!(field_is_zero(&val_0), 1);
-        assert!(!field_is_zero(&val_1), 1);
-        assert!(!field_is_one(&val_0), 1);
-        assert!(field_is_one(&val_1), 1);
-
-        // Serialization/deserialization.
+        assert!(FQ12_VAL_0_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_0), 1);
+        assert!(FQ12_VAL_1_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_1), 1);
         let val_7 = from_u64<Fq12>(7);
         let val_7_another = std::option::extract(&mut deserialize<Fq12, Fq12FormatLscLsb>(&FQ12_VAL_7_SERIALIZED));
         assert!(eq(&val_7, &val_7_another), 1);
@@ -323,12 +323,10 @@ module aptos_std::algebra_bls12381 {
     fun test__g1affine(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
-        // Special constants and checks.
+        // Special constants.
         assert!(R_SERIALIZED == group_order<G1Affine>(), 1);
         let point_at_infinity = group_identity<G1Affine>();
         let generator = group_generator<G1Affine>();
-        assert!(group_is_identity(&point_at_infinity), 1);
-        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
         assert!(G1AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&generator), 1);
@@ -338,10 +336,10 @@ module aptos_std::algebra_bls12381 {
         assert!(eq(&generator, &generator_from_comp), 1);
         assert!(eq(&generator, &generator_from_uncomp), 1);
 
-        // Deserialization: byte array of correct size but the value is not a member.
+        // Deserialization should fail if given a byte array of correct size but the value is not a member.
         assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
-        // Deserialization: byte array of wrong size.
+        // Deserialization should fail if given a byte array of wrong size.
         assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
 
         assert!(
@@ -448,12 +446,10 @@ module aptos_std::algebra_bls12381 {
     fun test_g2affine(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
-        // Special constants and checks.
+        // Special constants.
         assert!(R_SERIALIZED == group_order<G2Affine>(), 1);
         let point_at_infinity = group_identity<G2Affine>();
         let generator = group_generator<G2Affine>();
-        assert!(group_is_identity(&point_at_infinity), 1);
-        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
         assert!(G2AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&generator), 1);
@@ -554,12 +550,10 @@ module aptos_std::algebra_bls12381 {
     fun test_gt(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
-        // Special constants and checks.
+        // Special constants.
         assert!(R_SERIALIZED == group_order<Gt>(), 1);
         let identity = group_identity<Gt>();
         let generator = group_generator<Gt>();
-        assert!(group_is_identity(&identity), 1);
-        assert!(!group_is_identity(&generator), 1);
 
         // Serialization/deserialization.
         assert!(GT_GENERATOR_SERIALIZED == serialize<Gt, GtFormat>(&generator), 1);
@@ -572,10 +566,10 @@ module aptos_std::algebra_bls12381 {
         ));
         assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"ffff")), 1);
 
-        // Deserialization: in Fq12 but not in the prime-order subgroup.
+        // Deserialization should fail if given an element in Fq12 but not in the prime-order subgroup.
         assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
 
-        // Deserialization: byte array of wrong size.
+        // Deserialization should fail if given a byte array of wrong size.
         assert!(std::option::is_none(&deserialize<Gt, GtFormat>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
 
         // Element scalar multiplication.
@@ -604,41 +598,41 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{field_zero, field_one, field_is_zero, field_is_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_is_identity, group_scalar_mul, group_add, group_multi_scalar_mul, group_double, group_neg, group_sub, hash_to, upcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing, downcast};
+    use aptos_std::algebra::{field_zero, field_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_scalar_mul, group_add, group_multi_scalar_mul, group_double, group_neg, group_sub, hash_to, upcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing, downcast};
 
     #[test_only]
-    const FR_VAL_7_SERIALIZED_LENDIAN: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
+    const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const FR_VAL_7_SERIALIZED_BENDIAN: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000007";
+    const FR_VAL_1_SERIALIZED_LSB: vector<u8> = x"0100000000000000000000000000000000000000000000000000000000000000";
     #[test_only]
-    const FR_VAL_7_NEG_SERIALIZED_LENDIAN: vector<u8> = x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
+    const FR_VAL_7_SERIALIZED_LSB: vector<u8> = x"0700000000000000000000000000000000000000000000000000000000000000";
+    #[test_only]
+    const FR_VAL_7_SERIALIZED_MSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000007";
+    #[test_only]
+    const FR_VAL_7_NEG_SERIALIZED_LSB: vector<u8> = x"fafffffffefffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73";
 
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
         enable_initial_generic_algebraic_operations(&fx);
 
-        // Special elements and checks.
+        // Serialization/deserialization.
         let val_0 = field_zero<Fr>();
         let val_1 = field_one<Fr>();
-        assert!(field_is_zero(&val_0), 1);
-        assert!(!field_is_zero(&val_1), 1);
-        assert!(!field_is_one(&val_0), 1);
-        assert!(field_is_one(&val_1), 1);
-
-        // Serialization/deserialization.
+        assert!(FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_0), 1);
+        assert!(FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_1), 1);
         let val_7 = from_u64<Fr>(7);
-        let val_7_2nd = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(&FR_VAL_7_SERIALIZED_LENDIAN));
-        let val_7_3rd = std::option::extract(&mut deserialize<Fr, FrFormatMsb>(&FR_VAL_7_SERIALIZED_BENDIAN));
+        let val_7_2nd = std::option::extract(&mut deserialize<Fr, FrFormatLsb>(&FR_VAL_7_SERIALIZED_LSB));
+        let val_7_3rd = std::option::extract(&mut deserialize<Fr, FrFormatMsb>(&FR_VAL_7_SERIALIZED_MSB));
         assert!(eq(&val_7, &val_7_2nd), 1);
         assert!(eq(&val_7, &val_7_3rd), 1);
-        assert!(FR_VAL_7_SERIALIZED_LENDIAN == serialize<Fr, FrFormatLsb>(&val_7), 1);
-        assert!(FR_VAL_7_SERIALIZED_BENDIAN == serialize<Fr, FrFormatMsb>(&val_7), 1);
+        assert!(FR_VAL_7_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_7), 1);
+        assert!(FR_VAL_7_SERIALIZED_MSB == serialize<Fr, FrFormatMsb>(&val_7), 1);
 
-        // Deserialization: byte array of right size but the value is not a member.
+        // Deserialization should fail if given a byte array of right size but the value is not a member.
         assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
         assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
 
-        // Deserialization: byte array of wrong size.
+        // Deserialization should fail if given a byte array of wrong size.
         assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
         assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
         assert!(std::option::is_none(&deserialize<Fr, FrFormatLsb>(&x"ffff")), 1);
@@ -646,7 +640,7 @@ module aptos_std::algebra_bls12381 {
 
         // Negation.
         let val_minus_7 = field_neg(&val_7);
-        assert!(FR_VAL_7_NEG_SERIALIZED_LENDIAN == serialize<Fr, FrFormatLsb>(&val_minus_7), 1);
+        assert!(FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<Fr>(9);

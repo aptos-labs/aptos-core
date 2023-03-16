@@ -150,18 +150,6 @@ module aptos_std::algebra {
         }
     }
 
-    /// Check if an element `x` is the multiplicative identity of field `S`.
-    public fun field_is_one<S>(x: &Element<S>): bool {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        field_is_one_internal<S>(x.handle)
-    }
-
-    /// Check if an element `x` is the aditive identity of field `S`.
-    public fun field_is_zero<S>(x: &Element<S>): bool {
-        abort_unless_generic_algebraic_structures_basic_operations_enabled();
-        field_is_zero_internal<S>(x.handle)
-    }
-
     /// Compute `P + Q` for elements `P` and `Q` of a group `G`.
     public fun group_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -291,11 +279,6 @@ module aptos_std::algebra {
         group_order_internal<G>()
     }
 
-    /// Check if an element `x` is the identity of its group `G`.
-    public fun group_is_identity<G>(element_x: &Element<G>): bool {
-        group_is_identity_internal<G>(element_x.handle)
-    }
-
     /// Cast an element of a structure `S` to a parent structure `L`.
     public fun upcast<S,L>(element: &Element<S>): Element<L> {
         abort_unless_generic_algebraic_structures_basic_operations_enabled();
@@ -348,8 +331,6 @@ module aptos_std::algebra {
     native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_div_internal<F>(handle_1: u64, handle_2: u64): (bool, u64);
     native fun field_inv_internal<F>(handle: u64): (bool, u64);
-    native fun field_is_one_internal<F>(handle: u64): bool;
-    native fun field_is_zero_internal<F>(handle: u64): bool;
     native fun field_mul_internal<F>(handle_1: u64, handle_2: u64): u64;
     native fun field_neg_internal<F>(handle: u64): u64;
     native fun field_one_internal<S>(): u64;
@@ -361,7 +342,6 @@ module aptos_std::algebra {
     native fun group_double_internal<G>(element_handle: u64): u64;
     native fun group_generator_internal<G>(): u64;
     native fun group_identity_internal<G>(): u64;
-    native fun group_is_identity_internal<G>(handle: u64): bool;
     native fun group_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
     native fun group_neg_internal<G>(handle: u64): u64;
     native fun group_order_internal<G>(): vector<u8>;
