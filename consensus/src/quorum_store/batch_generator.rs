@@ -6,8 +6,8 @@ use crate::{
     quorum_store::{
         counters,
         quorum_store_db::QuorumStoreStorage,
-        types::Fragment,
-        utils::{BatchBuilder, MempoolProxy, RoundExpirations},
+        types::Batch,
+        utils::{MempoolProxy, RoundExpirations},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
@@ -41,14 +41,13 @@ pub struct BackPressure {
 }
 
 pub struct BatchGenerator {
-    epoch: u64,
     my_peer_id: PeerId,
+    batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
     batch_round_expirations: RoundExpirations<BatchId>,
-    batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
@@ -79,17 +78,15 @@ impl BatchGenerator {
         incremented_batch_id.increment();
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
-        let max_batch_bytes = config.max_batch_bytes;
 
         Self {
-            epoch,
             my_peer_id,
+            batch_id,
             db,
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
             batch_round_expirations: RoundExpirations::new(),
-            batch_builder: BatchBuilder::new(batch_id, max_batch_bytes),
             latest_logical_time: LogicalTime::new(epoch, 0),
             last_end_batch_time: Instant::now(),
             back_pressure: BackPressure {
@@ -99,26 +96,22 @@ impl BatchGenerator {
         }
     }
 
-    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Option<Fragment> {
+    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Option<Batch> {
         // TODO: as an optimization, we could filter out the txns that have expired
 
-        let mut exclude_txns: Vec<_> = self
+        let exclude_txns: Vec<_> = self
             .batches_in_progress
             .values()
             .flatten()
             .cloned()
             .collect();
-        exclude_txns.extend(self.batch_builder.summaries().clone());
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
-        let mut end_batch = false;
         let pulled_txns = self
             .mempool_proxy
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                // allow creating non-full fragments
-                // is this a good place to disable fragments actually?
                 true,
                 exclude_txns,
             )
@@ -126,85 +119,56 @@ impl BatchGenerator {
             .unwrap_or_default();
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
+
         if pulled_txns.is_empty() {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
+            // Quorum store metrics
+            counters::CREATED_EMPTY_BATCHES_COUNT.inc();
+
+            let duration = self.last_end_batch_time.elapsed().as_secs_f64();
+            counters::EMPTY_BATCH_CREATION_DURATION
+                .observe_duration(Duration::from_secs_f64(duration));
+
+            self.last_end_batch_time = Instant::now();
+            return None;
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
         }
 
-        if !self
-            .batch_builder
-            .append_transactions(&pulled_txns, max_count as usize)
-            || self.last_end_batch_time.elapsed().as_millis() > self.config.end_batch_ms as u128
-        {
-            end_batch = true;
-        }
+        // Quorum store metrics
+        counters::CREATED_BATCHES_COUNT.inc();
 
-        let serialized_txns = self.batch_builder.take_serialized_txns();
+        let duration = self.last_end_batch_time.elapsed().as_secs_f64();
+        counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
 
-        let batch_id = self.batch_builder.batch_id();
-        if !end_batch {
-            if !serialized_txns.is_empty() {
-                let fragment = Fragment::new(
-                    self.epoch,
-                    batch_id,
-                    self.batch_builder.fetch_and_increment_fragment_id(),
-                    serialized_txns,
-                    None,
-                    self.my_peer_id,
-                );
-                return Some(fragment);
-            }
-        } else {
-            if self.batch_builder.is_empty() {
-                // Quorum store metrics
-                counters::CREATED_EMPTY_BATCHES_COUNT.inc();
+        counters::NUM_TXN_PER_BATCH.observe(pulled_txns.len() as f64);
 
-                let duration = self.last_end_batch_time.elapsed().as_secs_f64();
-                counters::EMPTY_BATCH_CREATION_DURATION
-                    .observe_duration(Duration::from_secs_f64(duration));
+        let batch_id = self.batch_id;
+        self.batch_id.increment();
+        self.db
+            .save_batch_id(self.latest_logical_time.epoch(), self.batch_id)
+            .expect("Could not save to db");
 
-                self.last_end_batch_time = Instant::now();
-                return None;
-            }
+        let expiry_round =
+            self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
+        let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
+        let txn_summaries: Vec<_> = pulled_txns
+            .iter()
+            .map(|txn| TransactionSummary {
+                sender: txn.sender(),
+                sequence_number: txn.sequence_number(),
+            })
+            .collect();
 
-            // Quorum store metrics
-            counters::CREATED_BATCHES_COUNT.inc();
+        let batch = Batch::new(batch_id, pulled_txns, logical_time, self.my_peer_id);
 
-            let duration = self.last_end_batch_time.elapsed().as_secs_f64();
-            counters::BATCH_CREATION_DURATION.observe_duration(Duration::from_secs_f64(duration));
+        self.batches_in_progress.insert(batch_id, txn_summaries);
+        self.batch_round_expirations
+            .add_item(batch_id, expiry_round);
 
-            counters::NUM_TXN_PER_BATCH.observe(self.batch_builder.summaries().len() as f64);
-
-            let mut incremented_batch_id = batch_id;
-            incremented_batch_id.increment();
-            self.db
-                .save_batch_id(self.latest_logical_time.epoch(), incremented_batch_id)
-                .expect("Could not save to db");
-
-            let expiry_round =
-                self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
-            let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
-
-            let fragment = Fragment::new(
-                self.epoch,
-                batch_id,
-                self.batch_builder.fetch_and_increment_fragment_id(),
-                serialized_txns,
-                Some(logical_time),
-                self.my_peer_id,
-            );
-
-            self.batches_in_progress
-                .insert(batch_id, self.batch_builder.take_summaries());
-            self.batch_round_expirations
-                .add_item(batch_id, expiry_round);
-
-            self.last_end_batch_time = Instant::now();
-            return Some(fragment);
-        }
-        None
+        self.last_end_batch_time = Instant::now();
+        Some(batch)
     }
 
     pub async fn start(
@@ -279,9 +243,9 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        if let Some(fragment) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
+                        if let Some(batch) = self.handle_scheduled_pull(dynamic_pull_max_txn).await {
                             last_non_empty_pull = now;
-                            network_sender.broadcast_fragment(fragment).await;
+                            network_sender.broadcast_batch_msg(batch).await;
                         }
                     }
                 }),
