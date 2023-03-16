@@ -48,7 +48,10 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
-        return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+        return Err(VMStatus::Error(
+            StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+            None,
+        ));
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
@@ -68,7 +71,10 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
         let (valid, validation) = is_valid_txn_arg(session, ty);
         if !valid {
-            return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+            return Err(VMStatus::Error(
+                StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+                None,
+            ));
         }
         if validation {
             needs_validation.push(idx + signer_param_cnt);
@@ -76,7 +82,10 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     }
 
     if (signer_param_cnt + args.len()) != func.parameters.len() {
-        return Err(VMStatus::Error(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH));
+        return Err(VMStatus::Error(
+            StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+            None,
+        ));
     }
     // if function doesn't require signer, we reuse txn args
     // if the function require signer, we check senders number same as signers
@@ -88,6 +97,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         if senders.len() != signer_param_cnt {
             return Err(VMStatus::Error(
                 StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+                None,
             ));
         }
         senders
@@ -180,16 +190,24 @@ fn validate_arg<S: MoveResolverExt>(
             match current_pos.checked_add(len) {
                 Some(size) => {
                     if size > arg_len {
-                        return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
+                        return Err(VMStatus::Error(
+                            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                            None,
+                        ));
                     }
                 },
-                None => return Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
+                None => {
+                    return Err(VMStatus::Error(
+                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                        None,
+                    ))
+                },
             }
             // load the serialized string
             let mut s = vec![0u8; len];
             cursor
                 .read_exact(&mut s)
-                .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT))?;
+                .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
             let st = session
@@ -219,7 +237,10 @@ fn validate_arg<S: MoveResolverExt>(
 // Length of vectors in BCS uses uleb128 as a compression format.
 fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
     match read_uleb128_as_u64(cursor) {
-        Err(_) => Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
+        Err(_) => Err(VMStatus::Error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            None,
+        )),
         Ok(len) => Ok(len as usize),
     }
 }
@@ -233,6 +254,9 @@ fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
 fn check_string(s: &[u8]) -> Result<(), VMStatus> {
     match std::str::from_utf8(s) {
         Ok(_) => Ok(()),
-        Err(_) => Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
+        Err(_) => Err(VMStatus::Error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            None,
+        )),
     }
 }

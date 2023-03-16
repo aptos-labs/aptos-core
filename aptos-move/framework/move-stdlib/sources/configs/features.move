@@ -18,7 +18,7 @@ module std::features {
     //   is typically associated with the introduction of new native Move functions, and is only used
     //   from Move code. The owner of this feature is obliged to remove it once this can be done.
     //
-    // - an *ephemeral* feature flag is required to stay around forever. Typically, those flags guard
+    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
@@ -41,7 +41,7 @@ module std::features {
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
@@ -140,15 +140,28 @@ module std::features {
         is_enabled(DELEGATION_POOLS)
     }
 
+    /// Whether the basic operations over some BLS12381 structures are enabled in the algebra module.
+    ///
+    /// Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting, etc.
+    /// BLS12381 structures controlled by this flag includes `Fq12`, `G1`, `G2`, `Gt`, `Fr`.
+    ///
+    /// Lifetime: transient
+    const BLS12381_BASIC_OPERATIONS: u64 = 12;
+    public fun get_bls12381_basic_operations_feature(): u64 { BLS12381_BASIC_OPERATIONS }
+    public fun bls12381_basic_operations_enabled(): bool acquires Features {
+        is_enabled(BLS12381_BASIC_OPERATIONS)
+    }
+
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
-    const ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH: u64 = 12;
+    const ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH: u64 = 13;
 
     public fun get_pubkey_validate_aborts_wrong_length(): u64 { ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH }
 
     public fun pubkey_validate_aborts_wrong_length_enabled(): bool acquires Features {
 	is_enabled(ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH)
     } 
+
 
     // ============================================================================================
     // Feature Flag Implementation

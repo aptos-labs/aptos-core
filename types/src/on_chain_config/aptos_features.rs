@@ -19,7 +19,8 @@ pub enum FeatureFlag {
     RESOURCE_GROUPS = 9,
     MULTISIG_ACCOUNTS = 10,
     DELEGATION_POOLS = 11,
-    ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH = 12,
+    BLS12381_BASIC_OPERATIONS = 12,
+    ED25519_PK_VALIDATE_NO_ABORT_ON_WRONG_LENGTH = 13,
 }
 
 /// Representation of features on chain as a bitset.

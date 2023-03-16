@@ -75,7 +75,7 @@ pub(crate) fn update_store(
             )
             .unwrap();
         store.ledger_db.write_schemas(ledger_batch).unwrap();
-        store.state_kv_db.write_schemas(state_kv_batch).unwrap();
+        store.state_kv_db.commit(version, state_kv_batch).unwrap();
     }
     root_hash
 }

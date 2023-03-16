@@ -361,7 +361,8 @@ module aptos_framework::staking_contract {
         emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
     }
 
-    /// Convenience function to allow a staker to update the commision percentage paid to the operator.
+    /// Convenience function to allow a staker to update the commission percentage paid to the operator.
+    /// TODO: fix the typo in function name. commision -> commission
     public entry fun update_commision(staker: &signer, operator: address, new_commission_percentage: u64) acquires Store, StakingGroupUpdateCommissionEvent {
         assert!(
             new_commission_percentage >= 0 && new_commission_percentage <= 100,
@@ -908,7 +909,7 @@ module aptos_framework::staking_contract {
         let new_balance = with_rewards(INITIAL_BALANCE);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
-        // Operator tries to request commision multiple times. But their distribution shouldn't change.
+        // Operator tries to request commission multiple times. But their distribution shouldn't change.
         let expected_commission = (new_balance - last_recorded_principal(staker_address, operator_address)) / 10;
         request_commission(operator, staker_address, operator_address);
         assert_distribution(staker_address, operator_address, operator_address, expected_commission);
