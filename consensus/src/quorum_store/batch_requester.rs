@@ -11,6 +11,7 @@ use aptos_executor_types::*;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
+use rand::Rng;
 use std::time::Duration;
 use tokio::{sync::oneshot, time};
 
@@ -39,6 +40,9 @@ impl BatchRequesterState {
 
     fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
         if self.num_retries == 0 {
+            let mut rng = rand::thread_rng();
+            // make sure nodes request from the different set of nodes
+            self.next_index = rng.gen::<usize>() % self.signers.len();
             counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
