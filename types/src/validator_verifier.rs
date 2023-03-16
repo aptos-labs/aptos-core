@@ -330,7 +330,7 @@ impl ValidatorVerifier {
                 None => return Err(VerifyError::UnknownAuthor),
             }
         }
-
+        println!("aggregated_voting_power {} quorum_voting_power {}", aggregated_voting_power, self.quorum_voting_power);
         if aggregated_voting_power < self.quorum_voting_power {
             return Err(VerifyError::TooLittleVotingPower {
                 voting_power: aggregated_voting_power,

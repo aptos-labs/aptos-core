@@ -538,12 +538,24 @@ impl BufferItem {
         }
     }
 
+    pub fn update_block_dummy_rand(&mut self, block_idx: usize, rand: Vec<u8>) -> Option<usize> {
+        if let Self::Ordered(ref mut ordered_item) = *self {
+            // Only payload blocks need randomness
+            if  ordered_item.ordered_blocks[block_idx].block().author().is_none() && ordered_item.maybe_rand_vec[block_idx].is_none() {
+                ordered_item.maybe_rand_vec[block_idx] = Some(rand);
+                ordered_item.num_rand_ready += 1;
+                return Some(block_idx);
+            }
+        }
+        None
+    }
+
     // return the index of the block if the randomness is successfully updated
     pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) -> Option<usize> {
-        if let Some(idx) = self.find_block_idx_from_ordered(block_id) {
-            assert!(idx < self.get_blocks().len());
+        if let Some(idx) = self.find_block_idx_from_buffer_item(block_id) {
             if let Self::Ordered(ref mut ordered_item) = *self {
-                if ordered_item.maybe_rand_vec[idx].is_none() {
+                // Only payload blocks need randomness
+                if ordered_item.ordered_blocks[idx].block().author().is_some() && ordered_item.maybe_rand_vec[idx].is_none() {
                     ordered_item.maybe_rand_vec[idx] = Some(rand);
                     ordered_item.num_rand_ready += 1;
                     return Some(idx);
@@ -553,14 +565,9 @@ impl BufferItem {
         None
     }
 
-    // return None if not found
-    pub fn find_block_idx_from_ordered(&mut self, block_id: HashValue) -> Option<usize> {
-        match self {
-            BufferItem::Ordered(item) => {
-                item.ordered_blocks.iter().position(|block| (*block).id() == block_id)
-            }
-            _ => panic!("Not ordered item"),
-        }
+    // Return None if not found
+    pub fn find_block_idx_from_buffer_item(&mut self, block_id: HashValue) -> Option<usize> {
+        self.get_blocks().iter().position(|block| (*block).id() == block_id)
     }
 
     pub fn is_rand_ready(&self) -> bool {

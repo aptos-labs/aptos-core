@@ -215,22 +215,23 @@ impl BufferManager {
         // Disseminate the VRF shares for the ordered blocks
         // Happy path: each validator sends its VRF shares to the leader
         // Unhappy path: if the leader timeout, broadcast the randomness share
-        for block in ordered_blocks {
-            self.block_to_buffer_map.insert(block.id(), Some(item_hash));
+        for block_idx in 0..ordered_blocks.len() {
+            self.block_to_buffer_map.insert(ordered_blocks[block_idx].id(), Some(item_hash));
 
-            let maybe_proposer = block.block().author();
-            let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
+            let maybe_proposer = ordered_blocks[block_idx].block().author();
+            let rand_share = RandShare::new(self.author, ordered_blocks[block_idx].block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
 
             if let Some(proposer) = maybe_proposer {
                 // Proposal block, send the randomness shares through the proposer
                 self.rand_msg_tx
                     .send_rand_share(rand_share, proposer)
                     .await;
+                // todo: if the unhappy path is too bad, can try multiple leaders or retry with more leaders
             } else {
                 // Non-proposal block (genesis or Nil block),
                 // this block can move to execution-ready
                 // No need to send randomness shares
-                item.increment_rand();
+                item.update_block_dummy_rand(block_idx, vec![]);
             }
         }
 
@@ -249,7 +250,7 @@ impl BufferManager {
                 let author = rand_share.author();
                 let block_info = rand_share.block_info().clone();
                 let target_block_id = rand_share.block_info().id();
-                debug!("Receive random share from author {:?} for block {:?}", author, target_block_id);
+                info!("Receive random share from author {:?} for block {:?}", author, target_block_id);
 
                 // todo: verify rand message, ignore invalid ones
                 // todo: aggregate the randomness shares
@@ -261,24 +262,25 @@ impl BufferManager {
 
                 if self.verifier.check_voting_power(authors.iter()).is_ok() {
                     // enough randomness shares, can produce randomness for the block
+
                     // todo: aggregate the randomness
-                    let rand = vec![u8::MAX; 96]; // self.block_to_rand_share_map.get(&target_block_id).unwrap().share();
+                    let aggregated_rand = vec![u8::MAX; 96];
 
                     let current_cursor = self.get_cursor_for_block(target_block_id);
                     if current_cursor.is_some() {
-                        println!("got cursor rand share for block {}", target_block_id);
+                        info!("got cursor rand share for block {}", target_block_id);
                         let mut item = self.buffer.take(&current_cursor);
                         if item.is_ordered() {
                             // the aggregated share is 96 bytes
-                            if let Some(idx) = item.update_block_rand(target_block_id, vec![u8::MAX; 96]) {
-                                debug!(
+                            if let Some(idx) = item.update_block_rand(target_block_id, aggregated_rand.clone()) {
+                                info!(
                                     "updated rand by receiving rand share for block {}",
                                     target_block_id,
                                 );
                                 // randomness is updated successfully
                                 // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
                                 if item.unwrap_ordered_ref().ordered_blocks[idx].block().author() == Some(self.author) {
-                                    let rand_decision = RandDecision::new(block_info, rand);
+                                    let rand_decision = RandDecision::new(block_info, aggregated_rand);
                                     self.rand_msg_tx
                                         .broadcast_rand_decision(rand_decision)
                                         .await;
@@ -298,16 +300,16 @@ impl BufferManager {
                 // add the randomness to block
                 let target_block_id = rand_decision.block_info().id();
                 self.block_to_rand_decision_map.insert(target_block_id, *rand_decision.clone());
-                debug!("Receive random decision for block {:?}", target_block_id);
+                info!("Receive random decision for block {:?}", target_block_id);
 
                 let cursor = self.get_cursor_for_block(target_block_id);
                 if cursor.is_some() {
-                    println!("got cursor rand decision for block {}", target_block_id);
+                    info!("got cursor rand decision for block {}", target_block_id);
                     let mut item = self.buffer.take(&cursor);
                     if item.is_ordered() {
                         // the aggregated share is 96 bytes
                         if let Some(idx) = item.update_block_rand(target_block_id, rand_decision.rand().clone()) {
-                            debug!(
+                            info!(
                                 "updated rand by receiving rand decision for block {}",
                                 target_block_id,
                             );
@@ -321,7 +323,7 @@ impl BufferManager {
                         }
 
                         if item.is_rand_ready() {
-                            debug!("updated block {} to execution ready by receiving rand decision", target_block_id);
+                            info!("updated block {} to execution ready by receiving rand decision", target_block_id);
                             self.buffer.set(&cursor, item.try_advance_to_execution_ready());
                             return Some(target_block_id)
                         }
@@ -884,7 +886,7 @@ impl BufferManager {
                 },
                 _ = interval.tick().fuse() => {
                     monitor!("buffer_manager_process_rebroadcast_commit_vote", {
-                    // self.print_buffer();
+                    self.print_buffer();
                     self.update_buffer_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await
                     });
