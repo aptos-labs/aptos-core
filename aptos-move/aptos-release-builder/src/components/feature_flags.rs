@@ -29,7 +29,7 @@ pub enum FeatureFlag {
     MultisigAccounts,
     DelegationPools,
     Bls12381BasicOperations,
-    PubkeyValidateReturnFalseWrongLength,
+    Ed25519PubkeyValidateReturnFalseWrongLength,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -132,7 +132,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
             FeatureFlag::Bls12381BasicOperations => AptosFeatureFlag::BLS12381_BASIC_OPERATIONS,
             FeatureFlag::PubkeyValidateReturnFalseWrongLength => {
-                AptosFeatureFlag::PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
+                AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
             },
         }
     }

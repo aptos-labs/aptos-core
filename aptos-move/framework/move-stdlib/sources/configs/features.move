@@ -154,7 +154,7 @@ module std::features {
 
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
-    const PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 13;
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 13;
 
     // ============================================================================================
     // Feature Flag Implementation
