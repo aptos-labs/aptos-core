@@ -214,8 +214,10 @@ where
             // Only one thread try_commit to avoid contention.
             if committing {
                 // Keep committing txns until there is no more that can be committed now.
-                loop {
-                    if scheduler.try_commit().is_none() {
+                while let Some(txn_idx) = scheduler.try_commit() {
+                    if txn_idx + 1 == block.len() {
+                        // Committed the last transaction / everything.
+                        scheduler_task = SchedulerTask::Done;
                         break;
                     }
                 }

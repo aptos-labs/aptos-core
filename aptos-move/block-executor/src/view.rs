@@ -206,12 +206,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                 ReadResult::Value(v) => Ok(v.as_state_value()),
                 ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
                 ReadResult::Unresolved(delta) => {
-                    let from_storage = self
-                        .base_view
-                        .get_state_value_bytes(state_key)?
-                        .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR)), |bytes| {
-                            Ok(deserialize(&bytes))
-                        })?;
+                    let from_storage = self.base_view.get_state_value_bytes(state_key)?.map_or(
+                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                        |bytes| Ok(deserialize(&bytes)),
+                    )?;
                     let result = delta
                         .apply_to(from_storage)
                         .map_err(|pe| pe.finish(Location::Undefined).into_vm_status())?;

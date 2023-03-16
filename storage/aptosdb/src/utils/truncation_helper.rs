@@ -14,6 +14,7 @@ use crate::{
         transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
         write_set::WriteSetSchema,
     },
+    state_kv_db::StateKvDb,
     EventStore, TransactionStore,
 };
 use anyhow::Result;
@@ -41,8 +42,11 @@ pub(crate) fn get_ledger_commit_progress(ledger_db: &DB) -> Result<Option<Versio
     get_commit_progress(ledger_db, &DbMetadataKey::LedgerCommitProgress)
 }
 
-pub(crate) fn get_state_kv_commit_progress(state_kv_db: &DB) -> Result<Option<Version>> {
-    get_commit_progress(state_kv_db, &DbMetadataKey::StateKVCommitProgress)
+pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
+    get_commit_progress(
+        state_kv_db.metadata_db(),
+        &DbMetadataKey::StateKVCommitProgress,
+    )
 }
 
 fn get_commit_progress(db: &DB, progress_key: &DbMetadataKey) -> Result<Option<Version>> {
@@ -88,7 +92,7 @@ pub(crate) fn truncate_ledger_db(
 }
 
 pub(crate) fn truncate_state_kv_db(
-    state_kv_db: Arc<DB>,
+    state_kv_db: Arc<StateKvDb>,
     current_version: Version,
     target_version: Version,
     batch_size: usize,
@@ -102,11 +106,7 @@ pub(crate) fn truncate_state_kv_db(
         let end_version = current_version + 1;
         let batch = SchemaBatch::new();
         delete_state_value_and_index(&state_kv_db, start_version, end_version, &batch)?;
-        batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKVCommitProgress,
-            &DbMetadataValue::Version(start_version - 1),
-        )?;
-        state_kv_db.write_schemas(batch)?;
+        state_kv_db.commit(start_version - 1, batch)?;
         current_version = start_version - 1;
         status.set_current_version(current_version);
     }
@@ -286,12 +286,15 @@ fn delete_per_version_data(
 }
 
 fn delete_state_value_and_index(
-    state_kv_db: &DB,
+    state_kv_db: &StateKvDb,
     start_version: Version,
     end_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = state_kv_db.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+    // TODO(grao): Support sharding here.
+    let mut iter = state_kv_db
+        .metadata_db()
+        .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
     iter.seek(&start_version)?;
 
     for item in iter {

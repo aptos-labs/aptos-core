@@ -5,10 +5,11 @@ use crate::{
     error::DbError,
     quorum_store::{
         schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME},
-        types::{BatchId, PersistedValue},
+        types::PersistedValue,
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
@@ -26,6 +27,7 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
 
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError>;
+
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError>;
 }
 
@@ -80,7 +82,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
         trace!(
             "QS: db persists digest {} expiration {:?}",
             digest,
-            batch.expiration
+            batch.expiration()
         );
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }

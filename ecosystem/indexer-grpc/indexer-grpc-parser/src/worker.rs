@@ -198,7 +198,6 @@ impl Worker {
             // Gets a batch of transactions from the stream. Batch size is set in the grpc server.
             // The number of batches depends on our config
             for _ in 0..concurrent_tasks {
-                // TODO(larry): do not block here to wait for consumer items.
                 let next_stream = match resp_stream.next().await {
                     Some(Ok(r)) => r,
                     _ => {
@@ -234,10 +233,18 @@ impl Worker {
                 };
                 let current_batch_size = transactions.len();
                 if current_batch_size == 0 {
-                    error!("[Indexer Parser] Received empty batch from GRPC stream");
+                    error!(
+                        batch_start_version = batch_start_version,
+                        "[Indexer Parser] Received empty batch from GRPC stream"
+                    );
                     panic!();
                 }
 
+                info!(
+                    processor_name = processor_name,
+                    batch_size = current_batch_size,
+                    "[Parser] Received batch from GRPC stream"
+                );
                 transactions_batches.push(transactions);
                 // If it is a partial batch, then skip polling and head to process it first.
                 if current_batch_size < BLOB_STORAGE_SIZE {
