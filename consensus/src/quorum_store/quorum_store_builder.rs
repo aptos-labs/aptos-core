@@ -244,7 +244,7 @@ impl InnerBuilder {
             self.author,
             self.config.batch_request_num_peers,
             self.config.batch_request_retry_limit,
-            self.config.batch_request_retry_timeout_ms,
+            self.config.batch_request_retry_interval_ms,
             self.config.batch_request_rpc_timeout_ms,
             self.network_sender.clone(),
         );

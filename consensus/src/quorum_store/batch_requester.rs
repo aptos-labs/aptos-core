@@ -96,7 +96,7 @@ pub(crate) struct BatchRequester<T> {
     my_peer_id: PeerId,
     request_num_peers: usize,
     retry_limit: usize,
-    retry_timeout_ms: usize,
+    retry_interval_ms: usize,
     rpc_timeout_ms: usize,
     network_sender: T,
 }
@@ -107,7 +107,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         my_peer_id: PeerId,
         request_num_peers: usize,
         retry_limit: usize,
-        retry_timeout_ms: usize,
+        retry_interval_ms: usize,
         rpc_timeout_ms: usize,
         network_sender: T,
     ) -> Self {
@@ -116,7 +116,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
             my_peer_id,
             request_num_peers,
             retry_limit,
-            retry_timeout_ms,
+            retry_interval_ms,
             rpc_timeout_ms,
             network_sender,
         }
@@ -133,13 +133,12 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;
         let epoch = self.epoch;
-        let retry_timeout = Duration::from_millis(self.retry_timeout_ms as u64);
+        let retry_interval = Duration::from_millis(self.retry_interval_ms as u64);
         let rpc_timeout = Duration::from_millis(self.rpc_timeout_ms as u64);
-        let mut num_futures = request_num_peers * self.retry_limit;
 
         tokio::spawn(async move {
             monitor!("batch_request", {
-                let mut interval = time::interval(retry_timeout);
+                let mut interval = time::interval(retry_interval);
                 let mut futures = FuturesUnordered::new();
                 let request = BatchRequest::new(my_peer_id, epoch, digest);
                 loop {
@@ -150,10 +149,12 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 for peer in request_peers {
                                     futures.push(network_sender.request_batch(request.clone(), peer, rpc_timeout));
                                 }
+                            } else if futures.is_empty() {
+                                // end the loop when the futures are drained
+                                break;
                             }
                         }
                         Some(response) = futures.next() => {
-                            num_futures -= 1;
                             if let Ok(batch) = response {
                                 counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
                                 if batch.verify().is_ok() {
@@ -162,10 +163,6 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                     request_state.serve_request(digest, Some(payload));
                                     return;
                                 }
-                            }
-                            if num_futures == 0 {
-                                // end the batch requester when the futures are drained
-                                break;
                             }
                         },
                     }

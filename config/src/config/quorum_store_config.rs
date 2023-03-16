@@ -44,7 +44,7 @@ pub struct QuorumStoreConfig {
     pub max_batch_bytes: usize,
     pub batch_request_num_peers: usize,
     pub batch_request_retry_limit: usize,
-    pub batch_request_retry_timeout_ms: usize,
+    pub batch_request_retry_interval_ms: usize,
     pub batch_request_rpc_timeout_ms: usize,
     /// Used when setting up the expiration time for the batch initation.
     pub batch_expiry_round_gap_when_init: Round,
@@ -75,7 +75,7 @@ impl Default for QuorumStoreConfig {
             max_batch_bytes: 4 * 1024 * 1024,
             batch_request_num_peers: 3,
             batch_request_retry_limit: 10,
-            batch_request_retry_timeout_ms: 1000,
+            batch_request_retry_interval_ms: 1000,
             batch_request_rpc_timeout_ms: 5000,
             batch_expiry_round_gap_when_init: 100,
             batch_expiry_round_gap_behind_latest_certified: 500,
