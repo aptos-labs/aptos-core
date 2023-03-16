@@ -1078,6 +1078,12 @@ impl EpochManager {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
                 },
+                (peer, msg) = network_receivers.buffer_manager_messages.select_next_some() => {
+                    monitor!("epoch_manager_process_buffer_manager_messages",
+                    if let Err(e) = self.process_message(peer, msg).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                    });
+                },
                 (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
                     monitor!("epoch_manager_process_quorum_store_messages",
                     if let Err(e) = self.process_message(peer, msg).await {
