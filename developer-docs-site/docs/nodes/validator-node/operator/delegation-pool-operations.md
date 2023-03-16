@@ -135,16 +135,20 @@ This section describes the available operations that can be performed on this re
  
 Delegation pool owners have access to specific methods designed for modifying the `operator` and `voter` roles of the delegation pool. Use the following Aptos CLI commands and include the relevant addresses:
 
+* Set the operator address for the delegation pool:
+
   ```bash
   aptos move run --profile ‘delegation_pool_owner’ \
   --function-id 0x1::delegation_pool::set_operator \
   --args address:’new_operator_address’
   ```
-  
+
+* Set the delegated voter address for the delegation pool:
+
   ```bash
- aptos move run --profile ‘delegation_pool_owner’ \
- --function-id 0x1::delegation_pool::set_delegated_voter \
- --args address:’new_delegated_voter_address’
+  aptos move run --profile ‘delegation_pool_owner’ \
+  --function-id 0x1::delegation_pool::set_delegated_voter \
+  --args address:’new_delegated_voter_address’
   ```
   
 ## Check delegation pool information
@@ -153,7 +157,7 @@ Until the delegation pool has received 1 million APT and the validator has been 
 
 * `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
 
-* `delegation_pool_exists(addr: address): bool` - Returns if a delegation pool exists at the provided address `addr`.
+* `delegation_pool_exists(addr: address): bool` - Returns true if a delegation pool exists at the provided address `addr`.
 
 * `operator_commission_percentage(pool_address: address): u64` - Returns the operator commission percentage set on the delegation pool at initialization.
 
@@ -186,11 +190,11 @@ const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 })();
 
 ```
-Alternatively you can use Aptos CLI to call View functions. 
+Alternatively, you can use Aptos CLI to call View functions. 
 
 ```bash
  aptos move view [OPTIONS] --function-id <FUNCTION_ID>
 
 ```
 
-To discover the available options and the process for making an `aptos move view` call, access the help with `aptos move view --help`. This will display the required arguments for invoking the view functions.
+To discover the available options and the process for making an `aptos move view` call, access the help information with `aptos move view --help`. This will display the required arguments for invoking the view functions.
