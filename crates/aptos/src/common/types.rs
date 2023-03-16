@@ -903,7 +903,7 @@ impl RestOptions {
 }
 
 /// Options for compiling a move package dir
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
     #[clap(long, parse(from_os_str))]

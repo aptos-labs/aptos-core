@@ -1,0 +1,46 @@
+moveUrl = "https://github.com/move-language/move.git"
+aptosUrl = "https://github.com/aptos-labs/aptos-core.git"
+
+# Workflow to pull from Move to Aptos. This creates a draft PR at the fixed branch `from_move`
+# which should be further massaged before sending out.
+core.workflow(
+    name = "pull_move",
+    origin = git.origin(
+        url = moveUrl,
+        ref = "aptos-main",
+    ),
+    destination = git.github_pr_destination(
+        url = aptosUrl,
+        destination_ref = "main",
+        draft = True,
+        title = "Pull from move-language",
+        pr_branch = "from_move"
+    ),
+    #origin_files = glob(["language/**"]),
+    origin_files = glob(["language/README.md"]), # During testing use only one file
+    destination_files = glob(["third_party/move/**"]),
+    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    transformations = [
+        core.move("", "third_party/move"),
+    ],
+)
+
+# Workflow to push from Aptos to Move. This directly pushes without PR.
+core.workflow(
+    name = "push_move",
+    origin = git.origin(
+        url = aptosUrl,
+        ref = "main",
+    ),
+    destination = git.github_destination(
+        url = moveUrl,
+        push = "aptos_main",
+    ),
+    #origin_files = glob(["third_party/move/language/**"]),
+    origin_files = glob(["third_party/move/language/README.md"]), # During testing only one file
+    destination_files = glob(["language/**"]),
+    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    transformations = [
+        core.move("third_party/move", ""),
+    ],
+)

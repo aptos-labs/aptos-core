@@ -1,13 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    monitor,
-    quorum_store::{
-        counters,
-        types::{BatchId, SerializedTransaction},
-    },
-};
+use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{Round, TransactionSummary},
     proof_of_store::{LogicalTime, ProofOfStore},
@@ -25,102 +19,27 @@ use std::{
         BinaryHeap, HashMap, HashSet, VecDeque,
     },
     hash::Hash,
-    mem,
     time::{Duration, Instant},
 };
 use tokio::time::timeout;
 
-pub(crate) struct BatchBuilder {
-    id: BatchId,
-    summaries: Vec<TransactionSummary>,
-    data: Vec<SerializedTransaction>,
-    num_txns: usize,
-    num_bytes: usize,
-    // TODO: remove
-    max_bytes: usize,
+pub(crate) struct Timeouts<T> {
+    timeouts: VecDeque<(i64, T)>,
 }
 
-impl BatchBuilder {
-    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
-        Self {
-            id: batch_id,
-            summaries: Vec::new(),
-            data: Vec::new(),
-            num_txns: 0,
-            num_bytes: 0,
-            max_bytes,
-        }
-    }
-
-    pub(crate) fn append_transaction(
-        &mut self,
-        txn: &SignedTransaction,
-        max_txns_override: usize,
-    ) -> bool {
-        let serialized_txn = SerializedTransaction::from_signed_txn(txn);
-
-        if self.num_bytes + serialized_txn.len() <= self.max_bytes
-            && self.num_txns < max_txns_override
-        {
-            self.num_txns += 1;
-            self.num_bytes += serialized_txn.len();
-
-            self.summaries.push(TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
-            });
-            self.data.push(serialized_txn);
-
-            self.num_txns < max_txns_override && self.num_bytes < self.max_bytes
-        } else {
-            false
-        }
-    }
-
-    pub(crate) fn take_serialized_txns(&mut self) -> Vec<SerializedTransaction> {
-        mem::take(&mut self.data)
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.summaries.is_empty()
-    }
-
-    pub(crate) fn batch_id(&self) -> BatchId {
-        self.id
-    }
-
-    /// Clears the state, increments (batch) id.
-    pub(crate) fn take_summaries(&mut self) -> Vec<TransactionSummary> {
-        assert!(self.data.is_empty());
-
-        self.id.increment();
-        self.num_bytes = 0;
-        self.num_txns = 0;
-        mem::take(&mut self.summaries)
-    }
-
-    pub(crate) fn summaries(&self) -> &Vec<TransactionSummary> {
-        &self.summaries
-    }
-}
-
-pub(crate) struct DigestTimeouts {
-    timeouts: VecDeque<(i64, HashValue)>,
-}
-
-impl DigestTimeouts {
+impl<T> Timeouts<T> {
     pub(crate) fn new() -> Self {
         Self {
             timeouts: VecDeque::new(),
         }
     }
 
-    pub(crate) fn add_digest(&mut self, digest: HashValue, timeout: usize) {
+    pub(crate) fn add(&mut self, value: T, timeout: usize) {
         let expiry = Utc::now().naive_utc().timestamp_millis() + timeout as i64;
-        self.timeouts.push_back((expiry, digest));
+        self.timeouts.push_back((expiry, value));
     }
 
-    pub(crate) fn expire(&mut self) -> Vec<HashValue> {
+    pub(crate) fn expire(&mut self) -> Vec<T> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
         trace!(
             "QS: expire cur time {} timeouts len {}",
@@ -260,8 +179,11 @@ impl ProofQueue {
             },
         }
         if local {
+            counters::LOCAL_POS_COUNT.inc();
             self.local_digest_queue
                 .push_back((*proof.digest(), proof.expiration()));
+        } else {
+            counters::REMOTE_POS_COUNT.inc();
         }
     }
 
@@ -318,8 +240,8 @@ impl ProofQueue {
             {
                 if *expiration >= current_time {
                     // non-committed proof that has not expired
-                    cur_bytes += proof.info().num_bytes;
-                    cur_txns += proof.info().num_txns;
+                    cur_bytes += proof.num_bytes();
+                    cur_txns += proof.num_txns();
                     if cur_bytes > max_bytes || cur_txns > max_txns {
                         // Exceeded the limit for requested bytes or number of transactions.
                         full = true;
@@ -344,7 +266,7 @@ impl ProofQueue {
             // before non full check
             byte_size = cur_bytes,
             block_size = cur_txns,
-            batch_count = ret,
+            batch_count = ret.len(),
             remaining_proof_num = size,
             initial_remaining_proof_num = initial_size,
             full = full,
@@ -372,7 +294,7 @@ impl ProofQueue {
             if *expiration >= current_time {
                 // Not committed
                 if let Some(Some(proof)) = self.digest_proof.get(digest) {
-                    remaining_txns += proof.info().num_txns;
+                    remaining_txns += proof.num_txns();
                     remaining_proofs += 1;
                 }
             }

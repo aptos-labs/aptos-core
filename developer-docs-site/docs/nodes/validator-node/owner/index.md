@@ -17,7 +17,7 @@ The [Petra wallet extension](../../../guides/install-petra-wallet.md) is support
 ## Owner operations with CLI
 
 :::tip Testnet vs Mainnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet and devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### Initialize CLI
@@ -26,7 +26,7 @@ Initialize CLI with your Petra wallet private key or create new wallet.
 
 ```bash
 aptos init --profile mainnet-owner \
-  --rest-url https://fullnode.mainnet.aptoslabs.com/v1
+  --network mainnet
 ```
 
 You can either enter the private key from an existing wallet, or create new wallet address.
