@@ -12,10 +12,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::{
-    common::Round,
-    proof_of_store::{ProofOfStore, SignedBatchInfo},
-};
+use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_logger::prelude::*;
@@ -30,9 +27,12 @@ use dashmap::{
 use fail::fail_point;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, Mutex,
+use std::{
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
 };
 use tokio::sync::oneshot;
 
@@ -262,9 +262,13 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                 // Skip caching and storing value to the db
                 Ok(false)
             });
+            counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE.observe(
+                Duration::from_micros(value.expiration() - last_certified_time).as_secs_f64(),
+            );
 
             return self.insert_to_cache(digest, value);
         }
+        counters::NUM_BATCH_EXPIRED_WHEN_SAVE.inc();
         bail!(
             "Incorrect expiration {} in epoch {}, last committed timestamp {}",
             value.expiration(),
@@ -320,12 +324,6 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    // TODO: make sure state-sync also sends the message, or execution cleans.
-    // When self.expiry_grace_rounds == 0, certified time contains a round for
-    // which execution result has been certified by a quorum, and as such, the
-    // batches with expiration in this round can be cleaned up. The parameter
-    // expiry grace rounds just keeps the batches around for a little longer
-    // for lagging nodes to be able to catch up (without state-sync).
     pub async fn update_certified_timestamp(&self, certified_time: u64) {
         trace!("QS: batch reader updating time {:?}", certified_time);
         let prev_time = self
@@ -346,7 +344,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    fn last_certified_time(&self) -> Round {
+    fn last_certified_time(&self) -> u64 {
         self.last_certified_time.load(Ordering::Relaxed)
     }
 

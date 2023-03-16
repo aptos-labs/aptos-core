@@ -54,7 +54,7 @@ pub struct ExecutionProxy {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
     validators: Mutex<Vec<AccountAddress>>,
-    write_mutex: AsyncMutex<LogicalTime>, // TODO: mutex needed?
+    write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
 }

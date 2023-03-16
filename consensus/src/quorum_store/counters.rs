@@ -130,6 +130,25 @@ pub static EXPIRED_PROOFS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_gap_batch_expiration_and_current_time_when_save",
+        "Histogram for the gaps between expiration round and the current round when saving proofs, and expiration time is lower.",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+    },
+);
+
+pub static NUM_BATCH_EXPIRED_WHEN_SAVE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_num_batch_expired_when_save",
+        "Number of batches that were already expired when save is called"
+    )
+    .unwrap()
+});
+
 /// Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS: Lazy<Histogram> =
     Lazy::new(|| {
