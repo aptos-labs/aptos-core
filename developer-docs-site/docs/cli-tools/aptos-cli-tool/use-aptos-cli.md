@@ -794,8 +794,8 @@ Please use `aptos move coverage -h` for more detailed test coverage of this pack
   "Result": "Success"
 }
    ```
-4. Run the following command to obtain more detailed coverage information: `aptos move coverage`
-5. Optionally, narrow down your test runs and results to a specific package name with the `--filter` option, like so:
+
+4. Optionally, narrow down your test runs and results to a specific package name with the `--filter` option, like so:
    ```bash
    $ aptos move test --filter vector --coverage
    BUILDING MoveStdlib
@@ -805,7 +805,8 @@ Please use `aptos move coverage -h` for more detailed test coverage of this pack
    [ PASS    ] 0x1::bit_vector_tests::index_bit_out_of_bounds
    [ PASS    ] 0x1::vector_tests::append_respects_order_empty_lhs
    ```
-   Or pass the module name to the `--module` option, for example:
+5. Run the following command to obtain more detailed coverage information: `aptos move coverage`
+6. Optionally, isolate the results to a module by passing its name to the `--module` option, for example:
    ```bash
    $ aptos move coverage bytecode --module signer
    // Move bytecode v6
