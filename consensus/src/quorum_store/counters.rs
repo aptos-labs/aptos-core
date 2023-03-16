@@ -90,16 +90,6 @@ pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the number of fragments per batch.
-pub static NUM_FRAGMENT_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_num_fragment_per_batch",
-        "Histogram for the number of fragments per batch.",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
-    )
-    .unwrap()
-});
-
 /// Histogram for the number of transactions per block when pulled for consensus.
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -284,29 +274,29 @@ pub static REMOTE_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the delivered batches since last restart.
-pub static DELIVERED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Count of the received batches since last restart.
+pub static RECEIVED_REMOTE_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "quorum_store_delivered_batch_count",
-        "Count of the delivered batches since last restart."
+        "quorum_store_received_remote_batch_count",
+        "Count of the received batches since last restart."
     )
     .unwrap()
 });
 
-/// Count of the delivered fragments since last restart.
-pub static DELIVERED_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Count of the received batch msg since last restart.
+pub static RECEIVED_BATCH_MSG_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "quorum_store_delivered_fragments_count",
-        "Count of the delivered fragments since last restart."
+        "quorum_store_received_batch_msg_count",
+        "Count of the received batch msg since last restart."
     )
     .unwrap()
 });
 
-/// Count of the delivered end batch since last restart.
-pub static DELIVERED_END_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Count of the received batch since last restart.
+pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "quorum_store_delivered_end_batch_count",
-        "Count of the delivered end batch since last restart."
+        "quorum_store_received_batch_count",
+        "Count of the received end batch since last restart."
     )
     .unwrap()
 });
@@ -329,29 +319,20 @@ pub static TIMEOUT_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of the expired batch fragments at the receiver side.
-pub static EXPIRED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_expired_batch_fragments_count",
-        "Count of the expired batch fragments at the receiver side."
-    )
-    .unwrap()
-});
-
-/// Count of the missed batch fragments at the receiver side.
-pub static MISSED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "quorum_store_missed_batch_fragments_count",
-        "Count of the missed batch fragments at the receiver side."
-    )
-    .unwrap()
-});
-
 /// Count of the exceeded storage quota.
 pub static EXCEEDED_STORAGE_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_exceeded_storage_quota_count",
         "Count of the exceeded storage quota."
+    )
+    .unwrap()
+});
+
+/// Count of the exceeded batch quota.
+pub static EXCEEDED_BATCH_QUOTA_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_exceeded_batch_quota_count",
+        "Count of the exceeded batch quota."
     )
     .unwrap()
 });
@@ -412,9 +393,9 @@ pub static RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(||
 });
 
 /// Count of the number of batches received from other nodes.
-pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+pub static RECEIVED_BATCH_RESPONSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "quorum_store_received_batch_count",
+        "quorum_store_received_batch_response_count",
         "Count of the number of batches received from other nodes."
     )
     .unwrap()
@@ -477,4 +458,29 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
+});
+
+pub static BATCH_SUCCESSFUL_CREATION: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_batch_successful_creation",
+        "Counter for whether we are successfully creating batches",
+    )
+});
+
+/// Number of validators for which we received signed replies
+pub static BATCH_RECEIVED_REPLIES_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_received_replies_votes",
+        "Number of validators for which we received signed replies.",
+    )
+    .unwrap()
+});
+
+/// Voting power of validators for which we received signed replies
+pub static BATCH_RECEIVED_REPLIES_VOTING_POWER: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_received_replies_voting_power",
+        "Voting power of validators for which we received signed replies.",
+    )
+    .unwrap()
 });

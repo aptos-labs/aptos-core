@@ -22,7 +22,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::Fragment,
+    quorum_store::types::BatchMsg,
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -31,7 +31,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
-    proof_of_store::{ProofOfStore, SignedDigest},
+    proof_of_store::{ProofOfStore, SignedBatchInfo},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -68,8 +68,8 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    FragmentMsg(Box<Fragment>),
-    SignedDigestMsg(Box<SignedDigest>),
+    BatchMsg(Box<BatchMsg>),
+    SignedBatchInfo(Box<SignedBatchInfo>),
     ProofOfStoreMsg(Box<ProofOfStore>),
     RandShareMsg(Box<RandShare>),
     RandDecisionMsg(Box<RandDecision>),
@@ -113,17 +113,17 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::CommitDecision(cd)
             },
-            UnverifiedEvent::FragmentMsg(f) => {
+            UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
-                    f.verify(peer_id)?;
+                    b.verify(peer_id)?;
                 }
-                VerifiedEvent::FragmentMsg(f)
+                VerifiedEvent::BatchMsg(b)
             },
-            UnverifiedEvent::SignedDigestMsg(sd) => {
+            UnverifiedEvent::SignedBatchInfo(sd) => {
                 if !self_message {
                     sd.verify(peer_id, validator)?;
                 }
-                VerifiedEvent::SignedDigestMsg(sd)
+                VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
@@ -151,8 +151,8 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
-            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
-            UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::BatchMsg(b) => b.epoch(),
+            UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
             UnverifiedEvent::RandShareMsg(r) => r.epoch(),
             UnverifiedEvent::RandDecisionMsg(r) => r.epoch(),
@@ -168,8 +168,8 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
-            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
-            ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
+            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             ConsensusMsg::RandShareMsg(m) => UnverifiedEvent::RandShareMsg(m),
             ConsensusMsg::RandDecisionMsg(m) => UnverifiedEvent::RandDecisionMsg(m),
@@ -187,8 +187,8 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    FragmentMsg(Box<Fragment>),
-    SignedDigestMsg(Box<SignedDigest>),
+    BatchMsg(Box<BatchMsg>),
+    SignedBatchInfo(Box<SignedBatchInfo>),
     ProofOfStoreMsg(Box<ProofOfStore>),
     RandShareMsg(Box<RandShare>),
     RandDecisionMsg(Box<RandDecision>),

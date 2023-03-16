@@ -115,7 +115,7 @@ impl Default for ConsensusConfigV1 {
         Self {
             decoupled_execution: true,
             back_pressure_limit: 10,
-            exclude_round: 20,
+            exclude_round: 40,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(
                 LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {

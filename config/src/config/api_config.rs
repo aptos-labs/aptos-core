@@ -34,7 +34,7 @@ pub struct ApiConfig {
 
     pub max_submit_transaction_batch_size: usize,
 
-    /// Maximum page size for paginated APIs
+    // Maximum page size for paginated APIs
     pub max_transactions_page_size: u16,
     pub max_events_page_size: u16,
     pub max_account_resources_page_size: u16,
@@ -42,6 +42,10 @@ pub struct ApiConfig {
 
     /// Max gas unit for view function.
     pub max_gas_view_function: u64,
+
+    // Performance functionality
+    pub max_runtime_workers: Option<usize>, // The maximum number of workers to use for the API runtime
+    pub runtime_worker_multiplier: usize, // If max_runtime_workers is None, use runtime_worker_multiplier * num CPU cores
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -83,6 +87,8 @@ impl Default for ApiConfig {
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
+            max_runtime_workers: None,
+            runtime_worker_multiplier: 2,
         }
     }
 }
