@@ -9,9 +9,9 @@ slug: "delegation-pool-operations"
 
 Validator operators should follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
-Once the delegation pool attains 1M APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Pool owner operations](#pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations/#joining-validator-set).
+Once the delegation pool attains 1M APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations.md#joining-validator-set).
 
-The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Delegation pool operations](#delegation-pool-operations).
+The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Perform delegation pool operations](#perform-delegation-pool-operations).
 
 
 ## Prerequisites
@@ -97,7 +97,7 @@ Now initialize a delegation pool by following these steps:
  
  4. The delegation pool can now accept a minimum amount of 10 APT from any user who wishes to delegate to it.
 
-## Delegation pool operations
+## Perform delegation pool operations
 
 This section describes the available operations that can be performed on this recently created pool. Once the delegation pool has been established, use the Aptos CLI to operate the pool. The available actions that can be performed on it include:
 
@@ -133,7 +133,7 @@ This section describes the available operations that can be performed on this re
   --args address:’pool_address’ u64:’amount’
   ```
 
-## Pool owner operations
+## Perform pool owner operations
  
 Delegation pool owners have access to specific methods designed for modifying the `operator` and `voter` roles of the delegation pool. Use the following Aptos CLI commands and include the relevant addresses:
 
