@@ -15,7 +15,6 @@ spec:
     rate: "{rate}mbps"
     limit: {limit}
     buffer: {buffer}
-  direction: both
   target:
     # For delay NetworkChaos, always use "from" direction and always target an entire namespace
     # This is because Forge submits API requests to k8s Services, whereas Chaos Mesh applies the chaos
