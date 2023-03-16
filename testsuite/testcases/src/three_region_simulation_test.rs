@@ -115,8 +115,6 @@ fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
     SwarmNetworkBandwidth {
         group_network_bandwidth: vec![GroupNetworkBandwidth {
             name: "forge-namespace-1000mbps-bandwidth".to_owned(),
-            source_nodes: all_validators.clone(),
-            target_nodes: all_validators,
             rate: 1000,
             limit: 20971520,
             buffer: 10000,

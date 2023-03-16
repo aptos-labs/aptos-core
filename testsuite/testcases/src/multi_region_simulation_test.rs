@@ -118,8 +118,6 @@ fn create_multi_region_swarm_network_chaos(
         SwarmNetworkBandwidth {
             group_network_bandwidth: vec![GroupNetworkBandwidth {
                 name: "forge-namespace-1000mbps-bandwidth".to_owned(),
-                source_nodes: all_validators.clone(),
-                target_nodes: all_validators,
                 rate: 1000 / 8,
                 limit: 20971520,
                 buffer: 10000,
@@ -262,8 +260,6 @@ mod tests {
             bandwidth.group_network_bandwidth[0],
             GroupNetworkBandwidth {
                 name: "forge-namespace-1000mbps-bandwidth".to_owned(),
-                source_nodes: all_validators.clone(),
-                target_nodes: all_validators,
                 rate: 125,
                 limit: 20971520,
                 buffer: 10000

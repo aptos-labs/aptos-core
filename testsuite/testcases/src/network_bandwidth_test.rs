@@ -34,8 +34,6 @@ impl NetworkLoadTest for NetworkBandwidthTest {
             .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
                 group_network_bandwidth: vec![GroupNetworkBandwidth {
                     name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
-                    source_nodes: all_validators.clone(),
-                    target_nodes: all_validators,
                     rate: RATE_MBPS,
                     limit: LIMIT_BYTES,
                     buffer: BUFFER_BYTES,
@@ -55,8 +53,6 @@ impl NetworkLoadTest for NetworkBandwidthTest {
         swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
             group_network_bandwidth: vec![GroupNetworkBandwidth {
                 name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
-                source_nodes: all_validators.clone(),
-                target_nodes: all_validators,
                 rate: RATE_MBPS,
                 limit: LIMIT_BYTES,
                 buffer: BUFFER_BYTES,
