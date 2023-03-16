@@ -188,12 +188,11 @@ const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 })();
 
 ```
-Alternatively you can use Aptos CLI to call view functions. 
+Alternatively you can use Aptos CLI to call View functions. 
 
 ```bash
  aptos move view [OPTIONS] --function-id <FUNCTION_ID>
 
 ```
 
-To discover the available options and the process for making an aptos move call, you can use the command aptos move view --help. This will display the required arguments for invoking the view functions.
-
+To discover the available options and the process for making an `aptos move view` call, access the help with `aptos move view --help`. This will display the required arguments for invoking the view functions.
