@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.7"
+version = "1.0.8"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -273,6 +273,7 @@ dependencies = [
  "mime",
  "move-core-types",
  "move-package",
+ "num_cpus",
  "once_cell",
  "paste",
  "percent-encoding",

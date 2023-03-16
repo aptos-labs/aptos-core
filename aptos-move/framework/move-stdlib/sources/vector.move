@@ -84,9 +84,6 @@ module std::vector {
             right = right - 1;
         }
     }
-    spec reverse_slice {
-        pragma intrinsic = true;
-    }
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {

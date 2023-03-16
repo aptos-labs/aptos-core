@@ -1,0 +1,11 @@
+[package]
+name = "basic_coin"
+version = "0.0.0"
+
+[addresses]
+named_addr = "0xDEADBEEF"
+
+[dependencies.AptosStdlib]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'main'
+subdir = 'aptos-move/framework/aptos-stdlib'
