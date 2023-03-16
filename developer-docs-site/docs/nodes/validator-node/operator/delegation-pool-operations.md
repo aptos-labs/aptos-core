@@ -76,7 +76,7 @@ To create a delegation pool and obtain information about it, connect to the [Apt
 
 Now initialize a delegation pool by following these steps:
 
-1. Run the command below, substituting in your previously configured profile:
+1. Run the command below, substituting in your previously configured profile set during initialization:
 
   ```bash
   aptos move run --profile ‘your_profile’ \ 
@@ -86,8 +86,8 @@ Now initialize a delegation pool by following these steps:
 
   Where `--args`:
 
-  - `u64:1000` represents `operator_commission_percentage`
-  - `raw: 00` represents `delegation_pool_creation_seed`
+  - `u64:1000` represents `operator_commission_percentage` - 1000 is equivalent to 10% and 10000 is 100%.
+  - `raw: 00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
 
   Note that once `operator_commission_percentage` is set, it cannot be changed.
 
