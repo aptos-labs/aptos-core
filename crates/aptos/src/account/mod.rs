@@ -6,6 +6,7 @@ use clap::Subcommand;
 
 pub mod create;
 pub mod create_resource_account;
+pub mod derive_resource_account;
 pub mod fund;
 pub mod key_rotation;
 pub mod list;
@@ -24,6 +25,7 @@ pub enum AccountTool {
     LookupAddress(key_rotation::LookupAddress),
     RotateKey(key_rotation::RotateKey),
     Transfer(transfer::TransferCoins),
+    DeriveResourceAccountAddress(derive_resource_account::DeriveResourceAccount),
 }
 
 impl AccountTool {
@@ -31,6 +33,7 @@ impl AccountTool {
         match self {
             AccountTool::Create(tool) => tool.execute_serialized().await,
             AccountTool::CreateResourceAccount(tool) => tool.execute_serialized().await,
+            AccountTool::DeriveResourceAccountAddress(tool) => tool.execute_serialized().await,
             AccountTool::FundWithFaucet(tool) => tool.execute_serialized().await,
             AccountTool::List(tool) => tool.execute_serialized().await,
             AccountTool::LookupAddress(tool) => tool.execute_serialized().await,

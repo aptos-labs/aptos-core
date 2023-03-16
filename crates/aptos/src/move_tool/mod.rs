@@ -9,6 +9,7 @@ pub mod stored_package;
 mod transactional_tests_runner;
 
 use crate::{
+    account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
             load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
@@ -749,16 +750,21 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
 #[derive(Parser)]
 pub struct CreateResourceAccountAndPublishPackage {
-    #[clap(long)]
-    pub(crate) seed: String,
-
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the resource account and put it in this location
     #[clap(long)]
     pub(crate) address_name: String,
 
     /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
     #[clap(long)]
     pub(crate) override_size_check: bool,
 
+    #[clap(flatten)]
+    pub(crate) seed_args: ResourceAccountSeed,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -775,12 +781,12 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let CreateResourceAccountAndPublishPackage {
-            seed,
             address_name,
             mut move_options,
             txn_options,
             override_size_check,
             included_artifacts_args,
+            seed_args,
         } = self;
 
         let account = if let Some(Some(account)) = CliConfig::load_profile(
@@ -795,9 +801,9 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
                 "Please provide an account using --profile or run aptos init".to_string(),
             ));
         };
+        let seed = seed_args.seed()?;
 
-        let resource_address =
-            create_resource_address(account, &bcs::to_bytes(&seed.clone()).unwrap());
+        let resource_address = create_resource_address(account, &seed);
         move_options.add_named_address(address_name, resource_address.to_string());
 
         let package_path = move_options.get_package_path()?;
@@ -819,7 +825,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         prompt_yes_with_override(&message, txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
-            bcs::to_bytes(&seed)?,
+            seed,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );
@@ -1350,6 +1356,13 @@ impl FunctionArgType {
                         hex::decode(arg)
                             .map_err(|err| CliError::UnableToParse("vector<hex>", err.to_string()))
                     }),
+                    // Note commas cannot be put into the strings.  But, this should be a less likely case,
+                    // and the utility from having this available should be worth it.
+                    FunctionArgType::String => parse_vector_arg(arg, |arg| {
+                        bcs::to_bytes(arg).map_err(|err| {
+                            CliError::UnableToParse("vector<string>", err.to_string())
+                        })
+                    }),
                     FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
@@ -1420,12 +1433,7 @@ impl FromStr for FunctionArgType {
                 if str.starts_with("vector<") && str.ends_with('>') {
                     let arg = FunctionArgType::from_str(&str[7..str.len() - 1])?;
 
-                    // String gets confusing on parsing by commas
-                    if arg == FunctionArgType::String {
-                        return Err(CliError::CommandArgumentError(
-                            "vector<string> is not supported".to_string(),
-                        ));
-                    } else if arg == FunctionArgType::Raw {
+                    if arg == FunctionArgType::Raw {
                         return Err(CliError::CommandArgumentError(
                             "vector<raw> is not supported".to_string(),
                         ));
