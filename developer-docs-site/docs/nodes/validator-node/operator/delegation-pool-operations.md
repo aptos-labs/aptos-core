@@ -13,7 +13,6 @@ Once the delegation pool attains 1M APT, the pool's owner who initiates the dele
 
 The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Delegation pool operations](#delegation-pool-operations).
 
-It is not mandatory to operate an Aptos node personally to become a part of the active validators set. Instead, one can designate an individual with an Aptos node as the operator and associate the pool with their node. By doing so, the new operator will be able to successfully join the active validators set.
 
 ## Prerequisites
 
@@ -189,5 +188,12 @@ const NODE_URL = "https://aptos-testnet.public.blastapi.io";
 })();
 
 ```
+Alternatively you can use Aptos CLI to call view functions. 
 
-When publishing the module that has View functions, pass ‘--bytecode-version 6’ to the Aptos CLI.
+```bash
+ aptos move view [OPTIONS] --function-id <FUNCTION_ID>
+
+```
+
+To discover the available options and the process for making an aptos move call, you can use the command aptos move view --help. This will display the required arguments for invoking the view functions.
+
