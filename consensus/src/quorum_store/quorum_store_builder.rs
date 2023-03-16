@@ -18,6 +18,7 @@ use crate::{
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
+        types::Batch,
     },
     round_manager::VerifiedEvent,
 };
@@ -171,7 +172,7 @@ impl InnerBuilder {
             );
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
-        for _ in 0..config.num_workers_for_remote_batches {
+        for _ in 0..config.num_workers_for_remote_fragments {
             let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
                 tokio::sync::mpsc::channel(config.channel_size);
             remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
@@ -373,6 +374,7 @@ impl InnerBuilder {
         spawn_named!("network_listener", net.start());
 
         let batch_store = self.batch_store.clone().unwrap();
+        let author = self.author;
         let epoch = self.epoch;
         let (batch_retrieval_tx, mut batch_retrieval_rx) =
             aptos_channel::new::<AccountAddress, IncomingBatchRetrievalRequest>(
@@ -385,8 +387,13 @@ impl InnerBuilder {
             while let Some(rpc_request) = batch_retrieval_rx.next().await {
                 counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
                 if let Ok(value) = batch_store.get_batch_from_local(&rpc_request.req.digest()) {
-                    let batch = value.try_into().unwrap();
-                    let msg = ConsensusMsg::BatchResponse(Box::new(batch));
+                    let batch = Batch::new(
+                        author,
+                        epoch,
+                        rpc_request.req.digest(),
+                        value.maybe_payload.expect("Must have payload"),
+                    );
+                    let msg = ConsensusMsg::BatchMsg(Box::new(batch));
                     let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
                     if let Err(e) = rpc_request
                         .response_sender

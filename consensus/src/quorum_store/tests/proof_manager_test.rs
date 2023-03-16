@@ -4,7 +4,7 @@
 use crate::quorum_store::proof_manager::ProofManager;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{BatchId, BatchInfo, LogicalTime, ProofOfStore},
+    proof_of_store::{BatchId, LogicalTime, ProofOfStore, SignedDigestInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
@@ -20,11 +20,11 @@ async fn test_block_request() {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(1);
     let proof = ProofOfStore::new(
-        BatchInfo::new(
+        SignedDigestInfo::new(
             PeerId::random(),
             batch_id,
-            LogicalTime::new(0, 10),
             digest,
+            LogicalTime::new(0, 10),
             1,
             1,
         ),

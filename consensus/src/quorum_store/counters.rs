@@ -90,6 +90,16 @@ pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of fragments per batch.
+pub static NUM_FRAGMENT_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_num_fragment_per_batch",
+        "Histogram for the number of fragments per batch.",
+        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of transactions per block when pulled for consensus.
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -315,6 +325,24 @@ pub static TIMEOUT_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_timeout_batch_count",
         "Count of the timeout batches at the sender side."
+    )
+    .unwrap()
+});
+
+/// Count of the expired batch fragments at the receiver side.
+pub static EXPIRED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_expired_batch_fragments_count",
+        "Count of the expired batch fragments at the receiver side."
+    )
+    .unwrap()
+});
+
+/// Count of the missed batch fragments at the receiver side.
+pub static MISSED_BATCH_FRAGMENTS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_missed_batch_fragments_count",
+        "Count of the missed batch fragments at the receiver side."
     )
     .unwrap()
 });

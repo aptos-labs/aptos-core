@@ -8,7 +8,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use anyhow::{anyhow, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -96,7 +96,7 @@ pub trait QuorumStoreSender: Send + Clone {
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
 
-    async fn broadcast_batch_msg(&mut self, batch: Batch);
+    async fn broadcast_fragment(&mut self, fragment: Fragment);
 
     async fn broadcast_proof_of_store(&mut self, proof_of_store: ProofOfStore);
 }
@@ -334,17 +334,14 @@ impl QuorumStoreSender for NetworkSender {
             .send_rpc(recipient, msg, timeout)
             .await?;
         match response {
-            ConsensusMsg::BatchResponse(batch) => {
-                batch.verify()?;
-                Ok(*batch)
-            },
+            ConsensusMsg::BatchMsg(batch) => Ok(*batch),
             _ => Err(anyhow!("Invalid batch response")),
         }
     }
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         fail_point!("consensus::send::batch", |_| ());
-        let msg = ConsensusMsg::BatchResponse(Box::new(batch));
+        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
         self.send(msg, recipients).await
     }
 
@@ -354,9 +351,9 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
-    async fn broadcast_batch_msg(&mut self, batch: Batch) {
-        fail_point!("consensus::send::broadcast_batch", |_| ());
-        let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batch)));
+    async fn broadcast_fragment(&mut self, fragment: Fragment) {
+        fail_point!("consensus::send::broadcast_fragment", |_| ());
+        let msg = ConsensusMsg::FragmentMsg(Box::new(fragment));
         self.broadcast(msg).await
     }
 
@@ -449,11 +446,11 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     match msg {
-                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
-                            warn!("unexpected rpc msg");
+                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchMsg(_) => {
+                            warn!("unexpected msg");
                         },
                         quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
-                        | ConsensusMsg::BatchMsg(_)
+                        | ConsensusMsg::FragmentMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
                             Self::push_msg(
                                 peer_id,

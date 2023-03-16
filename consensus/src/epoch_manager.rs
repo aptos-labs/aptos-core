@@ -904,8 +904,9 @@ impl EpochManager {
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
-            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::FragmentMsg(_)
             | ConsensusMsg::BatchRequestMsg(_)
+            | ConsensusMsg::BatchMsg(_)
             | ConsensusMsg::SignedDigestMsg(_)
             | ConsensusMsg::ProofOfStoreMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
@@ -959,7 +960,7 @@ impl EpochManager {
         event: &UnverifiedEvent,
     ) -> anyhow::Result<()> {
         match event {
-            UnverifiedEvent::BatchMsg(_)
+            UnverifiedEvent::FragmentMsg(_)
             | UnverifiedEvent::SignedDigestMsg(_)
             | UnverifiedEvent::ProofOfStoreMsg(_) => {
                 if self.quorum_store_enabled {
@@ -1008,7 +1009,7 @@ impl EpochManager {
         if let Err(e) = match event {
             quorum_store_event @ (VerifiedEvent::SignedDigestMsg(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
-            | VerifiedEvent::BatchMsg(_)) => {
+            | VerifiedEvent::FragmentMsg(_)) => {
                 Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
                     .context("quorum store sender")
             },
