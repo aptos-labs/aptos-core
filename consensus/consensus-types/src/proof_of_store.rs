@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
+    hash::Hash,
+    ops::Deref,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
@@ -86,78 +88,86 @@ impl Display for BatchId {
 #[derive(
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
-pub struct SignedDigestInfo {
-    pub batch_author: PeerId,
-    pub batch_id: BatchId,
-    pub digest: HashValue,
-    pub expiration: LogicalTime,
-    pub num_txns: u64,
-    pub num_bytes: u64,
+pub struct BatchInfo {
+    author: PeerId,
+    batch_id: BatchId,
+    expiration: LogicalTime,
+    digest: HashValue,
+    num_txns: u64,
+    num_bytes: u64,
 }
 
-impl SignedDigestInfo {
+impl BatchInfo {
     pub fn new(
-        batch_author: PeerId,
+        author: PeerId,
         batch_id: BatchId,
-        digest: HashValue,
         expiration: LogicalTime,
+        digest: HashValue,
         num_txns: u64,
         num_bytes: u64,
     ) -> Self {
         Self {
-            batch_author,
+            author,
             batch_id,
-            digest,
             expiration,
+            digest,
             num_txns,
             num_bytes,
         }
     }
+
+    pub fn epoch(&self) -> u64 {
+        self.expiration.epoch
+    }
+
+    pub fn author(&self) -> PeerId {
+        self.author
+    }
+
+    pub fn batch_id(&self) -> BatchId {
+        self.batch_id
+    }
+
+    pub fn expiration(&self) -> LogicalTime {
+        self.expiration
+    }
+
+    pub fn digest(&self) -> &HashValue {
+        &self.digest
+    }
+
+    pub fn num_txns(&self) -> u64 {
+        self.num_txns
+    }
+
+    pub fn num_bytes(&self) -> u64 {
+        self.num_bytes
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SignedDigest {
-    epoch: u64,
+pub struct SignedBatchInfo {
+    info: BatchInfo,
     signer: PeerId,
-    info: SignedDigestInfo,
     signature: bls12381::Signature,
 }
 
-impl SignedDigest {
+impl SignedBatchInfo {
     pub fn new(
-        batch_author: PeerId,
-        batch_id: BatchId,
-        epoch: u64,
-        digest: HashValue,
-        expiration: LogicalTime,
-        num_txns: u64,
-        num_bytes: u64,
+        batch_info: BatchInfo,
         validator_signer: &ValidatorSigner,
     ) -> Result<Self, CryptoMaterialError> {
-        let info = SignedDigestInfo::new(
-            batch_author,
-            batch_id,
-            digest,
-            expiration,
-            num_txns,
-            num_bytes,
-        );
-        let signature = validator_signer.sign(&info)?;
+        let signature = validator_signer.sign(&batch_info)?;
 
         Ok(Self {
-            epoch,
+            info: batch_info,
             signer: validator_signer.author(),
-            info,
             signature,
         })
     }
 
     pub fn signer(&self) -> PeerId {
         self.signer
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
     }
 
     pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -168,50 +178,43 @@ impl SignedDigest {
         }
     }
 
-    pub fn info(&self) -> &SignedDigestInfo {
-        &self.info
-    }
-
     pub fn signature(self) -> bls12381::Signature {
         self.signature
     }
 
-    pub fn digest(&self) -> HashValue {
-        self.info.digest
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
+}
+
+impl Deref for SignedBatchInfo {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum SignedDigestError {
+pub enum SignedBatchInfoError {
     WrongAuthor,
     WrongInfo,
     DuplicatedSignature,
+    InvalidAuthor,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofOfStore {
-    info: SignedDigestInfo,
+    info: BatchInfo,
     multi_signature: AggregateSignature,
 }
 
 impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
+    pub fn new(info: BatchInfo, multi_signature: AggregateSignature) -> Self {
         Self {
             info,
             multi_signature,
         }
-    }
-
-    pub fn info(&self) -> &SignedDigestInfo {
-        &self.info
-    }
-
-    pub fn digest(&self) -> &HashValue {
-        &self.info.digest
-    }
-
-    pub fn expiration(&self) -> LogicalTime {
-        self.info.expiration
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -227,8 +230,12 @@ impl ProofOfStore {
         ret.shuffle(&mut thread_rng());
         ret
     }
+}
 
-    pub fn epoch(&self) -> u64 {
-        self.info.expiration.epoch
+impl Deref for ProofOfStore {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
