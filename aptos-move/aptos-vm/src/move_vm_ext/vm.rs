@@ -6,9 +6,11 @@ use crate::{
     natives::aptos_natives,
 };
 use aptos_framework::natives::{
-    aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
-    cryptography::ristretto255_point::NativeRistrettoPointContext,
-    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+    aggregator_natives::NativeAggregatorContext,
+    code::NativeCodeContext,
+    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    state_storage::NativeStateStorageContext,
+    transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
@@ -79,6 +81,7 @@ impl MoveVmExt {
 
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
+        extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let script_hash = match session_id {
