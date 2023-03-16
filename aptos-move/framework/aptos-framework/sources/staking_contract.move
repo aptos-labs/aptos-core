@@ -58,6 +58,8 @@ module aptos_framework::staking_contract {
     const EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW: u64 = 7;
     /// Caller must be either the staker or operator.
     const ENOT_STAKER_OR_OPERATOR: u64 = 8;
+    /// Operator address in OperatorPrincipal doesn't match.
+    const EOPERATOR_PRINCIPAL_OPERATOR_NOT_MATCH: u64 = 9;
 
     /// Maximum number of distributions a stake pool can support.
     const MAXIMUM_PENDING_DISTRIBUTIONS: u64 = 20;
@@ -99,6 +101,16 @@ module aptos_framework::staking_contract {
         operator: address,
         old_commission_percentage: u64,
         new_commission_percentage: u64,
+    }
+
+    struct OperatorPrincipal has key {
+        // Recorded operator's principal after the last commission distribution.
+        // This is only used to calculate the commission the operator should be receiving.
+        // This struct could be stored in either staker account or operator account.
+
+        operator: address,
+        // Key is staker address because an operator could operator multiple stake pools.
+        operator_principal: SimpleMap<address, u64>,
     }
 
     #[resource_group_member(group = aptos_framework::staking_contract::StakingGroupContainer)]
@@ -323,6 +335,8 @@ module aptos_framework::staking_contract {
         let staked_coins = coin::withdraw<AptosCoin>(staker, amount);
         stake::add_stake_with_cap(&staking_contract.owner_cap, staked_coins);
 
+        // distribute reward to staker and operator here
+
         staking_contract.principal = staking_contract.principal + amount;
         let pool_address = staking_contract.pool_address;
         emit_event(
@@ -392,6 +406,7 @@ module aptos_framework::staking_contract {
         );
     }
 
+    // We will need a new function to withdraw staked commission
     /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
     /// at the end of the stake pool's lockup period before they can actually can withdraw_commission.
     ///
@@ -419,6 +434,7 @@ module aptos_framework::staking_contract {
         );
     }
 
+    // This function will only involve unstaked commission
     fun request_commission_internal(
         operator: address,
         staking_contract: &mut StakingContract,
@@ -498,6 +514,7 @@ module aptos_framework::staking_contract {
         );
     }
 
+    // This function will only involves unstaked commission.
     /// Unlock all accumulated rewards since the last recorded principals.
     public entry fun unlock_rewards(staker: &signer, operator: address) acquires Store {
         let staker_address = signer::address_of(staker);
@@ -552,6 +569,8 @@ module aptos_framework::staking_contract {
             &mut store.add_distribution_events,
             &mut store.request_commission_events,
         );
+
+        // Also withdraw staked commission and remove operator principal for this staker in operator's account.
 
         // Update the staking contract's commission rate and stake pool's operator.
         stake::set_operator_with_cap(&staking_contract.owner_cap, new_operator);
@@ -651,6 +670,8 @@ module aptos_framework::staking_contract {
 
     // Calculate accumulated rewards and commissions since last update.
     fun get_staking_contract_amounts_internal(staking_contract: &StakingContract): (u64, u64, u64) {
+        // refactor calculation here
+
         // Pending_inactive is not included in the calculation because pending_inactive can only come from:
         // 1. Outgoing commissions. This means commission has already been extracted.
         // 2. Stake withdrawals from stakers. This also means commission has already been extracted as
@@ -742,6 +763,50 @@ module aptos_framework::staking_contract {
             distribute_events: account::new_event_handle<DistributeEvent>(staker),
         }
     }
+
+    fun update_operator_principal(account: &signer, staker: address, operator: address, new_principal: u64) acquires Store, OperatorPrincipal {
+        assert_staking_contract_exists(staker, operator);
+        let account_addr = signer::address_of(account);
+        assert!(account_addr == staker || account_addr == operator, ENOT_STAKER_OR_OPERATOR);
+        let principal_already_exists = false;
+        if (exists<OperatorPrincipal>(staker)) {
+            let operator_principal = borrow_global_mut<OperatorPrincipal>(staker);
+            assert!(operator_principal.operator == operator, EOPERATOR_PRINCIPAL_OPERATOR_NOT_MATCH);
+            let old_principal = simple_map::borrow_mut<address, u64>(&mut operator_principal.operator_principal, &staker);
+            *old_principal = new_principal;
+            return
+        } else if (exists<OperatorPrincipal>(operator)) {
+            let operator_principal = borrow_global_mut<OperatorPrincipal>(operator);
+            assert!(operator_principal.operator == operator, EOPERATOR_PRINCIPAL_OPERATOR_NOT_MATCH);
+            if (simple_map::contains_key<address, u64>(&operator_principal.operator_principal, &staker)) {
+                let old_principal = simple_map::borrow_mut<address, u64>(&mut operator_principal.operator_principal, &staker);
+                *old_principal = new_principal;
+                return
+            }
+        };
+        let operator_principal = simple_map::create<address, u64>();
+        simple_map::add<address, u64>(&mut operator_principal, staker, new_principal);
+        move_to(account, OperatorPrincipal {
+            operator,
+            operator_principal,
+        });
+    }
+
+    fun get_operator_principal(staker: address, operator: address): u64 acquires OperatorPrincipal {
+        if (exists<OperatorPrincipal>(staker)) {
+            let operator_principal = borrow_global<OperatorPrincipal>(staker);
+            assert!(operator_principal.operator == operator, EOPERATOR_PRINCIPAL_OPERATOR_NOT_MATCH);
+            simple_map::borrow<address, u64>(&operator_principal.operator_principal, &staker)
+        } else if (exists<OperatorPrincipal>(operator)) {
+            let operator_principal = borrow_global_mut<OperatorPrincipal>(operator);
+            assert!(operator_principal.operator == operator, EOPERATOR_PRINCIPAL_OPERATOR_NOT_MATCH);
+            if (simple_map::contains_key<address, u64>(&operator_principal.operator_principal, &staker)) {
+                simple_map::borrow<address, u64>(&operator_principal.operator_principal, &staker);
+            }
+        };
+        0
+    }
+
 
     #[test_only]
     const VALIDATOR_STATUS_ACTIVE: u64 = 2;
