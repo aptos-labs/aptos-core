@@ -812,25 +812,35 @@ Please use `aptos move coverage -h` for more detailed test coverage of this pack
 5. Run the `aptos move coverage` command to obtain more detailed coverage information.
 6. Optionally, isolate the results to a module by passing its name to the `--module` option, for example:
    ```bash
-   $ aptos move coverage bytecode --module signer
+   $ aptos move coverage source --module signer
    ```
 
    With results:
    ```
-   // Move bytecode v6
-   module 1.signer {
-   public address_of(s: &signer): address {
-   B0:
-   [2]	0: MoveLoc[0](s: &signer)
-   [2]	1: Call borrow_address(&signer): &address
-   [2]	2: ReadRef
-   [2]	3: Ret
-   }
-   native public borrow_address(s: &signer): &address
-   }
-   {
-     "Result": "Success"
-   }
+   module std::signer {
+       // Borrows the address of the signer
+       // Conceptually, you can think of the `signer` as being a struct wrapper arround an
+       // address
+       // ```
+       // struct signer has drop { addr: address }
+       // ```
+       // `borrow_address` borrows this inner field
+       native public fun borrow_address(s: &signer): &address;
+
+       // Copies the address of the signer
+       public fun address_of(s: &signer): address {
+           *borrow_address(s)
+       }
+
+    /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
+    spec native fun is_txn_signer(s: signer): bool;
+
+    /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
+    spec native fun is_txn_signer_addr(a: address): bool;
+}
+{
+  "Result": "Success"
+}
    ```
 6. Find failures and iteratively improve your testing and running these commands to eliminate gaps in your testing coverage.
 
