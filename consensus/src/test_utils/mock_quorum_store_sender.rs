@@ -4,7 +4,7 @@
 use crate::{
     network::QuorumStoreSender,
     network_interface::ConsensusMsg,
-    quorum_store::types::{Batch, BatchRequest},
+    quorum_store::types::{Batch, BatchRequest, Fragment},
 };
 use aptos_consensus_types::{
     common::Author,
@@ -44,7 +44,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
 
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
         self.tx
-            .send((ConsensusMsg::BatchResponse(Box::new(batch)), recipients))
+            .send((ConsensusMsg::BatchMsg(Box::new(batch)), recipients))
             .await
             .expect("could not send");
     }
@@ -59,7 +59,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .expect("could not send");
     }
 
-    async fn broadcast_batch_msg(&mut self, _batch: Batch) {
+    async fn broadcast_fragment(&mut self, _fragment: Fragment) {
         unimplemented!()
     }
 

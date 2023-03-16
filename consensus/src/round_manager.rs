@@ -23,7 +23,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
+    quorum_store::types::Fragment,
 };
 use anyhow::{bail, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -69,7 +69,7 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    BatchMsg(Box<BatchMsg>),
+    FragmentMsg(Box<Fragment>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
 }
@@ -112,11 +112,11 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::CommitDecision(cd)
             },
-            UnverifiedEvent::BatchMsg(b) => {
+            UnverifiedEvent::FragmentMsg(f) => {
                 if !self_message {
-                    b.verify(peer_id)?;
+                    f.verify(peer_id)?;
                 }
-                VerifiedEvent::BatchMsg(b)
+                VerifiedEvent::FragmentMsg(f)
             },
             UnverifiedEvent::SignedDigestMsg(sd) => {
                 if !self_message {
@@ -140,7 +140,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
-            UnverifiedEvent::BatchMsg(b) => b.epoch(),
+            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
             UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
@@ -155,7 +155,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
-            ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
+            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
             ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
@@ -172,7 +172,7 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    BatchMsg(Box<BatchMsg>),
+    FragmentMsg(Box<Fragment>),
     SignedDigestMsg(Box<SignedDigest>),
     ProofOfStoreMsg(Box<ProofOfStore>),
     // local messages

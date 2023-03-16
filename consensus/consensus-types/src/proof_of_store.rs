@@ -86,56 +86,68 @@ impl Display for BatchId {
 #[derive(
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
-pub struct BatchInfo {
-    pub author: PeerId,
+pub struct SignedDigestInfo {
+    pub batch_author: PeerId,
     pub batch_id: BatchId,
-    pub expiration: LogicalTime,
     pub digest: HashValue,
+    pub expiration: LogicalTime,
     pub num_txns: u64,
     pub num_bytes: u64,
 }
 
-impl BatchInfo {
+impl SignedDigestInfo {
     pub fn new(
-        author: PeerId,
+        batch_author: PeerId,
         batch_id: BatchId,
-        expiration: LogicalTime,
         digest: HashValue,
+        expiration: LogicalTime,
         num_txns: u64,
         num_bytes: u64,
     ) -> Self {
         Self {
-            author,
+            batch_author,
             batch_id,
-            expiration,
             digest,
+            expiration,
             num_txns,
             num_bytes,
         }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.expiration.epoch
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedDigest {
+    epoch: u64,
     signer: PeerId,
-    info: BatchInfo,
+    info: SignedDigestInfo,
     signature: bls12381::Signature,
 }
 
 impl SignedDigest {
     pub fn new(
-        batch_info: BatchInfo,
+        batch_author: PeerId,
+        batch_id: BatchId,
+        epoch: u64,
+        digest: HashValue,
+        expiration: LogicalTime,
+        num_txns: u64,
+        num_bytes: u64,
         validator_signer: &ValidatorSigner,
     ) -> Result<Self, CryptoMaterialError> {
-        let signature = validator_signer.sign(&batch_info)?;
+        let info = SignedDigestInfo::new(
+            batch_author,
+            batch_id,
+            digest,
+            expiration,
+            num_txns,
+            num_bytes,
+        );
+        let signature = validator_signer.sign(&info)?;
 
         Ok(Self {
+            epoch,
             signer: validator_signer.author(),
-            info: batch_info,
+            info,
             signature,
         })
     }
@@ -145,7 +157,7 @@ impl SignedDigest {
     }
 
     pub fn epoch(&self) -> u64 {
-        self.info.epoch()
+        self.epoch
     }
 
     pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -156,7 +168,7 @@ impl SignedDigest {
         }
     }
 
-    pub fn info(&self) -> &BatchInfo {
+    pub fn info(&self) -> &SignedDigestInfo {
         &self.info
     }
 
@@ -179,19 +191,19 @@ pub enum SignedDigestError {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofOfStore {
-    info: BatchInfo,
+    info: SignedDigestInfo,
     multi_signature: AggregateSignature,
 }
 
 impl ProofOfStore {
-    pub fn new(info: BatchInfo, multi_signature: AggregateSignature) -> Self {
+    pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
         Self {
             info,
             multi_signature,
         }
     }
 
-    pub fn info(&self) -> &BatchInfo {
+    pub fn info(&self) -> &SignedDigestInfo {
         &self.info
     }
 
