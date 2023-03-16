@@ -145,9 +145,6 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 for peer in request_peers {
                                     futures.push(network_sender.request_batch(request.clone(), peer, rpc_timeout));
                                 }
-                            } else {
-                                // retry_limit exceeds, fail to get batch from peers
-                                break;
                             }
                         }
                         Some(response) = futures.next() => {
@@ -161,6 +158,10 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 }
                             }
                         },
+                        else => {
+                            // end the batch requester when the futures are drained
+                            break;
+                        }
                     }
                 }
                 request_state.serve_request(digest, None);
