@@ -30,7 +30,7 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `get_delegation_pools_feature`](#0x1_features_get_delegation_pools_feature)
 -  [Function `delegation_pools_enabled`](#0x1_features_delegation_pools_enabled)
 -  [Function `get_cryptography_algebra_natives_feature`](#0x1_features_get_cryptography_algebra_natives_feature)
--  [Function `cryptogtaphy_algebra_enabled`](#0x1_features_cryptogtaphy_algebra_enabled)
+-  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -728,13 +728,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_cryptogtaphy_algebra_enabled"></a>
+<a name="0x1_features_cryptography_algebra_enabled"></a>
 
-## Function `cryptogtaphy_algebra_enabled`
+## Function `cryptography_algebra_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptogtaphy_algebra_enabled">cryptogtaphy_algebra_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool
 </code></pre>
 
 
@@ -743,7 +743,7 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptogtaphy_algebra_enabled">cryptogtaphy_algebra_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>)
 }
 </code></pre>

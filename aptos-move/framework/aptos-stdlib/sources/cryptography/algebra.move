@@ -5,7 +5,7 @@
 /// Currently supported operations include element serialization/deserialization and addition.
 module aptos_std::algebra {
     use std::option::{Option, some, none};
-    use std::features::cryptogtaphy_algebra_enabled;
+    use std::features::cryptography_algebra_enabled;
 
     /// This struct represents an element of an algebraic structure `S`.
     struct Element<phantom S> has copy, drop {
@@ -57,7 +57,7 @@ module aptos_std::algebra {
     //
 
     fun abort_unless_cryptography_algebra_natives_enabled() {
-        if (cryptogtaphy_algebra_enabled()) return;
+        if (cryptography_algebra_enabled()) return;
         abort(std::error::not_implemented(0))
     }
 

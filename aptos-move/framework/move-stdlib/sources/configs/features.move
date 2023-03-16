@@ -145,7 +145,7 @@ module std::features {
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
     public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
-    public fun cryptogtaphy_algebra_enabled(): bool acquires Features {
+    public fun cryptography_algebra_enabled(): bool acquires Features {
         is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
 

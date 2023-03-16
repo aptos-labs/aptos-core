@@ -223,7 +223,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>() {
-    <b>if</b> (cryptogtaphy_algebra_enabled()) <b>return</b>;
+    <b>if</b> (cryptography_algebra_enabled()) <b>return</b>;
     <b>abort</b>(std::error::not_implemented(0))
 }
 </code></pre>
