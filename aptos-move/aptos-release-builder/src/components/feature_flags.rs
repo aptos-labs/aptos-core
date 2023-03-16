@@ -132,7 +132,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
             FeatureFlag::Bls12381BasicOperations => AptosFeatureFlag::BLS12381_BASIC_OPERATIONS,
             FeatureFlag::PubkeyValidateReturnFalseWrongLength => {
-                AptosFeatureFlag::PUBKEYVALIDATERETURNFALSEWRONGLENGTH
+                AptosFeatureFlag::PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
             },
         }
     }
