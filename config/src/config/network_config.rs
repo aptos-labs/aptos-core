@@ -38,10 +38,10 @@ pub const PING_INTERVAL_MS: u64 = 10_000;
 pub const PING_TIMEOUT_MS: u64 = 20_000;
 pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
-pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
+pub const MAX_CONCURRENT_NETWORK_REQS: usize = 200;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
-pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
-pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
+pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 40;
+pub const MAX_INBOUND_CONNECTIONS: usize = 100; /* At 5k TPS this could easily hit ~50MiB a second */
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -51,10 +51,10 @@ pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
-pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 512 * 1024; // 1MB use a bigger spoon
-pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 3 * 1024 * 1024; // 3MB ~6MB/s with 500ms latency
-pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger spoon
+pub const INBOUND_TCP_RX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const INBOUND_TCP_TX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const OUTBOUND_TCP_RX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
+pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 5 * 1024 * 1024; // 5MB
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]

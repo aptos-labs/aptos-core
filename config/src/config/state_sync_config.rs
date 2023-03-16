@@ -85,16 +85,16 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
         }
@@ -168,9 +168,9 @@ impl Default for DataStreamingServiceConfig {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 20,
             max_concurrent_state_requests: 6,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 500,
             max_request_retry: 5,
-            max_notification_id_mappings: 300,
+            max_notification_id_mappings: 500,
             progress_check_interval_ms: 100,
         }
     }
@@ -192,13 +192,13 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            max_num_in_flight_priority_polls: 10,
-            max_num_in_flight_regular_polls: 10,
+            max_num_in_flight_priority_polls: 50,
+            max_num_in_flight_regular_polls: 50,
             max_num_output_reductions: 0,
             max_response_timeout_ms: 60000, // 60 seconds
-            response_timeout_ms: 20000,     // 20 seconds
+            response_timeout_ms: 30000,     // 30 seconds
             subscription_timeout_ms: 5000,  // 5 seconds
-            summary_poll_interval_ms: 200,
+            summary_poll_interval_ms: 100,
             use_compression: true,
         }
     }
