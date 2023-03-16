@@ -34,6 +34,12 @@ To run the faucet, the simplest way to start is with this command:
 cargo run -p aptos-faucet-service -- run-simple --key <private_key> --node-url <api_url> --chain-id TESTING
 ```
 
+Another example, running alongside a local testnet (without `--use-faucet`):
+```
+cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
+cargo run -p aptos-faucet-service -- run-simple --key ~/.aptos/testnet/mint.key --node-url http://127.0.0.1:8080 --chain-id TESTING
+```
+
 This command lets you configure only a subset of the full functionality of the faucet. You cannot enable any checkers / bypassers, and it supports only the MintFunder. Generally it is intended for use with some kind of local swarm-based testnet or other such uses.
 
 For running the faucet in production, you will instead want to build a configuration file and run it like this:
@@ -52,7 +58,7 @@ aptos move compile
 
 If you have issues with this, try deleting `~/.move`, updating your Aptos CLI, and changing the AptosFramework version.
 
-Then build the tap as normal (from the root of the repo):
+Then build the faucet as normal (from the root of the repo):
 ```
 cargo build
 ```
@@ -98,5 +104,5 @@ cargo run -- generate-openapi -o doc/spec.json -f json
 ## Generating the TS client
 From `ts-client`:
 ```
-yarn generate-client
+pnpm generate-client
 ```
