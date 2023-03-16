@@ -9,7 +9,7 @@ slug: "delegation-pool-operations"
 
 Validator operators should follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
-Once the delegation pool attains 1M APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations.md#joining-validator-set).
+Once the delegation pool attains 1 million APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations.md#joining-validator-set).
 
 The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Perform delegation pool operations](#perform-delegation-pool-operations).
 
@@ -77,19 +77,17 @@ To create a delegation pool and obtain information about it, connect to the [Apt
 Now initialize a delegation pool by following these steps:
 
 1. Run the command below, substituting in your previously configured profile set during initialization:
+    ```bash
+    aptos move run --profile ‘your_profile’ \ 
+    --function-id 0x1::delegation_pool::initialize_delegation_pool \
+    --args u64:1000 raw:00
+    ```
+    Where `--args`:
+  
+    - `u64:1000` represents `operator_commission_percentage` - 1000 is equivalent to 10% and 10000 is 100%.
+    - `raw: 00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
 
-  ```bash
-  aptos move run --profile ‘your_profile’ \ 
-  --function-id 0x1::delegation_pool::initialize_delegation_pool \
-  --args u64:1000 raw:00
-  ```
-
-  Where `--args`:
-
-  - `u64:1000` represents `operator_commission_percentage` - 1000 is equivalent to 10% and 10000 is 100%.
-  - `raw: 00` represents `delegation_pool_creation_seed` - a number chosen by you to create a resource account associated with your owner address; this account is used to host the delegation pool resource.
-
-  Note that once `operator_commission_percentage` is set, it cannot be changed.
+    Note that once `operator_commission_percentage` is set, it cannot be changed.
 
  2. Once this command is executed without error an account for resources is established using the `owner` signer and a provided `delegation_pool_creation_seed` to hold the `delegation pool resource` and possess the underlying stake pool.
  
@@ -151,23 +149,23 @@ Delegation pool owners have access to specific methods designed for modifying th
   
 ## Check delegation pool information
 
-Until the delegation pool has received 1M APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../guides/aptos-apis.md#reading-state-with-the-view-function).
+Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../guides/aptos-apis.md#reading-state-with-the-view-function).
 
-1. `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
+* `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
 
-2. `delegation_pool_exists(addr: address): bool` - Returns if a delegation pool exists at the provided address `addr`.
+* `delegation_pool_exists(addr: address): bool` - Returns if a delegation pool exists at the provided address `addr`.
 
-3. `operator_commission_percentage(pool_address: address): u64` - Returns the operator commission percentage set on the delegation pool at initialization.
+* `operator_commission_percentage(pool_address: address): u64` - Returns the operator commission percentage set on the delegation pool at initialization.
 
-4. `get_stake(pool_address: address, delegator_address: address): (u64, u64, u64)` - Returns total stake owned by `delegator_address` within delegation pool `pool_address` in each of its individual states: (`active`,`inactive`,`pending_inactive`).
+* `get_stake(pool_address: address, delegator_address: address): (u64, u64, u64)` - Returns total stake owned by `delegator_address` within delegation pool `pool_address` in each of its individual states: (`active`,`inactive`,`pending_inactive`).
 
-5. `get_delegation_pool_stake(pool_address: address): (u64, u64, u64, u64)` - Returns the stake amounts on `pool_address` in the different states:      (`active`,`inactive`,`pending_active`,`pending_inactive`).
+* `get_delegation_pool_stake(pool_address: address): (u64, u64, u64, u64)` - Returns the stake amounts on `pool_address` in the different states:      (`active`,`inactive`,`pending_active`,`pending_inactive`).
 
-6. `shareholders_count_active_pool(pool_address: address): u64` - Returns the number of delegators owning an active stake within `pool_address`. 
+* `shareholders_count_active_pool(pool_address: address): u64` - Returns the number of delegators owning an active stake within `pool_address`. 
 
-7. `get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64)` - Returns if the specified delegator possesses any withdrawable stake. However, if the delegator has recently initiated a request to release some of their stake and the stake pool's lockup cycle has not ended yet, then their funds may not yet be available for withdrawal.
+* `get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64)` - Returns if the specified delegator possesses any withdrawable stake. However, if the delegator has recently initiated a request to release some of their stake and the stake pool's lockup cycle has not ended yet, then their funds may not yet be available for withdrawal.
 
-8. `can_withdraw_pending_inactive(pool_address: address): bool` - Returns whether `pending_inactive` stake can be directly withdrawn from the delegation pool, implicitly its stake pool, in the special case the validator had gone inactive before its lockup expired.
+* `can_withdraw_pending_inactive(pool_address: address): bool` - Returns whether `pending_inactive` stake can be directly withdrawn from the delegation pool, implicitly its stake pool, in the special case the validator had gone inactive before its lockup expired.
 
 
 In the [Aptos TypeScript SDK](../../../sdks/ts-sdk/index.md), a View function request would resemble:
