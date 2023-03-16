@@ -135,6 +135,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         let epoch = self.epoch;
         let retry_timeout = Duration::from_millis(self.retry_timeout_ms as u64);
         let rpc_timeout = Duration::from_millis(self.rpc_timeout_ms as u64);
+        let mut num_futures = request_num_peers * self.retry_limit;
 
         tokio::spawn(async move {
             monitor!("batch_request", {
@@ -152,6 +153,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                             }
                         }
                         Some(response) = futures.next() => {
+                            num_futures -= 1;
                             if let Ok(batch) = response {
                                 counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
                                 if batch.verify().is_ok() {
@@ -161,11 +163,11 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                     return;
                                 }
                             }
+                            if num_futures == 0 {
+                                // end the batch requester when the futures are drained
+                                break;
+                            }
                         },
-                        else => {
-                            // end the batch requester when the futures are drained
-                            break;
-                        }
                     }
                 }
                 request_state.serve_request(digest, None);
