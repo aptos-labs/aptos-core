@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Checker, CheckerData, CompleteData};
+use super::{CheckerData, CheckerTrait, CompleteData};
 use crate::{
     endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
     helpers::{days_since_tap_epoch, get_current_time_secs},
@@ -64,7 +64,7 @@ impl MemoryRatelimitChecker {
 }
 
 #[async_trait]
-impl Checker for MemoryRatelimitChecker {
+impl CheckerTrait for MemoryRatelimitChecker {
     async fn check(
         &self,
         data: CheckerData,

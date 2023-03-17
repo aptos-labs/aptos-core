@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
+    batch_store::PersistRequest,
     quorum_store_db::{QuorumStoreDB, QuorumStoreStorage},
-    tests::utils::{compute_digest_from_signed_transaction, create_vec_signed_transactions},
-    types::PersistedValue,
+    tests::utils::create_vec_signed_transactions,
+    types::Batch,
 };
-use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 
@@ -17,14 +18,10 @@ fn test_db_for_data() {
 
     let source = AccountAddress::random();
     let signed_txns = create_vec_signed_transactions(100);
-    let digest_1 = compute_digest_from_signed_transaction(signed_txns.clone());
-    let value_1 = PersistedValue::new(
-        Some(signed_txns),
-        LogicalTime::new(1, 20),
-        source,
-        BatchId::new_for_test(1),
-        1000,
-    );
+    let persist_request_1: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+    let digest_1 = persist_request_1.digest;
+    let value_1 = persist_request_1.value;
     assert!(db.save_batch(digest_1, value_1.clone()).is_ok());
 
     assert_eq!(
@@ -35,25 +32,17 @@ fn test_db_for_data() {
     );
 
     let signed_txns = create_vec_signed_transactions(200);
-    let digest_2 = compute_digest_from_signed_transaction(signed_txns.clone());
-    let value_2 = PersistedValue::new(
-        Some(signed_txns),
-        LogicalTime::new(1, 20),
-        source,
-        BatchId::new_for_test(1),
-        1000,
-    );
+    let persist_request_2: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+    let digest_2 = persist_request_2.digest;
+    let value_2 = persist_request_2.value;
     assert!(db.save_batch(digest_2, value_2).is_ok());
 
     let signed_txns = create_vec_signed_transactions(300);
-    let digest_3 = compute_digest_from_signed_transaction(signed_txns.clone());
-    let value_3 = PersistedValue::new(
-        Some(signed_txns),
-        LogicalTime::new(1, 20),
-        source,
-        BatchId::new_for_test(1),
-        1000,
-    );
+    let persist_request_3: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
+    let digest_3 = persist_request_3.digest;
+    let value_3 = persist_request_3.value;
     assert!(db.save_batch(digest_3, value_3).is_ok());
 
     let batches = vec![digest_3];

@@ -273,7 +273,6 @@ impl ProposalGenerator {
             let payload = self
                 .payload_client
                 .pull_payload(
-                    round,
                     max_block_txns,
                     max_block_bytes,
                     payload_filter,

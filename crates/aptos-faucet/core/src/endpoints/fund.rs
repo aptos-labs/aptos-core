@@ -6,10 +6,10 @@ use super::{
     ApiTags,
 };
 use crate::{
-    bypasser::Bypasser,
-    checkers::{Checker, CheckerData, CompleteData},
+    bypasser::{Bypasser, BypasserTrait},
+    checkers::{Checker, CheckerData, CheckerTrait, CompleteData},
     endpoints::AptosTapErrorCode,
-    funder::Funder,
+    funder::{Funder, FunderTrait},
     helpers::{get_current_time_secs, transaction_hashes},
 };
 use aptos_logger::info;
@@ -167,13 +167,13 @@ impl FundApi {
 pub struct FundApiComponents {
     /// If any of the allowers say yes, the request is allowed unconditionally
     /// and we never write anything to storage.
-    pub bypassers: Vec<Box<dyn Bypasser>>,
+    pub bypassers: Vec<Bypasser>,
 
     /// If any of the checkers say no, the request is rejected.
-    pub checkers: Vec<Box<dyn Checker>>,
+    pub checkers: Vec<Checker>,
 
     /// The component that funds accounts.
-    pub funder: Arc<dyn Funder>,
+    pub funder: Arc<Funder>,
 
     /// See the comment in `RunConfig`.
     pub return_rejections_early: bool,

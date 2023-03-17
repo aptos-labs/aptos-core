@@ -8,6 +8,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.account.create_address.base, "account.create_address.base", 300 * MUL],
     [.account.create_signer.base, "account.create_signer.base", 300 * MUL],
 
+    [.algebra.placeholder, { 8.. => "algebra.placeholder"}, 1],
     [.bls12381.base, "bls12381.base", 150 * MUL],
 
     [.bls12381.per_pubkey_deserialize, "bls12381.per_pubkey_deserialize", 109_000 * MUL],

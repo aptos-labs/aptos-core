@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Checker, CheckerData, CompleteData};
+use super::{CheckerData, CheckerTrait, CompleteData};
 use crate::{
     endpoints::{AptosTapError, AptosTapErrorCode, RejectionReason, RejectionReasonCode},
     helpers::{days_since_tap_epoch, get_current_time_secs, seconds_until_next_day},
@@ -60,7 +60,7 @@ impl RedisRatelimitCheckerConfig {
         }
     }
 
-    pub async fn build_db_pool(&self) -> Result<Pool> {
+    pub fn build_db_pool(&self) -> Result<Pool> {
         let connection_info = self.build_connection_info();
         let cfg = Config {
             connection: Some(connection_info.into()),
@@ -108,7 +108,7 @@ pub struct RedisRatelimitChecker {
 
 impl RedisRatelimitChecker {
     pub async fn new(args: RedisRatelimitCheckerConfig) -> Result<Self> {
-        let db_pool = args.build_db_pool().await?;
+        let db_pool = args.build_db_pool()?;
 
         // Ensure we can connect.
         db_pool
@@ -160,7 +160,7 @@ impl RedisRatelimitChecker {
 }
 
 #[async_trait]
-impl Checker for RedisRatelimitChecker {
+impl CheckerTrait for RedisRatelimitChecker {
     async fn check(
         &self,
         data: CheckerData,

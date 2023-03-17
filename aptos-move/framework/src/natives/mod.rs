@@ -38,6 +38,7 @@ pub mod status {
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub account: account::GasParameters,
+    pub algebra: cryptography::algebra::gas::GasParameters,
     pub ed25519: ed25519::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
     pub secp256k1: cryptography::secp256k1::GasParameters,
@@ -75,7 +76,10 @@ impl GasParameters {
                 per_msg_hashing: 0.into(),
                 per_byte_hashing: 0.into(),
             },
-            ed25519: cryptography::ed25519::GasParameters {
+            algebra: cryptography::algebra::gas::GasParameters {
+                placeholder: 0.into(),
+            },
+            ed25519: ed25519::GasParameters {
                 base: 0.into(),
                 per_pubkey_deserialize: 0.into(),
                 per_pubkey_small_order_check: 0.into(),
@@ -235,6 +239,14 @@ pub fn all_natives(
         "ed25519",
         ed25519::make_all(
             gas_params.ed25519.clone(),
+            timed_features.clone(),
+            features.clone()
+        )
+    );
+    add_natives_from_module!(
+        "algebra",
+        cryptography::algebra::make_all(
+            gas_params.algebra.clone(),
             timed_features.clone(),
             features.clone()
         )

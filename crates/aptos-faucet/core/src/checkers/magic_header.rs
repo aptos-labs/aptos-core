@@ -1,10 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    checkers::traits::{Checker, CheckerData},
-    endpoints::{AptosTapError, RejectionReason, RejectionReasonCode},
-};
+use super::{CheckerData, CheckerTrait};
+use crate::endpoints::{AptosTapError, RejectionReason, RejectionReasonCode};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -26,7 +24,7 @@ impl MagicHeaderChecker {
 }
 
 #[async_trait]
-impl Checker for MagicHeaderChecker {
+impl CheckerTrait for MagicHeaderChecker {
     async fn check(
         &self,
         data: CheckerData,
