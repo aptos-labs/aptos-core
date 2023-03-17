@@ -7,7 +7,7 @@ use crate::quorum_store::{
     tests::utils::create_vec_signed_transactions,
     types::Batch,
 };
-use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 
@@ -18,13 +18,8 @@ fn test_db_for_data() {
 
     let source = AccountAddress::random();
     let signed_txns = create_vec_signed_transactions(100);
-    let persist_request_1: PersistRequest = Batch::new(
-        BatchId::new_for_test(1),
-        signed_txns,
-        LogicalTime::new(1, 20),
-        source,
-    )
-    .into();
+    let persist_request_1: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
     let digest_1 = persist_request_1.digest;
     let value_1 = persist_request_1.value;
     assert!(db.save_batch(digest_1, value_1.clone()).is_ok());
@@ -37,25 +32,15 @@ fn test_db_for_data() {
     );
 
     let signed_txns = create_vec_signed_transactions(200);
-    let persist_request_2: PersistRequest = Batch::new(
-        BatchId::new_for_test(1),
-        signed_txns,
-        LogicalTime::new(1, 20),
-        source,
-    )
-    .into();
+    let persist_request_2: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
     let digest_2 = persist_request_2.digest;
     let value_2 = persist_request_2.value;
     assert!(db.save_batch(digest_2, value_2).is_ok());
 
     let signed_txns = create_vec_signed_transactions(300);
-    let persist_request_3: PersistRequest = Batch::new(
-        BatchId::new_for_test(1),
-        signed_txns,
-        LogicalTime::new(1, 20),
-        source,
-    )
-    .into();
+    let persist_request_3: PersistRequest =
+        Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source).into();
     let digest_3 = persist_request_3.digest;
     let value_3 = persist_request_3.value;
     assert!(db.save_batch(digest_3, value_3).is_ok());
