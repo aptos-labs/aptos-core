@@ -79,14 +79,14 @@ fn create_multi_region_swarm_network_chaos(
                     jitter_ms: 5,
                     correlation_percentage: 50,
                 },
-                GroupNetworkDelay {
-                    name: format!("{}-to-{}-delay", to_region.clone(), from_region.clone()),
-                    source_nodes: to_chunk.to_vec(),
-                    target_nodes: from_chunk.to_vec(),
-                    latency_ms: *latency as u64,
-                    jitter_ms: 5,
-                    correlation_percentage: 50,
-                },
+                // GroupNetworkDelay {
+                //     name: format!("{}-to-{}-delay", to_region.clone(), from_region.clone()),
+                //     source_nodes: to_chunk.to_vec(),
+                //     target_nodes: from_chunk.to_vec(),
+                //     latency_ms: *latency as u64,
+                //     jitter_ms: 5,
+                //     correlation_percentage: 50,
+                // },
             ];
             info!("delay {:?}", delay);
             delay
@@ -106,9 +106,9 @@ fn create_multi_region_swarm_network_chaos(
         group_network_delays[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
-        group_network_delays[1]
-            .target_nodes
-            .append(remaining_validators.to_vec().as_mut());
+        // group_network_delays[1]
+        //     .target_nodes
+        //     .append(remaining_validators.to_vec().as_mut());
     }
 
     (

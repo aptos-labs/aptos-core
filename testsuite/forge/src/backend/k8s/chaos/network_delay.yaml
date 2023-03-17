@@ -20,7 +20,7 @@ spec:
   # to (the packets to target)
   # both ( the packets from or to target)
   # This parameter makes Chaos only take effect for a specific direction of packets.
-  direction: from
+  direction: both
   target:
     # For delay NetworkChaos, always use "from" direction and always target an entire namespace
     # This is because Forge submits API requests to k8s Services, whereas Chaos Mesh applies the chaos
