@@ -154,7 +154,7 @@ module fungible_asset::fungible_asset {
     }
 
     /// Ensure the coin store exists. If not, create it.
-    fun ensure_fungible_asset_store(account_address: address) {
+    inline fun ensure_fungible_asset_store(account_address: address) {
         if (!exists<FungibleAssetStore>(account_address)) {
             let account_signer = aptos_framework::create_signer::create_signer(account_address);
             move_to(&account_signer, FungibleAssetStore {
