@@ -485,32 +485,12 @@ export class AptosClient {
     });
   }
 
-  @parseApiError
-  async batchTransactionsFromDifferentSenders(
-    transactions: Transaction[],
-    batch_size: number = 10, // api.max_submit_transaction_batch_size config
-  ): Promise<Gen.UserTransaction[]> {
-    if (transactions.length > batch_size) {
-      throw new Error("Max submit transaction batch size");
-    }
-
-    const serializer = new Serializer();
-    serializer.serializeU32AsUleb128(transactions.length);
-    let result = new Uint8Array(serializer.getBytes());
-    result.set(serializer.getBytes(), 0);
-
-    for (let i = 0; i < transactions.length; i++) {
-      const txn = transactions[i];
-      const rawTransaction = await this.generateRawTransaction(txn.sender.address(), txn.payload, txn.extraArgs);
-      const bcsTxn = AptosClient.generateBCSTransaction(txn.sender, rawTransaction);
-      result = new Uint8Array([...result, ...bcsTxn]);
-    }
-    console.log(result);
-    return this.submitBatchTransactions(result);
-  }
-
-  async submitBatchTransactions(txnsArray: Uint8Array): Promise<Gen.UserTransaction[]> {
-    return this.client.request.request<Gen.UserTransaction[]>({
+  async submitBatchTransactions(
+    txnsArray: Uint8Array,
+  ): Promise<Gen.TransactionsBatchSubmissionResult | Gen.TransactionsBatchSingleSubmissionFailure> {
+    return this.client.request.request<
+      Gen.TransactionsBatchSubmissionResult | Gen.TransactionsBatchSingleSubmissionFailure
+    >({
       url: "/transactions/batch",
       method: "POST",
       body: txnsArray,
