@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE;
-use aptos_types::block_info::Round;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -45,15 +45,7 @@ pub struct QuorumStoreConfig {
     pub max_batch_bytes: usize,
     pub batch_request_timeout_ms: usize,
     /// Used when setting up the expiration time for the batch initation.
-    pub batch_expiry_round_gap_when_init: Round,
-    /// Batches may have expiry set for batch_expiry_rounds_gap rounds after the
-    /// latest committed round, and it will not be cleared from storage for another
-    /// so other batch_expiry_grace_rounds rounds, so the peers on the network
-    /// can still fetch the data they fall behind (later, they would have to state-sync).
-    /// Used when checking the expiration time of the received batch against current logical time to prevent DDoS.
-    pub batch_expiry_round_gap_behind_latest_certified: Round,
-    pub batch_expiry_round_gap_beyond_latest_certified: Round,
-    pub batch_expiry_grace_rounds: Round,
+    pub batch_expiry_gap_when_init_usecs: u64,
     pub memory_quota: usize,
     pub db_quota: usize,
     pub batch_quota: usize,
@@ -73,10 +65,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_max_interval_ms: 250,
             max_batch_bytes: 4 * 1024 * 1024,
             batch_request_timeout_ms: 10000,
-            batch_expiry_round_gap_when_init: 100,
-            batch_expiry_round_gap_behind_latest_certified: 500,
-            batch_expiry_round_gap_beyond_latest_certified: 500,
-            batch_expiry_grace_rounds: 5,
+            batch_expiry_gap_when_init_usecs: Duration::from_secs(60).as_micros() as u64,
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
             batch_quota: 300_000,

@@ -131,7 +131,6 @@ impl DirectMempoolQuorumStore {
     async fn handle_consensus_request(&self, req: GetPayloadCommand) {
         match req {
             GetPayloadCommand::GetPayloadRequest(
-                _round,
                 max_txns,
                 max_bytes,
                 return_non_full,

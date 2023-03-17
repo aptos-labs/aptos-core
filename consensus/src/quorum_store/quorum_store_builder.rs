@@ -225,19 +225,7 @@ impl InnerBuilder {
             .aptos_db
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
-        let last_committed_round = if latest_ledger_info_with_sigs
-            .ledger_info()
-            .commit_info()
-            .epoch()
-            == self.epoch
-        {
-            latest_ledger_info_with_sigs
-                .ledger_info()
-                .commit_info()
-                .round()
-        } else {
-            0
-        };
+        let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
 
         let batch_requester = BatchRequester::new(
             self.epoch,
@@ -248,12 +236,8 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
-            last_committed_round,
+            last_committed_timestamp,
             self.quorum_store_storage.clone(),
-            self.config.batch_expiry_round_gap_when_init,
-            self.config.batch_expiry_round_gap_behind_latest_certified,
-            self.config.batch_expiry_round_gap_beyond_latest_certified,
-            self.config.batch_expiry_grace_rounds,
             self.config.memory_quota,
             self.config.db_quota,
             self.config.batch_quota,
@@ -315,7 +299,6 @@ impl InnerBuilder {
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
         {
             let batch_coordinator = BatchCoordinator::new(
-                self.epoch,
                 self.author,
                 self.network_sender.clone(),
                 self.batch_store.clone().unwrap(),
@@ -347,7 +330,6 @@ impl InnerBuilder {
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(
-            self.epoch,
             self.author,
             self.config.back_pressure.backlog_txn_limit_count,
             self.config
