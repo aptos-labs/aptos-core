@@ -1,18 +1,12 @@
 module fungible_asset::fungible_source {
-
-    use aptos_framework::object::{object_address, Object, ExtendRef, address_from_extend_ref};
+    use aptos_framework::object::{object_address, Object, ConstructorRef, address_to_object};
     use std::option::Option;
     use std::option;
     use std::error;
-    use fungible_asset::fungible_asset::{mint, set_frozen_flag, withdraw_internal, burn, deposit};
+    use fungible_asset::fungible_asset::{mint, set_frozen_flag, burn, deposit, FungibleAsset};
     use aptos_framework::object;
     use std::signer;
-    #[test_only]
-    use fungible_asset::fungible_asset::{create_test_token, is_frozen};
-    #[test_only]
-    use aptos_framework::object::generate_extend_ref;
-    #[test_only]
-    use std::signer::address_of;
+    use fungible_asset::fungible_asset;
 
     /// The fungible asset supply exists or does not exist for this asset object.
     const EFUNGIBLE_SOURCE: u64 = 1;
@@ -34,7 +28,11 @@ module fungible_asset::fungible_source {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FungibleSource has key {
         current_supply: u64,
-        maximum_supply: Option<u64>
+        maximum_supply: Option<u64>,
+        /// Number of decimals used to get its user representation.
+        /// For example, if `decimals` equals `2`, a balance of `505` coins should
+        /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
+        decimals: u8,
     }
 
     /// Capabilities
@@ -51,11 +49,11 @@ module fungible_asset::fungible_source {
     }
 
     public fun init_fungible_source(
-        extend_ref: &ExtendRef,
-        maximum_supply: u64
+        constructor_ref: &ConstructorRef,
+        maximum_supply: u64,
+        decimals: u8,
     ): (MintCap, FreezeCap, BurnCap) {
-        assert_fungible_source_not_exists(address_from_extend_ref(extend_ref));
-        let asset_object_signer = object::generate_signer_for_extending(extend_ref);
+        let asset_object_signer = object::generate_signer(constructor_ref);
         let converted_maximum = if (maximum_supply == 0) {
             option::none()
         } else {
@@ -64,7 +62,8 @@ module fungible_asset::fungible_source {
         move_to(&asset_object_signer,
             FungibleSource {
                 current_supply: 0,
-                maximum_supply: converted_maximum
+                maximum_supply: converted_maximum,
+                decimals,
             }
         );
         let asset_addr = signer::address_of(&asset_object_signer);
@@ -73,84 +72,93 @@ module fungible_asset::fungible_source {
 
 
     public fun get_current_supply<T: key>(asset: &Object<T>): u64 acquires FungibleSource {
-        borrow_fungible_source(asset).current_supply
+        let asset_addr = verify(asset);
+        borrow_fungible_source(asset_addr).current_supply
     }
 
     public fun get_maximum_supply<T: key>(asset: &Object<T>): Option<u64> acquires FungibleSource {
-        borrow_fungible_source(asset).maximum_supply
+        let asset_addr = verify(asset);
+        borrow_fungible_source(asset_addr).maximum_supply
     }
 
-    public fun assert_fungible_source_exists(asset_address: address) {
-        assert!(fungible_source_exists(asset_address), error::not_found(EFUNGIBLE_SOURCE));
-    }
-
-    public fun assert_fungible_source_not_exists(asset_address: address) {
-        assert!(!fungible_source_exists(asset_address), error::already_exists(EFUNGIBLE_SOURCE));
-    }
-
-    public fun fungible_source_exists(asset_address: address): bool {
-        exists<FungibleSource>(asset_address)
+    public fun get_decimals<T: key>(asset: &Object<T>): u8 acquires FungibleSource {
+        let asset_addr = verify(asset);
+        borrow_fungible_source(asset_addr).decimals
     }
 
     /// Mint the `amount` of coin with MintCap.
-    public fun mint_with_cap<T: key>(
+    public fun mint_with_cap(
         cap: &MintCap,
-        asset: &Object<T>,
         amount: u64,
         to: address
     ) acquires FungibleSource {
         // This ensures amount > 0;
-        increase_supply(cap, asset, amount);
-        let fa = mint(object_address(asset), amount);
+        increase_supply(cap, amount);
+        let fa = mint(cap.asset_addr, amount);
         deposit(fa, to);
     }
 
     /// Freeze the fungible asset account of `fungible_asset_owner` with FreezeCap.
-    public fun freeze_with_cap<T: key>(
+    public fun freeze_with_cap(
         cap: &FreezeCap,
         fungible_asset_owner: address,
-        asset: &Object<T>
     ) {
-        set_frozen_with_cap(cap, fungible_asset_owner, asset, true);
+        set_frozen_with_cap(cap, fungible_asset_owner, true);
     }
 
     /// Unfreeze the fungible asset account of `fungible_asset_owner` with FreezeCap.
-    public fun unfreeze_with_cap<T: key>(
+    public fun unfreeze_with_cap(
         cap: &FreezeCap,
         fungible_asset_owner: address,
-        asset: &Object<T>
     ) {
-        set_frozen_with_cap(cap, fungible_asset_owner, asset, false);
+        set_frozen_with_cap(cap, fungible_asset_owner, false);
     }
 
-    fun set_frozen_with_cap<T: key>(
+    fun set_frozen_with_cap(
         cap: &FreezeCap,
         fungible_asset_owner: address,
-        asset: &Object<T>,
         frozen: bool
     ) {
-        assert_freeze_cap_and_asset_match(cap, asset);
-        set_frozen_flag(fungible_asset_owner, asset, frozen);
+        set_frozen_flag(fungible_asset_owner, cap.asset_addr, frozen);
     }
 
     /// Burn the `amount` of coin with MintCap.
-    public fun burn_with_cap<T: key>(
+    public fun burn_with_cap(
         cap: &BurnCap,
-        asset: &Object<T>,
         amount: u64,
         from_account: address
     ) acquires FungibleSource {
-        // This ensures amount > 0;
-        decrease_supply(cap, asset, amount);
-        let fungible_asset_to_burn = withdraw_internal(from_account, asset, amount);
+        decrease_supply(cap, amount);
+        let fungible_asset_to_burn = fungible_asset::withdraw(from_account, cap.asset_addr, amount);
         burn(fungible_asset_to_burn);
     }
 
+    public fun withdraw<T: key>(
+        fungible_asset_owner: &signer,
+        asset: &Object<T>,
+        amount: u64
+    ): FungibleAsset {
+        // Verify the passed-in object is a fungible source.
+        let asset_addr = verify(asset);
+        let account_address = signer::address_of(fungible_asset_owner);
+        fungible_asset::withdraw(account_address, asset_addr, amount)
+    }
+
+    // Moves balances around and not the underlying object.
+    public fun transfer<T: key>(
+        fungible_asset_owner: &signer,
+        asset: &Object<T>,
+        amount: u64,
+        to: address
+    ) {
+        let fa = withdraw(fungible_asset_owner, asset, amount);
+        deposit(fa, to);
+    }
+
     /// Increase the supply of a fungible asset by minting.
-    public fun increase_supply<T: key>(cap: &MintCap, asset: &Object<T>, amount: u64) acquires FungibleSource {
+    public fun increase_supply(cap: &MintCap, amount: u64) acquires FungibleSource {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
-        assert_mint_cap_and_asset_match(cap, asset);
-        let fungible_source = borrow_fungible_source_mut(asset);
+        let fungible_source = borrow_fungible_source_mut(cap.asset_addr);
         if (option::is_some(&fungible_source.maximum_supply)) {
             let max = *option::borrow(&fungible_source.maximum_supply);
             assert!(max - fungible_source.current_supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_OVERFLOW))
@@ -159,10 +167,9 @@ module fungible_asset::fungible_source {
     }
 
     /// Increase the supply of a fungible asset by burning.
-    public fun decrease_supply<T: key>(cap: &BurnCap, asset: &Object<T>, amount: u64) acquires FungibleSource {
+    public fun decrease_supply(cap: &BurnCap, amount: u64) acquires FungibleSource {
         assert!(amount != 0, error::invalid_argument(EZERO_AMOUNT));
-        assert_burn_cap_and_asset_match(cap, asset);
-        let fungible_source = borrow_fungible_source_mut(asset);
+        let fungible_source = borrow_fungible_source_mut(cap.asset_addr);
         assert!(fungible_source.current_supply >= amount, error::invalid_argument(ECURRENT_SUPPLY_UNDERFLOW));
         fungible_source.current_supply = fungible_source.current_supply - amount;
     }
@@ -179,38 +186,26 @@ module fungible_asset::fungible_source {
         let BurnCap { asset_addr: _ } = cap;
     }
 
-    inline fun assert_mint_cap_and_asset_match<T: key>(cap: &MintCap, asset: &Object<T>) {
-        assert!(cap.asset_addr == object_address(asset), error::invalid_argument(EMINT_CAP));
-    }
-
-    inline fun assert_freeze_cap_and_asset_match<T: key>(cap: &FreezeCap, asset: &Object<T>) {
-        assert!(cap.asset_addr == object_address(asset), error::invalid_argument(EFREEZE_CAP));
-    }
-
-    inline fun assert_burn_cap_and_asset_match<T: key>(cap: &BurnCap, asset: &Object<T>) {
-        assert!(cap.asset_addr == object_address(asset), error::invalid_argument(EBURN_CAP));
-    }
-
     /// Borrow a `&FungibleSource` from an asset.
-    inline fun borrow_fungible_source<T: key>(asset: &Object<T>): &FungibleSource acquires FungibleSource {
-        let object_addr = verify(asset);
-        borrow_global<FungibleSource>(object_addr)
+    inline fun borrow_fungible_source(asset_addr: address): &FungibleSource acquires FungibleSource {
+        borrow_global<FungibleSource>(asset_addr)
     }
 
     /// Borrow a `&mut FungibleSource` from an asset.
-    inline fun borrow_fungible_source_mut<T: key>(asset: &Object<T>): &mut FungibleSource acquires FungibleSource {
-        let object_addr = verify(asset);
-        borrow_global_mut<FungibleSource>(object_addr)
+    inline fun borrow_fungible_source_mut(asset_addr: address): &mut FungibleSource acquires FungibleSource {
+        borrow_global_mut<FungibleSource>(asset_addr)
     }
 
-    inline fun verify<T: key>(fungible_source: &Object<T>): address {
-        let fungible_source_address = object::object_address(fungible_source);
-        assert!(
-            exists<FungibleSource>(fungible_source_address),
-            error::not_found(EFUNGIBLE_SOURCE),
-        );
-        fungible_source_address
+    public inline fun verify<T: key>(asset: &Object<T>): address {
+        let addr = object_address(asset);
+        address_to_object<FungibleSource>(addr);
+        addr
     }
+
+    #[test_only]
+    use fungible_asset::fungible_asset::{create_test_token, is_frozen};
+    #[test_only]
+    use std::signer::address_of;
 
     #[test_only]
     public fun destroy_caps(mint_cap: MintCap, freeze_cap: FreezeCap, burn_cap: BurnCap) {
@@ -223,19 +218,20 @@ module fungible_asset::fungible_source {
     fun test_basic_flow_with_caps(creator: &signer) acquires FungibleSource {
         let (creator_ref, asset) = create_test_token(creator);
         let (mint_cap, freeze_cap, burn_cap) = init_fungible_source(
-            &generate_extend_ref(&creator_ref),
-            100 /* max supply */
+            &creator_ref,
+            100 /* max supply */,
+            0
         );
         let creator_address = address_of(creator);
         assert!(get_current_supply(&asset) == 0, 1);
         assert!(get_maximum_supply(&asset) == option::some(100), 1);
-        mint_with_cap(&mint_cap, &asset, 100, creator_address);
+        mint_with_cap(&mint_cap, 100, creator_address);
         assert!(get_current_supply(&asset) == 100, 2);
-        freeze_with_cap(&freeze_cap, creator_address, &asset);
+        freeze_with_cap(&freeze_cap, creator_address);
         assert!(is_frozen(creator_address, &asset), 3);
-        unfreeze_with_cap(&freeze_cap, creator_address, &asset);
+        unfreeze_with_cap(&freeze_cap, creator_address);
         assert!(!is_frozen(creator_address, &asset), 4);
-        burn_with_cap(&burn_cap, &asset, 90, creator_address);
+        burn_with_cap(&burn_cap, 90, creator_address);
         assert!(get_current_supply(&asset) == 10, 5);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
@@ -243,26 +239,28 @@ module fungible_asset::fungible_source {
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10007, location = Self)]
     fun test_supply_overflow(creator: &signer) acquires FungibleSource {
-        let (creator_ref, asset) = create_test_token(creator);
+        let (creator_ref, _asset) = create_test_token(creator);
         let (mint_cap, freeze_cap, burn_cap) = init_fungible_source(
-            &generate_extend_ref(&creator_ref),
-            100 /* max supply */
+            &creator_ref,
+            100 /* max supply */,
+            0
         );
         let creator_address = address_of(creator);
-        mint_with_cap(&mint_cap, &asset, 101, creator_address);
+        mint_with_cap(&mint_cap, 101, creator_address);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10008, location = Self)]
     fun test_supply_underflow(creator: &signer) acquires FungibleSource {
-        let (creator_ref, asset) = create_test_token(creator);
+        let (creator_ref, _asset) = create_test_token(creator);
         let (mint_cap, freeze_cap, burn_cap) = init_fungible_source(
-            &generate_extend_ref(&creator_ref),
-            100 /* max supply */
+            &creator_ref,
+            100 /* max supply */,
+            0
         );
         let creator_address = address_of(creator);
-        burn_with_cap(&burn_cap, &asset, 1, creator_address);
+        burn_with_cap(&burn_cap, 1, creator_address);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
 }

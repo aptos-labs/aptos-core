@@ -1,7 +1,6 @@
 module fungible_asset::fungible_asset {
     use aptos_std::smart_table::{Self, SmartTable};
-    use aptos_framework::object::{Self, Object, object_address, is_owner, generate_transfer_ref, DeleteRef, generate_delete_ref};
-    use std::signer;
+    use aptos_framework::object::{Self, Object, object_address, generate_transfer_ref, DeleteRef, generate_delete_ref};
     use std::error;
     use std::signer::address_of;
     use std::option;
@@ -10,6 +9,8 @@ module fungible_asset::fungible_asset {
     use aptos_framework::object::ConstructorRef;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
+    #[test_only]
+    use std::signer;
 
     friend fungible_asset::fungible_source;
 
@@ -25,8 +26,8 @@ module fungible_asset::fungible_asset {
     const EBALANCE_NOT_ZERO: u64 = 5;
     /// The token account is still frozen so cannot be deleted.
     const ESTILL_FROZEN: u64 = 6;
-    /// The coin object existence error.
-    const EFUNGIBLE_ASSET_OBJECT: u64 = 7;
+    /// The pinned fungible asset object existence error.
+    const PINNED_EFUNGIBLE_ASSET_OBJECT: u64 = 7;
     /// Insufficient amount.
     const EINSUFFICIENT_BALANCE: u64 = 8;
     /// FungibleAsset type mismatch.
@@ -34,88 +35,67 @@ module fungible_asset::fungible_asset {
 
 
     struct FungibleAssetStore has key {
-        index: SmartTable<address, Object<FungibleAsset>>
+        index: SmartTable<address, Object<PinnedFungibleAsset>>
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct FungibleAsset has key {
+    struct PinnedFungibleAsset has key {
         asset_addr: address,
         balance: u64,
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct FungibleAssetProperty has key {
         frozen: bool,
         delete_ref: DeleteRef
     }
 
-    // ================================================================================================================
-    // Public functions
-    // ================================================================================================================
+    struct FungibleAsset {
+        asset_addr: address,
+        balance: u64,
+    }
 
     /// Check the amount of an account.
     public fun balance<T: key>(
         fungible_asset_owner: address,
         fungible_source: &Object<T>
-    ): u64 acquires FungibleAssetStore, FungibleAsset {
-        let fungible_asset_obj_opt = get_fungible_asset_object(
+    ): u64 acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa_opt = get_pinned_fungible_asset_object(
             fungible_asset_owner,
             object_address(fungible_source),
             false
         );
-        if (option::is_none(&fungible_asset_obj_opt)) {
+        if (option::is_none(&pfa_opt)) {
             return 0
         };
-        let fungible_asset_obj = option::destroy_some(fungible_asset_obj_opt);
-        borrow_global<FungibleAsset>(verify(&fungible_asset_obj)).balance
+        let pfa = option::destroy_some(pfa_opt);
+        borrow_global<PinnedFungibleAsset>(object_address(&pfa)).balance
     }
 
     /// Check the coin account of `fungible_asset_owner` is frozen or not.
     public fun is_frozen<T: key>(
         fungible_asset_owner: address,
-        asset: &Object<T>
-    ): bool acquires FungibleAssetStore, FungibleAssetProperty {
-        let fungible_asset_obj_opt = get_fungible_asset_object(fungible_asset_owner, object_address(asset), false);
-        if (option::is_none(&fungible_asset_obj_opt)) {
+        fungible_source: &Object<T>
+    ): bool acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa_opt = get_pinned_fungible_asset_object(
+            fungible_asset_owner,
+            object_address(fungible_source),
+            false
+        );
+        if (option::is_none(&pfa_opt)) {
             return false
         };
-        let fungible_asset_obj = option::destroy_some(fungible_asset_obj_opt);
-        borrow_global<FungibleAssetProperty>(verify(&fungible_asset_obj)).frozen
-    }
-
-
-    public fun withdraw<T: key>(
-        fungible_asset_owner: &signer,
-        asset: &Object<T>,
-        amount: u64
-    ): FungibleAsset acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        let account_address = signer::address_of(fungible_asset_owner);
-        withdraw_internal(account_address, asset, amount)
+        let pfa = option::destroy_some(pfa_opt);
+        borrow_global<PinnedFungibleAsset>(object_address(&pfa)).frozen
     }
 
     public fun deposit(
         fa: FungibleAsset,
         to: address
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        let (stored_fa, property) = borrow_fungible_asset_mut_and_property(
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa = borrow_fungible_asset_mut(
             to,
             fa.asset_addr,
             true /* create token object if not exist */
         );
-        assert!(!property.frozen, error::invalid_argument(ESTILL_FROZEN));
-        merge(stored_fa, fa);
-    }
-
-    // Moves balances around and not the underlying object.
-    public fun transfer<T: key>(
-        fungible_asset_owner: &signer,
-        asset: &Object<T>,
-        amount: u64,
-        to: address
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        // This ensures amount > 0;
-        let fa = withdraw(fungible_asset_owner, asset, amount);
-        deposit(fa, to);
+        assert!(!pfa.frozen, error::invalid_argument(ESTILL_FROZEN));
+        merge(pfa, fa);
     }
 
     public(friend) fun mint(
@@ -129,14 +109,14 @@ module fungible_asset::fungible_asset {
         }
     }
 
-    public(friend) fun set_frozen_flag<T: key>(
+    public(friend) fun set_frozen_flag(
         fungible_asset_owner: address,
-        asset: &Object<T>,
+        asset_addr: address,
         frozen: bool
-    ) acquires FungibleAssetStore, FungibleAssetProperty {
-        let fungible_asset_obj_opt = get_fungible_asset_object(fungible_asset_owner, object_address(asset), true);
-        let fungible_asset_obj = option::destroy_some(fungible_asset_obj_opt);
-        borrow_global_mut<FungibleAssetProperty>(verify(&fungible_asset_obj)).frozen = frozen;
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa_opt = get_pinned_fungible_asset_object(fungible_asset_owner, asset_addr, true);
+        let pfa = option::destroy_some(pfa_opt);
+        borrow_global_mut<PinnedFungibleAsset>(object_address(&pfa)).frozen = frozen;
     }
 
     public(friend) fun burn(fungible_asset: FungibleAsset) {
@@ -146,35 +126,28 @@ module fungible_asset::fungible_asset {
         } = fungible_asset;
     }
 
-    public(friend) fun withdraw_internal<T: key>(
+    public(friend) fun withdraw(
         account: address,
-        asset: &Object<T>,
+        asset_addr: address,
         amount: u64
-    ): FungibleAsset acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        let asset_address = object_address(asset);
-        let (stored_fa, property) = borrow_fungible_asset_mut_and_property(
+    ): FungibleAsset acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa = borrow_fungible_asset_mut(
             account,
-            asset_address,
+            asset_addr,
             false /* create token object if not exist */
         );
 
-        assert!(!property.frozen, error::invalid_argument(ESTILL_FROZEN));
-        let fungible_asset = withdraw_fungible_asset(stored_fa, amount);
+        assert!(!pfa.frozen, error::invalid_argument(ESTILL_FROZEN));
+        let fungible_asset = extract(pfa, amount);
         // Clean up token obj if amount drops to 0 and not frozen (verified).
-        if (stored_fa.balance == 0) {
-            let fungible_asset_obj = remove_fungible_asset_object(account, asset_address);
-            let fungible_asset_obj_addr = verify(&fungible_asset_obj);
-            let FungibleAsset {
-                asset_addr,
-                balance: amount,
-            } = move_from<FungibleAsset>(fungible_asset_obj_addr);
-            let FungibleAssetProperty {
-                frozen,
+        if (pfa.balance == 0) {
+            let pfa = remove_pinned_fungible_asset_object(account, asset_addr);
+            let PinnedFungibleAsset {
+                asset_addr: _,
+                balance: _,
+                frozen: _,
                 delete_ref
-            } = move_from<FungibleAssetProperty>(fungible_asset_obj_addr);
-            assert!(asset_addr == asset_address, error::internal(EASSET_ADDRESS_MISMATCH));
-            assert!(amount == 0, error::internal(EBALANCE_NOT_ZERO));
-            assert!(!frozen, error::internal(ESTILL_FROZEN));
+            } = move_from<PinnedFungibleAsset>(object_address(&pfa));
             object::delete(delete_ref);
         };
         fungible_asset
@@ -191,7 +164,7 @@ module fungible_asset::fungible_asset {
     }
 
 
-    fun withdraw_fungible_asset(fa: &mut FungibleAsset, amount: u64): FungibleAsset {
+    fun extract(fa: &mut PinnedFungibleAsset, amount: u64): FungibleAsset {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         assert!(fa.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         fa.balance = fa.balance - amount;
@@ -201,103 +174,87 @@ module fungible_asset::fungible_asset {
         }
     }
 
-    fun merge(stored_fa: &mut FungibleAsset, fa: FungibleAsset) {
+    fun merge(pfa: &mut PinnedFungibleAsset, fa: FungibleAsset) {
         let FungibleAsset { asset_addr, balance: amount } = fa;
         // ensure merging the same coin
-        assert!(stored_fa.asset_addr == asset_addr, error::invalid_argument(EFUNGIBLE_ASSET_TYPE_MISMATCH));
-        stored_fa.balance = stored_fa.balance + amount;
+        assert!(pfa.asset_addr == asset_addr, error::invalid_argument(EFUNGIBLE_ASSET_TYPE_MISMATCH));
+        pfa.balance = pfa.balance + amount;
     }
 
-    fun get_fungible_asset_object(
+    fun get_pinned_fungible_asset_object(
         fungible_asset_owner: address,
         asset_address: address,
         create_on_demand: bool
-    ): Option<Object<FungibleAsset>> acquires FungibleAssetStore {
+    ): Option<Object<PinnedFungibleAsset>> acquires FungibleAssetStore {
         ensure_fungible_asset_store(fungible_asset_owner);
         let index_table = &mut borrow_global_mut<FungibleAssetStore>(fungible_asset_owner).index;
         if (!smart_table::contains(index_table, asset_address)) {
             if (create_on_demand) {
-                let fa_obj = create_fungible_asset_object(fungible_asset_owner, asset_address);
-                smart_table::add(index_table, asset_address, fa_obj);
+                let pfa_obj = create_pinned_fungible_asset_object(fungible_asset_owner, asset_address);
+                smart_table::add(index_table, asset_address, pfa_obj);
             } else {
                 return option::none()
             }
         };
-        let fungible_asset_obj = *smart_table::borrow(index_table, asset_address);
-        assert!(is_owner(fungible_asset_obj, fungible_asset_owner), error::internal(ENOT_OWNER));
-        option::some(fungible_asset_obj)
+        let pfa = *smart_table::borrow(index_table, asset_address);
+        option::some(pfa)
     }
 
     /// Create a zero-amount coin object of the passed-in asset.
-    fun create_fungible_asset_object(account: address, asset_address: address): Object<FungibleAsset> {
+    fun create_pinned_fungible_asset_object(account: address, asset_address: address): Object<PinnedFungibleAsset> {
         // Must review carefully here.
         let asset_signer = aptos_framework::create_signer::create_signer(asset_address);
         let creator_ref = object::create_object_from_object(&asset_signer);
-        let fungible_asset_signer = object::generate_signer(&creator_ref);
+        let pfa_signer = object::generate_signer(&creator_ref);
         // Transfer the owner to `account`.
-        object::transfer_call(&asset_signer, address_of(&fungible_asset_signer), account);
+        object::transfer_call(&asset_signer, address_of(&pfa_signer), account);
 
         // Disable transfer of coin object so the object itself never gets transfered.
         let transfer_ref = generate_transfer_ref(&creator_ref);
         object::disable_ungated_transfer(&transfer_ref);
 
-        move_to(&fungible_asset_signer, FungibleAsset {
+        move_to(&pfa_signer, PinnedFungibleAsset {
             asset_addr: asset_address,
             balance: 0,
-        });
-        move_to(&fungible_asset_signer, FungibleAssetProperty {
             frozen: false,
             delete_ref: generate_delete_ref(&creator_ref)
         });
-        object::object_from_constructor_ref<FungibleAsset>(&creator_ref)
+        object::object_from_constructor_ref<PinnedFungibleAsset>(&creator_ref)
     }
 
-    fun remove_fungible_asset_object(
+    fun remove_pinned_fungible_asset_object(
         fungible_asset_owner: address,
         asset_address: address
-    ): Object<FungibleAsset> acquires FungibleAssetStore {
+    ): Object<PinnedFungibleAsset> acquires FungibleAssetStore {
         ensure_fungible_asset_store(fungible_asset_owner);
         let index_table = &mut borrow_global_mut<FungibleAssetStore>(fungible_asset_owner).index;
-        assert!(smart_table::contains(index_table, asset_address), error::not_found(EFUNGIBLE_ASSET_OBJECT));
-        let fungible_asset_obj = smart_table::remove(index_table, asset_address);
-        assert!(is_owner(fungible_asset_obj, fungible_asset_owner), error::internal(ENOT_OWNER));
-        fungible_asset_obj
+        assert!(smart_table::contains(index_table, asset_address), error::not_found(PINNED_EFUNGIBLE_ASSET_OBJECT));
+        smart_table::remove(index_table, asset_address)
     }
 
-    inline fun borrow_fungible_asset_and_property(
+    inline fun borrow_fungible_asset(
         fungible_asset_owner: address,
         fungible_source_address: address
-    ): (&FungibleAsset, &FungibleAssetProperty) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        let fungible_asset_obj_opt = get_fungible_asset_object(fungible_asset_owner, fungible_source_address, false);
-        assert!(option::is_some(&fungible_asset_obj_opt), error::not_found(EFUNGIBLE_ASSET_OBJECT));
-        let fungible_asset_obj = option::destroy_some(fungible_asset_obj_opt);
-        let obj_addr = verify(&fungible_asset_obj);
-        (borrow_global<FungibleAsset>(obj_addr), borrow_global<FungibleAssetProperty>(obj_addr))
+    ): &PinnedFungibleAsset acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa_opt = get_pinned_fungible_asset_object(fungible_asset_owner, fungible_source_address, false);
+        assert!(option::is_some(&pfa_opt), error::not_found(PINNED_EFUNGIBLE_ASSET_OBJECT));
+        let pfa = option::destroy_some(pfa_opt);
+        borrow_global<PinnedFungibleAsset>(object_address(&pfa))
     }
 
-    inline fun borrow_fungible_asset_mut_and_property(
+    inline fun borrow_fungible_asset_mut(
         fungible_asset_owner: address,
         fungible_source_address: address,
         create_on_demand: bool
-    ): (&mut FungibleAsset, &FungibleAssetProperty) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
-        let fungible_asset_obj_opt = get_fungible_asset_object(
+    ): &mut PinnedFungibleAsset acquires FungibleAssetStore, PinnedFungibleAsset {
+        let pfa_opt = get_pinned_fungible_asset_object(
             fungible_asset_owner,
             fungible_source_address,
             create_on_demand
         );
-        assert!(option::is_some(&fungible_asset_obj_opt), error::not_found(EFUNGIBLE_ASSET_OBJECT));
-        let fungible_asset_obj = option::destroy_some(fungible_asset_obj_opt);
-        let obj_addr = verify(&fungible_asset_obj);
-        (borrow_global_mut<FungibleAsset>(obj_addr), borrow_global<FungibleAssetProperty>(obj_addr))
-    }
-
-    inline fun verify(fungible_asset_obj: &Object<FungibleAsset>): address {
-        let fungible_asset_address = object::object_address(fungible_asset_obj);
-        assert!(
-            exists<FungibleAsset>(fungible_asset_address),
-            error::not_found(EFUNGIBLE_ASSET),
-        );
-        fungible_asset_address
+        assert!(option::is_some(&pfa_opt), error::not_found(PINNED_EFUNGIBLE_ASSET_OBJECT));
+        let pfa = option::destroy_some(pfa_opt);
+        borrow_global_mut<PinnedFungibleAsset>(object_address(&pfa))
     }
 
     #[test_only]
@@ -319,32 +276,34 @@ module fungible_asset::fungible_asset {
     fun test_basic_flow(
         creator: &signer,
         aaron: &signer
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
         let (_, asset) = create_test_token(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
+        let asset_addr = object_address(&asset);
 
         // Mint
-        let fa = mint(object_address(&asset), 100);
+        let fa = mint(asset_addr, 100);
         deposit(fa, creator_address);
 
         // Transfer
-        transfer(creator, &asset, 90, aaron_address);
+        let fa = withdraw(creator_address, asset_addr, 90);
+        deposit(fa, aaron_address);
         assert!(balance(creator_address, &asset) == 10, 1);
         assert!(balance(aaron_address, &asset) == 90, 2);
 
-        let fa = withdraw(aaron, &asset, 60);
+        let fa = withdraw(aaron_address, asset_addr, 60);
         deposit(fa, creator_address);
         assert!(balance(creator_address, &asset) == 70, 3);
 
-        let fa_to_burn = withdraw_internal(creator_address, &asset, 70);
+        let fa_to_burn = withdraw(creator_address, asset_addr, 70);
         burn(fa_to_burn);
         assert!(balance(creator_address, &asset) == 0, 4);
 
         // Freeze
-        set_frozen_flag(creator_address, &asset, true);
+        set_frozen_flag(creator_address, asset_addr, true);
         assert!(is_frozen(creator_address, &asset), 5);
-        set_frozen_flag(creator_address, &asset, false);
+        set_frozen_flag(creator_address, asset_addr, false);
         assert!(!is_frozen(creator_address, &asset), 6);
     }
 
@@ -352,14 +311,16 @@ module fungible_asset::fungible_asset {
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_failed_withdraw_from_frozen_account(
         creator: &signer,
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
         let (_, asset) = create_test_token(creator);
         let creator_address = signer::address_of(creator);
+        let asset_addr = object_address(&asset);
+
         let fa = mint(object_address(&asset), 100);
         deposit(fa, creator_address);
 
-        set_frozen_flag(creator_address, &asset, true);
-        let fa = withdraw(creator, &asset, 1);
+        set_frozen_flag(creator_address, asset_addr, true);
+        let fa = withdraw(creator_address, asset_addr, 1);
         burn(fa);
     }
 
@@ -367,23 +328,27 @@ module fungible_asset::fungible_asset {
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_failed_deposit_to_frozen_account(
         creator: &signer,
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
         let (_, asset) = create_test_token(creator);
         let creator_address = signer::address_of(creator);
-        let fa = mint(object_address(&asset), 100);
-        set_frozen_flag(creator_address, &asset, true);
+        let asset_addr = object_address(&asset);
+
+        let fa = mint(asset_addr, 100);
+        set_frozen_flag(creator_address, asset_addr, true);
         deposit(fa, creator_address);
     }
 
     #[test(creator = @0xcafe)]
     fun test_empty_account_default_behavior_and_creation_on_demand(
         creator: &signer,
-    ) acquires FungibleAssetStore, FungibleAsset, FungibleAssetProperty {
+    ) acquires FungibleAssetStore, PinnedFungibleAsset {
         let (_, asset) = create_test_token(creator);
         let creator_address = signer::address_of(creator);
+        let asset_addr = object_address(&asset);
+
         assert!(balance(creator_address, &asset) == 0, 1);
         assert!(!is_frozen(creator_address, &asset), 2);
-        assert!(option::is_none(&get_fungible_asset_object(creator_address, object_address(&asset), false)), 3);
-        assert!(option::is_some(&get_fungible_asset_object(creator_address, object_address(&asset), true)), 3);
+        assert!(option::is_none(&get_pinned_fungible_asset_object(creator_address, asset_addr, false)), 3);
+        assert!(option::is_some(&get_pinned_fungible_asset_object(creator_address, asset_addr, true)), 3);
     }
 }
