@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use std::sync::Arc;
+use crate::state_store::StateStore;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
 /// a batch of db alterations will be added to the change set without writing them to the db.
@@ -96,6 +97,7 @@ pub fn save_transactions(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    mut state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
@@ -108,6 +110,7 @@ pub fn save_transactions(
             ledger_store,
             transaction_store,
             event_store,
+            state_store,
             first_version,
             txns,
             txn_infos,
@@ -121,6 +124,7 @@ pub fn save_transactions(
             ledger_store,
             transaction_store,
             event_store,
+            state_store,
             first_version,
             txns,
             txn_infos,
@@ -183,6 +187,7 @@ pub fn save_transactions_impl(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
@@ -199,6 +204,9 @@ pub fn save_transactions_impl(
     for ws in write_sets {
         transaction_store.put_write_set(first_version, ws, batch)?;
     }
+    // only write kv and not update the state tree
+    // TODO(bowu): investigate what happens if we already have state restored while saving the kv
+    state_store.put_write_sets(write_sets.to_vec(), first_version,batch, batch)?;
 
     Ok(())
 }

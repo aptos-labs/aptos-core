@@ -104,11 +104,14 @@ impl RestoreHandler {
         events: &[Vec<ContractEvent>],
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
+        let refer = Arc::get_mut(self.state_store.as_ref());
+            .expect("state_store is not unique");
         restore_utils::save_transactions(
             self.ledger_db.clone(),
             self.ledger_store.clone(),
             self.transaction_store.clone(),
             self.event_store.clone(),
+            self.state_store.clone(),
             first_version,
             txns,
             txn_infos,

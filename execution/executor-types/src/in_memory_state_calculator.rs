@@ -199,6 +199,7 @@ impl InMemoryStateCalculator {
             .iter()
             .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
+        // TODO(bowu): this should only be a subtree of SMT? consider delay SMT update to accelerate restoring
         let latest = self
             .latest
             .batch_update(smt_updates, self.usage, &self.proof_reader)?;

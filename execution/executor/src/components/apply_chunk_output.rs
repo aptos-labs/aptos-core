@@ -30,6 +30,7 @@ use std::{collections::HashMap, iter::repeat, sync::Arc};
 pub struct ApplyChunkOutput;
 
 impl ApplyChunkOutput {
+    /// Apply chunk of transactions and return the new state, along with discarded, tobe retried txns
     pub fn apply(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
@@ -154,6 +155,7 @@ impl ApplyChunkOutput {
         ))
     }
 
+    /// Mainly covert the basic transaction data to data structure with state updates, txn_info, etc.
     fn assemble_ledger_diff(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
         state_updates_vec: Vec<HashMap<StateKey, Option<StateValue>>>,

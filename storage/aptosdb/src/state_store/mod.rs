@@ -27,12 +27,12 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use aptos_executor_types::in_memory_state_calculator::{InMemoryStateCalculator, process_write_set};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_state_view::StateViewId;
+use aptos_state_view::{StateViewId, TStateView};
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
@@ -56,6 +56,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
+use aptos_types::write_set::WriteSet;
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -510,7 +511,9 @@ impl StateStore {
                 .filter(|(_idx, txn_info)| txn_info.is_state_checkpoint())
                 .last()
                 .map(|(idx, _)| idx);
+            // prime rocksDB cache by pre-reading key-value based on the incoming write_sets
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
+
             let calculator = InMemoryStateCalculator::new(
                 buffered_state.current_state(),
                 latest_snapshot_state_view.into_state_cache(),
@@ -576,7 +579,50 @@ impl StateStore {
     ) -> Result<SparseMerkleRangeProof> {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
+    /// Put the write sets on top of current state
+    pub fn put_write_sets(
+        &mut self,
+        write_sets: Vec<WriteSet>,
+        first_version: Version,
+        ledger_batch: &SchemaBatch,
+        state_kv_batch: &SchemaBatch
+    ) -> Result<()>{
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["update_with_writesets"])
+            .start_timer();
+        // obtain the current state
+        let current_state = self.buffered_state.lock().current_state().current.clone();
+        // get a cached state view
+        let state_view = CachedStateView::new(
+            StateViewId::Miscellaneous,
+            self.state_db.clone(),
+            first_version, // ensure the version is state_view is before the first_verson to write
+            current_state,
+            Arc::new(SyncProofFetcher::new(self.state_db.clone())),
+        )?;
+        state_view.prime_cache_by_write_set(&write_sets)?;
+        let mut state_cache = state_view.into_state_cache();
+        // convert the write_set to value_state_sets
+        for (idx, ws) in write_sets.iter().enumerate() {
 
+            // this updates the state_cache and returns the key-value pairs
+            let kv_results = process_write_set(
+                Option::None,
+                &mut state_cache.state_cache,
+                &mut state_view.get_usage()?,
+                ws.clone()
+            )?;
+            // write the key-value pairs to the state_kv_db
+            self.put_value_sets(
+                vec![&kv_results],
+                first_version + idx as Version,
+                state_view.get_usage()?,
+                ledger_batch,
+                state_kv_batch
+            )?;
+        }
+        Ok(())
+    }
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,

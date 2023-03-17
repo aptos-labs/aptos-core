@@ -398,7 +398,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         // Find epoch boundaries.
         let mut epochs = Vec::new();
-        let mut epoch_begin = chunk_begin;
+        let mut epoch_begin = chunk_begin; // epoch begin version
         for (version, events) in multizip((chunk_begin..chunk_end, event_vecs.iter())) {
             let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(events)
                 .next()
@@ -438,6 +438,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
+    /// Remove known broken version from verification and replay epoch
     fn remove_and_replay_epoch(
         &self,
         executed_chunk: &mut ExecutedChunk,
@@ -452,6 +453,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     ) -> Result<()> {
         // we try to apply the txns in sub-batches split by known txns to skip and the end of the batch
         let txns_to_skip = verify_execution_mode.txns_to_skip();
+        // combine the broken versions with the last version to replay
         let mut batch_ends = txns_to_skip
             .range(begin_version..end_version)
             .chain(once(&end_version));
@@ -553,6 +555,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         Ok(end_version)
     }
 
+    /// Consume the passed in arguments and apply the transaction to the latest_view
     fn remove_and_apply(
         &self,
         executed_chunk: &mut ExecutedChunk,

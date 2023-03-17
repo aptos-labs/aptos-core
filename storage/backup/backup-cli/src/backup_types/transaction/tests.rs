@@ -21,7 +21,11 @@ use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
+use std::iter::zip;
+use itertools::zip_eq;
 use tokio::time::Duration;
+use aptos_types::state_store::state_key::StateKeyTag;
+use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
 
 #[test]
 fn end_to_end() {
@@ -133,6 +137,20 @@ fn end_to_end() {
             .map(|txn_to_commit| txn_to_commit.write_set().clone())
             .collect::<Vec<_>>()
     );
+    // Get all the key value pairs and compare if they are the same
+    let state_key_value_pairs_new = src_db.get_prefixed_state_value_iterator(
+        &StateKeyPrefix::new(StateKeyTag::AccessPath, vec![]),
+        Option::None,
+        target_version).unwrap();
+    let state_key_value_pairs = tgt_db.get_prefixed_state_value_iterator(
+        &StateKeyPrefix::new(StateKeyTag::AccessPath, vec![]),
+        Option::None,
+        target_version).unwrap();
+    for (old, new ) in zip_eq(state_key_value_pairs_new, state_key_value_pairs) {
+        assert_eq!(old.0, new.0);
+        assert_eq!(old.1, new.1);
+    }
+
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()

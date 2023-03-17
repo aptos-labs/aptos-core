@@ -1916,11 +1916,13 @@ impl DbWriter for AptosDB {
                 .map(|output| output.write_set().clone())
                 .collect();
             let transaction_infos = output_with_proof.proof.transaction_infos;
+            // TODO(bowu): can we safely do key value save across snapshots?
             restore_utils::save_transactions(
                 self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
+                self.state_store.clone(),
                 version,
                 &transactions,
                 &transaction_infos,

@@ -139,13 +139,14 @@ impl RestoreCoordinator {
                     .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
                     .ok_or_else(|| anyhow!("No usable state snapshot."))?
             };
-        let version = state_snapshot_backup.version;
-        self.global_opt.target_version = version;
-        let epoch_ending_backups = metadata_view.select_epoch_ending_backups(version)?;
+        let snapshot_version = state_snapshot_backup.version;
+        let target_version = self.global_opt.target_version;
+        // self.global_opt.target_version = version;
+        let epoch_ending_backups = metadata_view.select_epoch_ending_backups(target_version)?;
         let transaction_backups = metadata_view
-            .select_transaction_backups(self.ledger_history_start_version(), version)?;
-        COORDINATOR_TARGET_VERSION.set(version as i64);
-        info!(version = version, "Restore target decided.");
+            .select_transaction_backups(self.ledger_history_start_version(), target_version)?;
+        COORDINATOR_TARGET_VERSION.set(target_version as i64);
+        info!(target_version = target_version, "Restore target decided.");
 
         let epoch_history = if !self.skip_epoch_endings {
             Some(Arc::new(
@@ -167,7 +168,7 @@ impl RestoreCoordinator {
         StateSnapshotRestoreController::new(
             StateSnapshotRestoreOpt {
                 manifest_handle: state_snapshot_backup.manifest,
-                version,
+                version: snapshot_version,
                 validate_modules: false,
             },
             self.global_opt.clone(),
@@ -185,7 +186,7 @@ impl RestoreCoordinator {
             self.global_opt,
             self.storage,
             txn_manifests,
-            None,
+            Some(snapshot_version),
             epoch_history,
             VerifyExecutionMode::NoVerify,
         )
