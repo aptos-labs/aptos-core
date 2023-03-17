@@ -63,6 +63,12 @@ pub struct TransferSummary {
     pub transaction_hash: HashValue,
 }
 
+impl TransferSummary {
+    pub fn octa_spent(&self) -> u64 {
+        self.gas_unit_price * self.gas_used
+    }
+}
+
 impl From<Transaction> for TransferSummary {
     fn from(transaction: Transaction) -> Self {
         if let Transaction::UserTransaction(txn) = transaction {
