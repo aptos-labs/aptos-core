@@ -5,7 +5,7 @@ use crate::quorum_store::{
     tests::utils::create_vec_signed_transactions,
     types::{Batch, BatchPayload, BatchRequest},
 };
-use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::account_address::AccountAddress;
 
@@ -26,7 +26,8 @@ fn test_batch() {
     let batch = Batch::new(
         BatchId::new_for_test(1),
         signed_txns.clone(),
-        LogicalTime::new(epoch, 1),
+        epoch,
+        1,
         source,
     );
 
