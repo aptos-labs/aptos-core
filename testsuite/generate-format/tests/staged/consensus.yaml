@@ -54,8 +54,8 @@ BatchInfo:
         TYPENAME: AccountAddress
     - batch_id:
         TYPENAME: BatchId
-    - expiration:
-        TYPENAME: LogicalTime
+    - epoch: U64
+    - expiration: U64
     - digest:
         TYPENAME: HashValue
     - num_txns: U64
@@ -323,10 +323,6 @@ LedgerInfoWithV0:
         TYPENAME: LedgerInfo
     - signatures:
         TYPENAME: AggregateSignature
-LogicalTime:
-  STRUCT:
-    - epoch: U64
-    - round: U64
 Module:
   STRUCT:
     - code: BYTES

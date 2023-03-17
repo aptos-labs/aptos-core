@@ -17,4 +17,5 @@ data_service_grpc_listen_address: 0.0.0.0:50052
 redis_address: 127.0.0.1:6379
 file_store_bucket_name: indexer-grpc-file-store-testnet 
 health_check_port: 8081
+whitelisted_auth_tokens: ["PUT YOUR TOKEN 1", "PUT YOUR TOKEN 2"]
 ```

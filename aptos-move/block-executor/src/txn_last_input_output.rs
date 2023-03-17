@@ -3,11 +3,11 @@
 
 use crate::{
     errors::Error,
-    scheduler::{Incarnation, TxnIndex, Version},
-    task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
+    task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_types::access_path::AccessPath;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use aptos_types::{access_path::AccessPath, executable::ModulePath};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -133,7 +133,7 @@ pub struct TxnLastInputOutput<K, T, E> {
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K, T, E> {
-    pub fn new(num_txns: usize) -> Self {
+    pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
@@ -202,8 +202,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
             }
         }
 
-        self.inputs[txn_idx].store(Some(Arc::new(input)));
-        self.outputs[txn_idx].store(Some(Arc::new(output)));
+        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
+        self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
     }
 
     pub fn module_publishing_may_race(&self) -> bool {
@@ -211,13 +211,13 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
     }
 
     pub fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
-        self.inputs[txn_idx].load_full()
+        self.inputs[txn_idx as usize].load_full()
     }
 
     // Extracts a set of paths written or updated during execution from transaction
     // output: (modified by writes, modified by deltas).
     pub fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
-        match &self.outputs[txn_idx].load_full() {
+        match &self.outputs[txn_idx as usize].load_full() {
             None => HashSet::new(),
             Some(txn_output) => match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
@@ -234,7 +234,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
     pub fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
-        let owning_ptr = self.outputs[txn_idx]
+        let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("Output must be recorded after execution");
 
