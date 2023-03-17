@@ -8,6 +8,7 @@ import {
   HexString,
   TransactionBuilderEd25519,
 } from "aptos";
+import { Timer } from "timer-node";
 
 export type Transaction = {
   sender: AptosAccount;
@@ -26,16 +27,24 @@ const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
  * We handle possible errors (for now, only `mempool_is_full` error is handled by re-submitting the failed buffer)
  */
 export class BatchTransaction {
-  transactions: Transaction[] = [];
-  batchSize: number = 0;
-  sequenceNumber: BCS.Uint64 | undefined = undefined;
+  private transactions: Transaction[] = [];
+  private batchSize: number = 0;
+  private sequenceNumber: BCS.Uint64 | undefined = undefined;
   //client = new AptosClient("http://0.0.0.0:8080/v1");
-  client = new AptosClient("https://fullnode.devnet.aptoslabs.com");
-  currentIndex = 0;
-  currentBuffer: Transaction[] = [];
-  latestTxnHash: string = "";
+  private client = new AptosClient("https://fullnode.devnet.aptoslabs.com");
+  private currentIndex: number = 0;
+  private currentBuffer: Transaction[] = [];
+  private latestTxnHash: string = "";
+  private lastRefreshed: Date | undefined = undefined;
+
+  private chainId: BCS.Uint8;
+  private gasUnitPrice: BCS.Uint64;
+  private maxGasAmount: BCS.Uint64;
+
+  private timer: Timer = new Timer();
 
   async send(transactions: Transaction[], batchSize: number = 10) {
+    this.timer.start();
     this.batchSize = batchSize;
     this.transactions = transactions;
     console.log(`submitting ${transactions.length} transactions`);
@@ -50,43 +59,44 @@ export class BatchTransaction {
 
   async sendInBatch(): Promise<any> {
     if (this.currentBuffer.length === 0) {
+      this.timer.stop();
+      console.log(this.timer.time());
       return this.latestTxnHash;
     }
 
-    for (let i = 0; i < this.currentBuffer.length; i++) {
-      console.log(`sending buffer no. ${i + 1}`);
-      const txns = await this.createTransactions(this.currentBuffer);
+    const txns = await this.createTransactions(this.currentBuffer);
 
-      return this.client
-        .submitBatchTransactions(txns)
-        .then(async (data) => {
-          if ((data as any).transaction_failures.length > 0) {
-            // TODO - this is for the case all transactions are from the same user,
-            // to handle different users we would need to process each index in the transaction_failures array
-            const error = (data as any).transaction_failures[0].error;
-            console.log("transaction_failures", JSON.stringify((data as any).transaction_failures, null, " "));
-            switch (error.error_code) {
-              case "mempool_is_full":
-                console.log("sleeps in", this.sequenceNumber);
-                await this.sleep(10 * 1000); // 10 seconds
-                // re-submit current failed buffer
-                this.currentBuffer = this.currentBuffer.slice(
-                  (data as any).transaction_failures[0].transaction_index,
-                  (data as any).transaction_failures[0].transaction_index + this.batchSize,
-                );
-                return this.sendInBatch();
-              default:
-                throw new Error(`Unexpected error ${JSON.stringify(error, null, " ")}`);
-            }
+    return this.client
+      .submitBatchTransactions(txns)
+      .then(async (data) => {
+        if ((data as any).transaction_failures.length > 0) {
+          // TODO - this is for the case all transactions are from the same user,
+          // to handle different users we would need to process each index in the transaction_failures array
+          const error = (data as any).transaction_failures[0].error;
+          console.log("transaction_failures", JSON.stringify((data as any).transaction_failures, null, " "));
+          switch (error.error_code) {
+            case "mempool_is_full":
+              console.log("sleeps");
+              await this.sleep(10 * 1000); // 10 seconds
+              // re-submit current failed buffer
+              this.currentBuffer = this.currentBuffer.slice(
+                (data as any).transaction_failures[0].transaction_index,
+                (data as any).transaction_failures[0].transaction_index + this.batchSize,
+              );
+
+              await this.syncSequenceNumber(this.currentBuffer[0].sender);
+              return this.sendInBatch();
+            default:
+              throw new Error(`Unexpected error ${JSON.stringify(error, null, " ")}`);
           }
-          this.currentIndex += this.batchSize;
-          this.currentBuffer = this.transactions.slice(this.currentIndex, this.currentIndex + this.batchSize);
-          return this.sendInBatch();
-        })
-        .catch((error) => {
-          console.error("error", error);
-        });
-    }
+        }
+        this.currentIndex += this.batchSize;
+        this.currentBuffer = this.transactions.slice(this.currentIndex, this.currentIndex + this.batchSize);
+        return this.sendInBatch();
+      })
+      .catch((error) => {
+        console.error("error", error);
+      });
   }
 
   async createTransactions(transactions: Transaction[]) {
@@ -106,11 +116,18 @@ export class BatchTransaction {
     const txn = transaction;
 
     if (!this.sequenceNumber) {
-      const { sequence_number } = await this.client.getAccount(txn.sender.address());
-      this.sequenceNumber = BigInt(sequence_number);
+      await this.syncSequenceNumber(txn.sender);
     }
 
-    const { chainId, gasUnitPrice, maxGasAmount } = await this.getTransactionArgs(txn.sender.address());
+    // 5 minutes cache
+    if (this.lastRefreshed === undefined || new Date().getTime() - this.lastRefreshed.getTime() > 5 * 60 * 1000) {
+      const { chainId, gasUnitPrice, maxGasAmount } = await this.getTransactionArgs(txn.sender.address());
+      this.chainId = chainId;
+      this.gasUnitPrice = gasUnitPrice;
+      this.maxGasAmount = maxGasAmount;
+      this.lastRefreshed = new Date();
+    }
+
     // let sequenceNumber;
     // if (accountSequnceNumberMap.has(txn.sender.address())) {
     //   let currSeqNumber = accountSequnceNumberMap.get(txn.sender.address());
@@ -128,15 +145,15 @@ export class BatchTransaction {
       this.sequenceNumber!,
       txn.payload,
       // Max gas unit to spend
-      txn.extraArgs?.maxGasAmount ?? maxGasAmount,
+      txn.extraArgs?.maxGasAmount ?? this.maxGasAmount,
       // Gas price per unit
-      txn.extraArgs?.gasUnitPrice ?? gasUnitPrice,
+      txn.extraArgs?.gasUnitPrice ?? this.gasUnitPrice,
       // Expiration timestamp. Transaction is discarded if it is not executed within 20 seconds from now.
       txn.extraArgs?.expireTimestamp ?? BigInt(Math.floor(Date.now() / 1000) + 20),
-      new TxnBuilderTypes.ChainId(chainId),
+      new TxnBuilderTypes.ChainId(this.chainId),
     );
     //this.latestTxnHash = await this.getSignedTxnHash(rawTransaction,txn.sender);
-    this.sequenceNumber++;
+    this.sequenceNumber!++;
     const bcsTxn = AptosClient.generateBCSTransaction(txn.sender, rawTransaction);
     this.latestTxnHash = this.getSignedTxnHash(rawTransaction, txn.sender);
     return bcsTxn;
@@ -164,6 +181,11 @@ export class BatchTransaction {
       gasUnitPrice: BigInt(gasUnitPrice),
       maxGasAmount: maxGasAmount < MAX_GAS_AMOUNT_ALLOWED ? maxGasAmount : MAX_GAS_AMOUNT_ALLOWED,
     };
+  }
+
+  async syncSequenceNumber(account: AptosAccount) {
+    const { sequence_number } = await this.client.getAccount(account.address());
+    this.sequenceNumber = BigInt(sequence_number);
   }
 
   async sleep(timeMs: number): Promise<null> {

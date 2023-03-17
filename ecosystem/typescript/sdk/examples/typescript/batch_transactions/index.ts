@@ -15,11 +15,7 @@ export type Transaction = {
 async function main() {
   const client = new AptosClient("https://fullnode.devnet.aptoslabs.com");
   //const faucetClient = new FaucetClient("http://0.0.0.0:8080/v1", "http://0.0.0.0:8081");
-  const faucetClient = new FaucetClient(
-    "https://fullnode.devnet.aptoslabs.com",
-    "https://faucet.devnet.aptoslabs.com",
-    { TOKEN: "klsdjfoids6f78f3nm2wuvnaslku6y2387hasdfuph32vclkjdf8jsdfj2983fjafp12jfjfj0p00y93378" },
-  );
+  const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com");
 
   const account1 = new AptosAccount();
   await faucetClient.fundAccount(account1.address(), 100_000_000);
@@ -34,11 +30,11 @@ async function main() {
     ),
   );
 
-  console.log("/////submiting batch transactions for account", account1.address().hex());
+  console.log("/////submitting batch transactions for account", account1.address().hex());
 
   const transactions: Transaction[] = [];
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 1000; i++) {
     transactions.push({
       sender: account1,
       payload: entryFunctionPayload,
