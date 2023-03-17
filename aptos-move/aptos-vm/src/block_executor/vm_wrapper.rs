@@ -11,6 +11,7 @@ use crate::{
 use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_core_types::{
@@ -59,10 +60,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         &self,
         view: &impl StateView,
         txn: &PreprocessedTransaction,
-        txn_idx: usize,
+        txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
+        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
         match self
             .vm
