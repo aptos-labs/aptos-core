@@ -1,3 +1,6 @@
+/// This module provides an addtional abstraction on top of `FungibleSource` that manages the capabilities of mint, burn
+/// and freeze for the creator in a simple way. It offers creators to destory any capabilities in an on-demand way too.
+/// For more advanced goverance, please build your own module to manage capabilitys exntending `FungibleSource`.
 module fungible_asset::managed_fungible_source {
     use std::option;
     use aptos_framework::object::{is_owner, address_to_object, Object, object_address, ConstructorRef};
@@ -23,6 +26,7 @@ module fungible_asset::managed_fungible_source {
     /// Caps existence errors.
     const EMANAGED_FUNGIBLE_ASSET_CAPS: u64 = 5;
 
+    /// The container of capabilities.
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct GoveranceCapabilities has key {
         mint: Option<MintCap>,
@@ -30,6 +34,7 @@ module fungible_asset::managed_fungible_source {
         burn: Option<BurnCap>,
     }
 
+    /// Initialize capabilities of an asset object after initializing `FungibleSource`.
     public fun initialize_managing_capabilities(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
@@ -71,7 +76,8 @@ module fungible_asset::managed_fungible_source {
         fungible_source::burn(burn_cap, amount, from);
     }
 
-    /// Freeze an owner of fungible asset.
+    /// Freeze as an owner of fungible asset.
+    /// Note: `freeze` is a built-in function name.
     public fun freeze_<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -82,7 +88,7 @@ module fungible_asset::managed_fungible_source {
         fungible_source::freeze_(freeze_cap, account);
     }
 
-    /// Unfreeze an owner of fungible asset.
+    /// Unfreeze as an owner of fungible asset.
     public fun unfreeze<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
@@ -93,19 +99,23 @@ module fungible_asset::managed_fungible_source {
         fungible_source::unfreeze(freeze_cap, fungible_asset_owner);
     }
 
+    /// Self-explanatory.
     public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).mint)
     }
 
+    /// Self-explanatory.
     public fun owner_can_freeze<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).freeze)
     }
 
+    /// Self-explanatory.
     public fun owner_can_burn<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).burn)
     }
 
-    public fun destroy_mint_cap<T: key>(
+    /// Explicitly waive the mint capability.
+    public fun waive_mint<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
     ) acquires GoveranceCapabilities {
@@ -114,7 +124,8 @@ module fungible_asset::managed_fungible_source {
         fungible_source::destroy_mint_cap(option::extract(mint_cap));
     }
 
-    public fun destroy_freeze_cap<T: key>(
+    /// Explicitly wavie the freeze capability.
+    public fun waive_freeze<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
     ) acquires GoveranceCapabilities {
@@ -123,7 +134,8 @@ module fungible_asset::managed_fungible_source {
         fungible_source::destroy_freeze_cap(option::extract(freeze_cap));
     }
 
-    public fun destroy_burn_cap<T: key>(
+    /// Explicitly destory the burn capability.
+    public fun waive_burn<T: key>(
         asset_owner: &signer,
         asset: &Object<T>
     ) acquires GoveranceCapabilities {
@@ -132,6 +144,7 @@ module fungible_asset::managed_fungible_source {
         fungible_source::destroy_burn_cap(option::extract(burn_cap));
     }
 
+    /// Borrow the immutable reference of mint capability from `asset`.
     inline fun borrow_mint_from_caps<T: key>(
         asset: &Object<T>,
     ): &MintCap acquires GoveranceCapabilities {
@@ -140,6 +153,7 @@ module fungible_asset::managed_fungible_source {
         option::borrow(mint_cap)
     }
 
+    /// Borrow the immutable reference of freeze capability from `asset`.
     inline fun borrow_freeze_from_caps<T: key>(
         asset: &Object<T>,
     ): &FreezeCap acquires GoveranceCapabilities {
@@ -148,6 +162,7 @@ module fungible_asset::managed_fungible_source {
         option::borrow(freeze_cap)
     }
 
+    /// Borrow the immutable reference of burn capability from `asset`.
     inline fun borrow_burn_from_caps<T: key>(
         asset: &Object<T>,
     ): &BurnCap acquires GoveranceCapabilities {
@@ -156,12 +171,14 @@ module fungible_asset::managed_fungible_source {
         option::borrow(burn_cap)
     }
 
+    /// Borrow the immutable reference of capabilities from `asset`.
     inline fun borrow_caps<T: key>(
         asset: &Object<T>,
     ): &GoveranceCapabilities acquires GoveranceCapabilities {
         borrow_global_mut<GoveranceCapabilities>(verify(asset))
     }
 
+    /// Borrow the mutable reference of capabilities from `asset`.
     inline fun borrow_caps_mut<T: key>(
         owner: &signer,
         asset: &Object<T>,
@@ -170,12 +187,14 @@ module fungible_asset::managed_fungible_source {
         borrow_global_mut<GoveranceCapabilities>(verify(asset))
     }
 
+    /// Verify `asset` indeed has `GoveranceCapabilities` resource associated.
     inline fun verify<T: key>(asset: &Object<T>): address {
         let asset_addr = object_address(asset);
         address_to_object<GoveranceCapabilities>(asset_addr);
         asset_addr
     }
 
+    /// Assert the owner of `asset` is `owner`.
     inline fun assert_owner<T: key>(owner: &signer, asset: &Object<T>) {
         assert!(is_owner(*asset, address_of(owner)), error::permission_denied(ENOT_OWNER));
     }
@@ -200,9 +219,9 @@ module fungible_asset::managed_fungible_source {
         assert!(!is_frozen(creator_address, &asset), 6);
         burn(creator, &asset, 90, creator_address);
 
-        destroy_mint_cap(creator, &asset);
-        destroy_freeze_cap(creator, &asset);
-        destroy_burn_cap(creator, &asset);
+        waive_mint(creator, &asset);
+        waive_freeze(creator, &asset);
+        waive_burn(creator, &asset);
 
         assert!(!owner_can_mint(&asset), 7);
         assert!(!owner_can_freeze(&asset), 8);

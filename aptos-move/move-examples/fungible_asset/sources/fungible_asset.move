@@ -1,3 +1,5 @@
+/// This defines the fungible asset module that can issue fungible assets of any `FungibleSource` object. The source
+/// can be a token object or any object that equipped with `FungibleSource` resource.
 module fungible_asset::fungible_asset {
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_framework::object::{Self, Object, object_address, generate_transfer_ref, DeleteRef, generate_delete_ref};
@@ -34,18 +36,26 @@ module fungible_asset::fungible_asset {
     const EFUNGIBLE_ASSET_TYPE_MISMATCH: u64 = 9;
 
 
+    /// Represents all the fungible asset objects of an onwer keyed by the address of the base asset object.
     struct FungibleAssetStore has key {
         index: SmartTable<address, Object<PinnedFungibleAsset>>
     }
 
+    /// The the pinned fungible asset the object of which cannot be transferred.
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct PinnedFungibleAsset has key {
+        /// The address of the base asset object.
         asset_addr: address,
+        /// The balance of the fungible asset.
         balance: u64,
+        /// Whether this account is frozen for this fungible asset.
         frozen: bool,
+        /// The delete_ref of this object, used for cleanup.
         delete_ref: DeleteRef
     }
 
+    /// The unpinned version of fungible asset.
+    /// Note: it does not have `store` ability so only used in hot potato pattern.
     struct FungibleAsset {
         asset_addr: address,
         balance: u64,
@@ -85,6 +95,7 @@ module fungible_asset::fungible_asset {
         borrow_global<PinnedFungibleAsset>(object_address(&pfa)).frozen
     }
 
+    /// Deposit fungible asset to an account.
     public fun deposit(
         fa: FungibleAsset,
         to: address
@@ -98,6 +109,7 @@ module fungible_asset::fungible_asset {
         merge(pfa, fa);
     }
 
+    /// Mint fungible asset with `amount`.
     public(friend) fun mint(
         asset_addr: address,
         amount: u64,
@@ -109,6 +121,7 @@ module fungible_asset::fungible_asset {
         }
     }
 
+    /// Freeeze/unfreeze any account of asset address `asset_addr`.
     public(friend) fun set_frozen_flag(
         fungible_asset_owner: address,
         asset_addr: address,
@@ -119,6 +132,7 @@ module fungible_asset::fungible_asset {
         borrow_global_mut<PinnedFungibleAsset>(object_address(&pfa)).frozen = frozen;
     }
 
+    /// Burn fungible asset.
     public(friend) fun burn(fungible_asset: FungibleAsset) {
         let FungibleAsset {
             asset_addr: _,
@@ -126,6 +140,7 @@ module fungible_asset::fungible_asset {
         } = fungible_asset;
     }
 
+    /// Withdraw `amount` of fungible asset of asset address `asset_addr` from `account`.
     public(friend) fun withdraw(
         account: address,
         asset_addr: address,
@@ -164,6 +179,7 @@ module fungible_asset::fungible_asset {
     }
 
 
+    /// Extract `amount` of fungible asset from a `PinnedFungibleAsset`.
     fun extract(fa: &mut PinnedFungibleAsset, amount: u64): FungibleAsset {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         assert!(fa.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
@@ -174,6 +190,7 @@ module fungible_asset::fungible_asset {
         }
     }
 
+    /// Merge `amount` of fungible asset to `PinnedFungibleAsset`.
     fun merge(pfa: &mut PinnedFungibleAsset, fa: FungibleAsset) {
         let FungibleAsset { asset_addr, balance: amount } = fa;
         // ensure merging the same coin
@@ -181,6 +198,9 @@ module fungible_asset::fungible_asset {
         pfa.balance = pfa.balance + amount;
     }
 
+    /// Get the `PinnedFungibleAsset` object of an asset from owner address.
+    /// if `create_on_demand` is true, an default`PinnedFungibleAsset` will be created if not exists; otherwise, abort
+    /// with error.
     fun get_pinned_fungible_asset_object(
         fungible_asset_owner: address,
         asset_address: address,
@@ -200,7 +220,7 @@ module fungible_asset::fungible_asset {
         option::some(pfa)
     }
 
-    /// Create a zero-amount coin object of the passed-in asset.
+    /// Create a default `PinnedFungibleAsset` object with zero balance of the passed-in asset.
     fun create_pinned_fungible_asset_object(account: address, asset_address: address): Object<PinnedFungibleAsset> {
         // Must review carefully here.
         let asset_signer = aptos_framework::create_signer::create_signer(asset_address);
@@ -222,6 +242,7 @@ module fungible_asset::fungible_asset {
         object::object_from_constructor_ref<PinnedFungibleAsset>(&creator_ref)
     }
 
+    /// Remove the corresponding `PinnedFungibleAsset` object from the index of owner.
     fun remove_pinned_fungible_asset_object(
         fungible_asset_owner: address,
         asset_address: address
@@ -232,24 +253,26 @@ module fungible_asset::fungible_asset {
         smart_table::remove(index_table, asset_address)
     }
 
+    /// Private helper funtion to get an immutable reference of the `PinnedFungibleAsset` specified by `asset_address`.
     inline fun borrow_fungible_asset(
         fungible_asset_owner: address,
-        fungible_source_address: address
+        asset_address: address
     ): &PinnedFungibleAsset acquires FungibleAssetStore, PinnedFungibleAsset {
-        let pfa_opt = get_pinned_fungible_asset_object(fungible_asset_owner, fungible_source_address, false);
+        let pfa_opt = get_pinned_fungible_asset_object(fungible_asset_owner, asset_address, false);
         assert!(option::is_some(&pfa_opt), error::not_found(PINNED_EFUNGIBLE_ASSET_OBJECT));
         let pfa = option::destroy_some(pfa_opt);
         borrow_global<PinnedFungibleAsset>(object_address(&pfa))
     }
 
+    /// Private helper funtion to get a mutable reference of the `PinnedFungibleAsset` specified by `asset_address`.
     inline fun borrow_fungible_asset_mut(
         fungible_asset_owner: address,
-        fungible_source_address: address,
+        asset_address: address,
         create_on_demand: bool
     ): &mut PinnedFungibleAsset acquires FungibleAssetStore, PinnedFungibleAsset {
         let pfa_opt = get_pinned_fungible_asset_object(
             fungible_asset_owner,
-            fungible_source_address,
+            asset_address,
             create_on_demand
         );
         assert!(option::is_some(&pfa_opt), error::not_found(PINNED_EFUNGIBLE_ASSET_OBJECT));

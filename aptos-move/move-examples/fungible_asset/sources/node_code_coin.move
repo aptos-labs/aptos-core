@@ -17,9 +17,13 @@ module fungible_asset::node_code_coin {
     #[test_only]
     use aptos_framework::object::{create_object_address, address_to_object};
 
+    /// Defines a `Coin` type that has `name` and `symbol`.
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct Coin has key {
+        /// Name of the coin, i.e., "USDT".
         name: String,
+        /// Symbol of the coin, usually a shorter version of the name.
+        /// For example, Singapore Dollar is SGD.
         symbol: String,
     }
 

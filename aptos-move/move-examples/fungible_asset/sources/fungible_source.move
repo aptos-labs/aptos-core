@@ -1,3 +1,4 @@
+/// This module defines the extension called `FungibleSource` that any object must equip with to make it fungible.
 module fungible_asset::fungible_source {
     use aptos_framework::object::{object_address, Object, ConstructorRef, address_to_object};
     use std::option::Option;
@@ -25,9 +26,12 @@ module fungible_asset::fungible_source {
     /// Current supply underflow
     const ECURRENT_SUPPLY_UNDERFLOW: u64 = 8;
 
+    /// The metadata associated with an asset to be fungible.
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FungibleSource has key {
+        /// Self-explanatory.
         current_supply: u64,
+        /// The max supply limit where `option::none()` means no limit.
         maximum_supply: Option<u64>,
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
@@ -35,19 +39,22 @@ module fungible_asset::fungible_source {
         decimals: u8,
     }
 
-    /// Capabilities
+    /// Capability to mint fungible assets of the asset at `asset_addr`.
     struct MintCap has store {
         asset_addr: address
     }
 
+    /// Capability to (un)freeze fungible assets of the asset at `asset_addr` in an account.
     struct FreezeCap has store {
         asset_addr: address
     }
 
+    /// Capability to burn fungible assets of the asset at `asset_addr`.
     struct BurnCap has store {
         asset_addr: address
     }
 
+    /// The initialization of an object with `FungibleSource`.
     public fun init_fungible_source(
         constructor_ref: &ConstructorRef,
         maximum_supply: u64,
@@ -71,16 +78,19 @@ module fungible_asset::fungible_source {
     }
 
 
+    /// Self-explanatory.
     public fun get_current_supply<T: key>(asset: &Object<T>): u64 acquires FungibleSource {
         let asset_addr = verify(asset);
         borrow_fungible_source(asset_addr).current_supply
     }
 
+    /// Self-explanatory.
     public fun get_maximum_supply<T: key>(asset: &Object<T>): Option<u64> acquires FungibleSource {
         let asset_addr = verify(asset);
         borrow_fungible_source(asset_addr).maximum_supply
     }
 
+    /// Self-explanatory.
     public fun get_decimals<T: key>(asset: &Object<T>): u8 acquires FungibleSource {
         let asset_addr = verify(asset);
         borrow_fungible_source(asset_addr).decimals
@@ -114,6 +124,7 @@ module fungible_asset::fungible_source {
         set_frozen(cap, fungible_asset_owner, false);
     }
 
+    /// set `frozen` flag of an owner.
     fun set_frozen(
         cap: &FreezeCap,
         fungible_asset_owner: address,
@@ -133,6 +144,7 @@ module fungible_asset::fungible_source {
         fungible_asset::burn(fungible_asset_to_burn);
     }
 
+    /// Withdarw `amount` of fungible assets of `asset`.
     public fun withdraw<T: key>(
         fungible_asset_owner: &signer,
         asset: &Object<T>,
@@ -144,15 +156,16 @@ module fungible_asset::fungible_source {
         fungible_asset::withdraw(account_address, asset_addr, amount)
     }
 
-    // Moves balances around and not the underlying object.
+    /// Transfer `amount` of fungible assets of `asset` to `receiver`.
+    /// Note: it does not move the underlying object.
     public fun transfer<T: key>(
         fungible_asset_owner: &signer,
         asset: &Object<T>,
         amount: u64,
-        to: address
+        receiver: address
     ) {
         let fa = withdraw(fungible_asset_owner, asset, amount);
-        deposit(fa, to);
+        deposit(fa, receiver);
     }
 
     /// Increase the supply of a fungible asset by minting.
@@ -174,16 +187,34 @@ module fungible_asset::fungible_source {
         fungible_source.current_supply = fungible_source.current_supply - amount;
     }
 
+    /// Self-explanatory.
     public fun destroy_mint_cap(cap: MintCap) {
         let MintCap { asset_addr: _ } = cap;
     }
 
+    /// Self-explanatory.
     public fun destroy_freeze_cap(cap: FreezeCap) {
         let FreezeCap { asset_addr: _ } = cap;
     }
 
+    /// Self-explanatory.
     public fun destroy_burn_cap(cap: BurnCap) {
         let BurnCap { asset_addr: _ } = cap;
+    }
+
+    /// Self-explanatory.
+    public fun address_from_mint_cap(cap: &MintCap): address {
+        cap.asset_addr
+    }
+
+    /// Self-explanatory.
+    public fun addres_from_freeze_cap(cap: &FreezeCap): address {
+        cap.asset_addr
+    }
+
+    /// Self-explanatory.
+    public fun address_from_burn_cap(cap: &BurnCap): address {
+        cap.asset_addr
     }
 
     /// Borrow a `&FungibleSource` from an asset.
@@ -196,6 +227,7 @@ module fungible_asset::fungible_source {
         borrow_global_mut<FungibleSource>(asset_addr)
     }
 
+    /// Verify any object is equipped with `FungibleSource` and return its address.
     public inline fun verify<T: key>(asset: &Object<T>): address {
         let addr = object_address(asset);
         address_to_object<FungibleSource>(addr);
