@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network::{NetworkSender, QuorumStoreSender},
+    monitor,
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
 use aptos_consensus_types::{
@@ -12,19 +12,20 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::collections::HashSet;
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
-    LocalProof(ProofOfStore),
-    RemoteProof(ProofOfStore),
+    ReceiveProof(ProofOfStore),
     CommitNotification(LogicalTime, Vec<HashValue>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
 pub struct ProofManager {
+    my_peer_id: PeerId,
     proofs_for_consensus: ProofQueue,
     latest_logical_time: LogicalTime,
     back_pressure_total_txn_limit: u64,
@@ -36,10 +37,12 @@ pub struct ProofManager {
 impl ProofManager {
     pub fn new(
         epoch: u64,
+        my_peer_id: PeerId,
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
     ) -> Self {
         Self {
+            my_peer_id,
             proofs_for_consensus: ProofQueue::new(),
             latest_logical_time: LogicalTime::new(epoch, 0),
             back_pressure_total_txn_limit,
@@ -55,21 +58,11 @@ impl ProofManager {
         self.remaining_total_proof_num += 1;
     }
 
-    pub(crate) async fn handle_local_proof(
-        &mut self,
-        proof: ProofOfStore,
-        network_sender: &mut NetworkSender,
-    ) {
-        let num_txns = proof.info().num_txns;
-        self.proofs_for_consensus.push(proof.clone(), true);
+    pub(crate) fn receive_proof(&mut self, proof: ProofOfStore) {
+        let is_local = proof.author() == self.my_peer_id;
+        let num_txns = proof.num_txns();
         self.increment_remaining_txns(num_txns);
-        network_sender.broadcast_proof_of_store(proof).await;
-    }
-
-    pub(crate) fn handle_remote_proof(&mut self, proof: ProofOfStore) {
-        let num_txns = proof.info().num_txns;
-        self.proofs_for_consensus.push(proof, false);
-        self.increment_remaining_txns(num_txns);
+        self.proofs_for_consensus.push(proof, is_local);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -159,7 +152,6 @@ impl ProofManager {
 
     pub async fn start(
         mut self,
-        mut network_sender: NetworkSender,
         back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
@@ -174,49 +166,48 @@ impl ProofManager {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                Some(msg) = proposal_rx.next() => {
-                    self.handle_proposal_request(msg);
+                    Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
+                        self.handle_proposal_request(msg);
 
-                    let updated_back_pressure = self.qs_back_pressure();
-                    if updated_back_pressure != back_pressure {
-                        back_pressure = updated_back_pressure;
-                        if back_pressure_tx.send(back_pressure).await.is_err() {
-                            debug!("Failed to send back_pressure for proposal");
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for proposal");
+                            }
                         }
-                    }
-                },
-                Some(msg) = proof_rx.recv() => {
-                    match msg {
-                        ProofManagerCommand::Shutdown(ack_tx) => {
-                            ack_tx
-                                .send(())
-                                .expect("Failed to send shutdown ack to QuorumStore");
-                            break;
-                        },
-                        ProofManagerCommand::LocalProof(proof) => {
-                            self.handle_local_proof(proof, &mut network_sender).await;
-                        },
-                        ProofManagerCommand::RemoteProof(proof) => {
-                            self.handle_remote_proof(proof);
-                        },
-                        ProofManagerCommand::CommitNotification(logical_time, digests) => {
-                            self.handle_commit_notification(logical_time, digests);
+                    }),
+                    Some(msg) = proof_rx.recv() => {
+                        monitor!("proof_manager_handle_command", {
+                        match msg {
+                            ProofManagerCommand::Shutdown(ack_tx) => {
+                                ack_tx
+                                    .send(())
+                                    .expect("Failed to send shutdown ack to QuorumStore");
+                                break;
+                            },
+                            ProofManagerCommand::ReceiveProof(proof) => {
+                                self.receive_proof(proof);
+                            },
+                            ProofManagerCommand::CommitNotification(logical_time, digests) => {
+                                self.handle_commit_notification(logical_time, digests);
 
-                            // update the backpressure upon new commit round
-                            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-                                self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
-                            // TODO: keeping here for metrics, might be part of the backpressure in the future?
-                            self.proofs_for_consensus.clean_local_proofs(logical_time);
-                        },
-                    }
-                    let updated_back_pressure = self.qs_back_pressure();
-                    if updated_back_pressure != back_pressure {
-                        back_pressure = updated_back_pressure;
-                        if back_pressure_tx.send(back_pressure).await.is_err() {
-                            debug!("Failed to send back_pressure for commit notification");
+                                // update the backpressure upon new commit round
+                                (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+                                    self.proofs_for_consensus.num_total_txns_and_proofs(logical_time);
+                                // TODO: keeping here for metrics, might be part of the backpressure in the future?
+                                self.proofs_for_consensus.clean_local_proofs(logical_time);
+                            },
                         }
-                    }
-                },
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for commit notification");
+                            }
+                        }
+                    })
+                }
             }
         }
     }

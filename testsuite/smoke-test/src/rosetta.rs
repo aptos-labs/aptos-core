@@ -19,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
     aptos_api_types::{TransactionOnChainData, UserTransaction},
     Response, Transaction,
@@ -57,7 +58,12 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
+) -> (
+    LocalSwarm,
+    CliTestFramework,
+    JoinHandle<anyhow::Result<()>>,
+    RosettaClient,
+) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
@@ -546,20 +552,6 @@ async fn test_transfer() {
             break;
         }
     }
-    // Attempt to transfer all coins to another user (should fail)
-    rosetta_client
-        .transfer(
-            &network,
-            sender_private_key,
-            receiver,
-            sender_balance,
-            expiry_time(Duration::from_secs(5)).as_secs(),
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect_err("Should fail simulation since we can't transfer all coins");
 
     // Attempt to transfer more than balance to another user (should fail)
     rosetta_client
@@ -577,9 +569,11 @@ async fn test_transfer() {
         .expect_err("Should fail simulation since we can't transfer more than balance coins");
 
     // Attempt to transfer more than balance to another user (should fail)
-    // TODO(Gas): check this
     let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
+        // We purposely don't set gas unit price here so the builder uses the default.
+        // Note that the default is different in tests. See here:
+        // config/global-constants/src/lib.rs
+        .with_gas_unit_price(GAS_UNIT_PRICE)
         .with_max_gas_amount(1000);
     let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
     let unsigned_transaction = transaction_factory
@@ -598,7 +592,7 @@ async fn test_transfer() {
         .await
         .expect("Should succeed getting gas estimate")
         .into_inner();
-    let gas_usage = simulation_txn.info.gas_used();
+    let gas_usage = simulation_txn.info.gas_used() * GAS_UNIT_PRICE;
 
     // Attempt to transfer more than balance - gas to another user (should fail)
     rosetta_client

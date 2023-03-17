@@ -6,8 +6,8 @@
 import logging
 import subprocess
 import time
-from urllib.request import urlopen
 
+import requests
 from common import FAUCET_PORT, NODE_PORT, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
@@ -66,9 +66,15 @@ def wait_for_startup(container_name: str, timeout: int):
     faucet_response = None
     while True:
         try:
-            api_response = urlopen(f"http://127.0.0.1:{NODE_PORT}/v1")
-            faucet_response = urlopen(f"http://127.0.0.1:{FAUCET_PORT}/health")
-            if api_response.status != 200 or faucet_response.status != 200:
+            api_response = requests.get(f"http://127.0.0.1:{NODE_PORT}/v1")
+            # Try to query the legacy faucet health endpoint first. TODO: Remove this
+            # once all local testnet images we use have the new faucet in them.
+            try:
+                faucet_response = requests.get(f"http://127.0.0.1:{FAUCET_PORT}/health")
+            except:
+                # If that fails, try the new faucet health endpoint.
+                faucet_response = requests.get(f"http://127.0.0.1:{FAUCET_PORT}/")
+            if api_response.status_code != 200 or faucet_response.status_code != 200:
                 raise RuntimeError(
                     f"API or faucet not ready. API response: {api_response}. "
                     f"Faucet response: {faucet_response}"
