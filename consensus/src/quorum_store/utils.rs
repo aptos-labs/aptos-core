@@ -335,10 +335,10 @@ impl ProofQueue {
     }
 
     //mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(&mut self, digests: Vec<HashValue>) {
-        for digest in digests {
-            self.digest_proof.insert(digest, None);
-            if let Some(insertion_time) = self.digest_insertion_time.get(&digest) {
+    pub(crate) fn mark_committed(&mut self, proofs: Vec<ProofOfStore>) {
+        for digest in proofs.iter().map(|p| p.digest()) {
+            self.digest_proof.insert(*digest, None);
+            if let Some(insertion_time) = self.digest_insertion_time.get(digest) {
                 counters::POS_TO_COMMIT.observe(insertion_time.elapsed().as_secs_f64());
             }
         }

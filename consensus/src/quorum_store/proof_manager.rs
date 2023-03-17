@@ -20,7 +20,7 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProof(ProofOfStore),
-    CommitNotification(u64, Vec<HashValue>),
+    CommitNotification(u64, Vec<ProofOfStore>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -67,7 +67,7 @@ impl ProofManager {
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
-        digests: Vec<HashValue>,
+        proofs: Vec<ProofOfStore>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",
@@ -78,7 +78,7 @@ impl ProofManager {
             "Decreasing block timestamp"
         );
         self.latest_block_timestamp = block_timestamp;
-        self.proofs_for_consensus.mark_committed(digests);
+        self.proofs_for_consensus.mark_committed(proofs);
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
@@ -178,8 +178,8 @@ impl ProofManager {
                             ProofManagerCommand::ReceiveProof(proof) => {
                                 self.receive_proof(proof);
                             },
-                            ProofManagerCommand::CommitNotification(block_timestamp, digests) => {
-                                self.handle_commit_notification(block_timestamp, digests);
+                            ProofManagerCommand::CommitNotification(block_timestamp, proofs) => {
+                                self.handle_commit_notification(block_timestamp, proofs);
 
                                 // update the backpressure upon new commit round
                                 (self.remaining_total_txn_num, self.remaining_total_proof_num) =
