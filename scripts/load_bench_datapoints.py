@@ -7,6 +7,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+import re
 
 def get_datapoint(bench_path):
     items = bench_path.split('/')
@@ -28,7 +29,18 @@ if __name__=='__main__':
     parser.add_argument('--plot', action='store_true')
     args = parser.parse_args()
     datapoints = main(args.bench_path)
-    print(json.dumps(datapoints))
+    jsonstr = json.dumps(datapoints)
+    print(jsonstr)
+    print()
+    # Save to file.
+    bench_name = str(Path(args.bench_path).relative_to(Path('target/criterion')))
+    formatted_bench_name = re.sub('[^0-9a-zA-Z]', '_', bench_name)
+    x_min = datapoints[0][0]
+    x_max = datapoints[-1][0]
+    out_path = Path(f'{formatted_bench_name}.{x_min}-{x_max+1}.json')
+    out_path.write_text(jsonstr)
+    print(f'Saved to {out_path}.')
+    print()
     if args.plot:
         x_values, y_values = zip(*datapoints)
         X = np.array(x_values)
