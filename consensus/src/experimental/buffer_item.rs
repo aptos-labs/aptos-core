@@ -404,12 +404,12 @@ impl BufferItem {
         }
     }
 
-    pub fn get_rand(&self, block_idx: usize) -> Vec<u8> {
-        // if let Self::ExecutionReady(execution_ready) = self {
-        //     return execution_ready.rand_vec[block_idx].clone();
-        // }
-        vec![u8::MAX; 96]   // 96 bytes
-    }
+    // pub fn get_rand(&self, block_idx: usize) -> Vec<u8> {
+    //     // if let Self::ExecutionReady(execution_ready) = self {
+    //     //     return execution_ready.rand_vec[block_idx].clone();
+    //     // }
+    //     vec![u8::MAX; 96]   // 96 bytes
+    // }
 
     pub fn block_id(&self) -> HashValue {
         self.get_blocks().last().unwrap().id()

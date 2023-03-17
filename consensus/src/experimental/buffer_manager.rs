@@ -45,6 +45,13 @@ pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
+
+// Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
+pub const RAND_SIZE: usize = 96;
+pub const RAND_NUM: usize = 1000;
+pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
+pub const DECISION_SIZE: usize = RAND_SIZE;
+
 #[derive(Debug, Default)]
 pub struct ResetAck {}
 
@@ -219,7 +226,7 @@ impl BufferManager {
             self.block_to_buffer_map.insert(ordered_blocks[block_idx].id(), Some(item_hash));
 
             let maybe_proposer = ordered_blocks[block_idx].block().author();
-            let rand_share = RandShare::new(self.author, ordered_blocks[block_idx].block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
+            let rand_share = RandShare::new(self.author, ordered_blocks[block_idx].block_info(), vec![u8::MAX; SHARE_SIZE]);    // each VRF share has 96 bytes, assuming even distribution
 
             if let Some(proposer) = maybe_proposer {
                 // Proposal block, send the randomness shares through the proposer
@@ -264,7 +271,7 @@ impl BufferManager {
                     // enough randomness shares, can produce randomness for the block
 
                     // todo: aggregate the randomness
-                    let aggregated_rand = vec![u8::MAX; 96];
+                    let aggregated_rand = vec![u8::MAX; DECISION_SIZE];
 
                     let current_cursor = self.get_cursor_for_block(target_block_id);
                     if current_cursor.is_some() {
@@ -742,7 +749,7 @@ impl BufferManager {
             let blocks = item.get_blocks();
             for (idx, block) in blocks.iter().enumerate() {
                 println!("rebroadcast_rand_share_if_needed for block {}", block.id());
-                let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; 96 * 10000 / 100]);    // each VRF share has 96 bytes, assuming even distribution
+                let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; SHARE_SIZE]);    // each VRF share has 96 bytes, assuming even distribution
                 self.rand_msg_tx
                 .broadcast_rand_share(rand_share)
                 .await;
@@ -774,7 +781,7 @@ impl BufferManager {
             let blocks = item.get_blocks();
             for idx in 0..blocks.len() {
                 println!("rebroadcast_rand_decision_if_needed for block {}", blocks[idx].id());
-                let rand = item.get_rand(idx);
+                let rand = vec![u8::MAX; DECISION_SIZE]; //item.get_rand(idx);
                 if !rand.is_empty() {
                     let rand_decision = RandDecision::new(item.get_blocks()[idx].block_info(), rand);
                     self.rand_msg_tx
