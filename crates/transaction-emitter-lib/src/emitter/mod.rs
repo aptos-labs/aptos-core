@@ -43,7 +43,7 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
 
-const MAX_RETRIES: usize = 6;
+const MAX_RETRIES: usize = 8;
 
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
@@ -198,6 +198,9 @@ pub struct EmitJobRequest {
     prompt_before_spending: bool,
 
     coordination_delay_between_instances: Duration,
+
+    init_retry_count: usize,
+    init_retry_interval: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -219,6 +222,8 @@ impl Default for EmitJobRequest {
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
+            init_retry_count: MAX_RETRIES,
+            init_retry_interval: Duration::from_secs(5),
         }
     }
 }
@@ -606,7 +611,8 @@ impl TxnEmitter {
         );
         let txn_executor = RestApiTransactionExecutor {
             rest_clients: req.rest_clients.clone(),
-            max_retries: MAX_RETRIES,
+            max_retries: req.init_retry_count,
+            retry_after: req.init_retry_interval,
         };
         let mut all_accounts = account_minter
             .create_accounts(&txn_executor, &req, &mode_params, num_accounts)
