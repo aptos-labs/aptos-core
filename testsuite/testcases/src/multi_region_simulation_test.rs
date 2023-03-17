@@ -200,12 +200,12 @@ impl NetworkLoadTest for MultiRegionSimulationTest {
 
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
-        // inject network delay
-        let chaos = SwarmChaos::Delay(delay);
-        ctx.swarm().inject_chaos(chaos)?;
-
         // inject bandwidth limit
         let chaos = SwarmChaos::Bandwidth(bandwidth);
+        ctx.swarm().inject_chaos(chaos)?;
+
+        // inject network delay
+        let chaos = SwarmChaos::Delay(delay);
         ctx.swarm().inject_chaos(chaos)?;
 
         if let Some(config) = &self.add_execution_delay {
