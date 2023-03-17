@@ -4,6 +4,11 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for EKS cluster"
+  default     = "1.24"
+}
+
 variable "maximize_single_az_capacity" {
   description = "TEST ONLY: Whether to maximize the capacity of the cluster by allocating a large CIDR block to the first AZ"
   default     = false
