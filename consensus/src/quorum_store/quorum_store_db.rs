@@ -32,7 +32,7 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
 }
 
 /// The name of the quorum store db file
-pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDBpreview2";
+pub const QUORUM_STORE_DB_NAME: &str = "quorumstoreDBpreview3";
 
 pub struct QuorumStoreDB {
     db: DB,
