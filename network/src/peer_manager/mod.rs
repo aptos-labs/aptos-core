@@ -97,7 +97,7 @@ where
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        Arc<HashMap<ProtocolId, futures::channel::mpsc::Sender<PeerManagerNotification>>>,
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
@@ -147,7 +147,7 @@ where
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            futures::channel::mpsc::Sender<PeerManagerNotification>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
@@ -192,7 +192,7 @@ where
             transport_notifs_rx,
             outstanding_disconnect_requests: HashMap::new(),
             phantom_transport: PhantomData,
-            upstream_handlers,
+            upstream_handlers: Arc::new(upstream_handlers),
             connection_event_handlers,
             max_concurrent_network_reqs,
             channel_size,
@@ -772,7 +772,7 @@ where
         peer_id: PeerId,
         network_events: aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ) {
-        let mut upstream_handlers = self.upstream_handlers.clone();
+        let upstream_handlers = self.upstream_handlers.clone();
         let network_context = self.network_context;
         self.executor.spawn(network_events.for_each_concurrent(
             self.max_concurrent_network_reqs,
@@ -781,22 +781,20 @@ where
                     network_context,
                     inbound_event,
                     peer_id,
-                    &mut upstream_handlers,
-                );
-                futures::future::ready(())
+                    upstream_handlers.clone(),
+                )
             },
         ));
     }
 }
 
 /// A task for consuming inbound network messages
-fn handle_inbound_request(
+async fn handle_inbound_request(
     network_context: NetworkContext,
     inbound_event: PeerNotification,
     peer_id: PeerId,
-    upstream_handlers: &mut HashMap<
-        ProtocolId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    upstream_handlers: Arc<
+        HashMap<ProtocolId, futures::channel::mpsc::Sender<PeerManagerNotification>>,
     >,
 ) {
     let (protocol_id, notification) = match inbound_event {
@@ -810,9 +808,9 @@ fn handle_inbound_request(
         ),
     };
 
-    if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
+    if let Some(handler) = upstream_handlers.get(&protocol_id) {
         // Send over aptos channel for fairness.
-        if let Err(err) = handler.push((peer_id, protocol_id), notification) {
+        if let Err(err) = handler.clone().send(notification).await {
             warn!(
                 NetworkSchema::new(&network_context),
                 error = ?err,

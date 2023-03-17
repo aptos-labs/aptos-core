@@ -74,8 +74,7 @@ struct PeerManagerContext {
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
     peers_and_metadata: Arc<PeersAndMetadata>,
-    upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    upstream_handlers: HashMap<ProtocolId, futures::channel::mpsc::Sender<PeerManagerNotification>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
     max_concurrent_network_reqs: usize,
@@ -99,7 +98,7 @@ impl PeerManagerContext {
         peers_and_metadata: Arc<PeersAndMetadata>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            futures::channel::mpsc::Sender<PeerManagerNotification>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
@@ -136,7 +135,7 @@ impl PeerManagerContext {
     fn add_upstream_handler(
         &mut self,
         protocol_id: ProtocolId,
-        channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        channel: futures::channel::mpsc::Sender<PeerManagerNotification>,
     ) -> &mut Self {
         self.upstream_handlers.insert(protocol_id, channel);
         self
@@ -445,7 +444,8 @@ impl PeerManagerBuilder {
         &mut self,
         config: &NetworkServiceConfig,
     ) -> (
-        aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        futures::channel::mpsc::Receiver<PeerManagerNotification>,
+        // aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,
     ) {
         // Register the direct send and rpc protocols
@@ -455,18 +455,19 @@ impl PeerManagerBuilder {
             .add_protocols(&config.rpc_protocols_and_preferences);
 
         // Create the context and register the protocols
-        let (network_notifs_tx, network_notifs_rx) = config.inbound_queue_config.build();
+        // let (network_notifs_tx, network_notifs_rx) = config.inbound_queue_config.build();
+        let (tx, rx) = futures::channel::mpsc::channel(1024);
         let pm_context = self.peer_manager_context();
         for protocol in config
             .direct_send_protocols_and_preferences
             .iter()
             .chain(&config.rpc_protocols_and_preferences)
         {
-            pm_context.add_upstream_handler(*protocol, network_notifs_tx.clone());
+            pm_context.add_upstream_handler(*protocol, tx.clone());
         }
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 
-        (network_notifs_rx, connection_notifs_rx)
+        (rx, connection_notifs_rx)
     }
 }
 

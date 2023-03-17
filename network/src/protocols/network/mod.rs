@@ -155,7 +155,7 @@ pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
         FilterMap<
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+            futures::channel::mpsc::Receiver<PeerManagerNotification>,
             future::Ready<Option<Event<TMessage>>>,
             fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
         >,
@@ -170,14 +170,14 @@ pub struct NetworkEvents<TMessage> {
 /// Trait specifying the signature for `new()` `NetworkEvents`
 pub trait NewNetworkEvents {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        peer_mgr_notifs_rx: futures::channel::mpsc::Receiver<PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self;
 }
 
 impl<TMessage: Message> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        peer_mgr_notifs_rx: futures::channel::mpsc::Receiver<PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self {
         let data_event_stream = peer_mgr_notifs_rx.filter_map(

@@ -109,13 +109,13 @@ impl MockSharedMempool {
         let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (_tx, rx) = futures::channel::mpsc::channel(8);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx);
+        let network_events = NetworkEvents::new(rx, conn_notifs_rx);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
