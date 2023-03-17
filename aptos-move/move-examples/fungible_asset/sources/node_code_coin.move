@@ -59,6 +59,6 @@ module fungible_asset::node_code_coin {
         transfer(aaron, &coin, 80, creator_address);
         burn(creator, &coin, 20, creator_address);
         assert!(balance(creator_address, &coin) == 60, 1);
-        assert!(balance(aaron_address, &coin) == 20, 1);
+        assert!(balance(aaron_address, &coin) == 20, 2);
     }
 }

@@ -1,6 +1,6 @@
 /// This module provides an addtional abstraction on top of `FungibleSource` that manages the capabilities of mint, burn
 /// and freeze for the creator in a simple way. It offers creators to destory any capabilities in an on-demand way too.
-/// For more advanced goverance, please build your own module to manage capabilitys exntending `FungibleSource`.
+/// For more advanced goverance, please build your own module to manage capabilitys extending `FungibleSource`.
 module fungible_asset::managed_fungible_source {
     use std::option;
     use aptos_framework::object::{is_owner, address_to_object, Object, object_address, ConstructorRef};

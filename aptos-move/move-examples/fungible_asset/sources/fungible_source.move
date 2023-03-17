@@ -44,7 +44,7 @@ module fungible_asset::fungible_source {
         asset_addr: address
     }
 
-    /// Capability to (un)freeze fungible assets of the asset at `asset_addr` in an account.
+    /// Capability to (un)freeze fungible assets of the asset at `asset_addr` in any account.
     struct FreezeCap has store {
         asset_addr: address
     }
@@ -76,7 +76,6 @@ module fungible_asset::fungible_source {
         let asset_addr = signer::address_of(&asset_object_signer);
         (MintCap { asset_addr }, FreezeCap { asset_addr }, BurnCap { asset_addr })
     }
-
 
     /// Self-explanatory.
     public fun get_current_supply<T: key>(asset: &Object<T>): u64 acquires FungibleSource {
