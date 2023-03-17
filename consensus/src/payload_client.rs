@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, PayloadFilter},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
@@ -55,7 +55,6 @@ impl QuorumStoreClient {
 
     async fn pull_internal(
         &self,
-        round: Round,
         max_items: u64,
         max_bytes: u64,
         return_non_full: bool,
@@ -63,7 +62,6 @@ impl QuorumStoreClient {
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(
-            round,
             max_items,
             max_bytes,
             return_non_full,
@@ -94,7 +92,6 @@ impl QuorumStoreClient {
 impl PayloadClient for QuorumStoreClient {
     async fn pull_payload(
         &self,
-        round: Round,
         max_items: u64,
         max_bytes: u64,
         exclude_payloads: PayloadFilter,
@@ -124,7 +121,6 @@ impl PayloadClient for QuorumStoreClient {
             let done = count == 0 || start_time.elapsed().as_millis() >= max_duration;
             let payload = self
                 .pull_internal(
-                    round,
                     max_items,
                     max_bytes,
                     return_non_full || return_empty || done || self.poll_count == u64::MAX,

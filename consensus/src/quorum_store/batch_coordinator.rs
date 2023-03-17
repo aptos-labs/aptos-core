@@ -21,7 +21,6 @@ pub enum BatchCoordinatorCommand {
 }
 
 pub struct BatchCoordinator {
-    epoch: u64,
     my_peer_id: PeerId,
     network_sender: NetworkSender,
     batch_store: Arc<BatchStore<NetworkSender>>,
@@ -30,14 +29,12 @@ pub struct BatchCoordinator {
 
 impl BatchCoordinator {
     pub(crate) fn new(
-        epoch: u64, //TODO: pass the epoch config
         my_peer_id: PeerId,
         network_sender: NetworkSender,
         batch_store: Arc<BatchStore<NetworkSender>>,
         max_batch_bytes: u64,
     ) -> Self {
         Self {
-            epoch,
             my_peer_id,
             network_sender,
             batch_store,
@@ -47,35 +44,23 @@ impl BatchCoordinator {
 
     async fn handle_batch(&mut self, batch: Batch) -> Option<PersistRequest> {
         let source = batch.author();
-        let expiration = batch.expiration();
         let batch_id = batch.batch_id();
         trace!(
             "QS: got batch message from {} batch_id {}",
             source,
             batch_id,
         );
-        if expiration.epoch() == self.epoch {
-            counters::RECEIVED_BATCH_COUNT.inc();
-            let num_bytes = batch.num_bytes();
-            if num_bytes > self.max_batch_bytes {
-                error!(
-                    "Batch from {} exceeds size limit {}, actual size: {}",
-                    source, self.max_batch_bytes, num_bytes
-                );
-                return None;
-            }
-            let persist_request = batch.into();
-            return Some(persist_request);
-        }
-        // Malformed request with an inconsistent expiry epoch.
-        else {
-            trace!(
-                "QS: got end batch message from different epoch {} != {}",
-                expiration.epoch(),
-                self.epoch
+        counters::RECEIVED_BATCH_COUNT.inc();
+        let num_bytes = batch.num_bytes();
+        if num_bytes > self.max_batch_bytes {
+            error!(
+                "Batch from {} exceeds size limit {}, actual size: {}",
+                source, self.max_batch_bytes, num_bytes
             );
+            return None;
         }
-        None
+        let persist_request = batch.into();
+        Some(persist_request)
     }
 
     fn persist_and_send_digest(&self, persist_request: PersistRequest) {
