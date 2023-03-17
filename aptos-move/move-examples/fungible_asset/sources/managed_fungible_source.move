@@ -24,7 +24,7 @@ module fungible_asset::managed_fungible_source {
     const EMANAGED_FUNGIBLE_ASSET_CAPS: u64 = 5;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct Caps has key {
+    struct GoveranceCapabilities has key {
         mint: Option<MintCap>,
         freeze: Option<FreezeCap>,
         burn: Option<BurnCap>,
@@ -39,7 +39,11 @@ module fungible_asset::managed_fungible_source {
         let asset_object_signer = object::generate_signer(constructor_ref);
         move_to(
             &asset_object_signer,
-            Caps { mint: option::some(mint_cap), freeze: option::some(freeze_cap), burn: option::some(burn_cap) }
+            GoveranceCapabilities {
+                mint: option::some(mint_cap), freeze: option::some(
+                    freeze_cap
+                ), burn: option::some(burn_cap)
+            }
         )
     }
 
@@ -49,7 +53,7 @@ module fungible_asset::managed_fungible_source {
         asset: &Object<T>,
         amount: u64,
         to: address
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         assert_owner(asset_owner, asset);
         let mint_cap = borrow_mint_from_caps(asset);
         fungible_source::mint(mint_cap, amount, to);
@@ -61,7 +65,7 @@ module fungible_asset::managed_fungible_source {
         asset: &Object<T>,
         amount: u64,
         from: address
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         assert_owner(asset_owner, asset);
         let burn_cap = borrow_burn_from_caps(asset);
         fungible_source::burn(burn_cap, amount, from);
@@ -72,7 +76,7 @@ module fungible_asset::managed_fungible_source {
         asset_owner: &signer,
         asset: &Object<T>,
         account: address,
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         assert_owner(asset_owner, asset);
         let freeze_cap = borrow_freeze_from_caps(asset);
         fungible_source::freeze_(freeze_cap, account);
@@ -83,37 +87,46 @@ module fungible_asset::managed_fungible_source {
         asset_owner: &signer,
         asset: &Object<T>,
         fungible_asset_owner: address
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         assert_owner(asset_owner, asset);
         let freeze_cap = borrow_freeze_from_caps(asset);
         fungible_source::unfreeze(freeze_cap, fungible_asset_owner);
     }
 
-    public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires Caps {
+    public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).mint)
     }
 
-    public fun owner_can_freeze<T: key>(asset: &Object<T>): bool acquires Caps {
+    public fun owner_can_freeze<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).freeze)
     }
 
-    public fun owner_can_burn<T: key>(asset: &Object<T>): bool acquires Caps {
+    public fun owner_can_burn<T: key>(asset: &Object<T>): bool acquires GoveranceCapabilities {
         option::is_some(&borrow_caps(asset).burn)
     }
 
-    public fun destroy_mint_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
+    public fun destroy_mint_cap<T: key>(
+        asset_owner: &signer,
+        asset: &Object<T>
+    ) acquires GoveranceCapabilities {
         let mint_cap = &mut borrow_caps_mut(asset_owner, asset).mint;
         assert!(option::is_some(mint_cap), error::not_found(EMINT_CAP));
         fungible_source::destroy_mint_cap(option::extract(mint_cap));
     }
 
-    public fun destroy_freeze_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
+    public fun destroy_freeze_cap<T: key>(
+        asset_owner: &signer,
+        asset: &Object<T>
+    ) acquires GoveranceCapabilities {
         let freeze_cap = &mut borrow_caps_mut(asset_owner, asset).freeze;
         assert!(option::is_some(freeze_cap), error::not_found(EFREEZE_CAP));
         fungible_source::destroy_freeze_cap(option::extract(freeze_cap));
     }
 
-    public fun destroy_burn_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
+    public fun destroy_burn_cap<T: key>(
+        asset_owner: &signer,
+        asset: &Object<T>
+    ) acquires GoveranceCapabilities {
         let burn_cap = &mut borrow_caps_mut(asset_owner, asset).burn;
         assert!(option::is_some(burn_cap), error::not_found(EFREEZE_CAP));
         fungible_source::destroy_burn_cap(option::extract(burn_cap));
@@ -121,7 +134,7 @@ module fungible_asset::managed_fungible_source {
 
     inline fun borrow_mint_from_caps<T: key>(
         asset: &Object<T>,
-    ): &MintCap acquires Caps {
+    ): &MintCap acquires GoveranceCapabilities {
         let mint_cap = &borrow_caps(asset).mint;
         assert!(option::is_some(mint_cap), error::not_found(EMINT_CAP));
         option::borrow(mint_cap)
@@ -129,7 +142,7 @@ module fungible_asset::managed_fungible_source {
 
     inline fun borrow_freeze_from_caps<T: key>(
         asset: &Object<T>,
-    ): &FreezeCap acquires Caps {
+    ): &FreezeCap acquires GoveranceCapabilities {
         let freeze_cap = &borrow_caps(asset).freeze;
         assert!(option::is_some(freeze_cap), error::not_found(EFREEZE_CAP));
         option::borrow(freeze_cap)
@@ -137,7 +150,7 @@ module fungible_asset::managed_fungible_source {
 
     inline fun borrow_burn_from_caps<T: key>(
         asset: &Object<T>,
-    ): &BurnCap acquires Caps {
+    ): &BurnCap acquires GoveranceCapabilities {
         let burn_cap = &borrow_caps(asset).burn;
         assert!(option::is_some(burn_cap), error::not_found(EBURN_CAP));
         option::borrow(burn_cap)
@@ -145,21 +158,21 @@ module fungible_asset::managed_fungible_source {
 
     inline fun borrow_caps<T: key>(
         asset: &Object<T>,
-    ): &Caps acquires Caps {
-        borrow_global_mut<Caps>(verify(asset))
+    ): &GoveranceCapabilities acquires GoveranceCapabilities {
+        borrow_global_mut<GoveranceCapabilities>(verify(asset))
     }
 
     inline fun borrow_caps_mut<T: key>(
         owner: &signer,
         asset: &Object<T>,
-    ): &mut Caps acquires Caps {
+    ): &mut GoveranceCapabilities acquires GoveranceCapabilities {
         assert_owner(owner, asset);
-        borrow_global_mut<Caps>(verify(asset))
+        borrow_global_mut<GoveranceCapabilities>(verify(asset))
     }
 
     inline fun verify<T: key>(asset: &Object<T>): address {
         let asset_addr = object_address(asset);
-        address_to_object<Caps>(asset_addr);
+        address_to_object<GoveranceCapabilities>(asset_addr);
         asset_addr
     }
 
@@ -170,7 +183,7 @@ module fungible_asset::managed_fungible_source {
     #[test(creator = @0xcafe)]
     fun test_basic_flow(
         creator: &signer,
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         let (creator_ref, asset) = create_test_token(creator);
         initialize_managing_capabilities(&creator_ref, 100 /* max supply */, 0);
         let creator_address = signer::address_of(creator);
@@ -201,7 +214,7 @@ module fungible_asset::managed_fungible_source {
     fun test_permission_denied(
         creator: &signer,
         aaron: &signer
-    ) acquires Caps {
+    ) acquires GoveranceCapabilities {
         let (creator_ref, asset) = create_test_token(creator);
         initialize_managing_capabilities(&creator_ref, 100 /* max supply */, 0);
         let creator_address = signer::address_of(creator);
