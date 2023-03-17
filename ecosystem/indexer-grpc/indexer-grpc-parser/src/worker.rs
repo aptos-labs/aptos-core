@@ -138,10 +138,10 @@ impl Worker {
             "[Parser] Making request to GRPC endpoint",
         );
 
-        let request = tonic::Request::new(RawDatastreamRequest {
+        let request = grpc_request_builder(
             starting_version,
-            transactions_count: None,
-        });
+            self.config.indexer_grpc_auth_token.clone(),
+        );
         let mut resp_stream = rpc_client
             .raw_datastream(request)
             .await
@@ -206,10 +206,10 @@ impl Worker {
                             "[Parser] Error receiving datastream response; reconnecting..."
                         );
                         // If we get an error, we need to reconnect to the stream.
-                        let request = tonic::Request::new(RawDatastreamRequest {
-                            starting_version: batch_start_version,
-                            transactions_count: None,
-                        });
+                        let request = grpc_request_builder(
+                            batch_start_version,
+                            self.config.indexer_grpc_auth_token.clone(),
+                        );
                         resp_stream = rpc_client
                             .raw_datastream(request)
                             .await
@@ -417,4 +417,19 @@ impl Worker {
             _ => anyhow::bail!("Grpc first response is not a init signal"),
         }
     }
+}
+
+pub fn grpc_request_builder(
+    starting_version: u64,
+    grpc_auth_token: String,
+) -> tonic::Request<RawDatastreamRequest> {
+    let mut request = tonic::Request::new(RawDatastreamRequest {
+        starting_version,
+        transactions_count: None,
+    });
+    request.metadata_mut().insert(
+        aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER,
+        grpc_auth_token.parse().unwrap(),
+    );
+    request
 }

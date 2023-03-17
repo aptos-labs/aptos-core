@@ -29,8 +29,10 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
 -  [Function `get_delegation_pools_feature`](#0x1_features_get_delegation_pools_feature)
 -  [Function `delegation_pools_enabled`](#0x1_features_delegation_pools_enabled)
--  [Function `get_bls12381_basic_operations_feature`](#0x1_features_get_bls12381_basic_operations_feature)
--  [Function `bls12381_basic_operations_enabled`](#0x1_features_bls12381_basic_operations_enabled)
+-  [Function `get_cryptography_algebra_natives_feature`](#0x1_features_get_cryptography_algebra_natives_feature)
+-  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
+-  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
+-  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -106,17 +108,14 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_BLS12381_BASIC_OPERATIONS"></a>
+<a name="0x1_features_BLS12_381_STRUCTURES"></a>
 
-Whether the basic operations over some BLS12381 structures are enabled in the algebra module.
-
-Basic operations include element (de)serialization, field/group arithmetic, hash-to-structure, casting, etc.
-BLS12381 structures controlled by this flag includes <code>Fq12</code>, <code>G1</code>, <code>G2</code>, <code>Gt</code>, <code>Fr</code>.
+Whether the generic algebra implementation for BLS12381 operations are enabled.
 
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a>: u64 = 12;
+<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
 </code></pre>
 
 
@@ -140,6 +139,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
+
+Whether generic algebra basic operation support in <code>algebra.<b>move</b></code> are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
 </code></pre>
 
 
@@ -695,13 +706,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_bls12381_basic_operations_feature"></a>
+<a name="0x1_features_get_cryptography_algebra_natives_feature"></a>
 
-## Function `get_bls12381_basic_operations_feature`
+## Function `get_cryptography_algebra_natives_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12381_basic_operations_feature">get_bls12381_basic_operations_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64
 </code></pre>
 
 
@@ -710,20 +721,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12381_basic_operations_feature">get_bls12381_basic_operations_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64 { <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_bls12381_basic_operations_enabled"></a>
+<a name="0x1_features_cryptography_algebra_enabled"></a>
 
-## Function `bls12381_basic_operations_enabled`
+## Function `cryptography_algebra_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12381_basic_operations_enabled">bls12381_basic_operations_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool
 </code></pre>
 
 
@@ -732,8 +743,54 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12381_basic_operations_enabled">bls12381_basic_operations_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12381_BASIC_OPERATIONS">BLS12381_BASIC_OPERATIONS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_bls12_381_strutures_feature"></a>
+
+## Function `get_bls12_381_strutures_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_bls12_381_structures_enabled"></a>
+
+## Function `bls12_381_structures_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>)
 }
 </code></pre>
 
