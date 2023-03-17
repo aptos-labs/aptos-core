@@ -442,6 +442,7 @@ pub fn convert_entry_function_payload(
             .iter()
             .map(|move_value| move_value.to_string())
             .collect(),
+        entry_function_id_str: entry_function_payload.function.to_string(),
     }
 }
 
