@@ -228,6 +228,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
             })?;
 
+        // Send the client requests
         if max_num_requests_to_send > 0 {
             let client_requests = self
                 .stream_engine
@@ -255,6 +256,10 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 )
             );
         }
+
+        // Update the counters for the pending response queue
+        metrics::set_pending_data_responses(self.get_sent_data_requests()?.len());
+
         Ok(())
     }
 
