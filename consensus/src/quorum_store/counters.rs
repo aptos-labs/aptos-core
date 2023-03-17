@@ -54,11 +54,22 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
 });
 
 /// Duration of each run of the event loop.
-pub static WRAPPER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+pub static PROOF_MANAGER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
         register_histogram!(
-            "quorum_store_wrapper_main_loop",
-            "Duration of the each run of the event loop"
+            "quorum_store_proof_manager_main_loop",
+            "Duration of the each run of the proof manager event loop"
+        )
+        .unwrap(),
+    )
+});
+
+/// Duration of each run of the event loop.
+pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_generator_main_loop",
+            "Duration of the each run of the batch generator event loop"
         )
         .unwrap(),
     )
@@ -85,7 +96,7 @@ pub static NUM_TXN_PER_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_num_txn_per_batch",
         "Histogram for the number of transanctions per batch.",
-        // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -120,14 +131,13 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the number of expired proof-of-store when pulled for consensus.
-pub static EXPIRED_PROOFS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_expired_proof_size_when_pull",
-        "Histogram for the number of expired proof-of-store when pulled for consensus.",
+        "quorum_store_excluded_txns_when_pull",
+        "Histogram for the number of transactions were considered but excluded when pulled for consensus.",
         // exponential_buckets(/*start=*/ 5.0, /*factor=*/ 1.1, /*count=*/ 20).unwrap(),
     )
-    .unwrap()
+        .unwrap()
 });
 
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
@@ -149,16 +159,25 @@ pub static NUM_BATCH_EXPIRED_WHEN_SAVE: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.
-pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_PULL_PROOFS: Lazy<Histogram> =
-    Lazy::new(|| {
+/// Histogram for the gaps between expiration time and the current block timestamp on commit, and expiration round is lower.
+pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_COMMIT: Lazy<Histogram> = Lazy::new(
+    || {
         register_histogram!(
-        "quorum_store_gap_batch_expiration_and_current_round_when_pull",
-        "Histogram for the gaps between expiration round and the current round when pulling the proofs, and expiration round is lower.",
+        "quorum_store_gap_batch_expiration_and_current_time_when_commit",
+        "Histogram for the gaps between expiration time and the current block timestamp on commit, and expiration round is lower.",
         // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
     )
+            .unwrap()
+    },
+);
+
+pub static NUM_PROOFS_EXPIRED_WHEN_COMMIT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_num_proofs_expired_when_commit",
+        "Number of proofs that were expired when commit is called"
+    )
     .unwrap()
-    });
+});
 
 pub static POS_TO_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -179,33 +198,35 @@ pub static POS_TO_COMMIT: Lazy<Histogram> = Lazy::new(|| {
 });
 
 /// Histogram for the number of total txns left after cleaning up commit notifications.
-pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static NUM_TOTAL_TXNS_LEFT_ON_COMMIT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "quorum_store_num_total_txns_left_on_commit",
         "Histogram for the number of total txns left after cleaning up commit notifications.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
     )
-    .unwrap()
 });
 
 /// Histogram for the number of total batches/PoS left after cleaning up commit notifications.
-pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static NUM_TOTAL_PROOFS_LEFT_ON_COMMIT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "quorum_store_num_total_proofs_left_on_commit",
         "Histogram for the number of total batches/PoS left after cleaning up commit notifications.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
     )
-        .unwrap()
+});
+
+/// Histogram for the number of local txns left after cleaning up commit notifications.
+pub static NUM_LOCAL_TXNS_LEFT_ON_COMMIT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
+        "quorum_store_num_local_txns_left_on_commit",
+        "Histogram for the number of locally created txns left after cleaning up commit notifications.",
+    )
 });
 
 /// Histogram for the number of local batches/PoS left after cleaning up commit notifications.
-pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static NUM_LOCAL_PROOFS_LEFT_ON_COMMIT: Lazy<AverageIntCounter> = Lazy::new(|| {
+    AverageIntCounter::register(
         "quorum_store_num_local_proofs_left_on_commit",
         "Histogram for the number of locally created batches/PoS left after cleaning up commit notifications.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
     )
-    .unwrap()
 });
 
 /// Counters
@@ -266,6 +287,15 @@ pub static REMOTE_POS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_remote_PoS_count",
         "Count of the received PoS since last restart."
+    )
+    .unwrap()
+});
+
+pub static REJECTED_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_rejected_PoS_count",
+        "Count of the rejected PoS since last restart, grouped by reason.",
+        &["reason"]
     )
     .unwrap()
 });
