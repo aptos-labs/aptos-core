@@ -10,7 +10,7 @@ use crate::{
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_consensus_types::proof_of_store::{BatchId, LogicalTime};
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
@@ -41,10 +41,6 @@ fn batch_store_for_test_no_db(memory_quota: usize) -> Arc<BatchStore<MockQuorumS
         10, // epoch
         10, // last committed round
         db,
-        0,
-        0,
-        2100,
-        0,            // grace period rounds
         memory_quota, // memory_quota
         1000,         // db quota
         1000,         //batch quota
@@ -62,7 +58,8 @@ fn test_insert_expire() {
     let batch = Batch::new(
         BatchId::new_for_test(1),
         vec![],
-        LogicalTime::new(10, 15),
+        10,
+        15,
         AccountAddress::random(),
     );
     let persisted_request: PersistRequest = batch.into();
@@ -73,7 +70,8 @@ fn test_insert_expire() {
     let batch = Batch::new(
         BatchId::new_for_test(1),
         vec![],
-        LogicalTime::new(10, 30),
+        10,
+        30,
         AccountAddress::random(),
     );
     let persisted_request: PersistRequest = batch.into();
@@ -84,7 +82,8 @@ fn test_insert_expire() {
     let batch = Batch::new(
         BatchId::new_for_test(1),
         vec![],
-        LogicalTime::new(10, 25),
+        10,
+        25,
         AccountAddress::random(),
     );
     let persisted_request: PersistRequest = batch.into();
@@ -92,14 +91,11 @@ fn test_insert_expire() {
         batch_store.insert_to_cache(digest, persisted_request.value),
         false,
     );
-    let expired = batch_store.clear_expired_payload(LogicalTime::new(10, 27));
+    let expired = batch_store.clear_expired_payload(27);
     assert!(expired.is_empty());
-    let expired = batch_store.clear_expired_payload(LogicalTime::new(10, 29));
+    let expired = batch_store.clear_expired_payload(29);
     assert!(expired.is_empty());
-    assert_eq!(
-        batch_store.clear_expired_payload(LogicalTime::new(10, 30)),
-        vec![digest]
-    );
+    assert_eq!(batch_store.clear_expired_payload(30), vec![digest]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -118,7 +114,8 @@ async fn test_extend_expiration_vs_save() {
                 let batch = Batch::new(
                     BatchId::new_for_test(1),
                     vec![],
-                    LogicalTime::new(10, i as u64 + 30),
+                    10,
+                    i as u64 + 30,
                     AccountAddress::random(),
                 );
                 let persisted_request: PersistRequest = batch.into();
@@ -129,7 +126,8 @@ async fn test_extend_expiration_vs_save() {
             let batch = Batch::new(
                 BatchId::new_for_test(1),
                 vec![],
-                LogicalTime::new(10, i as u64 + 40),
+                10,
+                i as u64 + 40,
                 AccountAddress::random(),
             );
             let persisted_request: PersistRequest = batch.into();
@@ -170,9 +168,7 @@ async fn test_extend_expiration_vs_save() {
                 }
             }
 
-            block_on(
-                batch_store_clone2.update_certified_round(LogicalTime::new(10, i as u64 + 30)),
-            );
+            block_on(batch_store_clone2.update_certified_timestamp(i as u64 + 30));
             start_clone2.fetch_add(1, Ordering::Relaxed);
         }
     });
@@ -185,7 +181,8 @@ async fn test_extend_expiration_vs_save() {
             let batch = Batch::new(
                 BatchId::new_for_test(1),
                 vec![],
-                LogicalTime::new(10, i as u64 + 30),
+                10,
+                i as u64 + 30,
                 AccountAddress::random(),
             );
             let persisted_request: PersistRequest = batch.into();
@@ -201,7 +198,7 @@ async fn test_extend_expiration_vs_save() {
     // Expire everything, call for higher times as well.
     for i in 35..50 {
         batch_store
-            .update_certified_round(LogicalTime::new(10, (i + num_experiments) as u64))
+            .update_certified_timestamp((i + num_experiments) as u64)
             .await;
     }
 }
