@@ -5258,6 +5258,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 
 [[package]]
+name = "dunce"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bd4b30a6560bbd9b4620f4de34c3f14f60848e58a9b7216801afcb4c7b31c3c"
+
+[[package]]
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
@@ -7288,6 +7294,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsp-server"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c351c75989da23b355226dc188dc2b52538a7f4f218d70fd7393c6b62b110444"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "serde 1.0.149",
+ "serde_json",
+]
+
+[[package]]
+name = "lsp-types"
+version = "0.90.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3734ab1d7d157fc0c45110e06b587c31cd82bea2ccfd6b563cbff0aaeeb1d3"
+dependencies = [
+ "bitflags",
+ "serde 1.0.149",
+ "serde_json",
+ "serde_repr",
+ "url",
+]
+
+[[package]]
 name = "lz4"
 version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7557,6 +7588,54 @@ dependencies = [
  "move-prover-test-utils",
  "serde 1.0.149",
  "tempfile",
+]
+
+[[package]]
+name = "move-analyzer"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "clap 3.2.23",
+ "codespan-reporting",
+ "crossbeam",
+ "derivative",
+ "dunce",
+ "im",
+ "lsp-server",
+ "lsp-types",
+ "move-command-line-common",
+ "move-compiler",
+ "move-ir-types",
+ "move-package",
+ "move-symbol-pool",
+ "petgraph 0.5.1",
+ "serde 1.0.149",
+ "serde_json",
+ "tempfile",
+ "url",
+]
+
+[[package]]
+name = "move-async-vm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "better_any",
+ "datatest-stable",
+ "itertools",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-prover-test-utils",
+ "move-stdlib",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "sha3 0.9.1",
+ "smallvec",
+ "walkdir",
 ]
 
 [[package]]
@@ -10995,6 +11074,20 @@ checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "spec-flatten"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 3.2.23",
+ "itertools",
+ "move-compiler",
+ "move-model",
+ "move-prover",
+ "move-stackless-bytecode",
+ "pretty",
 ]
 
 [[package]]
