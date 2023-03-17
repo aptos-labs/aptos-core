@@ -47,13 +47,6 @@ interface PaginationArgs {
   limit?: number;
 }
 
-//array of transactions
-export type Transaction = {
-  sender: AptosAccount;
-  payload: TxnBuilderTypes.TransactionPayload;
-  extraArgs?: OptionalTransactionArgs;
-};
-
 /**
  * Provides methods for retrieving data from Aptos node.
  * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
@@ -481,19 +474,6 @@ export class AptosClient {
       query: queryParams,
       method: "POST",
       body: bcsBody,
-      mediaType: "application/x.aptos.signed_transaction+bcs",
-    });
-  }
-
-  async submitBatchTransactions(
-    txnsArray: Uint8Array,
-  ): Promise<Gen.TransactionsBatchSubmissionResult | Gen.TransactionsBatchSingleSubmissionFailure> {
-    return this.client.request.request<
-      Gen.TransactionsBatchSubmissionResult | Gen.TransactionsBatchSingleSubmissionFailure
-    >({
-      url: "/transactions/batch",
-      method: "POST",
-      body: txnsArray,
       mediaType: "application/x.aptos.signed_transaction+bcs",
     });
   }

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, Transaction } from "../../providers/aptos_client";
+import { AptosClient } from "../../providers/aptos_client";
 import * as Gen from "../../generated/index";
 import { AptosAccount } from "../../account/aptos_account";
 import {
