@@ -70,6 +70,7 @@ use std::{
         Arc,
     },
 };
+use move_vm_runtime::session::SerializedReturnValues;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -328,6 +329,35 @@ impl AptosVM {
         ))
     }
 
+    fn validate_and_execute_entry_function<SS: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<SS>,
+        gas_meter: &mut AptosGasMeter,
+        senders: Vec<AccountAddress>,
+        script_fn: &EntryFunction
+    ) -> Result<VMResult<SerializedReturnValues>, VMStatus> {
+        let function = session.load_function(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args(),
+        )?;
+        let args =
+            verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                session,
+                senders,
+                script_fn.args().to_vec(),
+                &function,
+                gas_meter
+            )?;
+        Ok(session.execute_entry_function(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args().to_vec(),
+            args,
+            gas_meter,
+        ))
+    }
+
     fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
         storage: &S,
@@ -358,10 +388,11 @@ impl AptosVM {
                         session.load_script(script.code(), script.ty_args().to_vec())?;
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &session,
+                            &mut session,
                             senders,
                             convert_txn_args(script.args()),
                             &loaded_func,
+                            gas_meter
                         )?;
                     session.execute_script(
                         script.code(),
@@ -374,26 +405,7 @@ impl AptosVM {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
-
-                    let function = session.load_function(
-                        script_fn.module(),
-                        script_fn.function(),
-                        script_fn.ty_args(),
-                    )?;
-                    let args =
-                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &session,
-                            senders,
-                            script_fn.args().to_vec(),
-                            &function,
-                        )?;
-                    session.execute_entry_function(
-                        script_fn.module(),
-                        script_fn.function(),
-                        script_fn.ty_args().to_vec(),
-                        args,
-                        gas_meter,
-                    )
+                    self.validate_and_execute_entry_function(&mut session, gas_meter, senders, script_fn)?
                 },
 
                 // Not reachable as this function should only be invoked for entry or script
@@ -511,14 +523,16 @@ impl AptosVM {
         // The multisig transaction would still be considered executed even if execution fails.
         let execution_result = match payload {
             MultisigTransactionPayload::EntryFunction(entry_function) => self
-                .execute_multisig_entry_function(
+                .validate_and_execute_entry_function(
                     &mut session,
                     gas_meter,
-                    txn_payload.multisig_address,
+                    vec![txn_payload.multisig_address],
                     &entry_function,
-                    new_published_modules_loaded,
                 ),
         };
+        // Resolve any pending module publishes in case the multisig transaction is deploying
+        // modules.
+        self.resolve_pending_code_publish(&mut session, gas_meter, new_published_modules_loaded)?;
 
         // Step 3: Call post transaction cleanup function in multisig account module with the result
         // from Step 2.
@@ -563,41 +577,6 @@ impl AptosVM {
             txn_data,
             log_context,
         )
-    }
-
-    fn execute_multisig_entry_function<SS: MoveResolverExt>(
-        &self,
-        session: &mut SessionExt<SS>,
-        gas_meter: &mut AptosGasMeter,
-        multisig_address: AccountAddress,
-        payload: &EntryFunction,
-        new_published_modules_loaded: &mut bool,
-    ) -> Result<(), VMStatus> {
-        let function =
-            session.load_function(payload.module(), payload.function(), payload.ty_args())?;
-        // This transaction is now being executed as the multisig account.
-        // If txn args are not valid, we'd still consider the multisig transaction as executed but
-        // failed. This is primarily because it's unrecoverable at this point.
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            vec![multisig_address],
-            payload.args().to_vec(),
-            &function,
-        )?;
-        session
-            .execute_entry_function(
-                payload.module(),
-                payload.function(),
-                payload.ty_args().to_vec(),
-                args,
-                gas_meter,
-            )
-            .map_err(|e| e.into_vm_status())?;
-
-        // Resolve any pending module publishes in case the multisig transaction is deploying
-        // modules.
-        self.resolve_pending_code_publish(session, gas_meter, new_published_modules_loaded)?;
-        Ok(())
     }
 
     fn success_multisig_payload_cleanup<S: MoveResolverExt + StateView, SS: MoveResolverExt>(
@@ -1112,10 +1091,11 @@ impl AptosVM {
                     .map_err(|e| Err(e.into_vm_status()))?;
                 let args =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &tmp_session,
+                        &mut tmp_session,
                         senders,
                         convert_txn_args(script.args()),
                         &loaded_func,
+                        &mut gas_meter
                     )
                     .map_err(Err)?;
 
@@ -1663,14 +1643,17 @@ impl AptosSimulationVM {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {
                             self.0
-                                .execute_multisig_entry_function(
+                                .validate_and_execute_entry_function(
                                     &mut session,
                                     &mut gas_meter,
-                                    multisig.multisig_address,
+                                    vec![multisig.multisig_address],
                                     &entry_function,
-                                    &mut new_published_modules_loaded,
                                 )
                                 .and_then(|_| {
+                                    // Resolve any pending module publishes in case the multisig transaction is deploying
+                                    // modules.
+                                    self.0.resolve_pending_code_publish(&mut session, &mut gas_meter, &mut new_published_modules_loaded)?;
+
                                     // TODO: Deduplicate this against execute_multisig_transaction
                                     // A bit tricky since we need to skip success/failure cleanups,
                                     // which is in the middle. Introducing a boolean would make the code
