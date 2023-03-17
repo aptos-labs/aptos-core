@@ -1,0 +1,2 @@
+-p p1 sandbox publish --bundle --override-ordering A --override-ordering B -v
+-p p2 sandbox publish --bundle --override-ordering A --override-ordering C -v
