@@ -27,7 +27,7 @@ ignored_crates = set([
     'siphasher',
 ])
 
-proc = subprocess.run("cargo doc --workspace --document-private-items", shell=True)
+proc = subprocess.run("cargo doc --workspace --no-deps --document-private-items", shell=True)
 assert proc.returncode == 0
 assert os.path.exists('target/doc')
 
