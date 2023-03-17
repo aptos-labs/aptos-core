@@ -6,6 +6,15 @@
 use crate::natives::cryptography::algebra::{HashToStructureSuite, SerializationFormat, Structure};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
 
+fn log2_floor(n: usize) -> usize {
+    (0_usize.leading_zeros() - n.leading_zeros()) as usize
+}
+
+fn log2_ceil(n: usize) -> usize {
+    log2_floor(n-1)+1
+}
+
+
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub ark_bls12_381_fr_add: InternalGasPerArg,
@@ -230,15 +239,29 @@ impl GasParameters {
         }
     }
 
+    fn ark_msm_window_size(&self, num_entries: usize) -> usize {
+        if num_entries < 32 {
+            3
+        } else {
+            (log2_ceil(num_entries) * 69 / 100) + 2
+        }
+    }
+
     pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
         match structure {
             Structure::BLS12381G1Affine => {
-                self.ark_bls12_381_g1_affine_msm_base * NumArgs::one()
-                    + self.ark_bls12_381_g1_affine_msm_per_entry * NumArgs::from(num_entries as u64)
+                let window_size = self.ark_msm_window_size(num_entries);
+                let num_windows = (255 + window_size - 1) / window_size;
+                let num_buckets = 1_usize << window_size;
+                self.ark_bls12_381_g1_proj_add * NumArgs::from(((num_entries + 2 * num_buckets + 1) * num_windows) as u64)
+                    + self.ark_bls12_381_g1_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
             },
             Structure::BLS12381G2Affine => {
-                self.ark_bls12_381_g2_affine_msm_base * NumArgs::one()
-                    + self.ark_bls12_381_g2_affine_msm_per_entry * NumArgs::from(num_entries as u64)
+                let window_size = self.ark_msm_window_size(num_entries);
+                let num_windows = (255 + window_size - 1) / window_size;
+                let num_buckets = 1_usize << window_size;
+                self.ark_bls12_381_g2_proj_add * NumArgs::from(((num_entries + 2 * num_buckets + 1) * num_windows) as u64)
+                    + self.ark_bls12_381_g2_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
             },
             _ => unreachable!(),
         }

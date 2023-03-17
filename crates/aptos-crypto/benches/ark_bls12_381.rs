@@ -6,6 +6,7 @@
 #[macro_use]
 extern crate criterion;
 
+use std::iter::StepBy;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::{BigInteger256, Field, One, UniformRand, Zero};
@@ -783,8 +784,15 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    let msm_max_num_entries = 1024;
-    for num_entries in (0..msm_max_num_entries).step_by(msm_max_num_entries / linear_regression_max_num_datapoints) {
+    fn ark_msm_all_cases() -> Vec<usize> {
+        let series_until_32 = (0..32_usize).step_by(2);
+        let series_until_33 = (32..33).step_by(1);
+        let series_until_65 = (33..65).step_by(2);
+        let series_until_129 = (64..129).step_by(4);
+        let series_until_257 = (129..257).step_by(8);
+        series_until_32.chain(series_until_33).chain(series_until_65).chain(series_until_129).chain(series_until_257).collect::<Vec<_>>()
+    }
+    for num_entries in ark_msm_all_cases() {
         group.bench_function(BenchmarkId::new("g1_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
@@ -799,7 +807,7 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    for num_entries in (0..msm_max_num_entries).step_by(msm_max_num_entries / linear_regression_max_num_datapoints) {
+    for num_entries in ark_msm_all_cases() {
         group.bench_function(BenchmarkId::new("g2_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
