@@ -85,121 +85,6 @@ enum ReadState {
     DecryptionError(noise::NoiseError),
 }
 
-impl<TSocket> NoiseStream<TSocket>
-where
-    TSocket: AsyncRead + Unpin,
-{
-    fn poll_read(&mut self, context: &mut Context, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        loop {
-            trace!("NoiseStream ReadState::{:?}", self.read_state);
-            match self.read_state {
-                ReadState::Init => {
-                    self.read_state = ReadState::ReadFrameLen {
-                        buf: [0, 0],
-                        offset: 0,
-                    };
-                },
-                ReadState::ReadFrameLen {
-                    ref mut buf,
-                    ref mut offset,
-                } => {
-                    match ready!(poll_read_u16frame_len(
-                        context,
-                        Pin::new(&mut self.socket),
-                        buf,
-                        offset
-                    )) {
-                        Ok(Some(frame_len)) => {
-                            // Empty Frame
-                            if frame_len == 0 {
-                                // 0-length messages are not expected
-                                self.read_state = ReadState::Eof(Err(()));
-                            } else {
-                                self.read_state = ReadState::ReadFrame {
-                                    frame_len,
-                                    offset: 0,
-                                };
-                            }
-                        },
-                        Ok(None) => {
-                            self.read_state = ReadState::Eof(Ok(()));
-                        },
-                        Err(e) => {
-                            if e.kind() == io::ErrorKind::UnexpectedEof {
-                                self.read_state = ReadState::Eof(Err(()));
-                            }
-                            return Poll::Ready(Err(e));
-                        },
-                    }
-                },
-                ReadState::ReadFrame {
-                    frame_len,
-                    ref mut offset,
-                } => {
-                    match ready!(poll_read_exact(
-                        context,
-                        Pin::new(&mut self.socket),
-                        &mut self.buffers.read_buffer[..(frame_len as usize)],
-                        offset
-                    )) {
-                        Ok(()) => {
-                            match self.session.read_message_in_place(
-                                &mut self.buffers.read_buffer[..(frame_len as usize)],
-                            ) {
-                                Ok(decrypted) => {
-                                    self.read_state = ReadState::CopyDecryptedFrame {
-                                        decrypted_len: decrypted.len(),
-                                        offset: 0,
-                                    };
-                                },
-                                Err(e) => {
-                                    error!(error = %e, "Decryption Error: {}", e);
-                                    self.read_state = ReadState::DecryptionError(e);
-                                },
-                            }
-                        },
-                        Err(e) => {
-                            if e.kind() == io::ErrorKind::UnexpectedEof {
-                                self.read_state = ReadState::Eof(Err(()));
-                            }
-                            return Poll::Ready(Err(e));
-                        },
-                    }
-                },
-                ReadState::CopyDecryptedFrame {
-                    decrypted_len,
-                    ref mut offset,
-                } => {
-                    let bytes_to_copy = ::std::cmp::min(decrypted_len - *offset, buf.len());
-                    buf[..bytes_to_copy].copy_from_slice(
-                        &self.buffers.read_buffer[*offset..(*offset + bytes_to_copy)],
-                    );
-                    trace!(
-                        "CopyDecryptedFrame: copied {}/{} bytes",
-                        *offset + bytes_to_copy,
-                        decrypted_len
-                    );
-                    *offset += bytes_to_copy;
-                    if *offset == decrypted_len {
-                        self.read_state = ReadState::Init;
-                    }
-                    return Poll::Ready(Ok(bytes_to_copy));
-                },
-                ReadState::Eof(Ok(())) => return Poll::Ready(Ok(0)),
-                ReadState::Eof(Err(())) => {
-                    return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()))
-                },
-                ReadState::DecryptionError(ref e) => {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("DecryptionError: {}", e),
-                    )))
-                },
-            }
-        }
-    }
-}
-
 //
 // Writing a stream
 // ----------------
@@ -222,141 +107,6 @@ enum WriteState {
     EncryptionError(noise::NoiseError),
 }
 
-impl<TSocket> NoiseStream<TSocket>
-where
-    TSocket: AsyncWrite + Unpin,
-{
-    fn poll_write_or_flush(
-        &mut self,
-        context: &mut Context,
-        buf: Option<&[u8]>,
-    ) -> Poll<io::Result<Option<usize>>> {
-        loop {
-            trace!(
-                "NoiseStream {} WriteState::{:?}",
-                if buf.is_some() {
-                    "poll_write"
-                } else {
-                    "poll_flush"
-                },
-                self.write_state,
-            );
-            match self.write_state {
-                WriteState::Init => {
-                    if buf.is_some() {
-                        self.write_state = WriteState::BufferData { offset: 0 };
-                    } else {
-                        return Poll::Ready(Ok(None));
-                    }
-                },
-                WriteState::BufferData { ref mut offset } => {
-                    let bytes_buffered = if let Some(buf) = buf {
-                        let bytes_to_copy =
-                            ::std::cmp::min(MAX_WRITE_BUFFER_LENGTH - *offset, buf.len());
-                        self.buffers.write_buffer[*offset..(*offset + bytes_to_copy)]
-                            .copy_from_slice(&buf[..bytes_to_copy]);
-                        trace!("BufferData: buffered {}/{} bytes", bytes_to_copy, buf.len());
-                        *offset += bytes_to_copy;
-                        Some(bytes_to_copy)
-                    } else {
-                        None
-                    };
-
-                    if buf.is_none() || *offset == MAX_WRITE_BUFFER_LENGTH {
-                        match self
-                            .session
-                            .write_message_in_place(&mut self.buffers.write_buffer[..*offset])
-                        {
-                            Ok(authentication_tag) => {
-                                // append the authentication tag
-                                self.buffers.write_buffer[*offset..*offset + noise::AES_GCM_TAGLEN]
-                                    .copy_from_slice(&authentication_tag);
-                                // calculate frame length
-                                let frame_len = noise::encrypted_len(*offset);
-                                let frame_len = frame_len
-                                    .try_into()
-                                    .expect("offset should be able to fit in u16");
-                                self.write_state = WriteState::WriteEncryptedFrame {
-                                    frame_len,
-                                    offset: 0,
-                                };
-                            },
-                            Err(e) => {
-                                error!(error = %e, "Encryption Error: {}", e);
-                                let err = io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    format!("EncryptionError: {}", e),
-                                );
-                                self.write_state = WriteState::EncryptionError(e);
-                                return Poll::Ready(Err(err));
-                            },
-                        }
-                    }
-
-                    if let Some(bytes_buffered) = bytes_buffered {
-                        return Poll::Ready(Ok(Some(bytes_buffered)));
-                    }
-                },
-                WriteState::WriteEncryptedFrame {
-                    frame_len,
-                    ref mut offset,
-                } => {
-                    // TODO: avoid the memory copy
-                    // Create a buffer with the message len prepended to the message data
-                    let frame_len_bytes = &u16::to_be_bytes(frame_len);
-                    let message_bytes = &self.buffers.write_buffer[..(frame_len as usize)];
-                    let message_and_len_bytes = [frame_len_bytes, message_bytes].concat();
-
-                    // Write all the data to the socket
-                    match ready!(poll_write_all(
-                        context,
-                        Pin::new(&mut self.socket),
-                        &message_and_len_bytes,
-                        offset
-                    )) {
-                        Ok(()) => {
-                            self.write_state = WriteState::Flush;
-                        },
-                        Err(e) => {
-                            if e.kind() == io::ErrorKind::WriteZero {
-                                self.write_state = WriteState::Eof;
-                            }
-                            return Poll::Ready(Err(e));
-                        },
-                    }
-                },
-                WriteState::Flush => {
-                    ready!(Pin::new(&mut self.socket).poll_flush(context))?;
-                    self.write_state = WriteState::Init;
-                },
-                WriteState::Eof => return Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
-                WriteState::EncryptionError(ref e) => {
-                    return Poll::Ready(Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("EncryptionError: {}", e),
-                    )))
-                },
-            }
-        }
-    }
-
-    fn poll_write(&mut self, context: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
-        if let Some(bytes_written) = ready!(self.poll_write_or_flush(context, Some(buf)))? {
-            Poll::Ready(Ok(bytes_written))
-        } else {
-            unreachable!();
-        }
-    }
-
-    fn poll_flush(&mut self, context: &mut Context) -> Poll<io::Result<()>> {
-        if ready!(self.poll_write_or_flush(context, None))?.is_none() {
-            Poll::Ready(Ok(()))
-        } else {
-            unreachable!();
-        }
-    }
-}
-
 //
 // Trait implementations
 // ---------------------
@@ -367,11 +117,11 @@ where
     TSocket: AsyncRead + Unpin,
 {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().poll_read(context, buf)
+        Pin::new(&mut self.socket).poll_read(context, buf)
     }
 }
 
@@ -380,15 +130,15 @@ where
     TSocket: AsyncWrite + Unpin,
 {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         context: &mut Context,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().poll_write(context, buf)
+        Pin::new(&mut self.socket).poll_write(context, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
-        self.get_mut().poll_flush(context)
+    fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.socket).poll_flush(context)
     }
 
     fn poll_close(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
