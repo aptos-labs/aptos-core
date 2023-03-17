@@ -361,7 +361,7 @@ impl InnerBuilder {
         let epoch = self.epoch;
         let (batch_retrieval_tx, mut batch_retrieval_rx) =
             aptos_channel::new::<AccountAddress, IncomingBatchRetrievalRequest>(
-                QueueStyle::LIFO,
+                QueueStyle::FIFO,
                 10,
                 Some(&counters::BATCH_RETRIEVAL_TASK_MSGS),
             );

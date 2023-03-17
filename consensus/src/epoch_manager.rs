@@ -453,7 +453,7 @@ impl EpochManager {
 
     fn spawn_block_retrieval_task(&mut self, epoch: u64, block_store: Arc<BlockStore>) {
         let (request_tx, mut request_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
+            QueueStyle::FIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
