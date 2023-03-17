@@ -69,17 +69,17 @@ pub struct ChainHealthBackoffValues {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_sending_block_txns: 2500,
+            max_sending_block_txns: 6000,
             max_sending_block_txns_quorum_store_override:
                 MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
-            max_sending_block_bytes: 600 * 1024, // 600 KB
+            max_sending_block_bytes: 3 * 1024 * 1024, // 1500 KB
             max_sending_block_bytes_quorum_store_override: 10 * 1024 * 1024, // 10MB
             max_receiving_block_txns: 10000,
             max_receiving_block_txns_quorum_store_override: 2
                 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
-            max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
+            max_receiving_block_bytes: 5 * 1024 * 1024, // 3MB
             max_receiving_block_bytes_quorum_store_override: 15 * 1024 * 1024, // 15MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
