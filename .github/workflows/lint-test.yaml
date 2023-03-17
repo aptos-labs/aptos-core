@@ -129,6 +129,7 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 4297152
+          MVP_TEST_ON_CI: true
 
   rust-consensus-only-unit-test:
     runs-on: high-perf-docker
@@ -180,7 +181,7 @@ jobs:
 
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
-    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }} 
+    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }}
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
