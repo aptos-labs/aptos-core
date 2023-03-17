@@ -20,7 +20,7 @@ const MAX_GAS_AMOUNT_ALLOWED = BigInt(2000000);
 
 /**
  * This class submits banch transactions.
- * If number of transactions are higher than the api max_batch_size config, we create `total_transactions` / `max_batch_size` transaction buffers.
+ * If number of transactions is higher than the api max_batch_size config, we create `total_transactions` / `max_batch_size` transaction buffers.
  * For each buffer we create a signed-ready-to-be-submitted transaction.
  * To create each transaction, we fetch the current sender sequence number and maintaining a local sequence number that would be increased for every new transaction creation.
  * We then submit each buffer to the `/transactions/batch` endpoint.
@@ -83,7 +83,7 @@ export class BatchTransaction {
                 (data as any).transaction_failures[0].transaction_index,
                 (data as any).transaction_failures[0].transaction_index + this.batchSize,
               );
-
+              // re-fetch the account sequence number
               await this.syncSequenceNumber(this.currentBuffer[0].sender);
               return this.sendInBatch();
             default:
@@ -95,7 +95,7 @@ export class BatchTransaction {
         return this.sendInBatch();
       })
       .catch((error) => {
-        console.error("error", error);
+        console.error("unexpected error", error);
       });
   }
 
