@@ -246,6 +246,7 @@ message EntryFunctionPayload {
   EntryFunctionId function = 1;
   repeated MoveType type_arguments = 2;
   repeated string arguments = 3;
+  string entry_function_id_str = 4;
 }
 
 message MoveScriptBytecode {
