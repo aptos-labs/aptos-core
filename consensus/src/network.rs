@@ -385,8 +385,8 @@ pub struct NetworkTask {
         (AccountAddress, ConsensusMsg),
     >,
     buffer_manager_messages_tx: aptos_channel::Sender<
-    (AccountAddress, Discriminant<ConsensusMsg>),
-    (AccountAddress, ConsensusMsg),
+        (AccountAddress, Discriminant<ConsensusMsg>),
+        (AccountAddress, ConsensusMsg),
     >,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
@@ -404,8 +404,11 @@ impl NetworkTask {
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
-        let (buffer_manager_messages_tx, buffer_manager_messages) =
-            aptos_channel::new(QueueStyle::FIFO, 30, Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS));
+        let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            30,
+            Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
+        );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
