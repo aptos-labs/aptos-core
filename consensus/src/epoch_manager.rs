@@ -798,7 +798,7 @@ impl EpochManager {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
                 let execution_config = onchain_execution_config.unwrap_or_default();
-                self.quorum_store_enabled = self.enable_quourum_store(&consensus_config);
+                self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.start_round_manager(
                     initial_data,
                     epoch_state,
@@ -813,7 +813,7 @@ impl EpochManager {
         }
     }
 
-    fn enable_quourum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
+    fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
         fail_point!("consensus::start_new_epoch::disable_qs", |_| false);
         onchain_config.quorum_store_enabled()
     }
