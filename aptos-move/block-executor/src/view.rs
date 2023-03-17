@@ -209,7 +209,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     let from_storage = self
                         .base_view
                         .get_state_value_bytes(state_key)?
-                        .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR)), |bytes| {
+                        .map_or(Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Option::None)), |bytes| {
                             Ok(deserialize(&bytes))
                         })?;
                     let result = delta

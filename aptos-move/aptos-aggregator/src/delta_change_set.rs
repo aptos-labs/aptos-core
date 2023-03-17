@@ -171,7 +171,7 @@ impl DeltaOp {
     ) -> anyhow::Result<WriteOp, VMStatus> {
         state_view
             .get_state_value_bytes(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))
+            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, Option::None))
             .and_then(|maybe_bytes| {
                 match maybe_bytes {
                     Some(bytes) => {
@@ -188,7 +188,7 @@ impl DeltaOp {
                     },
                     // Something is wrong, the value to which we apply delta should
                     // always exist. Guard anyway.
-                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR)),
+                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Option::None)),
                 }
             })
     }

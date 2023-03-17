@@ -490,36 +490,36 @@ x25519-dalek = "1.2.0"
 
 # Note: the BEGIN and END comments below are required for external tooling. Do not remove.
 # BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-binary-format = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-bytecode-verifier = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-bytecode-utils = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-cli = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-command-line-common = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-coverage = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-compiler ={ git = "file:///Users/gerbenstavenga/projects/move" }
-move-core-types = { git = "file:///Users/gerbenstavenga/projects/move", features = ["address32"] }
-move-docgen = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-disassembler = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-ir-compiler = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-model = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-package = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-prover = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-prover-boogie-backend = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-stackless-bytecode = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-prover-test-utils = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-resource-viewer = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-stackless-bytecode-interpreter = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-stdlib = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-symbol-pool = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-table-extension = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-transactional-test-runner = { git = "file:///Users/gerbenstavenga/projects/move" }
-move-unit-test = { git = "file:///Users/gerbenstavenga/projects/move", features = ["table-extension"] }
-move-vm-runtime = { git = "file:///Users/gerbenstavenga/projects/move", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "file:///Users/gerbenstavenga/projects/move", features = ["table-extension"] }
-move-vm-types = { git = "file:///Users/gerbenstavenga/projects/move" }
-read-write-set = { git = "file:///Users/gerbenstavenga/projects/move" }
-read-write-set-dynamic = { git = "file:///Users/gerbenstavenga/projects/move" }
+move-abigen = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-binary-format = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-bytecode-verifier = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-bytecode-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-cli = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-command-line-common = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-coverage = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-compiler ={ git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-core-types = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main", features = ["address32"] }
+move-docgen = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-disassembler = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-ir-compiler = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-model = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-package = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-prover = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-prover-boogie-backend = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-stackless-bytecode = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-prover-test-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-resource-viewer = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-stackless-bytecode-interpreter = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-stdlib = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-symbol-pool = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-table-extension = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-transactional-test-runner = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+move-unit-test = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main", features = ["table-extension"] }
+move-vm-runtime = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main", features = ["lazy_natives"] }
+move-vm-test-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main", features = ["table-extension"] }
+move-vm-types = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+read-write-set = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
+read-write-set-dynamic = { git = "file:///Users/gerbenstavenga/projects/move", branch = "aptos-main" }
 # END MOVE DEPENDENCIES
 
 [profile.release]

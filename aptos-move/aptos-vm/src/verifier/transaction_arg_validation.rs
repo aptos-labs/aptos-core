@@ -138,8 +138,7 @@ pub(crate) fn validate_and_construct<S: MoveResolverExt>(
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
 ) -> Result<Vec<u8>, VMError> {
-    // match ty_arg
-    let function = session.load_function_with_match(constructor.module_id, constructor.func_name, ty_arg)?;
+    let function = session.load_function_with_type_inference(constructor.module_id, constructor.func_name, ty_arg)?;
     let args = recurse_arg(session, ty_arg, cursor)?;
     let serialized_result = session.execute_function_bypass_visibility(
         &constructor.module_id, IdentStr::new(constructor.func_name).expect("Can't fail"),
