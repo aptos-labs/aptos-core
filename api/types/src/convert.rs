@@ -44,6 +44,7 @@ use move_core_types::{
 use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
@@ -77,6 +78,24 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_resource<'b>(&self, typ: &StructTag, bytes: &'b [u8]) -> Result<MoveResource> {
         self.inner.view_resource(typ, bytes)?.try_into()
+    }
+
+    pub fn try_into_resources_from_resource_group(
+        &self,
+        bytes: &[u8],
+    ) -> Result<Vec<MoveResource>> {
+        // Resource groups cannot be nested.
+        let resources_with_tag: Vec<(StructTag, Vec<u8>)> =
+            bcs::from_bytes::<BTreeMap<StructTag, Vec<u8>>>(bytes).map(|map| {
+                map.into_iter()
+                    .map(|(key, value)| (key, value))
+                    .collect::<Vec<_>>()
+            })?;
+
+        resources_with_tag
+            .iter()
+            .map(|(struct_tag, value_bytes)| self.try_into_resource(struct_tag, value_bytes))
+            .collect::<Result<Vec<_>>>()
     }
 
     pub fn move_struct_fields<'b>(
@@ -152,7 +171,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
             changes: write_set
                 .into_iter()
-                .filter_map(|(sk, wo)| self.try_into_write_set_change(sk, wo).ok())
+                .filter_map(|(sk, wo)| self.try_into_write_set_changes(sk, wo).ok())
+                .flatten()
                 .collect(),
             block_height: None,
             epoch: None,
@@ -261,13 +281,17 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             },
             Direct(d) => {
                 let (write_set, events) = d.into_inner();
+                let nested_writeset_changes: Vec<Vec<WriteSetChange>> = write_set
+                    .into_iter()
+                    .map(|(state_key, op)| self.try_into_write_set_changes(state_key, op))
+                    .collect::<Result<Vec<Vec<_>>>>()?;
                 WriteSetPayload {
                     write_set: WriteSet::DirectWriteSet(DirectWriteSet {
                         // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
-                        changes: write_set
+                        changes: nested_writeset_changes
                             .into_iter()
-                            .map(|(state_key, op)| self.try_into_write_set_change(state_key, op))
-                            .collect::<Result<_>>()?,
+                            .flatten()
+                            .collect::<Vec<WriteSetChange>>(),
                         events: self.try_into_events(&events)?,
                     }),
                 }
@@ -276,19 +300,21 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         Ok(ret)
     }
 
-    pub fn try_into_write_set_change(
+    pub fn try_into_write_set_changes(
         &self,
         state_key: StateKey,
         op: WriteOp,
-    ) -> Result<WriteSetChange> {
+    ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
         let state_key = state_key.into_inner();
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
-                self.try_access_path_into_write_set_change(hash, access_path, op)
+                self.try_access_path_into_write_set_changes(hash, access_path, op)
             },
             StateKeyInner::TableItem { handle, key } => {
-                self.try_table_item_into_write_set_change(hash, handle, key, op)
+                vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
+                    .into_iter()
+                    .collect()
             },
             StateKeyInner::Raw(_) => Err(format_err!(
                 "Can't convert account raw key {:?} to WriteSetChange",
@@ -297,47 +323,52 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         }
     }
 
-    // TODO: Consider expanding ResourceGroup into Resource and returning Vec<WriteSetChange>
-    pub fn try_access_path_into_write_set_change(
+    pub fn try_access_path_into_write_set_changes(
         &self,
         state_key_hash: String,
         access_path: AccessPath,
         op: WriteOp,
-    ) -> Result<WriteSetChange> {
+    ) -> Result<Vec<WriteSetChange>> {
         let ret = match op.into_bytes() {
             None => match access_path.get_path() {
-                Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
+                Path::Code(module_id) => vec![WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     module: module_id.into(),
-                }),
-                Path::Resource(typ) => WriteSetChange::DeleteResource(DeleteResource {
+                })],
+                Path::Resource(typ) => vec![WriteSetChange::DeleteResource(DeleteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     resource: typ.into(),
-                }),
-                Path::ResourceGroup(typ) => WriteSetChange::DeleteResource(DeleteResource {
+                })],
+                Path::ResourceGroup(typ) => vec![WriteSetChange::DeleteResource(DeleteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     resource: typ.into(),
-                }),
+                })],
             },
             Some(bytes) => match access_path.get_path() {
-                Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
+                Path::Code(_) => vec![WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: MoveModuleBytecode::new(bytes).try_parse_abi()?,
-                }),
-                Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
+                })],
+                Path::Resource(typ) => vec![WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &bytes)?,
-                }),
-                Path::ResourceGroup(typ) => WriteSetChange::WriteResource(WriteResource {
-                    address: access_path.address.into(),
-                    state_key_hash,
-                    data: self.try_into_resource(&typ, &bytes)?,
-                }),
+                })],
+                Path::ResourceGroup(_) => self
+                    .try_into_resources_from_resource_group(&bytes)?
+                    .into_iter()
+                    .map(|data| {
+                        WriteSetChange::WriteResource(WriteResource {
+                            address: access_path.address.into(),
+                            state_key_hash: state_key_hash.clone(),
+                            data,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
             },
         };
         Ok(ret)

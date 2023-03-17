@@ -90,4 +90,12 @@ async fn test_gen_resource_group() {
 
     let response = context.gen_resource(&user.address(), &secondary).await;
     assert_eq!(response.unwrap()["data"]["value"], 55);
+
+    let resp = context
+        .get(format!("/accounts/{}/transactions", user.address()).as_str())
+        .await;
+    let changes = &resp.as_array().unwrap()[1]["changes"].as_array().unwrap();
+    assert!(changes.iter().any(|c| c.get("data").map_or(false, |d| d
+        .get("type")
+        .map_or(false, |t| t.as_str().unwrap().contains("secondary")))));
 }
