@@ -1,7 +1,7 @@
 module fungible_asset::managed_fungible_source {
     use std::option;
     use aptos_framework::object::{is_owner, address_to_object, Object, object_address, ConstructorRef};
-    use fungible_asset::fungible_source::{MintCap, FreezeCap, BurnCap, unfreeze_with_cap, burn_with_cap, mint_with_cap, init_fungible_source, freeze_with_cap};
+    use fungible_asset::fungible_source::{MintCap, FreezeCap, BurnCap, init_fungible_source};
     use std::option::Option;
     use aptos_framework::object;
     use std::error;
@@ -44,7 +44,7 @@ module fungible_asset::managed_fungible_source {
     }
 
     /// Mint fungible tokens as the owner of the base asset.
-    public fun mint_by_asset_owner<T: key>(
+    public fun mint<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
         amount: u64,
@@ -52,11 +52,11 @@ module fungible_asset::managed_fungible_source {
     ) acquires Caps {
         assert_owner(asset_owner, asset);
         let mint_cap = borrow_mint_from_caps(asset);
-        mint_with_cap(mint_cap, amount, to);
+        fungible_source::mint(mint_cap, amount, to);
     }
 
     /// Burn fungible tokens as the owner of the base asset.
-    public fun burn_by_asset_owner<T: key>(
+    public fun burn<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
         amount: u64,
@@ -64,29 +64,29 @@ module fungible_asset::managed_fungible_source {
     ) acquires Caps {
         assert_owner(asset_owner, asset);
         let burn_cap = borrow_burn_from_caps(asset);
-        burn_with_cap(burn_cap, amount, from);
+        fungible_source::burn(burn_cap, amount, from);
     }
 
     /// Freeze an owner of fungible asset.
-    public fun freeze_by_asset_owner<T: key>(
+    public fun freeze_<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
         account: address,
     ) acquires Caps {
         assert_owner(asset_owner, asset);
         let freeze_cap = borrow_freeze_from_caps(asset);
-        freeze_with_cap(freeze_cap, account);
+        fungible_source::freeze_(freeze_cap, account);
     }
 
     /// Unfreeze an owner of fungible asset.
-    public fun unfreeze_by_asset_owner<T: key>(
+    public fun unfreeze<T: key>(
         asset_owner: &signer,
         asset: &Object<T>,
         fungible_asset_owner: address
     ) acquires Caps {
         assert_owner(asset_owner, asset);
         let freeze_cap = borrow_freeze_from_caps(asset);
-        unfreeze_with_cap(freeze_cap, fungible_asset_owner);
+        fungible_source::unfreeze(freeze_cap, fungible_asset_owner);
     }
 
     public fun owner_can_mint<T: key>(asset: &Object<T>): bool acquires Caps {
@@ -104,19 +104,19 @@ module fungible_asset::managed_fungible_source {
     public fun destroy_mint_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
         let mint_cap = &mut borrow_caps_mut(asset_owner, asset).mint;
         assert!(option::is_some(mint_cap), error::not_found(EMINT_CAP));
-        fungible_source::destory_mint_cap(option::extract(mint_cap));
+        fungible_source::destroy_mint_cap(option::extract(mint_cap));
     }
 
     public fun destroy_freeze_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
         let freeze_cap = &mut borrow_caps_mut(asset_owner, asset).freeze;
         assert!(option::is_some(freeze_cap), error::not_found(EFREEZE_CAP));
-        fungible_source::destory_freeze_cap(option::extract(freeze_cap));
+        fungible_source::destroy_freeze_cap(option::extract(freeze_cap));
     }
 
     public fun destroy_burn_cap<T: key>(asset_owner: &signer, asset: &Object<T>) acquires Caps {
         let burn_cap = &mut borrow_caps_mut(asset_owner, asset).burn;
         assert!(option::is_some(burn_cap), error::not_found(EFREEZE_CAP));
-        fungible_source::destory_burn_cap(option::extract(burn_cap));
+        fungible_source::destroy_burn_cap(option::extract(burn_cap));
     }
 
     inline fun borrow_mint_from_caps<T: key>(
@@ -179,13 +179,13 @@ module fungible_asset::managed_fungible_source {
         assert!(owner_can_freeze(&asset), 2);
         assert!(owner_can_burn(&asset), 3);
 
-        mint_by_asset_owner(creator, &asset, 100, creator_address);
+        mint(creator, &asset, 100, creator_address);
         assert!(balance(creator_address, &asset) == 100, 4);
-        freeze_by_asset_owner(creator, &asset, creator_address);
+        freeze_(creator, &asset, creator_address);
         assert!(is_frozen(creator_address, &asset), 5);
-        unfreeze_by_asset_owner(creator, &asset, creator_address);
+        unfreeze(creator, &asset, creator_address);
         assert!(!is_frozen(creator_address, &asset), 6);
-        burn_by_asset_owner(creator, &asset, 90, creator_address);
+        burn(creator, &asset, 90, creator_address);
 
         destroy_mint_cap(creator, &asset);
         destroy_freeze_cap(creator, &asset);
@@ -206,6 +206,6 @@ module fungible_asset::managed_fungible_source {
         initialize_managing_capabilities(&creator_ref, 100 /* max supply */, 0);
         let creator_address = signer::address_of(creator);
         assert!(owner_can_mint(&asset), 1);
-        mint_by_asset_owner(aaron, &asset, 100, creator_address);
+        mint(aaron, &asset, 100, creator_address);
     }
 }

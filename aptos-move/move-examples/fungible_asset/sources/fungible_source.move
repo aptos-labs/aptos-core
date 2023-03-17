@@ -3,7 +3,7 @@ module fungible_asset::fungible_source {
     use std::option::Option;
     use std::option;
     use std::error;
-    use fungible_asset::fungible_asset::{mint, set_frozen_flag, burn, deposit, FungibleAsset};
+    use fungible_asset::fungible_asset::{set_frozen_flag, deposit, FungibleAsset};
     use aptos_framework::object;
     use std::signer;
     use fungible_asset::fungible_asset;
@@ -87,34 +87,34 @@ module fungible_asset::fungible_source {
     }
 
     /// Mint the `amount` of coin with MintCap.
-    public fun mint_with_cap(
+    public fun mint(
         cap: &MintCap,
         amount: u64,
         to: address
     ) acquires FungibleSource {
         // This ensures amount > 0;
         increase_supply(cap, amount);
-        let fa = mint(cap.asset_addr, amount);
+        let fa = fungible_asset::mint(cap.asset_addr, amount);
         deposit(fa, to);
     }
 
     /// Freeze the fungible asset account of `fungible_asset_owner` with FreezeCap.
-    public fun freeze_with_cap(
+    public fun freeze_(
         cap: &FreezeCap,
         fungible_asset_owner: address,
     ) {
-        set_frozen_with_cap(cap, fungible_asset_owner, true);
+        set_frozen(cap, fungible_asset_owner, true);
     }
 
     /// Unfreeze the fungible asset account of `fungible_asset_owner` with FreezeCap.
-    public fun unfreeze_with_cap(
+    public fun unfreeze(
         cap: &FreezeCap,
         fungible_asset_owner: address,
     ) {
-        set_frozen_with_cap(cap, fungible_asset_owner, false);
+        set_frozen(cap, fungible_asset_owner, false);
     }
 
-    fun set_frozen_with_cap(
+    fun set_frozen(
         cap: &FreezeCap,
         fungible_asset_owner: address,
         frozen: bool
@@ -123,14 +123,14 @@ module fungible_asset::fungible_source {
     }
 
     /// Burn the `amount` of coin with MintCap.
-    public fun burn_with_cap(
+    public fun burn(
         cap: &BurnCap,
         amount: u64,
         from_account: address
     ) acquires FungibleSource {
         decrease_supply(cap, amount);
         let fungible_asset_to_burn = fungible_asset::withdraw(from_account, cap.asset_addr, amount);
-        burn(fungible_asset_to_burn);
+        fungible_asset::burn(fungible_asset_to_burn);
     }
 
     public fun withdraw<T: key>(
@@ -174,15 +174,15 @@ module fungible_asset::fungible_source {
         fungible_source.current_supply = fungible_source.current_supply - amount;
     }
 
-    public fun destory_mint_cap(cap: MintCap) {
+    public fun destroy_mint_cap(cap: MintCap) {
         let MintCap { asset_addr: _ } = cap;
     }
 
-    public fun destory_freeze_cap(cap: FreezeCap) {
+    public fun destroy_freeze_cap(cap: FreezeCap) {
         let FreezeCap { asset_addr: _ } = cap;
     }
 
-    public fun destory_burn_cap(cap: BurnCap) {
+    public fun destroy_burn_cap(cap: BurnCap) {
         let BurnCap { asset_addr: _ } = cap;
     }
 
@@ -209,13 +209,13 @@ module fungible_asset::fungible_source {
 
     #[test_only]
     public fun destroy_caps(mint_cap: MintCap, freeze_cap: FreezeCap, burn_cap: BurnCap) {
-        destory_mint_cap(mint_cap);
-        destory_freeze_cap(freeze_cap);
-        destory_burn_cap(burn_cap);
+        destroy_mint_cap(mint_cap);
+        destroy_freeze_cap(freeze_cap);
+        destroy_burn_cap(burn_cap);
     }
 
     #[test(creator = @0xcafe)]
-    fun test_basic_flow_with_caps(creator: &signer) acquires FungibleSource {
+    fun test_basic_flows(creator: &signer) acquires FungibleSource {
         let (creator_ref, asset) = create_test_token(creator);
         let (mint_cap, freeze_cap, burn_cap) = init_fungible_source(
             &creator_ref,
@@ -225,13 +225,13 @@ module fungible_asset::fungible_source {
         let creator_address = address_of(creator);
         assert!(get_current_supply(&asset) == 0, 1);
         assert!(get_maximum_supply(&asset) == option::some(100), 1);
-        mint_with_cap(&mint_cap, 100, creator_address);
+        mint(&mint_cap, 100, creator_address);
         assert!(get_current_supply(&asset) == 100, 2);
-        freeze_with_cap(&freeze_cap, creator_address);
+        freeze_(&freeze_cap, creator_address);
         assert!(is_frozen(creator_address, &asset), 3);
-        unfreeze_with_cap(&freeze_cap, creator_address);
+        unfreeze(&freeze_cap, creator_address);
         assert!(!is_frozen(creator_address, &asset), 4);
-        burn_with_cap(&burn_cap, 90, creator_address);
+        burn(&burn_cap, 90, creator_address);
         assert!(get_current_supply(&asset) == 10, 5);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
@@ -246,7 +246,7 @@ module fungible_asset::fungible_source {
             0
         );
         let creator_address = address_of(creator);
-        mint_with_cap(&mint_cap, 101, creator_address);
+        mint(&mint_cap, 101, creator_address);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
 
@@ -260,7 +260,7 @@ module fungible_asset::fungible_source {
             0
         );
         let creator_address = address_of(creator);
-        burn_with_cap(&burn_cap, 1, creator_address);
+        burn(&burn_cap, 1, creator_address);
         destroy_caps(mint_cap, freeze_cap, burn_cap);
     }
 }
