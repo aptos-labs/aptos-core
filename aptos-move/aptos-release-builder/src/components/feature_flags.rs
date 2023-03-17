@@ -163,15 +163,13 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
             AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
             AptosFeatureFlag::DELEGATION_POOLS => FeatureFlag::DelegationPools,
-<<<<<<< HEAD
-            AptosFeatureFlag::BLS12381_BASIC_OPERATIONS => FeatureFlag::Bls12381BasicOperations,
-            AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH => FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength,
-=======
             AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES => {
                 FeatureFlag::CryptographyAlgebraNatives
             },
             AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
->>>>>>> main
+            AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH => {
+                FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength
+            },
         }
     }
 }
