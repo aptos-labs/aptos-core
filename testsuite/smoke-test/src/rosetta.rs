@@ -907,7 +907,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(account_id_2),
         Some(100000000000000),
         Some(5),
@@ -927,7 +927,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Duration::from_secs(5),
         None,
         None,
@@ -972,7 +972,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(10),
         Duration::from_secs(5),
         None,
@@ -988,7 +988,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_1,
+        account_id_2,
         account_id_3,
         Duration::from_secs(5),
         None,
@@ -1003,7 +1003,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_2,
+        account_id_3,
         account_id_2,
         Duration::from_secs(5),
         None,
@@ -1732,21 +1732,8 @@ async fn parse_operations(
                         ref payload,
                     ) = txn.payload()
                     {
-                        let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-                        let operator = operation
-                            .metadata
-                            .as_ref()
-                            .unwrap()
-                            .operator
-                            .as_ref()
-                            .unwrap()
-                            .account_address()
-                            .unwrap();
-                        assert_eq!(actual_operator_address, operator);
-
                         let actual_staker_address: AccountAddress =
-                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let staker = operation
                             .metadata
                             .as_ref()
@@ -1757,6 +1744,19 @@ async fn parse_operations(
                             .account_address()
                             .unwrap();
                         assert_eq!(actual_staker_address, staker);
+
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
                     } else {
                         panic!("Not an entry function");
                     }
