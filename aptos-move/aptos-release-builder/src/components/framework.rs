@@ -30,6 +30,7 @@ pub fn generate_upgrade_proposals(
         ("0x1", "aptos-move/framework/aptos-stdlib"),
         ("0x1", "aptos-move/framework/aptos-framework"),
         ("0x3", "aptos-move/framework/aptos-token"),
+        ("0x4", "aptos-move/framework/aptos-token-objects"),
     ];
 
     let mut result: Vec<(String, String)> = vec![];

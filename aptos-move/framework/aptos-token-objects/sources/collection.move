@@ -20,7 +20,7 @@
 /// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
 /// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
-module token_objects::collection {
+module aptos_token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -29,9 +29,9 @@ module token_objects::collection {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::royalty::{Self, Royalty};
+    use aptos_token_objects::royalty::{Self, Royalty};
 
-    friend token_objects::token;
+    friend aptos_token_objects::token;
 
     /// The collections supply is at its maximum amount
     const EEXCEEDS_MAX_SUPPLY: u64 = 1;
