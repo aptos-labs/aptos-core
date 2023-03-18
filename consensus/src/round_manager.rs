@@ -30,7 +30,7 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShares, rand_decision:: RandDecisions},
     proof_of_store::{ProofOfStore, SignedBatchInfo},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -71,8 +71,8 @@ pub enum UnverifiedEvent {
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfo>),
     ProofOfStoreMsg(Box<ProofOfStore>),
-    RandShareMsg(Box<RandShare>),
-    RandDecisionMsg(Box<RandDecision>),
+    RandShareMsg(Box<RandShares>),
+    RandDecisionMsg(Box<RandDecisions>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -131,15 +131,17 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
-            UnverifiedEvent::RandShareMsg(r) => {
-                // verify the validity of the VRF share
-                r.verify(validator)?;
-                VerifiedEvent::RandShareMsg(r)
+            UnverifiedEvent::RandShareMsg(rss) => {
+                if !self_message {
+                    rss.verify(validator)?;
+                }
+                VerifiedEvent::RandShareMsg(rss)
             },
-            UnverifiedEvent::RandDecisionMsg(r) => {
-                // verify the validity of the aggregated VRF
-                r.verify(validator)?;
-                VerifiedEvent::RandDecisionMsg(r)
+            UnverifiedEvent::RandDecisionMsg(rds) => {
+                if !self_message {
+                    rds.verify(validator)?;
+                }
+                VerifiedEvent::RandDecisionMsg(rds)
             },
         })
     }
@@ -190,8 +192,8 @@ pub enum VerifiedEvent {
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfo>),
     ProofOfStoreMsg(Box<ProofOfStore>),
-    RandShareMsg(Box<RandShare>),
-    RandDecisionMsg(Box<RandDecision>),
+    RandShareMsg(Box<RandShares>),
+    RandDecisionMsg(Box<RandDecisions>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

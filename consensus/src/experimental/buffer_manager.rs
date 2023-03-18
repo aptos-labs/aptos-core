@@ -18,7 +18,7 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
-use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecision, rand_share::RandShare}};
+use aptos_consensus_types::{common::Author, executed_block::ExecutedBlock, experimental::{rand_decision::RandDecisions, rand_share::RandShares}};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -39,16 +39,16 @@ use std::{sync::{
 }, collections::{HashMap, HashSet}};
 use tokio::time::{Duration, Instant};
 
-pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3000;
-pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1000;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 5000;
+pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1000;
 
-pub const LOOP_INTERVAL_MS: u64 = 1500;
+pub const LOOP_INTERVAL_MS: u64 = 1000;
 
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 100;
+pub const RAND_NUM: usize = 1000;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
@@ -82,14 +82,11 @@ pub struct BufferManager {
 
     buffer: Buffer<BufferItem>,
 
-    // map from block_id to the partially aggregated randomness
-    block_to_rand_share_map: HashMap<HashValue, RandShare>,
-    // map from block_id to the authors of the randomness shares
-    block_to_rand_authors_map: HashMap<HashValue, HashSet<Author>>,
-    // map from block_id to the aggregated randomness
-    block_to_rand_decision_map: HashMap<HashValue, RandDecision>,
-    // map from block_id to the buffer_item hash it belongs to
-    block_to_buffer_map: HashMap<HashValue, BufferItemRootType>,
+
+    // map from item_id to the authors of the randomness shares
+    item_to_rand_authors_map: HashMap<HashValue, HashSet<Author>>,
+    // map from item_id to the partially aggregated randomness
+    item_to_rand_shares_map: HashMap<HashValue, HashMap<Author, RandShares>>,
 
     rand_msg_tx: NetworkSender,
     rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
@@ -151,10 +148,8 @@ impl BufferManager {
             author,
 
             buffer,
-            block_to_rand_share_map: HashMap::new(),
-            block_to_rand_authors_map: HashMap::new(),
-            block_to_rand_decision_map: HashMap::new(),
-            block_to_buffer_map: HashMap::new(),
+            item_to_rand_authors_map: HashMap::new(),
+            item_to_rand_shares_map: HashMap::new(),
 
             rand_msg_tx,
             rand_msg_rx,
@@ -216,30 +211,23 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
-        let mut item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
+        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
         let item_hash = item.get_hash();
 
         // Disseminate the VRF shares for the ordered blocks
         // Happy path: each validator sends its VRF shares to the leader
         // Unhappy path: if the leader timeout, broadcast the randomness share
-        for block_idx in 0..ordered_blocks.len() {
-            self.block_to_buffer_map.insert(ordered_blocks[block_idx].id(), Some(item_hash));
 
-            let maybe_proposer = ordered_blocks[block_idx].block().author();
-            let rand_share = RandShare::new(self.author, ordered_blocks[block_idx].block_info(), vec![u8::MAX; SHARE_SIZE]);    // each VRF share has 96 bytes, assuming even distribution
+        // todo: if the unhappy path is too bad, can try multiple proposers or retry with more proposers
 
-            if let Some(proposer) = maybe_proposer {
-                // Proposal block, send the randomness shares through the proposer
-                self.rand_msg_tx
-                    .send_rand_share(rand_share, proposer)
-                    .await;
-                // todo: if the unhappy path is too bad, can try multiple leaders or retry with more leaders
-            } else {
-                // Non-proposal block (genesis or Nil block),
-                // this block can move to execution-ready
-                // No need to send randomness shares
-                item.update_block_dummy_rand(block_idx, vec![]);
-            }
+        if let Some(proposer) = item.get_first_proposer() {
+            // Send the randomness shares through the first proposer,
+            // otherwise all blocks are Nil/genesis blocks that do not need randomness
+            let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
+
+            self.rand_msg_tx
+            .send_rand_shares(rand_shares, proposer)
+            .await;
         }
 
         self.buffer.push_back(item);
@@ -250,109 +238,64 @@ impl BufferManager {
     /// once the randomness is aggregated
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try adding randomness to the item
-    async fn process_rand_message(&mut self, rand_msg: VerifiedEvent) -> Option<HashValue> {
+    async fn process_rand_message(&mut self, rand_msg: VerifiedEvent) -> bool {
         match rand_msg {
-            VerifiedEvent::RandShareMsg(rand_share) => {
-                // aggregate the randomness shares
-                let author = rand_share.author();
-                let block_info = rand_share.block_info().clone();
-                let target_block_id = rand_share.block_info().id();
-                info!("Receive random share from author {:?} for block {:?}", author, target_block_id);
+            VerifiedEvent::RandShareMsg(rand_shares) => {
+                let item_id = rand_shares.item_id();
+                info!("Receive random shares for item {:?}", item_id);
 
                 // todo: verify rand message, ignore invalid ones
-                // todo: aggregate the randomness shares
 
-                // todo: insert the new aggregated randomness share
-                self.block_to_rand_share_map.insert(target_block_id, *rand_share.clone());
-                let authors = self.block_to_rand_authors_map.entry(target_block_id).or_default();
-                (*authors).insert(author);
+                let shares = self.item_to_rand_shares_map.entry(item_id).or_insert(HashMap::new());
+                (*shares).insert(rand_shares.author(), *rand_shares.clone());
+
+                let authors = self.item_to_rand_authors_map.entry(item_id).or_default();
+                (*authors).insert(rand_shares.author());
 
                 if self.verifier.check_voting_power(authors.iter()).is_ok() {
                     // enough randomness shares, can produce randomness for the block
-
-                    // todo: aggregate the randomness
-                    let aggregated_rand = vec![u8::MAX; DECISION_SIZE];
-
-                    let current_cursor = self.get_cursor_for_block(target_block_id);
+                    let current_cursor = self.buffer.find_elem_by_key(*self.buffer.head_cursor(), item_id);
                     if current_cursor.is_some() {
-                        info!("got cursor rand share for block {}", target_block_id);
                         let mut item = self.buffer.take(&current_cursor);
-                        if item.is_ordered() {
-                            // the aggregated share is 96 bytes
-                            if let Some(idx) = item.update_block_rand(target_block_id, aggregated_rand.clone()) {
-                                info!(
-                                    "updated rand by receiving rand share for block {}",
-                                    target_block_id,
-                                );
-                                // randomness is updated successfully
-                                // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
-                                if item.unwrap_ordered_ref().ordered_blocks[idx].block().author() == Some(self.author) {
-                                    let rand_decision = RandDecision::new(block_info, aggregated_rand);
-                                    self.rand_msg_tx
-                                        .broadcast_rand_decision(rand_decision)
-                                        .await;
-                                }
+                        if item.is_ordered() && item.aggregate_rand_shares(self.item_to_rand_shares_map.get(&item_id).unwrap().clone()).is_ok() {
+                            // if we're the proposer for the first proposal block,
+                            // we're responsible to broadcast the randomness decision
+                            if Some(self.author) == item.get_first_proposer() {
+                                let rand_decisions = RandDecisions::new(item_id, rand_shares.epoch(), item.gen_dummy_rand_decision_vec());
+                                self.rand_msg_tx
+                                    .broadcast_rand_decisions(rand_decisions)
+                                    .await;
                             }
-
-                            if item.is_rand_ready() {
-                                self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
-                                return Some(target_block_id)
-                            }
+                            self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
+                            return true;
                         }
                         self.buffer.set(&current_cursor, item);
                     }
                 }
             },
-            VerifiedEvent::RandDecisionMsg(rand_decision) => {
-                // add the randomness to block
-                let target_block_id = rand_decision.block_info().id();
-                self.block_to_rand_decision_map.insert(target_block_id, *rand_decision.clone());
-                info!("Receive random decision for block {:?}", target_block_id);
+            VerifiedEvent::RandDecisionMsg(rand_decisions) => {
+                let item_id = rand_decisions.item_id();
+                info!("Receive random decision for item {:?}", item_id);
 
-                let cursor = self.get_cursor_for_block(target_block_id);
-                if cursor.is_some() {
-                    info!("got cursor rand decision for block {}", target_block_id);
-                    let mut item = self.buffer.take(&cursor);
+                // todo: verify rand message, ignore invalid ones
+
+                let current_cursor = self.buffer.find_elem_by_key(*self.buffer.head_cursor(), item_id);
+                if current_cursor.is_some() {
+                    let mut item = self.buffer.take(&current_cursor);
                     if item.is_ordered() {
-                        // the aggregated share is 96 bytes
-                        if let Some(idx) = item.update_block_rand(target_block_id, rand_decision.rand().clone()) {
-                            info!(
-                                "updated rand by receiving rand decision for block {}",
-                                target_block_id,
-                            );
-                            // randomness is updated successfully
-                            // if we're the proposer for the block, we're responsible to broadcast the randomness decision.
-                            if item.unwrap_ordered_ref().ordered_blocks[idx].block().author() == Some(self.author) {
-                                self.rand_msg_tx
-                                    .broadcast_rand_decision(*rand_decision)
-                                    .await;
-                            }
-                        }
-
-                        if item.is_rand_ready() {
-                            info!("updated block {} to execution ready by receiving rand decision", target_block_id);
-                            self.buffer.set(&cursor, item.try_advance_to_execution_ready());
-                            return Some(target_block_id)
-                        }
+                        // add the randomness to block
+                        item.update_rand_decisions(*rand_decisions.clone());
+                        self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
+                        return true;
                     }
-                    self.buffer.set(&cursor, item);
+                    self.buffer.set(&current_cursor, item);
                 }
             },
             _ => {
                 unreachable!("[Buffer Manager] Processing randomness message of wrong format");
             },
         }
-        None
-    }
-
-    fn get_cursor_for_block(&mut self, block_id: HashValue) -> Cursor {
-        if self.block_to_buffer_map.contains_key(&block_id) {
-            let buffer_item = self.block_to_buffer_map.get(&block_id).unwrap();
-            if let Some(buffer_hash) = *buffer_item {
-                return self.buffer.find_elem_by_key(*self.buffer.head_cursor(), buffer_hash);
-            }
-        }
-        None
+        false
     }
 
     fn print_blocks(&mut self, blocks: Vec<ExecutedBlock>) {
@@ -733,11 +676,6 @@ impl BufferManager {
             return;
         }
         let mut cursor = *self.buffer.head_cursor();
-        // cursor = self
-        //     .buffer
-        //     .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
-        //         item.is_ordered()
-        //     });
         let mut count = 0;
 
         while cursor.is_some() {
@@ -746,15 +684,14 @@ impl BufferManager {
                 cursor = self.buffer.get_next(&cursor);
                 continue;
             }
-            let blocks = item.get_blocks();
-            for (idx, block) in blocks.iter().enumerate() {
-                println!("rebroadcast_rand_share_if_needed for block {}", block.id());
-                let rand_share = RandShare::new(self.author, block.block_info(), vec![u8::MAX; SHARE_SIZE]);    // each VRF share has 96 bytes, assuming even distribution
-                self.rand_msg_tx
-                .broadcast_rand_share(rand_share)
+            println!("rebroadcast_rand_share_if_needed for item {:?}", cursor);
+
+            let rand_shares = RandShares::new(cursor.unwrap(), self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
+
+            self.rand_msg_tx
+                .broadcast_rand_shares(rand_shares)
                 .await;
-                count += 1;
-            }
+            count += 1;
             cursor = self.buffer.get_next(&cursor);
         }
         if count > 0 {
@@ -772,24 +709,20 @@ impl BufferManager {
         // Need to rebroadcast randomness decisions for any non-committed execution ready block
         let mut cursor = *self.buffer.head_cursor();
         let mut count = 0;
+
         while cursor.is_some() {
             let item = self.buffer.get(&cursor);
             if item.is_ordered() {
                 cursor = self.buffer.get_next(&cursor);
                 continue;
             }
-            let blocks = item.get_blocks();
-            for idx in 0..blocks.len() {
-                println!("rebroadcast_rand_decision_if_needed for block {}", blocks[idx].id());
-                let rand = vec![u8::MAX; DECISION_SIZE]; //item.get_rand(idx);
-                if !rand.is_empty() {
-                    let rand_decision = RandDecision::new(item.get_blocks()[idx].block_info(), rand);
-                    self.rand_msg_tx
-                        .broadcast_rand_decision(rand_decision)
-                        .await;
-                    count += 1;
-                }
-            }
+            println!("rebroadcast_rand_decision_if_needed for item {:?}", cursor);
+            let rand_decision = RandDecisions::new(cursor.unwrap(), item.epoch(), item.gen_dummy_rand_decision_vec());
+
+            self.rand_msg_tx
+                .broadcast_rand_decisions(rand_decision)
+                .await;
+            count += 1;
             cursor = self.buffer.get_next(&cursor);
         }
         if count > 0 {
@@ -856,7 +789,8 @@ impl BufferManager {
                 },
                 rand_msg = self.rand_msg_rx.select_next_some() => {
                     monitor!("buffer_manager_process_rand", {
-                        if (self.process_rand_message(rand_msg).await).is_some() && self.execution_root.is_none() {
+                        self.process_rand_message(rand_msg).await;
+                        if self.execution_root.is_none() {
                             self.advance_execution_root().await;
                         }
                     });
@@ -892,13 +826,13 @@ impl BufferManager {
                     });
                 },
                 _ = interval.tick().fuse() => {
-                    monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     self.print_buffer();
                     self.update_buffer_manager_metrics();
+                    monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     self.rebroadcast_commit_votes_if_needed().await
                     });
-                    monitor!("buffer_manager_process_rebroadcast_rand_share", {
                     // unhappy path, keep broadcasting randomness decisions or randomness shares for non-committed blocks
+                    monitor!("buffer_manager_process_rebroadcast_rand_share", {
                     self.rebroadcast_rand_share_if_needed().await;
                     });
                     monitor!("buffer_manager_process_rebroadcast_rand_decision", {

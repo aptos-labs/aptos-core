@@ -9,7 +9,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShare, rand_decision::RandDecision},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShares, rand_decision::RandDecisions},
     proof_of_store::{ProofOfStore, SignedBatchInfo},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -62,9 +62,9 @@ pub enum ConsensusMsg {
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes).
     ProofOfStoreMsg(Box<ProofOfStore>),
     /// Randomness: send VRF evaluation shares for generating the distributed randomness of a given round
-    RandShareMsg(Box<RandShare>),
+    RandShareMsg(Box<RandShares>),
     /// Randomness: send VRF evaluation results (aggregated from 2/3 shares) as the distributed randomness for a given round
-    RandDecisionMsg(Box<RandDecision>),
+    RandDecisionMsg(Box<RandDecisions>),
 }
 
 /// Network type for consensus

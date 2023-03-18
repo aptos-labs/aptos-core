@@ -2,10 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
+
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
+    common::Author, executed_block::ExecutedBlock, experimental::{commit_vote::CommitVote, rand_share::{RandShare, RandShares}, rand_decision::{RandDecision, RandDecisions}},
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -15,7 +17,9 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
-use itertools::{zip_eq, Itertools};
+use itertools::zip_eq;
+
+use super::buffer_manager::{DECISION_SIZE, SHARE_SIZE};
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -90,8 +94,7 @@ pub struct OrderedItem {
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
-    pub maybe_rand_vec: Vec<Option<Vec<u8>>>, // place holder for aggregated randomness
-    pub num_rand_ready: usize,  // number of blocks that have randomness ready
+    pub partial_rand_decision: RandDecisions, // place holder for aggregated randomness
 }
 
 pub struct ExecutionReadyItem {
@@ -102,7 +105,7 @@ pub struct ExecutionReadyItem {
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
-    pub rand_vec: Vec<Vec<u8>>, // place holder for randomness
+    pub rand_decisions: RandDecisions, // place holder for aggregated randomness
 }
 
 pub struct ExecutedItem {
@@ -146,16 +149,32 @@ impl BufferItem {
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Self {
-        let num = ordered_blocks.len();
         Self::Ordered(Box::new(OrderedItem {
             unverified_signatures: PartialSignatures::empty(),
             commit_proof: None,
             callback,
             ordered_blocks,
             ordered_proof,
-            maybe_rand_vec: vec![None; num],
-            num_rand_ready: 0,
+            partial_rand_decision: RandDecisions::new(HashValue::default(), 0, vec![]),
         }))
+    }
+
+    pub fn aggregate_rand_shares(&mut self, _rand_shares_map: HashMap<Author,RandShares>) -> anyhow::Result<()> {
+        let hash = self.hash();
+        let epoch = self.epoch();
+        let decisions = self.gen_dummy_rand_decision_vec();
+        if let Self::Ordered(ref mut ordered_item) = self {
+            // todo: aggregate the new shares properly, update the rand decisions
+            ordered_item.partial_rand_decision = RandDecisions::new(hash, epoch, decisions);
+            return Ok(());
+        }
+        Err(anyhow!("Failed to aggregated randomness shares."))
+    }
+
+    pub fn update_rand_decisions(&mut self, rand_decisions: RandDecisions) {
+        if let Self::Ordered(ref mut ordered_item) = self {
+            ordered_item.partial_rand_decision = rand_decisions;
+        }
     }
 
     // pipeline functions
@@ -173,7 +192,7 @@ impl BufferItem {
                     unverified_signatures,
                     callback,
                     ordered_proof,
-                    rand_vec: _,
+                    rand_decisions: _,
                 } = *execution_ready_item;
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
@@ -404,12 +423,41 @@ impl BufferItem {
         }
     }
 
-    // pub fn get_rand(&self, block_idx: usize) -> Vec<u8> {
-    //     // if let Self::ExecutionReady(execution_ready) = self {
-    //     //     return execution_ready.rand_vec[block_idx].clone();
-    //     // }
-    //     vec![u8::MAX; 96]   // 96 bytes
-    // }
+    pub fn get_first_proposer(&self) -> Option<Author> {
+        self.get_blocks().iter()
+            .filter_map(|block| block.block().author())
+            .next()
+    }
+
+    pub fn gen_dummy_rand_share_vec(&self, author: Author) -> Vec<Option<RandShare>> {
+        self.get_blocks()
+            .iter()
+            .map(|block| {
+                if block.block().author().is_some() {
+                    Some(RandShare::new(author, block.block_info(), vec![u8::MAX; SHARE_SIZE]))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn gen_dummy_rand_decision_vec(&self) -> Vec<Option<RandDecision>> {
+        self.get_blocks()
+            .iter()
+            .map(|block| {
+                if block.block().author().is_some() {
+                    Some(RandDecision::new(block.block_info(), vec![u8::MAX; DECISION_SIZE]))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.get_blocks().last().unwrap().epoch()
+    }
 
     pub fn block_id(&self) -> HashValue {
         self.get_blocks().last().unwrap().id()
@@ -497,19 +545,19 @@ impl BufferItem {
         matches!(self, Self::Aggregated(_))
     }
 
-    pub fn unwrap_ordered_ref(&self) -> &OrderedItem {
-        match self {
-            BufferItem::Ordered(item) => item.as_ref(),
-            _ => panic!("Not ordered item"),
-        }
-    }
+    // pub fn unwrap_ordered_ref(&self) -> &OrderedItem {
+    //     match self {
+    //         BufferItem::Ordered(item) => item.as_ref(),
+    //         _ => panic!("Not ordered item"),
+    //     }
+    // }
 
-    pub fn unwrap_execution_ready_ref(&self) -> &ExecutionReadyItem {
-        match self {
-            BufferItem::ExecutionReady(item) => item.as_ref(),
-            _ => panic!("Not execution ready item"),
-        }
-    }
+    // pub fn unwrap_execution_ready_ref(&self) -> &ExecutionReadyItem {
+    //     match self {
+    //         BufferItem::ExecutionReady(item) => item.as_ref(),
+    //         _ => panic!("Not execution ready item"),
+    //     }
+    // }
 
     pub fn unwrap_signed_ref(&self) -> &SignedItem {
         match self {
@@ -532,63 +580,16 @@ impl BufferItem {
         }
     }
 
-    pub fn increment_rand(&mut self) {
-        if let Self::Ordered(ref mut ordered_item) = *self {
-            ordered_item.num_rand_ready += 1;
-        }
-    }
-
-    pub fn update_block_dummy_rand(&mut self, block_idx: usize, rand: Vec<u8>) -> Option<usize> {
-        if let Self::Ordered(ref mut ordered_item) = *self {
-            // Only payload blocks need randomness
-            if  ordered_item.ordered_blocks[block_idx].block().author().is_none() && ordered_item.maybe_rand_vec[block_idx].is_none() {
-                ordered_item.maybe_rand_vec[block_idx] = Some(rand);
-                ordered_item.num_rand_ready += 1;
-                return Some(block_idx);
-            }
-        }
-        None
-    }
-
-    // return the index of the block if the randomness is successfully updated
-    pub fn update_block_rand(&mut self, block_id: HashValue, rand: Vec<u8>) -> Option<usize> {
-        if let Some(idx) = self.find_block_idx_from_buffer_item(block_id) {
-            if let Self::Ordered(ref mut ordered_item) = *self {
-                // Only payload blocks need randomness
-                if ordered_item.ordered_blocks[idx].block().author().is_some() && ordered_item.maybe_rand_vec[idx].is_none() {
-                    ordered_item.maybe_rand_vec[idx] = Some(rand);
-                    ordered_item.num_rand_ready += 1;
-                    return Some(idx);
-                }
-            }
-        }
-        None
-    }
-
-    // Return None if not found
-    pub fn find_block_idx_from_buffer_item(&mut self, block_id: HashValue) -> Option<usize> {
-        self.get_blocks().iter().position(|block| (*block).id() == block_id)
-    }
-
-    pub fn is_rand_ready(&self) -> bool {
-        if let Self::Ordered(item) = self {
-            return item.num_rand_ready == self.get_blocks().len();
-        }
-        false
-        // matches!(self, Self::Ordered(item) if item.num_rand_ready == self.get_blocks().len())
-    }
-
     pub fn try_advance_to_execution_ready(self) -> Self {
         if let Self::Ordered(ordered_item) = self {
-            let rand_vec = ordered_item.maybe_rand_vec.iter().map(|x| x.clone().unwrap()).collect_vec();
-            assert!(ordered_item.ordered_blocks.len() == rand_vec.len());
+            assert!(ordered_item.ordered_blocks.len() ==  ordered_item.partial_rand_decision.decisions().len());
             return Self::ExecutionReady(Box::new(ExecutionReadyItem {
                 unverified_signatures: ordered_item.unverified_signatures,
                 commit_proof: ordered_item.commit_proof,
                 callback: ordered_item.callback,
                 ordered_blocks: ordered_item.ordered_blocks,
                 ordered_proof: ordered_item.ordered_proof,
-                rand_vec,
+                rand_decisions: ordered_item.partial_rand_decision,
             }));
         }
         self

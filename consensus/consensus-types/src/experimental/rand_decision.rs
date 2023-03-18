@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::Round;
+use aptos_crypto::HashValue;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{validator_verifier::ValidatorVerifier, block_info::BlockInfo};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
+
+type Epoch = u64;
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct RandDecision {
@@ -51,5 +55,65 @@ impl RandDecision {
 
     pub fn rand(&self) -> &Vec<u8> {
         &self.rand
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct RandDecisions {
+    item_id: HashValue,   // hash of the ordered_item
+    epoch: Epoch,
+    decisions: Vec<Option<RandDecision>>,
+}
+
+// this is required by structured log
+impl Debug for RandDecisions {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl Display for RandDecisions {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RandDecisions: [item_id: {}, epoch {}, decisions {:?}]",
+            self.item_id.short_str(),
+            self.epoch,
+            self.decisions,
+        )
+    }
+}
+
+impl RandDecisions {
+    /// Generates a new RandShare
+    pub fn new(
+        item_id: HashValue,
+        epoch: Epoch,
+        decisions: Vec<Option<RandDecision>>,
+    ) -> Self {
+        Self {
+            item_id,
+            epoch,
+            decisions,
+        }
+    }
+
+    pub fn item_id(&self) -> HashValue {
+        self.item_id
+    }
+
+    pub fn epoch(&self) -> Epoch {
+        self.epoch
+    }
+
+    /// Verifies that the consensus data hash of LedgerInfo corresponds to the commit proposal,
+    /// and then verifies the signature.
+    pub fn verify(&self, _validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        // todo: also need to verify the validity of the VRF share
+        Ok(())
+    }
+
+    pub fn decisions(&self) -> &Vec<Option<RandDecision>> {
+        &self.decisions
     }
 }
