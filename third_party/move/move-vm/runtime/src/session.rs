@@ -325,6 +325,21 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         Ok(instantiation)
     }
 
+    /// Load a module and a function into cache. To load types for the function into
+    /// cache as well, use `load_function`.
+    pub fn load_function_without_types(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+    ) -> VMResult<()> {
+        self.runtime.loader().load_function_without_types(
+            module_id,
+            function_name,
+            &self.data_cache,
+        )?;
+        Ok(())
+    }
+
     pub fn load_type(&self, type_tag: &TypeTag) -> VMResult<Type> {
         self.runtime.loader().load_type(type_tag, &self.data_cache)
     }

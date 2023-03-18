@@ -710,13 +710,8 @@ impl Loader {
         function_name: &IdentStr,
         data_store: &impl DataStore,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
-        let module = self.load_module(module_id, data_store)?;
-        let idx = self
-            .module_cache
-            .read()
-            .resolve_function_by_name(function_name, module_id)
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let func = self.module_cache.read().function_at(idx);
+        let (module, func) =
+            self.load_function_without_types(module_id, function_name, data_store)?;
 
         let parameters = func
             .parameters
@@ -903,6 +898,24 @@ impl Loader {
             return_,
         };
         Ok((module, func, loaded))
+    }
+
+    // A lighter version of `load_function` that does not load the types for arguments,
+    // return values, or type parameters.
+    pub(crate) fn load_function_without_types(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        data_store: &impl DataStore,
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
+        let module = self.load_module(module_id, data_store)?;
+        let idx = self
+            .module_cache
+            .read()
+            .resolve_function_by_name(function_name, module_id)
+            .map_err(|err| err.finish(Location::Undefined))?;
+        let func = self.module_cache.read().function_at(idx);
+        Ok((module, func))
     }
 
     // Entry point for module publishing (`MoveVM::publish_module_bundle`).
