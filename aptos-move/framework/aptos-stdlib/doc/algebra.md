@@ -18,6 +18,10 @@ Currently supported operations include element serialization/deserialization and
 -  [Function `add_internal`](#0x1_algebra_add_internal)
 -  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
 -  [Function `abort_unless_cryptography_algebra_natives_enabled`](#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled)
+-  [Specification](#@Specification_0)
+    -  [Function `deserialize_internal`](#@Specification_0_deserialize_internal)
+    -  [Function `add_internal`](#@Specification_0_add_internal)
+    -  [Function `serialize_internal`](#@Specification_0_serialize_internal)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -231,6 +235,57 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 
 </details>
+
+<a name="@Specification_0"></a>
+
+## Specification
+
+
+<a name="@Specification_0_deserialize_internal"></a>
+
+### Function `deserialize_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;G, F&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_add_internal"></a>
+
+### Function `add_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_serialize_internal"></a>
+
+### Function `serialize_internal`
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;G, F&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://move-language.github.io/move/introduction.html

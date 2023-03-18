@@ -1141,7 +1141,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 }
 
-/// Run a Move function
+/// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
