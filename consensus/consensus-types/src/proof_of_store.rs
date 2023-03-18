@@ -65,7 +65,17 @@ impl Display for BatchId {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone,
+    Debug,
+    Deserialize,
+    Serialize,
+    CryptoHasher,
+    BCSCryptoHash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
 )]
 pub struct BatchInfo {
     author: PeerId,
@@ -211,6 +221,10 @@ impl ProofOfStore {
             .get_voter_addresses(&validator.get_ordered_account_addresses());
         ret.shuffle(&mut thread_rng());
         ret
+    }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.info
     }
 }
 
