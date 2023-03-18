@@ -55,25 +55,25 @@ const GENESIS_FILE: &str = "genesis.blob";
 /// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
+    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     GenerateGenesis(GenerateGenesis),
+    GetPoolAddresses(tools::PoolAddresses),
     GenerateKeys(keys::GenerateKeys),
     GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
-    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
-    GetPoolAddresses(tools::PoolAddresses),
 }
 
 impl GenesisTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
+            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
