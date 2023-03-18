@@ -6,7 +6,7 @@
 /// * Creator-based freezing of tokens
 /// * Standard object-based transfer and events
 /// * Metadata property type
-module token_objects::aptos_token {
+module aptos_token_objects::aptos_token {
     use std::error;
     use std::option::{Self, Option};
     use std::string::String;
@@ -14,10 +14,10 @@ module token_objects::aptos_token {
 
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection;
-    use token_objects::property_map;
-    use token_objects::royalty;
-    use token_objects::token;
+    use aptos_token_objects::collection;
+    use aptos_token_objects::property_map;
+    use aptos_token_objects::royalty;
+    use aptos_token_objects::token;
 
     // The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;

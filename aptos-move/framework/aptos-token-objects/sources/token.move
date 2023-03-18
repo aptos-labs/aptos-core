@@ -6,7 +6,7 @@
 ///
 /// TODO:
 /// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
-module token_objects::token {
+module aptos_token_objects::token {
     use std::error;
     use std::option::{Self, Option};
     use std::string::{Self, String};
@@ -16,8 +16,8 @@ module token_objects::token {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection::{Self, Collection};
-    use token_objects::royalty::{Self, Royalty};
+    use aptos_token_objects::collection::{Self, Collection};
+    use aptos_token_objects::royalty::{Self, Royalty};
 
     // The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -359,7 +359,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
+    #[expected_failure(abort_code = 0x20001, location = aptos_token_objects::collection)]
     fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");

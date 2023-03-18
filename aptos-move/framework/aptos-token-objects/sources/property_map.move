@@ -1,7 +1,7 @@
 /// PropertyMap provides generic metadata support for AptosToken. It is a  specialization of
 /// SimpleMap that enforces strict typing with minimal storage use by using constant u64 to
 /// represent types and storing values in bcs format.
-module token_objects::property_map {
+module aptos_token_objects::property_map {
     use std::bcs;
     use std::vector;
     use std::error;
