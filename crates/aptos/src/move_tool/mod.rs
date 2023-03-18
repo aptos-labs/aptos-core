@@ -5,6 +5,7 @@ mod aptos_debug_natives;
 pub mod coverage;
 mod manifest;
 pub mod package_hooks;
+mod show;
 pub mod stored_package;
 mod transactional_tests_runner;
 
@@ -95,6 +96,8 @@ pub enum MoveTool {
     View(ViewFunction),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
+    #[clap(subcommand, hide = true)]
+    Show(show::ShowTool),
 }
 
 impl MoveTool {
@@ -119,6 +122,7 @@ impl MoveTool {
             },
             MoveTool::View(tool) => tool.execute_serialized().await,
             MoveTool::Coverage(tool) => tool.execute().await,
+            MoveTool::Show(tool) => tool.execute_serialized().await,
         }
     }
 }
