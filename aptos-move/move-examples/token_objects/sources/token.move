@@ -69,6 +69,7 @@ module token_objects::token {
         self: address,
     }
 
+    /// Creates a new token object and returns the ConstructorRef for additional specialization.
     public fun create(
         creator: &signer,
         collection: String,
@@ -101,10 +102,12 @@ module token_objects::token {
         constructor_ref
     }
 
+    /// Generates the collections address based upon the creators address and the collection's name
     public fun create_token_address(creator: &address, collection: &String, name: &String): address {
         object::create_object_address(creator, create_token_seed(collection, name))
     }
 
+    /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_token_seed(collection: &String, name: &String): vector<u8> {
         let seed = *string::bytes(collection);
         vector::append(&mut seed, b"::");
@@ -112,43 +115,13 @@ module token_objects::token {
         seed
     }
 
-    /// Simple token creation that generates a token and deposits it into the creators object store.
-    public entry fun mint(
-        creator: &signer,
-        collection: String,
-        description: String,
-        name: String,
-        uri: String,
-        enable_royalty: bool,
-        royalty_numerator: u64,
-        royalty_denominator: u64,
-        royalty_payee_address: address,
-    ) {
-        let royalty = if (enable_royalty) {
-            option::some(royalty::create(
-                royalty_numerator,
-                royalty_denominator,
-                royalty_payee_address,
-            ))
-        } else {
-            option::none()
-        };
-
-        create(
-            creator,
-            collection,
-            description,
-            name,
-            royalty,
-            uri,
-        );
-    }
-
+    /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
         let object = object::object_from_constructor_ref<Token>(ref);
         MutatorRef { self: object::object_address(&object) }
     }
 
+    /// Creates a BurnRef, which gates the ability to burn the given token.
     public fun generate_burn_ref(ref: &ConstructorRef): BurnRef {
         let (inner, self) = if (object::can_generate_delete_ref(ref)) {
             let delete_ref = object::generate_delete_ref(ref);
@@ -160,6 +133,7 @@ module token_objects::token {
         BurnRef { self, inner }
     }
 
+    /// Extracts the tokens address from a BurnRef.
     public fun address_from_burn_ref(ref: &BurnRef): address {
         if (option::is_some(&ref.inner)) {
             object::address_from_delete_ref(option::borrow(&ref.inner))
@@ -169,6 +143,7 @@ module token_objects::token {
     }
 
     // Accessors
+
     inline fun borrow<T: key>(token: &Object<T>): &Token {
         let token_address = object::object_address(token);
         assert!(
@@ -246,16 +221,18 @@ module token_objects::token {
         };
 
         let Token {
-            collection: _,
+            collection,
             collection_id: _,
-            creator: _,
+            creator,
             description: _,
             name: _,
             creation_name: _,
             uri: _,
             mutation_events,
         } = move_from<Token>(addr);
+
         event::destroy_handle(mutation_events);
+        collection::decrement_supply(&creator, &collection);
     }
 
     public fun set_description(
@@ -298,7 +275,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
-    entry fun test_create_and_transfer(creator: &signer, trader: &signer) acquires Token {
+    fun test_create_and_transfer(creator: &signer, trader: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -317,7 +294,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_collection_royalty(creator: &signer) acquires Token {
+    fun test_collection_royalty(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -350,7 +327,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_no_royalty(creator: &signer) acquires Token {
+    fun test_no_royalty(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -379,7 +356,7 @@ module token_objects::token {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x20001, location = token_objects::collection)]
-    entry fun test_too_many_tokens(creator: &signer) {
+    fun test_too_many_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -390,7 +367,7 @@ module token_objects::token {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x80001, location = aptos_framework::object)]
-    entry fun test_duplicate_tokens(creator: &signer) {
+    fun test_duplicate_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -400,7 +377,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_description(creator: &signer) acquires Token {
+    fun test_set_description(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -417,7 +394,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_name(creator: &signer) acquires Token {
+    fun test_set_name(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -439,7 +416,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_uri(creator: &signer) acquires Token {
+    fun test_set_uri(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -456,7 +433,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_burn_without_royalty(creator: &signer) acquires Token {
+    fun test_burn_without_royalty(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -479,7 +456,7 @@ module token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_burn_with_royalty(creator: &signer) acquires Token {
+    fun test_burn_with_royalty(creator: &signer) acquires Token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -502,7 +479,7 @@ module token_objects::token {
     }
 
     #[test_only]
-    entry fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64) {
+    fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64) {
         collection::create_collection(
             creator,
             string::utf8(b"collection description"),
@@ -517,34 +494,24 @@ module token_objects::token {
     }
 
     #[test_only]
-    entry fun create_token_helper(creator: &signer, collection_name: String, token_name: String) {
-        mint(
+    fun create_token_helper(creator: &signer, collection_name: String, token_name: String): ConstructorRef {
+        create(
             creator,
             collection_name,
             string::utf8(b"token description"),
             token_name,
-            string::utf8(b"token uri"),
-            true,
-            25,
-            10000,
-            signer::address_of(creator),
-        );
+            option::some(royalty::create(25, 10000, signer::address_of(creator))),
+            string::utf8(b"uri"),
+        )
     }
 
     #[test_only]
-    entry fun create_token_with_mutation_ref(
+    fun create_token_with_mutation_ref(
         creator: &signer,
         collection_name: String,
         token_name: String,
     ): MutatorRef {
-        let constructor_ref = create(
-            creator,
-            collection_name,
-            string::utf8(b"token description"),
-            token_name,
-            option::none(),
-            string::utf8(b"token uri"),
-        );
+        let constructor_ref = create_token_helper(creator, collection_name, token_name);
         generate_mutator_ref(&constructor_ref)
     }
 }

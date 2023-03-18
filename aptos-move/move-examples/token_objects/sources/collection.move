@@ -6,6 +6,8 @@
 /// supports:
 /// * Common fields: name, uri, description, creator
 /// * MutatorRef leaving mutability configuration to a higher level component
+/// * Addressed by a global identifier of creator's address and collection name, thus collections
+///   cannot be deleted as a restriction of the object model.
 /// * Optional support for collection-wide royalties
 /// * Optional support for tracking of supply
 ///
@@ -13,10 +15,11 @@
 /// * Events on mint or burn -- that's left to the collection creator.
 ///
 /// TODO:
-/// * Consider supporting changing the name of the collection.
-/// * Consider supporting changing the aspects of supply
+/// * Consider supporting changing the name of the collection with the MutatorRef. This would
+///   require adding the field original_name.
+/// * Consider supporting changing the aspects of supply with the MutatorRef.
 /// * Add aggregator support when added to framework
-/// * Update Object<T> to be a viable input as a transaction arg and then update all readers as view.
+/// * Update Object<T> to be viable input as a transaction arg and then update all readers as view.
 module token_objects::collection {
     use std::error;
     use std::option::{Self, Option};
@@ -70,6 +73,10 @@ module token_objects::collection {
         total_minted: u64,
     }
 
+    /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
+    /// This is useful to create a guaranteed, limited supply on-chain digital asset. For example,
+    /// a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results
+    /// in data structures that prevent Aptos from parallelizing mints of this collection type.
     public fun create_fixed_collection(
         creator: &signer,
         description: String,
@@ -94,6 +101,8 @@ module token_objects::collection {
         )
     }
 
+    /// Creates an untracked collection, or a collection that supports an arbitrary amount of
+    /// tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
     public fun create_untracked_collection(
         creator: &signer,
         description: String,
@@ -145,14 +154,17 @@ module token_objects::collection {
         constructor_ref
     }
 
+    /// Generates the collections address based upon the creators address and the collection's name
     public fun create_collection_address(creator: &address, name: &String): address {
         object::create_object_address(creator, create_collection_seed(name))
     }
 
+    /// Named objects are derived from a seed, the collection's seed is its name.
     public fun create_collection_seed(name: &String): vector<u8> {
         *string::bytes(name)
     }
 
+    /// Called by token on mint to increment supply if there's an appropriate Supply struct.
     public(friend) fun increment_supply(
         creator: &address,
         name: &String,
@@ -177,6 +189,7 @@ module token_objects::collection {
         }
     }
 
+    /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
     public(friend) fun decrement_supply(creator: &address, name: &String) acquires FixedSupply {
         let collection_addr = create_collection_address(creator, name);
         if (exists<FixedSupply>(collection_addr)) {
@@ -227,12 +240,14 @@ module token_objects::collection {
         };
     }
 
+    /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
         let object = object::object_from_constructor_ref<Collection>(ref);
         MutatorRef { self: object::object_address(&object) }
     }
 
     // Accessors
+
     inline fun borrow<T: key>(collection: &Object<T>): &Collection {
         let collection_address = object::object_address(collection);
         assert!(
@@ -240,6 +255,21 @@ module token_objects::collection {
             error::not_found(ECOLLECTION_DOES_NOT_EXIST),
         );
         borrow_global<Collection>(collection_address)
+    }
+
+    public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply {
+        let collection_address = object::object_address(&collection);
+        assert!(
+            exists<Collection>(collection_address),
+            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
+        );
+
+        if (exists<FixedSupply>(collection_address)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            option::some(supply.current_supply)
+        } else {
+            option::none()
+        }
     }
 
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {

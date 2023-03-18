@@ -52,6 +52,7 @@ module token_objects::aptos_token {
         freezable_by_creator: bool,
     }
 
+    /// With an existing collection, directly mint a viable token into the creators account.
     public entry fun mint(
         creator: &signer,
         collection: String,
@@ -95,6 +96,7 @@ module token_objects::aptos_token {
         option::fill(&mut aptos_token.transfer_ref, transfer_ref);
     }
 
+    /// With an existing collection, directly mint a soul bound token into the recipient's account.
     public entry fun mint_soul_bound(
         creator: &signer,
         collection: String,
@@ -109,6 +111,7 @@ module token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
         mutable_properties: bool,
+        soul_bound_to: address,
     ) {
         let constructor_ref = mint_internal(
             creator,
@@ -127,6 +130,8 @@ module token_objects::aptos_token {
         );
 
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
+        object::transfer_with_ref(linear_transfer_ref, soul_bound_to);
         object::disable_ungated_transfer(&transfer_ref);
     }
 
@@ -545,9 +550,9 @@ module token_objects::aptos_token {
         assert!(object::owner(token) == @0x345, 1);
     }
 
-    #[test(creator = @0x123)]
+    #[test(creator = @0x123, bob = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = object)]
-    fun test_mint_soul_bound(creator: &signer) {
+    fun test_mint_soul_bound(creator: &signer, bob: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -566,6 +571,7 @@ module token_objects::aptos_token {
             vector[],
             vector[],
             false,
+            signer::address_of(bob),
         );
 
         let token_addr = token::create_token_address(
@@ -574,7 +580,7 @@ module token_objects::aptos_token {
             &token_name,
         );
         let token = object::address_to_object<AptosToken>(token_addr);
-        object::transfer(creator, token, @0x345);
+        object::transfer(bob, token, @0x345);
     }
 
     #[test(creator = @0x123)]
