@@ -1,0 +1,31 @@
+//# publish
+
+// NOTE: given that we don't have multi-module publishing yet, we have to go through the
+// republishing flow (i.e., module N) to keep the loader happy --- the loader expects module N
+// to exist when loading module M.
+module 0x42.N {
+    foo() {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x42.M {
+    friend 0x42.N;
+    public(friend) foo() {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x42.N {
+    import 0x42.M;
+    foo() {
+    label b0:
+        // call friend visible function if declared a friend
+        M.foo();
+        return;
+    }
+}

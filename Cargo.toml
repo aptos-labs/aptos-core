@@ -141,6 +141,65 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
+
+    # third_party/move
+    "third_party/move/extensions/async/move-async-vm",
+    "third_party/move/extensions/move-table-extension",
+    "third_party/move/move-analyzer",
+    "third_party/move/move-binary-format",
+    "third_party/move/move-binary-format/serializer-tests",
+    "third_party/move/move-borrow-graph",
+    "third_party/move/move-bytecode-verifier",
+    "third_party/move/move-bytecode-verifier/bytecode-verifier-tests",
+    "third_party/move/move-bytecode-verifier/fuzz",
+    "third_party/move/move-bytecode-verifier/invalid-mutations",
+    "third_party/move/move-bytecode-verifier/transactional-tests",
+    "third_party/move/move-command-line-common",
+    "third_party/move/move-compiler",
+    "third_party/move/move-compiler/transactional-tests",
+    "third_party/move/move-core/types",
+    "third_party/move/move-ir-compiler",
+    "third_party/move/move-ir-compiler/move-bytecode-source-map",
+    "third_party/move/move-ir-compiler/move-ir-to-bytecode",
+    "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
+    "third_party/move/move-ir-compiler/transactional-tests",
+    "third_party/move/move-ir/types",
+    "third_party/move/move-model",
+    "third_party/move/move-prover",
+    "third_party/move/move-prover/boogie-backend",
+    "third_party/move/move-prover/bytecode",
+    "third_party/move/move-prover/interpreter",
+    "third_party/move/move-prover/interpreter-testsuite",
+    "third_party/move/move-prover/interpreter/crypto",
+    "third_party/move/move-prover/move-abigen",
+    "third_party/move/move-prover/move-docgen",
+    "third_party/move/move-prover/move-errmapgen",
+    # "third_party/move/move-prover/mutation",
+    "third_party/move/move-prover/test-utils",
+    "third_party/move/move-prover/tools/spec-flatten",
+    "third_party/move/move-stdlib",
+    "third_party/move/move-symbol-pool",
+    "third_party/move/move-vm/integration-tests",
+    "third_party/move/move-vm/paranoid-tests",
+    "third_party/move/move-vm/runtime",
+    "third_party/move/move-vm/test-utils",
+    "third_party/move/move-vm/transactional-tests",
+    "third_party/move/move-vm/types",
+    "third_party/move/testing-infra/module-generation",
+    "third_party/move/testing-infra/test-generation",
+    "third_party/move/testing-infra/transactional-test-runner",
+    "third_party/move/tools/move-bytecode-utils",
+    "third_party/move/tools/move-bytecode-viewer",
+    "third_party/move/tools/move-cli",
+    "third_party/move/tools/move-coverage",
+    "third_party/move/tools/move-disassembler",
+    "third_party/move/tools/move-explain",
+    "third_party/move/tools/move-package",
+    "third_party/move/tools/move-resource-viewer",
+    "third_party/move/tools/move-unit-test",
+    "third_party/move/tools/read-write-set",
+    "third_party/move/tools/read-write-set/dynamic",
+    "third_party/move/tools/read-write-set/types",
     "types",
     "vm-validator",
 ]
@@ -516,39 +575,37 @@ warp-reverse-proxy = "0.5.0"
 which = "4.2.5"
 x25519-dalek = "1.2.0"
 
-# Note: the BEGIN and END comments below are required for external tooling. Do not remove.
-# BEGIN MOVE DEPENDENCIES
-move-abigen = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-binary-format = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-bytecode-verifier = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-bytecode-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-cli = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-command-line-common = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-coverage = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-compiler ={ git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-core-types = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2", features = ["address32"] }
-move-docgen = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-disassembler = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-ir-compiler = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-model = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-package = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-prover = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-prover-boogie-backend = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-stackless-bytecode = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-prover-test-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-resource-viewer = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-stackless-bytecode-interpreter = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-stdlib = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-symbol-pool = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-table-extension = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-transactional-test-runner = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-move-unit-test = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2", features = ["table-extension"] }
-move-vm-runtime = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2", features = ["lazy_natives"] }
-move-vm-test-utils = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2", features = ["table-extension"] }
-move-vm-types = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-read-write-set = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-read-write-set-dynamic = { git = "file:///Users/gerbenstavenga/projects/move", branch = "loader-gerben2" }
-# END MOVE DEPENDENCIES
+# MOVE DEPENDENCIES
+move-abigen = { path = "third_party/move/move-prover/move-abigen" }
+move-binary-format = { path = "third_party/move/move-binary-format" }
+move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
+move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
+move-cli = { path = "third_party/move/tools/move-cli" }
+move-command-line-common = { path = "third_party/move/move-command-line-common" }
+move-coverage = { path = "third_party/move/tools/move-coverage" }
+move-compiler = { path = "third_party/move/move-compiler" }
+move-core-types = { path = "third_party/move/move-core/types" }
+move-docgen = { path = "third_party/move/move-prover/move-docgen" }
+move-disassembler = { path = "third_party/move/tools/move-disassembler" }
+move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
+move-model = { path = "third_party/move/move-model" }
+move-package = { path = "third_party/move/tools/move-package" }
+move-prover = { path = "third_party/move/move-prover" }
+move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
+move-stackless-bytecode = { path = "third_party/move/move-prover/bytecode" }
+move-stdlib = { path = "third_party/move/move-stdlib" }
+move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
+move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
+move-stackless-bytecode-interpreter = { path = "third_party/move/move-prover/interpreter" }
+move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
+move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
+move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
+move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
+move-vm-types = { path = "third_party/move/move-vm/types" }
+read-write-set = { path = "third_party/move/tools/read-write-set" }
+read-write-set-dynamic = { path = "third_party/move/tools/read-write-set/dynamic" }
 
 [profile.release]
 debug = true

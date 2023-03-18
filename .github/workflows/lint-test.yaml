@@ -125,10 +125,17 @@ jobs:
       - uses: taiki-e/install-action@v1.5.6
         with:
           tool: nextest
+      - run: scripts/dev_setup.sh -b -p -y
       - run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 4297152
+          MVP_TEST_ON_CI: true
+          SOLC_EXE: /home/runner/bin/solc
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
 
   rust-consensus-only-unit-test:
     runs-on: high-perf-docker
@@ -180,7 +187,7 @@ jobs:
 
   rust-consensus-only-smoke-test:
     runs-on: high-perf-docker
-    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }} 
+    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }}
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

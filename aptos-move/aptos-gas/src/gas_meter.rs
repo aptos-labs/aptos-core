@@ -338,15 +338,15 @@ impl GasMeter for AptosGasMeter {
     }
 
     fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
-        self.charge(self.gas_params.instr.br_false)
+        self.charge_execution(self.gas_params.instr.br_false)
     }
 
     fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
-        self.charge(self.gas_params.instr.br_true)
+        self.charge_execution(self.gas_params.instr.br_true)
     }
 
     fn charge_branch(&mut self, _target_offset: CodeOffset) -> PartialVMResult<()> {
-        self.charge(self.gas_params.instr.branch)
+        self.charge_execution(self.gas_params.instr.branch)
     }
 
     #[inline]
