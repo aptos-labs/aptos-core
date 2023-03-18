@@ -1014,6 +1014,71 @@ module token_objects::aptos_token {
         set_collection_uri(noncreator, collection, string::utf8(b""));
     }
 
+    #[test(creator = @0x123)]
+    entry fun test_property_add(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+        let property_name = string::utf8(b"u8");
+        let property_type = string::utf8(b"u8");
+
+        create_collection_helper(creator, collection_name, true);
+        let token = mint_helper(creator, collection_name, token_name);
+        add_property_call(creator, collection_name, token_name, property_name, property_type, vector [ 0x08 ]);
+
+        assert!(property_map::read_u8(&token, &property_name) == 0x8, 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_property_typed_add(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+        let property_name = string::utf8(b"u8");
+
+        create_collection_helper(creator, collection_name, true);
+        let token = mint_helper(creator, collection_name, token_name);
+        add_typed_property_call<u8>(creator, collection_name, token_name, property_name, 0x8);
+
+        assert!(property_map::read_u8(&token, &property_name) == 0x8, 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_property_update(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+        let property_name = string::utf8(b"bool");
+        let property_type = string::utf8(b"bool");
+
+        create_collection_helper(creator, collection_name, true);
+        let token = mint_helper(creator, collection_name, token_name);
+        update_property_call(creator, collection_name, token_name, property_name, property_type, vector [ 0x00 ]);
+
+        assert!(!property_map::read_bool(&token, &property_name), 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_property_update_typed(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+        let property_name = string::utf8(b"bool");
+
+        create_collection_helper(creator, collection_name, true);
+        let token = mint_helper(creator, collection_name, token_name);
+        update_typed_property_call<bool>(creator, collection_name, token_name, property_name, false);
+
+        assert!(!property_map::read_bool(&token, &property_name), 0);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun est_property_remove(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+        let property_name = string::utf8(b"bool");
+
+        create_collection_helper(creator, collection_name, true);
+        mint_helper(creator, collection_name, token_name);
+        remove_property_call(creator, collection_name, token_name, property_name);
+    }
+
     #[test_only]
     fun create_collection_helper(
         creator: &signer,
