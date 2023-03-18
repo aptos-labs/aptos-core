@@ -166,15 +166,9 @@ module token_objects::collection {
 
     /// Called by token on mint to increment supply if there's an appropriate Supply struct.
     public(friend) fun increment_supply(
-        creator: &address,
-        name: &String,
+        collection: &Object<Collection>,
     ): Option<u64> acquires FixedSupply {
-        let collection_addr = create_collection_address(creator, name);
-        assert!(
-            exists<Collection>(collection_addr),
-            error::not_found(ECOLLECTION_DOES_NOT_EXIST),
-        );
-
+        let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
@@ -190,8 +184,8 @@ module token_objects::collection {
     }
 
     /// Called by token on burn to decrement supply if there's an appropriate Supply struct.
-    public(friend) fun decrement_supply(creator: &address, name: &String) acquires FixedSupply {
-        let collection_addr = create_collection_address(creator, name);
+    public(friend) fun decrement_supply(collection: &Object<Collection>) acquires FixedSupply {
+        let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
