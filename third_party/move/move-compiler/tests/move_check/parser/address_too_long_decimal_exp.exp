@@ -1,0 +1,6 @@
+warning[W09003]: unused assignment
+  ┌─ tests/move_check/parser/address_too_long_decimal_exp.move:4:13
+  │
+4 │         let x = @3402823669209384634633746074317682114560282366920938463463374607431768211456;
+  │             ^ Unused assignment or binding for local 'x'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_x')
+
