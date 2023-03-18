@@ -16,7 +16,7 @@ module token_objects::token {
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
 
-    use token_objects::collection;
+    use token_objects::collection::{Self, Collection};
     use token_objects::royalty::{Self, Royalty};
 
     // The token does not exist
@@ -29,12 +29,10 @@ module token_objects::token {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
     struct Token has key {
-        /// An optional categorization of similar token, there are no constraints on collections.
-        collection: String,
+        /// The collection from which this token resides.
+        collection: Object<Collection>,
         /// Unique identifier within the collection, optional, 0 means unassigned
         collection_id: u64,
-        /// The original creator of this token.
-        creator: address,
         /// A brief description of the token.
         description: String,
         /// The name of the token, which should be unique within the collection; the length of name
@@ -72,22 +70,25 @@ module token_objects::token {
     /// Creates a new token object and returns the ConstructorRef for additional specialization.
     public fun create(
         creator: &signer,
-        collection: String,
+        collection_name: String,
         description: String,
         name: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
-        let seed = create_token_seed(&collection, &name);
+        let seed = create_token_seed(&collection_name, &name);
+
+        let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
+        let collection = object::address_to_object<Collection>(collection_addr);
+        let id = collection::increment_supply(&collection);
+
         let constructor_ref = object::create_named_object(creator, seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        let id = collection::increment_supply(&creator_address, &collection);
         let token = Token {
             collection,
             collection_id: option::get_with_default(&mut id, 0),
-            creator: creator_address,
             description,
             name,
             creation_name: option::none(),
@@ -154,11 +155,11 @@ module token_objects::token {
     }
 
     public fun creator<T: key>(token: Object<T>): address acquires Token {
-        borrow(&token).creator
+        collection::creator(borrow(&token).collection)
     }
 
     public fun collection<T: key>(token: Object<T>): String acquires Token {
-        borrow(&token).collection
+        collection::name(borrow(&token).collection)
     }
 
     public fun creation_name<T: key>(token: Object<T>): String acquires Token {
@@ -223,7 +224,6 @@ module token_objects::token {
         let Token {
             collection,
             collection_id: _,
-            creator,
             description: _,
             name: _,
             creation_name: _,
@@ -232,7 +232,7 @@ module token_objects::token {
         } = move_from<Token>(addr);
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&creator, &collection);
+        collection::decrement_supply(&collection);
     }
 
     public fun set_description(
@@ -371,7 +371,7 @@ module token_objects::token {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
-        create_collection_helper(creator, *&collection_name, 1);
+        create_collection_helper(creator, *&collection_name, 2);
         create_token_helper(creator, *&collection_name, *&token_name);
         create_token_helper(creator, collection_name, token_name);
     }
