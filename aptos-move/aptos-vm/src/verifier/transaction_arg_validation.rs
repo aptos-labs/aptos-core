@@ -75,13 +75,15 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 
     // validate all non_signer params
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, optional_constructor) = is_valid_txn_arg(session, ty);
+        let (valid, needs_construction) = is_valid_txn_arg(session, ty);
         if !valid {
             return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None));
         }
-        if let Some(constructor) = optional_constructor {
+        if needs_construction {
             let mut cursor = Cursor::new(&args[idx][..]);
-            args[idx] = validate_and_construct(session, ty,constructor, &mut cursor, gas_meter)?;
+            let mut new_arg = vec![];
+            recurse_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)?;
+            args[idx] = new_arg;
             // Check cursor has parsed everything
         }
     }
@@ -112,24 +114,21 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
 pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
     session: &SessionExt<S>,
     typ: &Type,
-) -> (bool, Option<&'static FunctionId>) {
+) -> (bool, bool) {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, None),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, false),
         Vector(inner) => is_valid_txn_arg(session, inner),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                match ALLOWED_STRUCTS.get(&full_name) {
-                    None => (false, None),
-                    Some(constructor_name) => (true, Some(constructor_name)),
-                }
+                (ALLOWED_STRUCTS.contains_key(&full_name), true)
             } else {
-                (false, None)
+                (false, false)
             }
         },
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => (false, None),
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) => (false, false),
     }
 }
 
@@ -153,7 +152,7 @@ pub(crate) fn validate_and_construct<S: MoveResolverExt>(
     // }
     let serialized_result = session.execute_instantiated_function(
         module, function, instantiation,
-        args, gas_meter).map_err(|e| e)?;
+        args, gas_meter).map_err(|_|VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals.pop().expect("Always a result").0)
@@ -161,7 +160,7 @@ pub(crate) fn validate_and_construct<S: MoveResolverExt>(
 
 // Validate a single arg. A Cursor is used to walk the serialized arg manually and correctly.
 // Only Strings and nested vector of them are validated.
-fn recurse_arg<S: MoveResolverExt>(
+pub(crate) fn recurse_arg<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     ty: &Type,
     cursor: &mut Cursor<&[u8]>,
