@@ -6,9 +6,6 @@
 /// * Creator-based freezing of tokens
 /// * Standard object-based transfer and events
 /// * Metadata property type
-///
-/// TODO:
-/// * Fungible of tokens
 module token_objects::aptos_token {
     use std::error;
     use std::option::{Self, Option};
@@ -40,6 +37,8 @@ module token_objects::aptos_token {
     struct AptosCollection has key {
         /// Used to mutate collection fields
         mutator_ref: Option<collection::MutatorRef>,
+        /// Used to mutate royalties
+        royalty_mutator_ref: Option<royalty::MutatorRef>,
         /// Determines if the creator can mutate the collection's description
         mutable_description: bool,
         /// Determines if the creator can mutate the collection's uri
@@ -79,6 +78,7 @@ module token_objects::aptos_token {
         name: String,
         uri: String,
         mutable_description: bool,
+        mutable_royalty: bool,
         mutable_uri: bool,
         mutable_token_description: bool,
         mutable_token_name: bool,
@@ -107,8 +107,15 @@ module token_objects::aptos_token {
             option::none()
         };
 
+        let royalty_mutator_ref = if (mutable_royalty) {
+            option::some(royalty::generate_mutator_ref(object::generate_extend_ref(&constructor_ref)))
+        } else {
+            option::none()
+        };
+
         let aptos_collection = AptosCollection {
             mutator_ref,
+            royalty_mutator_ref,
             mutable_description,
             mutable_uri,
             mutable_token_description,
@@ -590,6 +597,12 @@ module token_objects::aptos_token {
         borrow_collection(&collection).mutable_description
     }
 
+    public fun is_mutable_collection_royalty<T: key>(
+        collection: Object<T>,
+    ): bool acquires AptosCollection {
+        option::is_some(&borrow_collection(&collection).royalty_mutator_ref)
+    }
+
     public fun is_mutable_collection_uri<T: key>(
         collection: Object<T>,
     ): bool acquires AptosCollection {
@@ -660,6 +673,19 @@ module token_objects::aptos_token {
         collection::set_description(option::borrow(&aptos_collection.mutator_ref), description);
     }
 
+    public fun set_collection_royalties<T: key>(
+        creator: &signer,
+        collection: Object<T>,
+        royalty: royalty::Royalty,
+    ) acquires AptosCollection {
+        let aptos_collection = authorized_borrow_collection(&collection, signer::address_of(creator));
+        assert!(
+            option::is_some(&aptos_collection.royalty_mutator_ref),
+            error::permission_denied(EFIELD_NOT_MUTABLE),
+        );
+        royalty::update(option::borrow(&aptos_collection.royalty_mutator_ref), royalty);
+    }
+
     public fun set_collection_uri<T: key>(
         creator: &signer,
         collection: Object<T>,
@@ -686,6 +712,17 @@ module token_objects::aptos_token {
         description: String,
     ) acquires AptosCollection {
         set_collection_description(creator, collection_object(creator, &collection), description);
+    }
+
+    entry fun set_collection_royalties_call(
+        creator: &signer,
+        collection: String,
+        royalty_numerator: u64,
+        royalty_denominator: u64,
+        payee_address: address,
+    ) acquires AptosCollection {
+        let royalty = royalty::create(royalty_numerator, royalty_denominator, payee_address);
+        set_collection_royalties(creator, collection_object(creator, &collection), royalty);
     }
 
     entry fun set_collection_uri_call(
@@ -1069,7 +1106,7 @@ module token_objects::aptos_token {
     }
 
     #[test(creator = @0x123)]
-    entry fun est_property_remove(creator: &signer) acquires AptosCollection, AptosToken {
+    entry fun test_property_remove(creator: &signer) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
         let property_name = string::utf8(b"bool");
@@ -1077,6 +1114,20 @@ module token_objects::aptos_token {
         create_collection_helper(creator, collection_name, true);
         mint_helper(creator, collection_name, token_name);
         remove_property_call(creator, collection_name, token_name, property_name);
+    }
+
+    #[test(creator = @0x123)]
+    entry fun test_royalties(creator: &signer) acquires AptosCollection, AptosToken {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name, true);
+        let token = mint_helper(creator, collection_name, token_name);
+
+        let royalty_before = option::extract(&mut token::royalty(token));
+        set_collection_royalties_call(creator, collection_name, 2, 3, @0x444);
+        let royalty_after = option::extract(&mut token::royalty(token));
+        assert!(royalty_before != royalty_after, 0);
     }
 
     #[test_only]
@@ -1091,6 +1142,7 @@ module token_objects::aptos_token {
             1,
             collection_name,
             string::utf8(b"collection uri"),
+            flag,
             flag,
             flag,
             flag,
