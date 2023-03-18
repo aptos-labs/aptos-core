@@ -162,6 +162,10 @@ module token_objects::token {
         collection::name(borrow(&token).collection)
     }
 
+    public fun collection_object<T: key>(token: Object<T>): Object<Collection> acquires Token {
+        borrow(&token).collection
+    }
+
     public fun creation_name<T: key>(token: Object<T>): String acquires Token {
         let token = borrow(&token);
         if (option::is_some(&token.creation_name)) {
