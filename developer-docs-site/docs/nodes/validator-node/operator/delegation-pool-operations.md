@@ -29,9 +29,9 @@ After you create the delegation pool, you can use the CLI command `aptos account
 
 Now initialize a delegation pool by following these steps:
 
-1. Run the command below, substituting in your previously configured profile set during initialization:
+1. Run the command below, substitute in the profile you previously configured during initialization:
     ```bash
-    aptos move run --profile ‘your_profile’ \ 
+    aptos move run --profile <your-profile> \ 
     --function-id 0x1::delegation_pool::initialize_delegation_pool \
     --args u64:1000 raw:00
     ```
@@ -55,7 +55,7 @@ This section describes the available operations that can be performed on this re
 * Add `amount` of coins to the delegation pool `pool_address` using the public entry method `add_stake(delegator: &signer, pool_address: address, amount u64)` and substituting your values into the command below before running it:
 
   ```bash
-  aptos move run --profile ‘delegator’ \
+  aptos move run --profile delegator \
   --function-id 0x1::delegation_pool::add_stake \ 
   --args address: pool_address u64: ‘amount’
   ```
@@ -63,7 +63,7 @@ This section describes the available operations that can be performed on this re
 * Undelegate (unlock) the amount of funds from the delegator's active and pending active stake up to the limit of the active stake in the stake pool using public entry method `unlock(delegator: &signer, pool_address: address, amount: u64)` and substituting your values into the command below before running it:
 
   ```bash
-  aptos move run --profile ‘delegator’ \
+  aptos move run --profile delegator \
   --function-id 0x1::delegation_pool::unlock \ 
   --args address:’pool_address’ u64:’amount’
   ```
@@ -71,7 +71,7 @@ This section describes the available operations that can be performed on this re
 * Cancel undelegate (reactivate stake) `amount` of coins from `pending_inactive` state to `active state` using public entry method `reactivate_stake(delegator: &signer, pool_address: address, amount: u64)` with the command and your values:
 
   ```bash
-  aptos move run --profile ‘delegator’ \
+  aptos move run --profile delegator \
   --function-id 0x1::delegation_pool::reactivate_stake \
   --args address:’pool_address’ u64:’amount’
   ```
@@ -79,7 +79,7 @@ This section describes the available operations that can be performed on this re
 * Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address` using the public entry method ` withdraw(delegator: &signer, pool_address: address, amount: u64)` and the command:
 
   ```bash
-  aptos move run --profile ‘delegator’ \
+  aptos move run --profile delegator \
   --function-id 0x1::delegation_pool::withdraw \
   --args address:’pool_address’ u64:’amount’
   ```
@@ -91,7 +91,7 @@ Delegation pool owners have access to specific methods designed for modifying th
 * Set the operator address for the delegation pool:
 
   ```bash
-  aptos move run --profile ‘delegation_pool_owner’ \
+  aptos move run --profile delegation_pool_owner \
   --function-id 0x1::delegation_pool::set_operator \
   --args address:’new_operator_address’
   ```
@@ -99,7 +99,7 @@ Delegation pool owners have access to specific methods designed for modifying th
 * Set the delegated voter address for the delegation pool:
 
   ```bash
-  aptos move run --profile ‘delegation_pool_owner’ \
+  aptos move run --profile delegation_pool_owner \
   --function-id 0x1::delegation_pool::set_delegated_voter \
   --args address:’new_delegated_voter_address’
   ```
