@@ -9,6 +9,8 @@ spec aptos_framework::block {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
         requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
@@ -17,6 +19,7 @@ spec aptos_framework::block {
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
 
         aborts_if false;
     }

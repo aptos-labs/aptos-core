@@ -164,9 +164,9 @@ module std::option {
         vector::borrow_mut(&mut t.vec, 0)
     }
     spec borrow_mut {
-        pragma opaque;
         include AbortsIfNone<Element>;
         ensures result == spec_borrow(t);
+        ensures t == old(t);
     }
 
     /// Swap the old value inside `t` with `e` and return the old value
