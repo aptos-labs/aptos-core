@@ -1,0 +1,24 @@
+name: "Faucet Integration Tests"
+on:
+  pull_request:
+  push:
+    branches:
+      - devnet
+      - testnet
+
+jobs:
+  run-tests-devnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      # - uses: aptos-labs/aptos-core/.github/actions/run-faucet-tests@main
+      - uses: ./.github/actions/run-faucet-tests
+        with:
+          NETWORK: devnet
+  run-tests-testnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/run-faucet-tests
+        with:
+          NETWORK: testnet

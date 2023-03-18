@@ -22,10 +22,9 @@ use std::{
 use move_core_types::language_storage::ModuleId;
 use move_core_types::identifier::Identifier;
 use move_core_types::identifier::IdentStr;
-use move_binary_format::errors::VMError;
 use move_vm_types::gas::GasMeter;
 
-struct FunctionId {
+pub(crate) struct FunctionId {
     module_id: ModuleId,
     func_name: &'static str,
 }
@@ -48,13 +47,13 @@ static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
 pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     senders: Vec<AccountAddress>,
-    args: Vec<Vec<u8>>,
+    mut args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
     gas_meter: &mut impl GasMeter
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
-        return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+        return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None));
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
@@ -71,17 +70,19 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     }
 
     if (signer_param_cnt + args.len()) != func.parameters.len() {
-        return Err(VMStatus::Error(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH));
+        return Err(VMStatus::Error(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH, None));
     }
 
     // validate all non_signer params
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
         let (valid, optional_constructor) = is_valid_txn_arg(session, ty);
         if !valid {
-            return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+            return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None));
         }
         if let Some(constructor) = optional_constructor {
-            args[idx] = validate_and_construct(session, ty,constructor, &args[idx], gas_meter)?;
+            let mut cursor = Cursor::new(&args[idx][..]);
+            args[idx] = validate_and_construct(session, ty,constructor, &mut cursor, gas_meter)?;
+            // Check cursor has parsed everything
         }
     }
 
@@ -95,6 +96,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         if senders.len() != signer_param_cnt {
             return Err(VMStatus::Error(
                 StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+                None
             ));
         }
         senders
@@ -133,16 +135,25 @@ pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
 
 pub(crate) fn validate_and_construct<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
-    ty_arg: &Type,
+    expected_type: &Type,
     constructor: &FunctionId,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
-) -> Result<Vec<u8>, VMError> {
-    let function = session.load_function_with_type_inference(constructor.module_id, constructor.func_name, ty_arg)?;
-    let args = recurse_arg(session, ty_arg, cursor)?;
-    let serialized_result = session.execute_function_bypass_visibility(
-        &constructor.module_id, IdentStr::new(constructor.func_name).expect("Can't fail"),
-        function.type_arguments, args, gas_meter).map_err(|e| e)?;
+) -> Result<Vec<u8>, VMStatus> {
+    let (module, function, instantiation) = session.load_function_with_type_arg_inference(&constructor.module_id,
+                                                                 IdentStr::new(constructor.func_name).expect(""), expected_type)?;
+    let mut args = vec![];
+    for param_type in &instantiation.parameters {
+        let mut arg = vec![];
+        recurse_arg(session, param_type, cursor, gas_meter, &mut arg)?;
+        args.push(arg);
+    }
+    // if !cursor.is_empty() {
+        // return Err();
+    // }
+    let serialized_result = session.execute_instantiated_function(
+        module, function, instantiation,
+        args, gas_meter).map_err(|e| e)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals.pop().expect("Always a result").0)
@@ -155,15 +166,17 @@ fn recurse_arg<S: MoveResolverExt>(
     ty: &Type,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
-) -> Result<Vec<u8>, VMStatus> {
+    arg: &mut Vec<u8>
+) -> Result<(), VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match ty {
         Vector(inner) => {
             // get the vector length and iterate over each element
             let mut len = get_len(cursor)?;
+            serialize_uleb128(len, arg);
             while len > 0 {
-                recurse_arg(session, inner, cursor, gas_meter)?;
+                recurse_arg(session, inner, cursor, gas_meter, arg)?;
                 len -= 1;
             }
         },
@@ -173,22 +186,24 @@ fn recurse_arg<S: MoveResolverExt>(
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
             let st = session
-                .get_struct_type(*idx)
-                .expect("unreachable, type must exist");
+                .get_struct_type(*idx).ok_or(VMStatus::Error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, None))?;
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let constructor = ALLOWED_STRUCTS
-                .get(&full_name).ok_or(VMStatus::Error(StatusCode::INTERNAL_TYPE_ERROR))?;
-
+                .get(&full_name).ok_or(VMStatus::Error(StatusCode::INTERNAL_TYPE_ERROR, None))?;
+            arg.append(&mut validate_and_construct(session, ty, constructor, cursor, gas_meter)?);
         },
-        // this is unreachable given the check in `is_valid_txn_arg` and the
-        // fact we collect all arguments that involve strings and we validate
-        // them and them only
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Reference(_)
-        | MutableReference(_) | TyParam(_) => {
-            unreachable!("Validation is only for arguments with String")
-        },
+        Bool => read_n_bytes(1, cursor, arg)?,
+        U8 => read_n_bytes(1, cursor, arg)?,
+        U16 => read_n_bytes(2, cursor, arg)?,
+        U32 => read_n_bytes(4, cursor, arg)?,
+        U64 => read_n_bytes(8, cursor, arg)?,
+        U128 => read_n_bytes(16, cursor, arg)?,
+        U256 => read_n_bytes(32, cursor, arg)?,
+        Address => read_n_bytes(32, cursor, arg)?,
+        Signer |
+        Reference(_) | MutableReference(_) |
+        TyParam(_) => return Err(VMStatus::Error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, None)),
     };
-
     Ok(())
 }
 
@@ -196,7 +211,21 @@ fn recurse_arg<S: MoveResolverExt>(
 // Length of vectors in BCS uses uleb128 as a compression format.
 fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
     match read_uleb128_as_u64(cursor) {
-        Err(_) => Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)),
+        Err(_) => Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)),
         Ok(len) => Ok(len as usize),
     }
+}
+
+fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
+    while x > 128 {
+        dest.push((x | 128) as u8);
+        x = x >> 7;
+    }
+    dest.push(x as u8);
+}
+
+fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result<(), VMStatus> {
+    let len = dest.len();
+    dest.resize(len + n, 0);
+    src.read_exact(&mut dest[len..]).map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))
 }

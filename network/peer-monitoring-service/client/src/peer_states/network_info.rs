@@ -48,51 +48,10 @@ impl NetworkInfoState {
     /// Records the new network info response for the peer
     pub fn record_network_info_response(
         &mut self,
-        mut network_info_response: NetworkInformationResponse,
-        peer_network_id: &PeerNetworkId,
-        peer_metadata: PeerMetadata,
+        network_info_response: NetworkInformationResponse,
     ) {
         // Update the request tracker with a successful response
         self.request_tracker.write().record_response_success();
-
-        // Sanity check the response depth from the peer metadata
-        let network_id = peer_network_id.network_id();
-        let is_valid_depth = match network_info_response.distance_from_validators {
-            0 => {
-                // Verify the peer is a validator and has the correct network id
-                let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
-                let peer_has_correct_network = match self.base_config.role {
-                    RoleType::Validator => network_id.is_validator_network(), // We're a validator
-                    RoleType::FullNode => network_id.is_vfn_network(),        // We're a VFN
-                };
-                peer_is_validator && peer_has_correct_network
-            },
-            1 => {
-                // Verify the peer is a VFN and has the correct network id
-                let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
-                let peer_has_correct_network = match self.base_config.role {
-                    RoleType::Validator => network_id.is_vfn_network(), // We're a validator
-                    RoleType::FullNode => network_id.is_public_network(), // We're a PFN
-                };
-                peer_is_vfn && peer_has_correct_network
-            },
-            distance_from_validators => {
-                // The depth must be less than or equal to the max
-                distance_from_validators <= MAX_DISTANCE_FROM_VALIDATORS
-            },
-        };
-
-        // If the depth did not pass our sanity checks, store the max
-        if !is_valid_depth {
-            warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
-                .event(LogEvent::InvalidResponse)
-                .peer(peer_network_id)
-                .message(&format!(
-                    "Peer returned invalid depth from validators: {}",
-                    network_info_response.distance_from_validators
-                )));
-            network_info_response.distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
-        }
 
         // Save the network info
         self.recorded_network_info_response = Some(network_info_response);
@@ -100,7 +59,6 @@ impl NetworkInfoState {
 
     /// Handles a request failure for the specified peer
     fn handle_request_failure(&self) {
-        // Update the number of ping failures for the request tracker
         self.request_tracker.write().record_response_failure();
     }
 
@@ -149,8 +107,53 @@ impl StateValueInterface for NetworkInfoState {
             },
         };
 
+        // Sanity check the response depth from the peer metadata
+        let network_id = peer_network_id.network_id();
+        let is_valid_depth = match network_info_response.distance_from_validators {
+            0 => {
+                // Verify the peer is a validator and has the correct network id
+                let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
+                let peer_has_correct_network = match self.base_config.role {
+                    RoleType::Validator => network_id.is_validator_network(), // We're a validator
+                    RoleType::FullNode => network_id.is_vfn_network(),        // We're a VFN
+                };
+                peer_is_validator && peer_has_correct_network
+            },
+            1 => {
+                // Verify the peer is a VFN and has the correct network id
+                let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
+                let peer_has_correct_network = match self.base_config.role {
+                    RoleType::Validator => network_id.is_vfn_network(), // We're a validator
+                    RoleType::FullNode => network_id.is_public_network(), // We're a PFN
+                };
+                peer_is_vfn && peer_has_correct_network
+            },
+            distance_from_validators => {
+                // The peer should not be a validator, or a VFN, and the
+                // depth must be less than or equal to the max.
+                let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
+                let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
+                !peer_is_validator
+                    && !peer_is_vfn
+                    && distance_from_validators <= MAX_DISTANCE_FROM_VALIDATORS
+            },
+        };
+
+        // If the depth did not pass our sanity checks, handle a failure
+        if !is_valid_depth {
+            warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
+                .event(LogEvent::InvalidResponse)
+                .peer(peer_network_id)
+                .message(&format!(
+                    "Peer returned invalid depth from validators: {}",
+                    network_info_response.distance_from_validators
+                )));
+            self.handle_request_failure();
+            return;
+        }
+
         // Store the new latency ping result
-        self.record_network_info_response(network_info_response, peer_network_id, peer_metadata);
+        self.record_network_info_response(network_info_response);
     }
 
     fn handle_monitoring_service_response_error(
@@ -158,8 +161,8 @@ impl StateValueInterface for NetworkInfoState {
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
-        // Record the failure
-        self.request_tracker.write().record_response_failure();
+        // Handle the failure
+        self.handle_request_failure();
 
         // Log the error
         warn!(LogSchema::new(LogEntry::NetworkInfoRequest)
@@ -167,5 +170,273 @@ impl StateValueInterface for NetworkInfoState {
             .message("Error encountered when requesting network information from the peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::peer_states::{key_value::StateValueInterface, network_info::NetworkInfoState};
+    use aptos_config::{
+        config::{BaseConfig, NodeConfig, PeerRole, RoleType},
+        network_id::{NetworkId, PeerNetworkId},
+    };
+    use aptos_netcore::transport::ConnectionOrigin;
+    use aptos_network::{
+        application::metadata::PeerMetadata,
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
+    use aptos_peer_monitoring_service_types::{
+        NetworkInformationResponse, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    };
+    use aptos_time_service::TimeService;
+    use aptos_types::{network_address::NetworkAddress, PeerId};
+    use std::str::FromStr;
+
+    // Useful test constants
+    const TEST_NETWORK_ADDRESS: &str = "/ip4/127.0.0.1/tcp/8081";
+
+    #[test]
+    fn test_sanity_check_distance_validator() {
+        // Create the network info state for a validator
+        let mut network_info_state = create_network_info_state(RoleType::Validator);
+
+        // Verify there is no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 0 (the peer is a VFN, not a validator).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::ValidatorFullNode,
+            0,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 1 (the peer is a validator, not a VFN).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Validator,
+            PeerRole::Validator,
+            1,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 10 (the peer is a VFN).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::ValidatorFullNode,
+            10,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with a valid depth of
+        // 1 (the peer is a VFN).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::ValidatorFullNode,
+            1,
+        );
+
+        // Verify the latest stored distance is correct
+        verify_network_response_distance(&mut network_info_state, 1);
+    }
+
+    #[test]
+    fn test_sanity_check_distance_vfn() {
+        // Create the network info state for a VFN
+        let mut network_info_state = create_network_info_state(RoleType::FullNode);
+
+        // Verify there is no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 1 (the peer is a validator).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Validator,
+            PeerRole::Validator,
+            1,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 0 (the peer is a PFN, not a validator).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Public,
+            PeerRole::Unknown,
+            0,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 1 (the peer is a VFN, but VFNs can't connect to other VFN networks).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::ValidatorFullNode,
+            1,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with a valid depth of
+        // 2 (the peer is a public fullnode).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Public,
+            PeerRole::Unknown,
+            2,
+        );
+
+        // Verify the latest stored distance is correct
+        verify_network_response_distance(&mut network_info_state, 2);
+    }
+
+    #[test]
+    fn test_sanity_check_distance_pfn() {
+        // Create the network info state for a PFN
+        let mut network_info_state = create_network_info_state(RoleType::FullNode);
+
+        // Verify there is no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 0 (the peer is a PFN, not a validator).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Public,
+            PeerRole::Unknown,
+            0,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 1 (the peer is a PFN, not a VFN).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Public,
+            PeerRole::PreferredUpstream,
+            1,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Attempt to store a network response with an invalid depth of
+        // 2 (the peer is a VFN).
+        handle_monitoring_service_response(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::ValidatorFullNode,
+            2,
+        );
+
+        // Verify there is still no latest network info response
+        verify_empty_network_response(&mut network_info_state);
+
+        // Handle two correct responses
+        for distance_from_validators in [2, 3] {
+            // Attempt to store a network response with a valid depth
+            // (the peer is a PFN).
+            handle_monitoring_service_response(
+                &mut network_info_state,
+                NetworkId::Public,
+                PeerRole::Unknown,
+                distance_from_validators,
+            );
+
+            // Verify the latest stored distance is correct
+            verify_network_response_distance(&mut network_info_state, distance_from_validators);
+        }
+    }
+
+    /// Creates a network info state using the given role type
+    fn create_network_info_state(role: RoleType) -> NetworkInfoState {
+        let node_config = NodeConfig {
+            base: BaseConfig {
+                role,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        NetworkInfoState::new(node_config, TimeService::mock())
+    }
+
+    /// Handles a monitoring service response from a peer
+    fn handle_monitoring_service_response(
+        network_info_state: &mut NetworkInfoState,
+        network_id: NetworkId,
+        peer_role: PeerRole,
+        distance_from_validators: u64,
+    ) {
+        // Create a new peer metadata entry
+        let peer_network_id = PeerNetworkId::new(network_id, PeerId::random());
+        let connection_metadata = ConnectionMetadata::new(
+            peer_network_id.peer_id(),
+            ConnectionId::default(),
+            NetworkAddress::from_str(TEST_NETWORK_ADDRESS).unwrap(),
+            ConnectionOrigin::Outbound,
+            MessagingProtocolVersion::V1,
+            ProtocolIdSet::empty(),
+            peer_role,
+        );
+        let peer_metadata = PeerMetadata::new(connection_metadata);
+
+        // Create the service response
+        let peer_monitoring_service_response =
+            PeerMonitoringServiceResponse::NetworkInformation(NetworkInformationResponse {
+                connected_peers_and_metadata: Default::default(),
+                distance_from_validators,
+            });
+
+        // Handle the response
+        network_info_state.handle_monitoring_service_response(
+            &peer_network_id,
+            peer_metadata,
+            PeerMonitoringServiceRequest::GetNetworkInformation,
+            peer_monitoring_service_response,
+            0.0,
+        );
+    }
+
+    /// Verifies that there is no latest network info response stored
+    fn verify_empty_network_response(network_info_state: &mut NetworkInfoState) {
+        assert!(network_info_state
+            .get_latest_network_info_response()
+            .is_none());
+    }
+
+    /// Verifies that the latest network info response has a valid distance
+    fn verify_network_response_distance(
+        network_info_state: &mut NetworkInfoState,
+        distance_from_validators: u64,
+    ) {
+        let network_info_response = network_info_state
+            .get_latest_network_info_response()
+            .unwrap();
+        assert_eq!(
+            network_info_response.distance_from_validators,
+            distance_from_validators
+        );
     }
 }

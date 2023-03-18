@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-backup-cli = { workspace = true }
+aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
 aptos-db = { workspace = true, features = ["db-debugger"] }
 aptos-executor-types = { workspace = true }
@@ -24,3 +25,7 @@ aptos-types = { workspace = true }
 clap = { workspace = true }
 owo-colors = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-backup-service = { workspace = true }
+aptos-executor-test-helpers = { workspace = true }

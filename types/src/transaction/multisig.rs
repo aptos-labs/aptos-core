@@ -52,7 +52,7 @@ impl TryFrom<VMStatus> for ExecutionError {
                 location,
                 function: _,
                 code_offset: _,
-                ..
+                message: _,
             } => Ok(ExecutionError {
                 error_type: String::from("MoveExecutionFailure"),
                 abort_location: format!("{:?}", location),

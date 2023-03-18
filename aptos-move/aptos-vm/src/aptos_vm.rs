@@ -260,7 +260,7 @@ impl AptosVM {
                 (error_code, txn_output)
             },
             TransactionStatus::Discard(status) => {
-                (VMStatus::Error(status), discard_error_output(status))
+                (VMStatus::Error(status, None), discard_error_output(status))
             },
             TransactionStatus::Retry => unreachable!(),
         }
@@ -291,7 +291,7 @@ impl AptosVM {
             .expect("something terrible happened when applying aggregator deltas");
         let delta_write_set = delta_write_set_mut
             .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
 
@@ -306,7 +306,7 @@ impl AptosVM {
             .map_err(|e| e.into_vm_status())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
         let (write_set, events) = change_set.into_inner();
@@ -371,6 +371,7 @@ impl AptosVM {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -411,7 +412,7 @@ impl AptosVM {
                 // Not reachable as this function should only be invoked for entry or script
                 // transaction payload.
                 _ => {
-                    return Err(VMStatus::Error(StatusCode::UNREACHABLE));
+                    return Err(VMStatus::Error(StatusCode::UNREACHABLE, None));
                 },
             }
             .map_err(|e| e.into_vm_status())?;
@@ -464,6 +465,7 @@ impl AptosVM {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -610,7 +612,7 @@ impl AptosVM {
             .expect("something terrible happened when applying aggregator deltas");
         let delta_write_set = delta_write_set_mut
             .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, &delta_write_set).into_move_resolver();
         let resolver = self.0.new_move_resolver(&storage_with_changes);
@@ -628,7 +630,7 @@ impl AptosVM {
         // Merge the inner function writeset with cleanup writeset.
         inner_function_change_set_ext
             .squash(cleanup_change_set_ext)
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 
     fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateView>(
@@ -643,7 +645,7 @@ impl AptosVM {
         // the inner function call earlier (since it failed).
         let mut cleanup_session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         let execution_error = ExecutionError::try_from(execution_error)
-            .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE))?;
+            .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE, None))?;
         // Serialization is not expected to fail so we're using invariant_violation error here.
         cleanup_args.push(bcs::to_bytes(&execution_error).map_err(|_| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -773,11 +775,12 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-            return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+            return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING, None));
         }
         fail_point!("move_adapter::execute_module", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -1122,7 +1125,7 @@ impl AptosVM {
         for (state_key, _) in write_set.iter() {
             state_view
                 .get_state_value_bytes(state_key)
-                .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))?;
+                .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
     }
@@ -1146,7 +1149,7 @@ impl AptosVM {
                 *log_context,
                 "[aptos_vm] waypoint txn needs to emit new epoch and block"
             );
-            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET))
+            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET, None))
         }
     }
 
@@ -1190,6 +1193,7 @@ impl AptosVM {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -1266,11 +1270,12 @@ impl AptosVM {
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
-            &session,
+            &mut session,
             arguments,
             func_name.as_ident_str(),
             &func_inst,
             metadata.as_ref(),
+            &mut gas_meter
         )?;
 
         Ok(session
@@ -1328,7 +1333,7 @@ impl AptosVM {
             // Deprecated. Will be removed in the future.
             TransactionPayload::ModuleBundle(_module) => {
                 if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
+                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING, None));
                 }
                 self.0.check_gas(storage, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
@@ -1351,6 +1356,7 @@ impl VMExecutor for AptosVM {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
             ))
         });
 
@@ -1445,7 +1451,10 @@ impl VMAdapter for AptosVM {
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
         if txn.contains_duplicate_signers() {
-            return Err(VMStatus::Error(StatusCode::SIGNERS_CONTAIN_DUPLICATES));
+            return Err(VMStatus::Error(
+                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
+                None,
+            ));
         }
 
         Ok(())
@@ -1529,7 +1538,7 @@ impl VMAdapter for AptosVM {
             },
             PreprocessedTransaction::InvalidSignature => {
                 let (vm_status, output) =
-                    discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
+                    discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
                 (vm_status, output, None)
             },
             PreprocessedTransaction::StateCheckpoint => {
@@ -1593,7 +1602,7 @@ impl AptosSimulationVM {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.signature_is_valid() {
-            return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
+            return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
         }
 
         // Revalidate the transaction.
@@ -1681,7 +1690,7 @@ impl AptosSimulationVM {
                         },
                     }
                 } else {
-                    Err(VMStatus::Error(StatusCode::MISSING_DATA))
+                    Err(VMStatus::Error(StatusCode::MISSING_DATA, None))
                 }
             },
 
