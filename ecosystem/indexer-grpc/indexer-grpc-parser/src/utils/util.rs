@@ -106,6 +106,7 @@ pub fn get_entry_function_from_user_request(
     ))
 }
 
+/// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
     match payload.payload.as_ref().unwrap() {
         PayloadType::EntryFunctionPayload(inner) => {
@@ -167,6 +168,8 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
     }
 }
 
+/// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
+/// Note that DirectWriteSet is just events + writeset which is already represented separately 
 pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
     match writeset.write_set.as_ref().unwrap() {
         WriteSetType::ScriptWriteSet(inner) => {
@@ -187,6 +190,7 @@ pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
     }
 }
 
+/// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 fn get_clean_entry_function_payload(
     payload: &EntryFunctionPayload,
     version: i64,
@@ -210,6 +214,7 @@ fn get_clean_entry_function_payload(
     }
 }
 
+/// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayloadClean {
     ScriptPayloadClean {
         code: payload.code.clone(),

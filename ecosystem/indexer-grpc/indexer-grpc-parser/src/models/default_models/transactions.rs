@@ -186,8 +186,6 @@ impl Transaction {
                     version,
                     block_height,
                 );
-                // let payload = serde_json::to_value(&genesis_txn.payload)
-                //     .expect("Unable to deserialize Genesis transaction");
                 let payload = genesis_txn.payload.as_ref().unwrap();
                 let payload_cleaned = get_clean_writeset(payload, version);
                 (
