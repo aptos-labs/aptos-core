@@ -984,32 +984,7 @@ impl Loader {
     // All native functions must be known to the loader, unless we are compiling with feature
     // `lazy_natives`.
     fn check_natives(&self, module: &CompiledModule) -> VMResult<()> {
-        fn check_natives_impl(loader: &Loader, module: &CompiledModule) -> PartialVMResult<()> {
-            if !cfg!(feature = "lazy_natives") {
-                for (idx, native_function) in module
-                    .function_defs()
-                    .iter()
-                    .filter(|fdv| fdv.is_native())
-                    .enumerate()
-                {
-                    let fh = module.function_handle_at(native_function.function);
-                    let mh = module.module_handle_at(fh.module);
-                    loader
-                        .natives
-                        .resolve(
-                            module.address_identifier_at(mh.address),
-                            module.identifier_at(mh.name).as_str(),
-                            module.identifier_at(fh.name).as_str(),
-                        )
-                        .ok_or_else(|| {
-                            verification_error(
-                                StatusCode::MISSING_DEPENDENCY,
-                                IndexKind::FunctionHandle,
-                                idx as TableIndex,
-                            )
-                        })?;
-                }
-            }
+        fn check_natives_impl(_loader: &Loader, module: &CompiledModule) -> PartialVMResult<()> {
             // TODO: fix check and error code if we leave something around for native structs.
             // For now this generates the only error test cases care about...
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
@@ -2664,14 +2639,14 @@ impl Loader {
                 Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
                     result += 1;
                     todo.push(ty);
-                }
+                },
                 Type::StructInstantiation(_, ty_args) => {
                     result += 1;
                     todo.extend(ty_args.iter())
-                }
+                },
                 _ => {
                     result += 1;
-                }
+                },
             }
         }
         result
@@ -2739,39 +2714,39 @@ impl Loader {
             Type::Bool => {
                 *count += 1;
                 MoveTypeLayout::Bool
-            }
+            },
             Type::U8 => {
                 *count += 1;
                 MoveTypeLayout::U8
-            }
+            },
             Type::U16 => {
                 *count += 1;
                 MoveTypeLayout::U16
-            }
+            },
             Type::U32 => {
                 *count += 1;
                 MoveTypeLayout::U32
-            }
+            },
             Type::U64 => {
                 *count += 1;
                 MoveTypeLayout::U64
-            }
+            },
             Type::U128 => {
                 *count += 1;
                 MoveTypeLayout::U128
-            }
+            },
             Type::U256 => {
                 *count += 1;
                 MoveTypeLayout::U256
-            }
+            },
             Type::Address => {
                 *count += 1;
                 MoveTypeLayout::Address
-            }
+            },
             Type::Signer => {
                 *count += 1;
                 MoveTypeLayout::Signer
-            }
+            },
             Type::Vector(ty) => {
                 *count += 1;
                 MoveTypeLayout::Vector(Box::new(self.type_to_type_layout_impl(
@@ -2779,23 +2754,23 @@ impl Loader {
                     count,
                     depth + 1,
                 )?))
-            }
+            },
             Type::Struct(gidx) => {
                 *count += 1;
                 MoveTypeLayout::Struct(self.struct_gidx_to_type_layout(*gidx, &[], count, depth)?)
-            }
+            },
             Type::StructInstantiation(gidx, ty_args) => {
                 *count += 1;
                 MoveTypeLayout::Struct(
                     self.struct_gidx_to_type_layout(*gidx, ty_args, count, depth)?,
                 )
-            }
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
                 );
-            }
+            },
         })
     }
 
@@ -2890,7 +2865,7 @@ impl Loader {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
                 );
-            }
+            },
         })
     }
 
