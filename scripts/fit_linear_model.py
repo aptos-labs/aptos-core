@@ -31,6 +31,7 @@ if __name__=='__main__':
     print()
     dataset_base_path = args.dataset_path.replace('.json', '')
     out_path = Path(f'{dataset_base_path}.model.json')
+    out_path.write_text(jsonstr)
     print(f'Saved to {out_path}.')
     print()
     if args.plot:

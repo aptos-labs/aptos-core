@@ -65,7 +65,15 @@ cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
 
 [[bench]]
+name = "ark_bls12_381"
+harness = false
+
+[[bench]]
 name = "bls12381"
+harness = false
+
+[[bench]]
+name = "blst"
 harness = false
 
 [[bench]]
@@ -81,6 +89,10 @@ name = "noise"
 harness = false
 
 [[bench]]
+name = "pippenger"
+harness = false
+
+[[bench]]
 name = "ristretto255"
 harness = false
 
@@ -88,10 +100,3 @@ harness = false
 name = "secp256k1"
 harness = false
 
-[[bench]]
-name = "blst"
-harness = false
-
-[[bench]]
-name = "ark_bls12_381"
-harness = false

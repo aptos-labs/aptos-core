@@ -6,7 +6,6 @@
 #[macro_use]
 extern crate criterion;
 
-use std::iter::StepBy;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::{BigInteger256, Field, One, UniformRand, Zero};
@@ -21,28 +20,17 @@ use ark_ec::hashing::HashToCurve;
 use ark_ec::pairing::Pairing;
 use ark_ec::short_weierstrass::Projective;
 use rand::thread_rng;
+use aptos_crypto::{msm_all_bench_cases, rand, serialize};
 use aptos_crypto::test_utils::random_bytes;
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
 
-macro_rules! rand {
-    ($typ:ty) => {{
-        <$typ>::rand(&mut test_rng())
-    }}
-}
-macro_rules! serialize {
-    ($obj:expr, $method:ident) => {{
-        let mut buf = vec![];
-        $obj.$method(&mut buf).unwrap();
-        buf
-    }}
-}
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
 
     // Debugging configurations begin.
-    group.sample_size(100);
+    group.sample_size(10);
     group.warm_up_time(Duration::from_millis(500));
     group.measurement_time(Duration::from_millis(500));
     // Debugging configurations end.
@@ -784,15 +772,7 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    fn ark_msm_all_cases() -> Vec<usize> {
-        let series_until_32 = (0..32_usize).step_by(2);
-        let series_until_33 = (32..33).step_by(1);
-        let series_until_65 = (33..65).step_by(2);
-        let series_until_129 = (64..129).step_by(4);
-        let series_until_257 = (129..257).step_by(8);
-        series_until_32.chain(series_until_33).chain(series_until_65).chain(series_until_129).chain(series_until_257).collect::<Vec<_>>()
-    }
-    for num_entries in ark_msm_all_cases() {
+    for num_entries in msm_all_bench_cases() {
         group.bench_function(BenchmarkId::new("g1_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
@@ -807,11 +787,11 @@ fn bench_group(c: &mut Criterion) {
         });
     }
 
-    for num_entries in ark_msm_all_cases() {
+    for num_entries in msm_all_bench_cases() {
         group.bench_function(BenchmarkId::new("g2_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
-                    let elements = (0..num_entries).map(|_i|rand!(G2Affine)).collect::<Vec<_>>();
+                    let elements = (0..num_entries).map(|_i| rand!(G2Affine)).collect::<Vec<_>>();
                     let scalars = (0..num_entries).map(|_i|rand!(Fr)).collect::<Vec<_>>();
                     (elements, scalars)
                 },

@@ -14,7 +14,30 @@ fn log2_ceil(n: usize) -> usize {
     log2_floor(n-1)+1
 }
 
+fn ark_msm_window_size(num_entries: usize) -> usize {
+    if num_entries < 32 {
+        3
+    } else {
+        (log2_ceil(num_entries) * 69 / 100) + 2
+    }
+}
 
+fn ark_msm_window_size_2(num_entries: usize) -> usize {
+    if num_entries < 32 {
+        3
+    } else {
+        (ark_std::log2(num_entries) * 69 / 100) as usize + 2
+    }
+}
+//
+#[test]
+fn window_size() {
+    for x in 0..100 {
+        let w1 = ark_msm_window_size(x);
+        let w2 = ark_msm_window_size_2(x);
+        println!("x={x}, w1={w1}, w2={w2}");
+    }
+}
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub ark_bls12_381_fr_add: InternalGasPerArg,
