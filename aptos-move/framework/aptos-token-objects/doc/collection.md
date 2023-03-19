@@ -28,8 +28,8 @@ require adding the field original_name.
 
 
 -  [Resource `Collection`](#0x4_collection_Collection)
--  [Struct `MutationEvent`](#0x4_collection_MutationEvent)
 -  [Struct `MutatorRef`](#0x4_collection_MutatorRef)
+-  [Struct `MutationEvent`](#0x4_collection_MutationEvent)
 -  [Resource `FixedSupply`](#0x4_collection_FixedSupply)
 -  [Constants](#@Constants_0)
 -  [Function `create_fixed_collection`](#0x4_collection_create_fixed_collection)
@@ -38,7 +38,6 @@ require adding the field original_name.
 -  [Function `create_collection_seed`](#0x4_collection_create_collection_seed)
 -  [Function `increment_supply`](#0x4_collection_increment_supply)
 -  [Function `decrement_supply`](#0x4_collection_decrement_supply)
--  [Function `create_collection`](#0x4_collection_create_collection)
 -  [Function `generate_mutator_ref`](#0x4_collection_generate_mutator_ref)
 -  [Function `count`](#0x4_collection_count)
 -  [Function `creator`](#0x4_collection_creator)
@@ -113,6 +112,34 @@ Represents the common fields for a collection.
 
 </details>
 
+<a name="0x4_collection_MutatorRef"></a>
+
+## Struct `MutatorRef`
+
+This enables mutating description and URI by higher level services.
+
+
+<pre><code><b>struct</b> <a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>self: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x4_collection_MutationEvent"></a>
 
 ## Struct `MutationEvent`
@@ -133,34 +160,6 @@ directly understand the behavior in a writeset.
 <dl>
 <dt>
 <code>mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x4_collection_MutatorRef"></a>
-
-## Struct `MutatorRef`
-
-This enables mutating description and URI by higher level services.
-
-
-<pre><code><b>struct</b> <a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>self: <b>address</b></code>
 </dt>
 <dd>
 
@@ -440,68 +439,6 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
 
 </details>
 
-<a name="0x4_collection_create_collection"></a>
-
-## Function `create_collection`
-
-Entry function for creating a collection
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="collection.md#0x4_collection_create_collection">create_collection</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, max_supply: u64, enable_royalty: bool, royalty_numerator: u64, royalty_denominator: u64, royalty_payee_address: <b>address</b>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="collection.md#0x4_collection_create_collection">create_collection</a>(
-    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    description: String,
-    name: String,
-    uri: String,
-    max_supply: u64,
-    enable_royalty: bool,
-    royalty_numerator: u64,
-    royalty_denominator: u64,
-    royalty_payee_address: <b>address</b>,
-) {
-    <b>let</b> <a href="royalty.md#0x4_royalty">royalty</a> = <b>if</b> (enable_royalty) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="royalty.md#0x4_royalty_create">royalty::create</a>(
-            royalty_numerator,
-            royalty_denominator,
-            royalty_payee_address,
-        ))
-    } <b>else</b> {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    };
-
-    <b>if</b> (max_supply == 0) {
-        <a href="collection.md#0x4_collection_create_untracked_collection">create_untracked_collection</a>(
-            creator,
-            description,
-            name,
-            <a href="royalty.md#0x4_royalty">royalty</a>,
-            uri,
-        )
-    } <b>else</b> {
-        <a href="collection.md#0x4_collection_create_fixed_collection">create_fixed_collection</a>(
-            creator,
-            description,
-            max_supply,
-            name,
-            <a href="royalty.md#0x4_royalty">royalty</a>,
-            uri,
-        )
-    };
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x4_collection_generate_mutator_ref"></a>
 
 ## Function `generate_mutator_ref`
@@ -674,10 +611,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_description">set_description</a>(
-    mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>,
-    description: String,
-) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_description">set_description</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = borrow_mut(mutator_ref);
     <a href="collection.md#0x4_collection">collection</a>.description = description;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
@@ -706,10 +640,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_uri">set_uri</a>(
-    mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>,
-    uri: String,
-) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_uri">set_uri</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = borrow_mut(mutator_ref);
     <a href="collection.md#0x4_collection">collection</a>.uri = uri;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(

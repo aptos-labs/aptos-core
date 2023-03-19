@@ -35,6 +35,7 @@ module aptos_token_objects::property_map {
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
     const MAX_PROPERTY_NAME_LENGTH: u64 = 128;
 
+    // PropertyValue::type
     const BOOL: u8 = 0;
     const U8: u8 = 1;
     const U16: u8 = 2;
