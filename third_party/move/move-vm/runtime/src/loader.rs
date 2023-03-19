@@ -981,8 +981,6 @@ impl Loader {
         )
     }
 
-    // All native functions must be known to the loader, unless we are compiling with feature
-    // `lazy_natives`.
     fn check_natives(&self, module: &CompiledModule) -> VMResult<()> {
         fn check_natives_impl(_loader: &Loader, module: &CompiledModule) -> PartialVMResult<()> {
             // TODO: fix check and error code if we leave something around for native structs.
