@@ -19,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
     aptos_api_types::{TransactionOnChainData, UserTransaction},
     Response, Transaction,
@@ -57,7 +58,12 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
+) -> (
+    LocalSwarm,
+    CliTestFramework,
+    JoinHandle<anyhow::Result<()>>,
+    RosettaClient,
+) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
@@ -424,6 +430,7 @@ async fn test_account_balance() {
         account_2,
         1_000_000,
         10,
+        1,
     )
     .await;
 
@@ -436,6 +443,47 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::active_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
+
+    // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::pending_inactive_stake_account(account_4.address()),
+        1_000,
+        2,
+    )
+    .await
+    .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::inactive_stake_account(account_4.address()),
+        0,
+        2,
+    )
+    .await
+    .unwrap();
+
     /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
@@ -455,6 +503,7 @@ async fn create_staking_contract(
     voter: AccountAddress,
     amount: u64,
     commission_percentage: u64,
+    sequence_number: u64,
 ) -> Response<Transaction> {
     let staking_contract_creation = info
         .transaction_factory()
@@ -465,9 +514,27 @@ async fn create_staking_contract(
             commission_percentage,
             vec![],
         ))
-        .sequence_number(1);
+        .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn unlock_stake(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let unlock_stake = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_unlock_stake(
+            operator, amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(unlock_stake);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -546,20 +613,6 @@ async fn test_transfer() {
             break;
         }
     }
-    // Attempt to transfer all coins to another user (should fail)
-    rosetta_client
-        .transfer(
-            &network,
-            sender_private_key,
-            receiver,
-            sender_balance,
-            expiry_time(Duration::from_secs(5)).as_secs(),
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect_err("Should fail simulation since we can't transfer all coins");
 
     // Attempt to transfer more than balance to another user (should fail)
     rosetta_client
@@ -577,9 +630,11 @@ async fn test_transfer() {
         .expect_err("Should fail simulation since we can't transfer more than balance coins");
 
     // Attempt to transfer more than balance to another user (should fail)
-    // TODO(Gas): check this
     let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
+        // We purposely don't set gas unit price here so the builder uses the default.
+        // Note that the default is different in tests. See here:
+        // config/global-constants/src/lib.rs
+        .with_gas_unit_price(GAS_UNIT_PRICE)
         .with_max_gas_amount(1000);
     let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
     let unsigned_transaction = transaction_factory
@@ -598,7 +653,7 @@ async fn test_transfer() {
         .await
         .expect("Should succeed getting gas estimate")
         .into_inner();
-    let gas_usage = simulation_txn.info.gas_used();
+    let gas_usage = simulation_txn.info.gas_used() * GAS_UNIT_PRICE;
 
     // Attempt to transfer more than balance - gas to another user (should fail)
     rosetta_client

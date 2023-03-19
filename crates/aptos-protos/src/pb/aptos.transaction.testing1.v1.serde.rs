@@ -1413,6 +1413,9 @@ impl serde::Serialize for EntryFunctionPayload {
         if !self.arguments.is_empty() {
             len += 1;
         }
+        if !self.entry_function_id_str.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.testing1.v1.EntryFunctionPayload", len)?;
         if let Some(v) = self.function.as_ref() {
             struct_ser.serialize_field("function", v)?;
@@ -1422,6 +1425,9 @@ impl serde::Serialize for EntryFunctionPayload {
         }
         if !self.arguments.is_empty() {
             struct_ser.serialize_field("arguments", &self.arguments)?;
+        }
+        if !self.entry_function_id_str.is_empty() {
+            struct_ser.serialize_field("entryFunctionIdStr", &self.entry_function_id_str)?;
         }
         struct_ser.end()
     }
@@ -1437,6 +1443,8 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
             "type_arguments",
             "typeArguments",
             "arguments",
+            "entry_function_id_str",
+            "entryFunctionIdStr",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1444,6 +1452,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
             Function,
             TypeArguments,
             Arguments,
+            EntryFunctionIdStr,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1468,6 +1477,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                             "function" => Ok(GeneratedField::Function),
                             "typeArguments" | "type_arguments" => Ok(GeneratedField::TypeArguments),
                             "arguments" => Ok(GeneratedField::Arguments),
+                            "entryFunctionIdStr" | "entry_function_id_str" => Ok(GeneratedField::EntryFunctionIdStr),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1490,6 +1500,7 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                 let mut function__ = None;
                 let mut type_arguments__ = None;
                 let mut arguments__ = None;
+                let mut entry_function_id_str__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Function => {
@@ -1510,12 +1521,19 @@ impl<'de> serde::Deserialize<'de> for EntryFunctionPayload {
                             }
                             arguments__ = Some(map.next_value()?);
                         }
+                        GeneratedField::EntryFunctionIdStr => {
+                            if entry_function_id_str__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("entryFunctionIdStr"));
+                            }
+                            entry_function_id_str__ = Some(map.next_value()?);
+                        }
                     }
                 }
                 Ok(EntryFunctionPayload {
                     function: function__,
                     type_arguments: type_arguments__.unwrap_or_default(),
                     arguments: arguments__.unwrap_or_default(),
+                    entry_function_id_str: entry_function_id_str__.unwrap_or_default(),
                 })
             }
         }

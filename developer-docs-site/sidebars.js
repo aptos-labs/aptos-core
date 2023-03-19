@@ -25,9 +25,17 @@ const sidebars = {
     "whats-new-in-docs",
     {
       type: "category",
-      label: "Read the Aptos White Paper",
+      label: "Latest Releases",
       collapsible: true,
       collapsed: false,
+      link: { type: "doc", id: "releases/index" },
+      items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
+    },
+    {
+      type: "category",
+      label: "Read the Aptos White Paper",
+      collapsible: true,
+      collapsed: true,
       link: { type: "doc", id: "aptos-white-paper/index" },
       items: ["aptos-white-paper/in-korean"],
     },

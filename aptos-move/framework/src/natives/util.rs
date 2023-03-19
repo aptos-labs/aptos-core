@@ -5,7 +5,7 @@ use crate::{
     natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
     safely_pop_arg,
 };
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
@@ -14,7 +14,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, sync::Arc};
 
 // !!!! NOTE !!!!
 // This file is intended for natives from the util module in the framework.
@@ -78,10 +78,16 @@ pub struct GasParameters {
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "from_bytes",
-        make_safe_native(gas_params.from_bytes, timed_features, native_from_bytes),
+        make_safe_native(
+            gas_params.from_bytes,
+            timed_features,
+            features,
+            native_from_bytes,
+        ),
     )];
 
     crate::natives::helpers::make_module_natives(natives)

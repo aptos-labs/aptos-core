@@ -10,6 +10,7 @@ use crate::{
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
+    state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
@@ -83,7 +84,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub state_kv_db: Arc<DB>,
+    pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -187,7 +188,11 @@ impl StateDb {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.state_kv_db.iter::<StateValueSchema>(read_opts)?;
+        // TODO(grao): Support sharding here.
+        let mut iter = self
+            .state_kv_db
+            .metadata_db()
+            .iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()
@@ -276,7 +281,7 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
-        state_kv_db: Arc<DB>,
+        state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         state_kv_pruner: StateKvPrunerManager,
@@ -284,62 +289,11 @@ impl StateStore {
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
-            .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
-            .expect("Failed to read overall commit progress.")
-        {
-            info!(
-                overall_commit_progress = overall_commit_progress,
-                "Start syncing databases..."
-            );
-            let ledger_commit_progress = ledger_db
-                .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
-                .expect("Failed to read ledger commit progress.")
-                .expect("Ledger commit progress cannot be None.")
-                .expect_version();
-            assert_ge!(ledger_commit_progress, overall_commit_progress);
-
-            let state_kv_commit_progress = state_kv_db
-                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
-                .expect("Failed to read state K/V commit progress.")
-                .expect("State K/V commit progress cannot be None.")
-                .expect_version();
-            assert_ge!(state_kv_commit_progress, overall_commit_progress);
-
-            if ledger_commit_progress != overall_commit_progress {
-                info!(
-                    ledger_commit_progress = ledger_commit_progress,
-                    "Start truncation...",
-                );
-                let difference = ledger_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                truncate_ledger_db(
-                    Arc::clone(&ledger_db),
-                    ledger_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate ledger db.");
-            }
-
-            if state_kv_commit_progress != overall_commit_progress {
-                info!(
-                    state_kv_commit_progress = state_kv_commit_progress,
-                    "Start truncation..."
-                );
-                let difference = state_kv_commit_progress - overall_commit_progress;
-                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                truncate_state_kv_db(
-                    Arc::clone(&state_kv_db),
-                    state_kv_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate state K/V db.");
-            }
-        } else {
-            info!("No overall commit progress was found!");
-        }
+        Self::sync_commit_progress(
+            Arc::clone(&ledger_db),
+            Arc::clone(&state_kv_db),
+            /*crash_if_difference_is_too_large=*/ true,
+        );
         let state_merkle_db = Arc::new(StateMerkleDb::new(
             state_merkle_db,
             max_nodes_per_lru_cache_shard,
@@ -368,10 +322,81 @@ impl StateStore {
         }
     }
 
+    // We commit the overall commit progress at the last, and use it as the source of truth of the
+    // commit progress.
+    pub fn sync_commit_progress(
+        ledger_db: Arc<DB>,
+        state_kv_db: Arc<StateKvDb>,
+        crash_if_difference_is_too_large: bool,
+    ) {
+        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
+            .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
+            .expect("Failed to read overall commit progress.")
+        {
+            info!(
+                overall_commit_progress = overall_commit_progress,
+                "Start syncing databases..."
+            );
+            let ledger_commit_progress = ledger_db
+                .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
+                .expect("Failed to read ledger commit progress.")
+                .expect("Ledger commit progress cannot be None.")
+                .expect_version();
+            assert_ge!(ledger_commit_progress, overall_commit_progress);
+
+            let state_kv_commit_progress = state_kv_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
+                .expect("Failed to read state K/V commit progress.")
+                .expect("State K/V commit progress cannot be None.")
+                .expect_version();
+            assert_ge!(state_kv_commit_progress, overall_commit_progress);
+
+            if ledger_commit_progress != overall_commit_progress {
+                info!(
+                    ledger_commit_progress = ledger_commit_progress,
+                    "Start truncation...",
+                );
+                let difference = ledger_commit_progress - overall_commit_progress;
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
+                truncate_ledger_db(
+                    Arc::clone(&ledger_db),
+                    ledger_commit_progress,
+                    overall_commit_progress,
+                    difference as usize,
+                )
+                .expect("Failed to truncate ledger db.");
+            }
+
+            if state_kv_commit_progress != overall_commit_progress {
+                info!(
+                    state_kv_commit_progress = state_kv_commit_progress,
+                    "Start truncation..."
+                );
+                let difference = state_kv_commit_progress - overall_commit_progress;
+                if crash_if_difference_is_too_large {
+                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
+                }
+                truncate_state_kv_db(
+                    Arc::clone(&state_kv_db),
+                    state_kv_commit_progress,
+                    overall_commit_progress,
+                    difference as usize,
+                )
+                .expect("Failed to truncate state K/V db.");
+            }
+        } else {
+            info!("No overall commit progress was found!");
+        }
+    }
+
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<DB>,
         state_merkle_db: DB,
+        state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
@@ -385,7 +410,6 @@ impl StateStore {
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
-        let state_kv_db = Arc::clone(&ledger_db);
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
@@ -535,8 +559,9 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
+        // TODO(grao): Support sharding here.
         PrefixedStateValueIterator::new(
-            &self.state_kv_db,
+            self.state_kv_db.metadata_db(),
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
@@ -619,6 +644,7 @@ impl StateStore {
 
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
+        let base_version_usage = usage;
         let cache = Arc::new(DashMap::<StateKey, (Version, Option<StateValue>)>::new());
 
         if let Some(base_version) = base_version {
@@ -703,9 +729,12 @@ impl StateStore {
         if !expected_usage.is_untracked() {
             ensure!(
                 expected_usage == usage,
-                "Calculated state db usage not expected. expected: {:?}, calculated: {:?}",
+                "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
+                first_version + value_state_sets.len() as u64 - 1,
                 expected_usage,
                 usage,
+                base_version,
+                base_version_usage,
             );
         }
 
@@ -860,7 +889,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.state_kv_db.write_schemas(batch)
+        // TODO(grao): Support sharding here.
+        self.state_kv_db.commit_raw_batch(batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -871,6 +901,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
             .state_kv_db
+            .metadata_db()
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }
