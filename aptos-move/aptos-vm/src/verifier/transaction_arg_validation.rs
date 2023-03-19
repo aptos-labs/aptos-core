@@ -132,24 +132,21 @@ pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
     }
 }
 
-pub(crate) fn validate_and_construct<S: MoveResolverExt>(
+fn validate_and_construct<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     expected_type: &Type,
     constructor: &FunctionId,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
 ) -> Result<Vec<u8>, VMStatus> {
-    let (module, function, instantiation) = session.load_function_with_type_arg_inference(&constructor.module_id,
-                                                                 IdentStr::new(constructor.func_name).expect(""), expected_type)?;
+    let (module, function, instantiation) =
+        session.load_function_with_type_arg_inference(&constructor.module_id, IdentStr::new(constructor.func_name).expect(""), expected_type)?;
     let mut args = vec![];
     for param_type in &instantiation.parameters {
         let mut arg = vec![];
-        recurse_arg(session, param_type, cursor, gas_meter, &mut arg)?;
+        recursively_construct_arg(session, param_type, cursor, gas_meter, &mut arg)?;
         args.push(arg);
     }
-    // if !cursor.is_empty() {
-        // return Err();
-    // }
     let serialized_result = session.execute_instantiated_function(
         module, function, instantiation,
         args, gas_meter).map_err(|_|VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None))?;
@@ -158,9 +155,8 @@ pub(crate) fn validate_and_construct<S: MoveResolverExt>(
     Ok(ret_vals.pop().expect("Always a result").0)
 }
 
-// Validate a single arg. A Cursor is used to walk the serialized arg manually and correctly.
-// Only Strings and nested vector of them are validated.
-pub(crate) fn recurse_arg<S: MoveResolverExt>(
+// A Cursor is used to recursively walk the serialized arg manually and correctly.
+pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     ty: &Type,
     cursor: &mut Cursor<&[u8]>,
