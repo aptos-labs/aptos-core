@@ -83,8 +83,12 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             let mut cursor = Cursor::new(&args[idx][..]);
             let mut new_arg = vec![];
             recursively_construct_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)?;
-            args[idx] = new_arg;
             // Check cursor has parsed everything
+            // is_empty is not enabled
+            if cursor.position() != args[idx].len() as u64 {
+                return  Err(VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None));
+            }
+            args[idx] = new_arg;
         }
     }
 
@@ -110,7 +114,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     Ok(combined_args)
 }
 
-// Return whether the argument is valid/allowed and whether it needs validation.
+// Return whether the argument is valid/allowed and whether it needs construction.
 pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
     session: &SessionExt<S>,
     typ: &Type,
@@ -185,14 +189,12 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
                 .get(&full_name).ok_or(VMStatus::Error(StatusCode::INTERNAL_TYPE_ERROR, None))?;
             arg.append(&mut validate_and_construct(session, ty, constructor, cursor, gas_meter)?);
         },
-        Bool => read_n_bytes(1, cursor, arg)?,
-        U8 => read_n_bytes(1, cursor, arg)?,
+        Bool | U8 => read_n_bytes(1, cursor, arg)?,
         U16 => read_n_bytes(2, cursor, arg)?,
         U32 => read_n_bytes(4, cursor, arg)?,
         U64 => read_n_bytes(8, cursor, arg)?,
         U128 => read_n_bytes(16, cursor, arg)?,
-        U256 => read_n_bytes(32, cursor, arg)?,
-        Address => read_n_bytes(32, cursor, arg)?,
+        U256 | Address => read_n_bytes(32, cursor, arg)?,
         Signer |
         Reference(_) | MutableReference(_) |
         TyParam(_) => return Err(VMStatus::Error(StatusCode::ABORT_TYPE_MISMATCH_ERROR, None)),
