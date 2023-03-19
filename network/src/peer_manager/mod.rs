@@ -67,6 +67,8 @@ pub use types::*;
 
 pub type IpAddrTokenBucketLimiter = TokenBucketRateLimiter<IpAddr>;
 
+const MAX_CONNECTION_PER_PEER: usize = 6;
+
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>
 where
@@ -86,8 +88,11 @@ where
     active_peers: HashMap<
         PeerId,
         (
-            ConnectionMetadata,
-            aptos_channel::Sender<ProtocolId, PeerRequest>,
+            usize, // next index to use
+            Vec<(
+                ConnectionMetadata,
+                aptos_channel::Sender<ProtocolId, PeerRequest>,
+            )>,
         ),
     >,
     /// Shared metadata storage about trusted peers and metadata
@@ -205,13 +210,19 @@ where
     }
 
     pub fn update_connected_peers_metrics(&self) {
-        let total = self.active_peers.len();
         let inbound = self
             .active_peers
             .iter()
-            .filter(|(_, (metadata, _))| metadata.origin == ConnectionOrigin::Inbound)
+            .flat_map(|(_, (_, peers))| peers.iter())
+            .filter(|peers| peers.0.origin == ConnectionOrigin::Inbound)
             .count();
-        let outbound = total.saturating_sub(inbound);
+        let outbound = self
+            .active_peers
+            .iter()
+            .flat_map(|(_, (_, peers))| peers.iter())
+            .filter(|peers| peers.0.origin == ConnectionOrigin::Outbound)
+            .count();
+        // let outbound = total.saturating_sub(inbound);
 
         counters::connections(&self.network_context, ConnectionOrigin::Inbound).set(inbound as i64);
         counters::connections(&self.network_context, ConnectionOrigin::Outbound)
@@ -224,12 +235,14 @@ where
             let peers: Vec<_> = self
                 .active_peers
                 .values()
-                .map(|(connection, _)| {
-                    (
-                        connection.remote_peer_id,
-                        connection.addr.clone(),
-                        connection.origin,
-                    )
+                .flat_map(|(_, peers)| {
+                    peers.iter().map(|(connection, _)| {
+                        (
+                            connection.remote_peer_id,
+                            connection.addr.clone(),
+                            connection.origin,
+                        )
+                    })
                 })
                 .collect();
             info!(
@@ -304,7 +317,8 @@ where
                 let peer_id = lost_conn_metadata.remote_peer_id;
                 // If the active connection with the peer is lost, remove it from `active_peers`.
                 if let Entry::Occupied(entry) = self.active_peers.entry(peer_id) {
-                    let (conn_metadata, _) = entry.get();
+                    let (_, peers) = entry.get();
+                    let (conn_metadata, _) = peers.first().unwrap();
                     let connection_id = conn_metadata.connection_id;
                     if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
@@ -403,17 +417,25 @@ where
                 if conn.metadata.role == PeerRole::Unknown {
                     // TODO: Keep track of somewhere else to not take this hit in case of DDoS
                     // Count unknown inbound connections
-                    let unknown_inbound_conns = self
+                    let unknown_inbound_conns: usize = self
                         .active_peers
                         .iter()
-                        .filter(|(peer_id, (metadata, _))| {
-                            metadata.origin == ConnectionOrigin::Inbound
-                                && trusted_peers
-                                    .read()
-                                    .get(peer_id)
-                                    .map_or(true, |peer| peer.role == PeerRole::Unknown)
+                        .filter(|(peer_id, _)| {
+                            trusted_peers
+                                .read()
+                                .get(peer_id)
+                                .map_or(true, |peer| peer.role == PeerRole::Unknown)
                         })
-                        .count();
+                        .map(|(_, conns)| {
+                            conns
+                                .1
+                                .iter()
+                                .filter(|(conn_meta, _)| {
+                                    conn_meta.origin == ConnectionOrigin::Inbound
+                                })
+                                .count()
+                        })
+                        .sum();
 
                     // Reject excessive inbound connections made by unknown peers
                     // We control outbound connections with Connectivity manager before we even send them
@@ -481,44 +503,52 @@ where
         match request {
             ConnectionRequest::DialPeer(requested_peer_id, addr, response_tx) => {
                 // Only dial peers which we aren't already connected with
-                if let Some((curr_connection, _)) = self.active_peers.get(&requested_peer_id) {
-                    let error = PeerManagerError::AlreadyConnected(curr_connection.addr.clone());
-                    debug!(
-                        NetworkSchema::new(&self.network_context)
-                            .connection_metadata_with_address(curr_connection),
-                        "{} Already connected to Peer {} with connection {:?}. Not dialing address {}",
-                        self.network_context,
-                        requested_peer_id.short_str(),
-                        curr_connection,
-                        addr
-                    );
-                    if let Err(send_err) = response_tx.send(Err(error)) {
-                        info!(
-                            NetworkSchema::new(&self.network_context)
-                                .remote_peer(&requested_peer_id),
-                            "{} Failed to notify that peer is already connected for Peer {}: {:?}",
-                            self.network_context,
-                            requested_peer_id.short_str(),
-                            send_err
-                        );
-                    }
-                } else {
-                    let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
+                // if let Some((curr_connection, _)) = self.active_peers.get(&requested_peer_id) {
+                //     let error = PeerManagerError::AlreadyConnected(curr_connection.addr.clone());
+                //     debug!(
+                //         NetworkSchema::new(&self.network_context)
+                //             .connection_metadata_with_address(curr_connection),
+                //         "{} Already connected to Peer {} with connection {:?}. Not dialing address {}",
+                //         self.network_context,
+                //         requested_peer_id.short_str(),
+                //         curr_connection,
+                //         addr
+                //     );
+                //     if let Err(send_err) = response_tx.send(Err(error)) {
+                //         info!(
+                //             NetworkSchema::new(&self.network_context)
+                //                 .remote_peer(&requested_peer_id),
+                //             "{} Failed to notify that peer is already connected for Peer {}: {:?}",
+                //             self.network_context,
+                //             requested_peer_id.short_str(),
+                //             send_err
+                //         );
+                //     }
+                // } else {
+                let request =
+                    TransportRequest::DialPeer(requested_peer_id, addr.clone(), response_tx);
+                self.transport_reqs_tx.send(request).await.unwrap();
+
+                // Create more connections
+                for _ in 0..1 {
+                    let (tx, _rx) = oneshot::channel();
+                    let request = TransportRequest::DialPeer(requested_peer_id, addr.clone(), tx);
                     self.transport_reqs_tx.send(request).await.unwrap();
-                };
+                }
+                // };
             },
             ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
-                if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
-                    let connection_id = conn_metadata.connection_id;
-                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
+                if let Some((_, conns)) = self.active_peers.remove(&peer_id) {
+                    let (conn_metadata, _) = conns.first().unwrap();
+                    self.remove_peer_from_metadata(
+                        conn_metadata.remote_peer_id,
+                        conn_metadata.connection_id,
+                    );
 
-                    // This triggers a disconnect.
-                    drop(sender);
-                    // Add to outstanding disconnect requests.
                     self.outstanding_disconnect_requests
-                        .insert(connection_id, resp_tx);
+                        .insert(conn_metadata.connection_id, resp_tx);
                 } else {
                     info!(
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -560,7 +590,9 @@ where
             },
         };
 
-        if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
+        if let Some((next_index, conns)) = self.active_peers.get_mut(&peer_id) {
+            let index = *next_index % conns.len();
+            let (conn_metadata, sender) = &mut conns[index];
             if let Err(err) = sender.push(protocol_id, peer_request) {
                 info!(
                     NetworkSchema::new(&self.network_context).connection_metadata(conn_metadata),
@@ -570,6 +602,7 @@ where
                     self.network_context, err
                 );
             }
+            *next_index += 1;
         } else {
             warn!(
                 NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -655,39 +688,48 @@ where
             return Ok(());
         }
 
-        let mut send_new_peer_notification = true;
+        // Save PeerRequest sender to `active_peers`.
+        let send_new_peer_notification = !self.active_peers.contains_key(&peer_id);
+        {
+            let entry = self.active_peers.entry(peer_id).or_insert((0, vec![]));
 
-        // Check for and handle simultaneous dialing
-        if let Entry::Occupied(active_entry) = self.active_peers.entry(peer_id) {
-            let (curr_conn_metadata, _) = active_entry.get();
-            if Self::simultaneous_dial_tie_breaking(
-                self.network_context.peer_id(),
-                peer_id,
-                curr_conn_metadata.origin,
-                conn_meta.origin,
-            ) {
-                let (_, peer_handle) = active_entry.remove();
-                // Drop the existing connection and replace it with the new connection
-                drop(peer_handle);
-                info!(
-                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                    "{} Closing existing connection with Peer {} to mitigate simultaneous dial",
-                    self.network_context,
-                    peer_id.short_str()
-                );
-                send_new_peer_notification = false;
-            } else {
-                info!(
-                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                    "{} Closing incoming connection with Peer {} to mitigate simultaneous dial",
-                    self.network_context,
-                    peer_id.short_str()
-                );
-                // Drop the new connection and keep the one already stored in active_peers
+            if entry.1.len() >= MAX_CONNECTION_PER_PEER {
                 self.disconnect(connection);
                 return Ok(());
             }
         }
+
+        // Check for and handle simultaneous dialing
+        // if let Entry::Occupied(active_entry) = self.active_peers.entry(peer_id) {
+        //     let (curr_conn_metadata, _) = active_entry.get();
+        // if Self::simultaneous_dial_tie_breaking(
+        //     self.network_context.peer_id(),
+        //     peer_id,
+        //     curr_conn_metadata.origin,
+        //     conn_meta.origin,
+        // ) {
+        //     let (_, peer_handle) = active_entry.remove();
+        //     // Drop the existing connection and replace it with the new connection
+        //     drop(peer_handle);
+        //     info!(
+        //         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+        //         "{} Closing existing connection with Peer {} to mitigate simultaneous dial",
+        //         self.network_context,
+        //         peer_id.short_str()
+        //     );
+        //     send_new_peer_notification = false;
+        // } else {
+        //     info!(
+        //         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+        //         "{} Closing incoming connection with Peer {} to mitigate simultaneous dial",
+        //         self.network_context,
+        //         peer_id.short_str()
+        //     );
+        //     // Drop the new connection and keep the one already stored in active_peers
+        //     self.disconnect(connection);
+        //     return Ok(());
+        // }
+        // }
 
         let ip_addr = connection
             .metadata
@@ -732,15 +774,14 @@ where
         // Start background task to handle events (RPCs and DirectSend messages) received from
         // peer.
         self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
-        // Save PeerRequest sender to `active_peers`.
-        self.active_peers
-            .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
-        self.peers_and_metadata.insert_connection_metadata(
-            PeerNetworkId::new(self.network_context.network_id(), peer_id),
-            conn_meta.clone(),
-        )?;
+        let entry = self.active_peers.entry(peer_id).or_insert((0, vec![]));
+        entry.1.push((conn_meta.clone(), peer_reqs_tx));
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
+            self.peers_and_metadata.insert_connection_metadata(
+                PeerNetworkId::new(self.network_context.network_id(), peer_id),
+                conn_meta.clone(),
+            )?;
             let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
             self.send_conn_notification(peer_id, notif);
         }
