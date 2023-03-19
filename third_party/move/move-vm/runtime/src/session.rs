@@ -5,7 +5,7 @@
 use crate::{
     data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
     runtime::VMRuntime,
-    loader::{Function, Loader, Module},
+    loader::{Function, Module},
 };
 use move_binary_format::{
     compatibility::Compatibility,
@@ -26,7 +26,6 @@ use move_vm_types::{
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
 };
 use std::{borrow::Borrow, sync::Arc};
-use move_binary_format::file_format::FunctionInstantiation;
 
 pub struct Session<'r, 'l, S> {
     pub(crate) runtime: &'l VMRuntime,

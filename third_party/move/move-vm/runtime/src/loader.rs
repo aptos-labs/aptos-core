@@ -42,8 +42,6 @@ use std::{
     sync::Arc,
 };
 use tracing::error;
-use move_binary_format::IndexKind::TypeParameter;
-use move_core_types::vm_status::VMStatus;
 
 type ScriptHash = [u8; 32];
 
