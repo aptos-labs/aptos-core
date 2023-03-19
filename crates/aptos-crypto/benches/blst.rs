@@ -12,6 +12,7 @@ use criterion::{BenchmarkId, Criterion, Throughput};
 use rand::{distributions, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::ops::MulAssign;
+use std::time::Duration;
 use ark_std::UniformRand;
 use aptos_crypto::{msm_all_bench_cases, serialize, rand};
 use ark_std::test_rng;
@@ -86,7 +87,11 @@ fn random_p2_affine() -> blst_p2_affine {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("blst");
 
-    group.throughput(Throughput::Elements(1));
+    // Debugging configurations begin.
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_millis(500));
+    group.measurement_time(Duration::from_millis(500));
+    // Debugging configurations end.
 
     group.bench_function("g1_affine_serialize_comp", move |b| {
         b.iter_with_setup(random_p1_affine, |p_affine| {
@@ -347,7 +352,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    for num_entries in msm_all_bench_cases() {
+    for num_entries in msm_a2ll_bench_cases() {
         group.bench_function(BenchmarkId::new("g1_msm", num_entries), move |b| {
             b.iter_with_setup(
                 || {
