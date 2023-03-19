@@ -13,6 +13,7 @@ represent types and storing values in bcs format.
 -  [Struct `MutatorRef`](#0x4_property_map_MutatorRef)
 -  [Constants](#@Constants_0)
 -  [Function `init`](#0x4_property_map_init)
+-  [Function `burn`](#0x4_property_map_burn)
 -  [Function `prepare_input`](#0x4_property_map_prepare_input)
 -  [Function `generate_mutator_ref`](#0x4_property_map_generate_mutator_ref)
 -  [Function `contains_key`](#0x4_property_map_contains_key)
@@ -55,7 +56,7 @@ represent types and storing values in bcs format.
 
 
 
-<pre><code><b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> <b>has</b> drop, key
 </code></pre>
 
 
@@ -347,6 +348,30 @@ Invalid type specified
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_init">init</a>(ref: &ConstructorRef, container: <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>) {
     <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
     <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, container);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_property_map_burn"></a>
+
+## Function `burn`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_burn">burn</a>(ref: <a href="property_map.md#0x4_property_map_MutatorRef">property_map::MutatorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x4_property_map_burn">burn</a>(ref: <a href="property_map.md#0x4_property_map_MutatorRef">MutatorRef</a>) <b>acquires</b> <a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a> {
+    <b>move_from</b>&lt;<a href="property_map.md#0x4_property_map_PropertyMap">PropertyMap</a>&gt;(ref.self);
 }
 </code></pre>
 

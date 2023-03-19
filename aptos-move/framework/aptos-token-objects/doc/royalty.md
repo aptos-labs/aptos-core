@@ -75,6 +75,7 @@ The royalty of a token within this collection -- this optional
 
 ## Struct `MutatorRef`
 
+This enables creating or overwriting a MutatorRef.
 
 
 <pre><code><b>struct</b> <a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a> <b>has</b> drop, store

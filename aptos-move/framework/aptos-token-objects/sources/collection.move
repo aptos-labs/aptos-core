@@ -54,15 +54,15 @@ module aptos_token_objects::collection {
         mutation_events: event::EventHandle<MutationEvent>,
     }
 
+    /// This enables mutating description and URI by higher level services.
+    struct MutatorRef has drop, store {
+        self: address,
+    }
+
     /// Contains the mutated fields name. This makes the life of indexers easier, so that they can
     /// directly understand the behavior in a writeset.
     struct MutationEvent has drop, store {
         mutated_field_name: String,
-    }
-
-    /// This enables mutating description and URI by higher level services.
-    struct MutatorRef has drop, store {
-        self: address,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -192,48 +192,6 @@ module aptos_token_objects::collection {
         }
     }
 
-    /// Entry function for creating a collection
-    public entry fun create_collection(
-        creator: &signer,
-        description: String,
-        name: String,
-        uri: String,
-        max_supply: u64,
-        enable_royalty: bool,
-        royalty_numerator: u64,
-        royalty_denominator: u64,
-        royalty_payee_address: address,
-    ) {
-        let royalty = if (enable_royalty) {
-            option::some(royalty::create(
-                royalty_numerator,
-                royalty_denominator,
-                royalty_payee_address,
-            ))
-        } else {
-            option::none()
-        };
-
-        if (max_supply == 0) {
-            create_untracked_collection(
-                creator,
-                description,
-                name,
-                royalty,
-                uri,
-            )
-        } else {
-            create_fixed_collection(
-                creator,
-                description,
-                max_supply,
-                name,
-                royalty,
-                uri,
-            )
-        };
-    }
-
     /// Creates a MutatorRef, which gates the ability to mutate any fields that support mutation.
     public fun generate_mutator_ref(ref: &ConstructorRef): MutatorRef {
         let object = object::object_from_constructor_ref<Collection>(ref);
@@ -292,10 +250,7 @@ module aptos_token_objects::collection {
         borrow_global_mut<Collection>(mutator_ref.self)
     }
 
-    public fun set_description(
-        mutator_ref: &MutatorRef,
-        description: String,
-    ) acquires Collection {
+    public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
         event::emit_event(
@@ -304,10 +259,7 @@ module aptos_token_objects::collection {
         );
     }
 
-    public fun set_uri(
-        mutator_ref: &MutatorRef,
-        uri: String,
-    ) acquires Collection {
+    public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
         event::emit_event(
