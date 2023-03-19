@@ -118,7 +118,7 @@ impl ScriptCache {
                     script.parameter_tys.clone(),
                     script.return_tys.clone(),
                 )
-            }
+            },
         }
     }
 }
@@ -190,7 +190,7 @@ impl ModuleCache {
                 self.functions
                     .truncate(self.functions.len() - function_count);
                 Err(err.finish(Location::Undefined))
-            }
+            },
         }
     }
 
@@ -298,7 +298,7 @@ impl ModuleCache {
                     let mut struct_type = (*self.structs[struct_idx]).clone();
                     struct_type.fields = fields;
                     self.structs[struct_idx] = Arc::new(struct_type);
-                }
+                },
             }
             struct_idx += 1;
         }
@@ -374,15 +374,15 @@ impl ModuleCache {
             SignatureToken::Vector(inner_tok) => {
                 let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
                 Type::Vector(Box::new(inner_type))
-            }
+            },
             SignatureToken::Reference(inner_tok) => {
                 let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
                 Type::Reference(Box::new(inner_type))
-            }
+            },
             SignatureToken::MutableReference(inner_tok) => {
                 let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
                 Type::MutableReference(Box::new(inner_type))
-            }
+            },
             SignatureToken::Struct(sh_idx) => {
                 let struct_handle = module.struct_handle_at(*sh_idx);
                 let struct_name = module.identifier_at(struct_handle.name);
@@ -393,7 +393,7 @@ impl ModuleCache {
                 );
                 let def_idx = resolver(struct_name, &module_id)?;
                 Type::Struct(def_idx)
-            }
+            },
             SignatureToken::StructInstantiation(sh_idx, tys) => {
                 let type_parameters: Vec<_> = tys
                     .iter()
@@ -408,7 +408,7 @@ impl ModuleCache {
                 );
                 let def_idx = resolver(struct_name, &module_id)?;
                 Type::StructInstantiation(def_idx, type_parameters)
-            }
+            },
         };
         Ok(res)
     }
@@ -619,7 +619,7 @@ impl Loader {
                 let ver_script = self.deserialize_and_verify_script(script_blob, data_store)?;
                 let script = Script::new(ver_script, &hash_value, &self.module_cache.read())?;
                 scripts.insert(hash_value, script)
-            }
+            },
         };
 
         // verify type arguments
@@ -657,7 +657,7 @@ impl Loader {
                 return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
                     .with_message(msg)
                     .finish(Location::Script));
-            }
+            },
         };
 
         match self.verify_script(&script) {
@@ -670,14 +670,14 @@ impl Loader {
                     .collect::<VMResult<_>>()?;
                 self.verify_script_dependencies(&script, loaded_deps)?;
                 Ok(script)
-            }
+            },
             Err(err) => {
                 error!(
                     "[VM] bytecode verifier returned errors for script: {:?}",
                     err
                 );
                 Err(err)
-            }
+            },
         }
     }
 
@@ -1066,7 +1066,7 @@ impl Loader {
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation(idx, type_params)
                 }
-            }
+            },
         })
     }
 
@@ -1129,7 +1129,7 @@ impl Loader {
             Err(err) => {
                 error!("[VM] Error fetching module with id {:?}", id);
                 return Err(expect_no_verification_errors(err));
-            }
+            },
         };
 
         // for bytes obtained from the data store, they should always deserialize and verify.
@@ -1249,7 +1249,7 @@ impl Loader {
                             allow_dependency_loading_failure,
                             dependencies_depth + 1,
                         )?
-                    }
+                    },
                     Some(cached) => cached,
                 };
                 cached_deps.push(loaded);
@@ -1461,11 +1461,11 @@ impl Loader {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
-                AbilitySet::VECTOR,
-                vec![false],
-                vec![self.abilities(ty)?],
-            ),
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    self.abilities(ty)?
+                ])
+            },
             Type::Struct(idx) => Ok(self.module_cache.read().struct_at(*idx).abilities),
             Type::StructInstantiation(idx, type_args) => {
                 let struct_type = self.module_cache.read().struct_at(*idx);
@@ -1482,7 +1482,7 @@ impl Loader {
                     declared_phantom_parameters,
                     type_argument_abilities,
                 )
-            }
+            },
         }
     }
 }
@@ -1987,14 +1987,14 @@ impl Module {
                                                 expects one and only one signature token"
                                                     .to_owned(),
                                             ));
-                                        }
+                                        },
                                         Some(sig_token) => sig_token,
                                     };
                                     single_signature_token_map
                                         .insert(*si, cache.make_type_while_loading(&module, ty)?);
                                 }
-                            }
-                            _ => {}
+                            },
+                            _ => {},
                         }
                     }
                 }
@@ -2263,7 +2263,7 @@ impl Script {
                                         .to_owned(),
                                 )
                                 .finish(Location::Script));
-                            }
+                            },
                             Some(sig_token) => sig_token,
                         };
                         single_signature_token_map.insert(
@@ -2273,8 +2273,8 @@ impl Script {
                                 .map_err(|e| e.finish(Location::Script))?,
                         );
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -2421,11 +2421,11 @@ impl Function {
             Scope::Module(module_id) => {
                 let module = loader.get_module(module_id);
                 Resolver::for_module(loader, module)
-            }
+            },
             Scope::Script(script_hash) => {
                 let script = loader.get_script(script_hash);
                 Resolver::for_script(loader, script)
-            }
+            },
         }
     }
 
@@ -2486,20 +2486,10 @@ impl Function {
     }
 
     pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
-        if cfg!(feature = "lazy_natives") {
-            // If lazy_natives is configured, this is a MISSING_DEPENDENCY error, as we skip
-            // checking those at module loading time.
-            self.native.as_deref().ok_or_else(|| {
-                PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
-                    .with_message(format!("Missing Native Function `{}`", self.name))
-            })
-        } else {
-            // Otherwise this error should not happen, hence UNREACHABLE
-            self.native.as_deref().ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNREACHABLE)
-                    .with_message("Missing Native Function".to_string())
-            })
-        }
+        self.native.as_deref().ok_or_else(|| {
+            PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
+                .with_message(format!("Missing Native Function `{}`", self.name))
+        })
     }
 }
 
@@ -2653,16 +2643,16 @@ impl Loader {
             Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
             Type::Struct(gidx) => {
                 TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, &[])?))
-            }
+            },
             Type::StructInstantiation(gidx, ty_args) => {
                 TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, ty_args)?))
-            }
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type tag for {:?}", ty)),
                 );
-            }
+            },
         })
     }
 
