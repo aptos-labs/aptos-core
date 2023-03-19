@@ -11,7 +11,8 @@ from aptos_sdk.transactions import (EntryFunction, RawTransaction, Script,
                                     ScriptArgument, SignedTransaction,
                                     TransactionArgument, TransactionPayload)
 from aptos_sdk.type_tag import StructTag, TypeTag
-from common import FAUCET_URL, NODE_URL
+
+from .common import FAUCET_URL, NODE_URL
 
 
 def wait():
