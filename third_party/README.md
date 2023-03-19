@@ -1,12 +1,18 @@
-This directory contains synchronized copies of external repositories (currently only Move). Code can be submitted in this directory using a single atomic PR. Periodically, changes in this directory
-are pushed upstream or pulled from upstream, using the [copybara](https://github.com/google/copybara) tool.
+This directory contains synchronized copies of external repositories where Aptos is a close collaborator. Those repos
+are mirrored in the aptos-core repo for both security reasons as well a more agile development process. 
+
+- Code can be submitted in this directory using an aptos-core wide PR.
+- Periodically, changes in this directory are pushed upstream or pulled from upstream, using the [copybara](https://github.com/google/copybara) tool.
+
+Currently, this directory only mirrors the [Move language repo at `aptos-main`](https://github.com/move-language/move/tree/aptos-main).
 
 ## Usage
+
+### Pulling
 
 Assuming `copybara` is available from the command line, to pull from the
 Move repo (for example), use:
 
-### Pulling
 
 ```shell
 copybara copy.bar.sky pull_move

@@ -57,12 +57,7 @@ pub fn get_entry_function_from_user_request(
     user_request: &UserTransactionRequest,
 ) -> Option<String> {
     let entry_function_id_str: String = match &user_request.payload.as_ref().unwrap().payload {
-        Some(PayloadPB::EntryFunctionPayload(payload)) => payload
-            .function
-            .as_ref()
-            .expect("function not exists.")
-            .name
-            .clone(),
+        Some(PayloadPB::EntryFunctionPayload(payload)) => payload.entry_function_id_str.clone(),
         _ => return None,
     };
     Some(truncate_str(
