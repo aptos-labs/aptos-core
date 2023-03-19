@@ -769,9 +769,8 @@ impl Loader {
             (Type::StructInstantiation(ret_idx, ret_fields),
             Type::StructInstantiation(expected_idx, expected_fields)) =>
                 *ret_idx == *expected_idx && ret_fields.len() == expected_fields.len() &&
-                        ret_fields.iter().zip(expected_fields.iter()).fold(true, |s, types| {
-                            s && Self::match_return_type(types.0, types.1, map)
-                        }),
+                        ret_fields.iter().zip(expected_fields.iter()).all(
+                            |types| Self::match_return_type(types.0, types.1, map)),
             // For the rest we need to assure the types match
             _ => std::mem::discriminant(returned) == std::mem::discriminant(expected),
         }

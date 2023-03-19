@@ -175,8 +175,6 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
                 len -= 1;
             }
         },
-        // only strings are validated, and given we are here only if one was present
-        // (`is_valid_txn_arg`), this match arm must be for a string
         Struct(idx) | StructInstantiation(idx, _) => {
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`

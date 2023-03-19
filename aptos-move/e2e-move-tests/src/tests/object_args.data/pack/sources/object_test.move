@@ -1,6 +1,8 @@
 module 0xCAFE::test {
-    use std::signer;
-    use aptos_std::object;
+    use std::vector;
+    use std::string::String;
+    use aptos_std;
+    use aptos_std::object::Object;
 
     struct ModuleData has key, store {
         state: String,
@@ -13,7 +15,7 @@ module 0xCAFE::test {
     public entry fun object_arg(sender: &signer, msg: String, o: Object<ModuleData>) acquires ModuleData {
         let addr = aptos_std::object::get_address(o);
         if (!exists<ModuleData>(addr)) {
-            aptos_std::get_signer(o);
+            std::aptos_std::get_signer(o);
             move_to(, ModuleData{state: msg});
         } else {
             borrow_global_mut<ModuleData>(addr).state = msg;

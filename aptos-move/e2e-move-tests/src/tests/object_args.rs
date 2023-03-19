@@ -26,7 +26,7 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("object_args.data/pack")));
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 
@@ -63,7 +63,7 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("object_args.data/pack")));
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 
@@ -77,22 +77,8 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
     }
 }
 
-// Generates a vector of a vector of strings. Used to produce big size arguments
-// that require more than 1 byte lenght when compressed in uleb128
-fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
-    let mut outer = vec![];
-    for i in 0..first_dim {
-        let mut inner = vec![];
-        for j in 0..second_dim {
-            inner.push(format!("{}{}{}", base, i, j));
-        }
-        outer.push(inner);
-    }
-    bcs::to_bytes(&outer).unwrap()
-}
-
 #[test]
-fn string_args_good() {
+fn object_args_good() {
     let mut tests = vec![];
 
     // just strings
@@ -270,7 +256,7 @@ fn string_args_good() {
 }
 
 #[test]
-fn string_args_bad_utf8() {
+fn object_args_bad() {
     let mut tests = vec![];
 
     // simple strings
@@ -388,272 +374,4 @@ fn string_args_bad_utf8() {
     ));
 
     fail(tests);
-}
-
-#[test]
-fn string_args_chopped() {
-    let idx = 0u64;
-    let s_vec = vec![
-        "hi there!".as_bytes(),
-        "hello".as_bytes(),
-        "world".as_bytes(),
-    ];
-    let string_arg = bcs::to_bytes(&s_vec).unwrap();
-    let mut i = string_arg.len() - 1;
-    while i > 1 {
-        let mut arg = string_arg.clone();
-        arg.remove(i);
-        let args = vec![arg, bcs::to_bytes(&idx).unwrap()];
-        fail(vec![(
-            "0xcafe::test::str_vec",
-            args,
-            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-        )]);
-        i /= 2;
-    }
-}
-
-#[test]
-fn string_args_bad_length() {
-    // chop after bcs so length stays big but payload gets small basically a bogus input
-    let mut tests = vec![];
-
-    // simple strings
-
-    // length over max size
-    let mut args = bcs::to_bytes(&vec![0x30u8; 100000]).unwrap();
-    args.truncate(20);
-    tests.push((
-        "0xcafe::test::hi",
-        vec![args],
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // length in size but input chopped
-    let mut args = bcs::to_bytes(&vec![0x30u8; 30000]).unwrap();
-    args.truncate(300);
-    tests.push((
-        "0xcafe::test::hi",
-        vec![args],
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // vector of strings
-
-    // length over max size after 2 good strings
-    let bad = vec![0x30u8; 100000];
-    let s_vec = vec!["hello".as_bytes(), "world".as_bytes(), &bad[..]];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(200);
-    let i = 0u64;
-    let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // length over max size after 2 big-ish strings
-    let bad = vec![0x30u8; 100000];
-    let big = vec![0x30u8; 10000];
-    let s_vec = vec![&big[..], &big[..], &bad[..]];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(30000);
-    let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // length in size but input chopped
-    let big = vec![0x30u8; 10000];
-    let s_vec = vec![&big[..], &big[..], &big[..]];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(20000);
-    let args = vec![bcs_vec, bcs::to_bytes(&i).unwrap()];
-    tests.push((
-        "0xcafe::test::str_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // vector of vector of strings
-
-    let i = 0u64;
-    let j = 0u64;
-
-    let bad = vec![0x30u8; 100000];
-    let s_vec = vec![
-        vec![
-            "hello".as_bytes(),
-            "world".as_bytes(),
-            "hi there!".as_bytes(),
-        ],
-        vec![
-            "world".as_bytes(),
-            "hi there!".as_bytes(),
-            "hello".as_bytes(),
-        ],
-        vec![&bad[..], "hello".as_bytes(), "world".as_bytes()],
-    ];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(30000);
-    let args = vec![
-        bcs_vec,
-        bcs::to_bytes(&i).unwrap(),
-        bcs::to_bytes(&j).unwrap(),
-    ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    let bad = vec![0x30u8; 10000];
-    let s_vec = vec![
-        vec![
-            "hi there!".as_bytes(),
-            "hello".as_bytes(),
-            "world".as_bytes(),
-        ],
-        vec!["hello".as_bytes(), &bad[..], "hi there!".as_bytes()],
-        vec![
-            "world".as_bytes(),
-            "hi there!".as_bytes(),
-            "hello".as_bytes(),
-        ],
-    ];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(10000);
-    let args = vec![
-        bcs_vec,
-        bcs::to_bytes(&i).unwrap(),
-        bcs::to_bytes(&j).unwrap(),
-    ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    let bad = vec![0x30u8; 100000];
-    let s_vec = vec![
-        vec![
-            "hi there!".as_bytes(),
-            "hello".as_bytes(),
-            "world".as_bytes(),
-        ],
-        vec![
-            "hello".as_bytes(),
-            "world".as_bytes(),
-            "hi there!".as_bytes(),
-        ],
-        vec!["world".as_bytes(), "hi there!".as_bytes(), &bad[..]],
-    ];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(30000);
-    let args = vec![
-        bcs_vec,
-        bcs::to_bytes(&i).unwrap(),
-        bcs::to_bytes(&j).unwrap(),
-    ];
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    // length over max size with 0 length strings
-    let s_vec = vec![vec!["".as_bytes(); 3]; 100000];
-    let mut bcs_vec = bcs::to_bytes(&s_vec).unwrap();
-    bcs_vec.truncate(30000);
-    // replace the length with u64::max
-    // 100000 is the first 3 bytes in the buffer so... we push
-    // u64 max in ule128 in opposite order so vector swap_remove is good
-    // but we need to remove a 0 after to keep the vector consistent... don't ask...
-    // u64 max in ule128 in opposite order so vector swap_remove is good
-    let mut u64_max: Vec<u8> = vec![0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-    let len = u64_max.len();
-    bcs_vec.append(&mut u64_max);
-    let mut i = 0;
-    while i < len {
-        bcs_vec.swap_remove(i);
-        i += 1;
-    }
-    bcs_vec.remove(i);
-
-    let args = vec![
-        bcs_vec,
-        bcs::to_bytes(&i).unwrap(),
-        bcs::to_bytes(&j).unwrap(),
-    ];
-
-    tests.push((
-        "0xcafe::test::str_vec_vec",
-        args,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    ));
-
-    fail(tests);
-}
-
-#[test]
-fn string_args_generic_instantiation() {
-    let mut tests = vec![];
-    let long_addr = AccountAddress::from_hex_literal(
-        "0xffabcdeffff555777876542123456789ca843279e3427144cead5e4d59ffffff",
-    )
-    .unwrap();
-    let a_vec = vec![vec![&long_addr; 2], vec![&long_addr; 2]];
-    let s_vec = vec![
-        vec![
-            "hi there! hello".as_bytes(),
-            "hello".as_bytes(),
-            "world, hello world".as_bytes(),
-        ],
-        vec![
-            "hello".as_bytes(),
-            "world, hello world".as_bytes(),
-            "hi there! hello".as_bytes(),
-        ],
-        vec![
-            "world, hello world".as_bytes(),
-            "hi there! hello".as_bytes(),
-            "hello".as_bytes(),
-        ],
-    ];
-    let u8_vec = vec![0xFFu8; 100];
-    let u64_vec = vec![std::u64::MAX, std::u64::MAX, std::u64::MAX];
-    let val1 = "hi there! hello".as_bytes();
-    let val2 = long_addr;
-    let i = 0u64;
-    let j = 0u64;
-    let args = vec![
-        bcs::to_bytes(&a_vec).unwrap(),
-        bcs::to_bytes(&s_vec).unwrap(),
-        bcs::to_bytes(&u8_vec).unwrap(),
-        bcs::to_bytes(&u64_vec).unwrap(),
-        bcs::to_bytes(&val1).unwrap(),
-        bcs::to_bytes(&val2).unwrap(),
-        bcs::to_bytes(&i).unwrap(),
-        bcs::to_bytes(&j).unwrap(),
-    ];
-
-    tests.push((
-        "0xcafe::test::generic_multi_vec",
-        args,
-        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
-    ));
-
-    let address_type = TypeTag::Address;
-    let string_struct = StructTag {
-        address: AccountAddress::from_hex_literal("0x1").expect("valid address"),
-        module: Identifier::new("string").expect("valid identifier"),
-        name: Identifier::new("String").expect("valid identifier"),
-        type_params: vec![],
-    };
-    let string_type = TypeTag::Struct(Box::new(string_struct));
-
-    fail_generic(vec![address_type, string_type], tests);
 }
