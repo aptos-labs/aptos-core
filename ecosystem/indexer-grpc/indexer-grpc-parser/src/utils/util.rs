@@ -169,7 +169,7 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
 }
 
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
-/// Note that DirectWriteSet is just events + writeset which is already represented separately 
+/// Note that DirectWriteSet is just events + writeset which is already represented separately
 pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
     match writeset.write_set.as_ref().unwrap() {
         WriteSetType::ScriptWriteSet(inner) => {
