@@ -82,7 +82,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         if needs_construction {
             let mut cursor = Cursor::new(&args[idx][..]);
             let mut new_arg = vec![];
-            recurse_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)?;
+            recursively_construct_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)?;
             args[idx] = new_arg;
             // Check cursor has parsed everything
         }
@@ -171,7 +171,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
             let mut len = get_len(cursor)?;
             serialize_uleb128(len, arg);
             while len > 0 {
-                recurse_arg(session, inner, cursor, gas_meter, arg)?;
+                recursively_construct_arg(session, inner, cursor, gas_meter, arg)?;
                 len -= 1;
             }
         },

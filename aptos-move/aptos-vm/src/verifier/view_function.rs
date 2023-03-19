@@ -55,7 +55,7 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
         if needs_construction {
             let mut cursor = Cursor::new(&args[idx][..]);
             let mut new_arg = vec![];
-            transaction_arg_validation::recurse_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)
+            transaction_arg_validation::recursively_construct_arg(session, ty,&mut cursor, gas_meter, &mut new_arg)
                 .map_err(|_| PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                     .with_message("invalid view function argument".to_string()))?;
             args[idx] = new_arg;
