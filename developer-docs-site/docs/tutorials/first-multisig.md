@@ -23,16 +23,16 @@ Other developers are invited to add support for the [TypeScript SDK](../sdks/ts-
 
 ## Step 2: Start the example
 
-Navigate to the Python SDK examples directory:
+Navigate to the Python SDK directory:
 
 ```zsh
-cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/examples
+cd <aptos-core-parent-directory>/aptos-core/ecosystem/python/sdk/
 ```
 
 Run the `multisig.py` example:
 
 ```zsh
-poetry run python multisig.py
+poetry run python -m examples.multisig
 ```
 
 :::tip
