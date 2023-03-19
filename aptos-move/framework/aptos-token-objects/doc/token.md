@@ -15,8 +15,8 @@ TODO:
 
 -  [Resource `Token`](#0x4_token_Token)
 -  [Struct `BurnRef`](#0x4_token_BurnRef)
--  [Struct `MutationEvent`](#0x4_token_MutationEvent)
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
+-  [Struct `MutationEvent`](#0x4_token_MutationEvent)
 -  [Constants](#@Constants_0)
 -  [Function `create`](#0x4_token_create)
 -  [Function `create_token_address`](#0x4_token_create_token_address)
@@ -154,6 +154,34 @@ a small optimization to support either and take a fixed amount of 34-bytes.
 
 </details>
 
+<a name="0x4_token_MutatorRef"></a>
+
+## Struct `MutatorRef`
+
+This enables mutating descritpion and URI by higher level services.
+
+
+<pre><code><b>struct</b> <a href="token.md#0x4_token_MutatorRef">MutatorRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>self: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x4_token_MutationEvent"></a>
 
 ## Struct `MutationEvent`
@@ -174,34 +202,6 @@ directly understand the behavior in a writeset.
 <dl>
 <dt>
 <code>mutated_field_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x4_token_MutatorRef"></a>
-
-## Struct `MutatorRef`
-
-This enables mutating descritpion and URI by higher level services.
-
-
-<pre><code><b>struct</b> <a href="token.md#0x4_token_MutatorRef">MutatorRef</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>self: <b>address</b></code>
 </dt>
 <dd>
 
@@ -711,10 +711,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_description">set_description</a>(
-    mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>,
-    description: String,
-) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_description">set_description</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
     <a href="token.md#0x4_token">token</a>.description = description;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
@@ -743,10 +740,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(
-    mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>,
-    name: String,
-) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, name: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
     <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="token.md#0x4_token">token</a>.creation_name)) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> <a href="token.md#0x4_token">token</a>.creation_name, <a href="token.md#0x4_token">token</a>.name)
@@ -778,10 +772,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_uri">set_uri</a>(
-    mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>,
-    uri: String,
-) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_uri">set_uri</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> <a href="token.md#0x4_token">token</a> = borrow_mut(mutator_ref);
     <a href="token.md#0x4_token">token</a>.uri = uri;
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(

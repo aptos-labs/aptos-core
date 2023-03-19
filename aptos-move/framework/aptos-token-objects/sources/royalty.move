@@ -26,6 +26,7 @@ module aptos_token_objects::royalty {
         payee_address: address,
     }
 
+    /// This enables creating or overwriting a MutatorRef.
     struct MutatorRef has drop, store {
         inner: ExtendRef,
     }
