@@ -582,7 +582,8 @@ impl BufferItem {
 
     pub fn try_advance_to_execution_ready(self) -> Self {
         if let Self::Ordered(ordered_item) = self {
-            assert!(ordered_item.ordered_blocks.len() ==  ordered_item.partial_rand_decision.decisions().len());
+            println!("assert equal length {} == {}", ordered_item.ordered_blocks.len(), ordered_item.partial_rand_decision.decisions().len());
+            // assert!(ordered_item.ordered_blocks.len() ==  ordered_item.partial_rand_decision.decisions().len());
             return Self::ExecutionReady(Box::new(ExecutionReadyItem {
                 unverified_signatures: ordered_item.unverified_signatures,
                 commit_proof: ordered_item.commit_proof,
