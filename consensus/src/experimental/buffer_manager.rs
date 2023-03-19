@@ -40,10 +40,10 @@ use std::{sync::{
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 1500;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 500;
 pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
-pub const LOOP_INTERVAL_MS: u64 = 1500;
+pub const LOOP_INTERVAL_MS: u64 = 500;
 
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
@@ -258,10 +258,15 @@ impl BufferManager {
                     if current_cursor.is_some() {
                         let mut item = self.buffer.take(&current_cursor);
                         if item.is_ordered() && item.aggregate_rand_shares(self.item_to_rand_shares_map.get(&item_id).unwrap().clone()).is_ok() {
+                            let rand_decisions = RandDecisions::new(item_id, rand_shares.epoch(), item.gen_dummy_rand_decision_vec());
+                            item.update_rand_decisions(rand_decisions.clone());
+
+                            if item.get_blocks().len() != rand_decisions.decisions().len() {
+                                println!("unequal length on generated rand {} != {}", item.get_blocks().len(), rand_decisions.decisions().len());
+                            }
                             // if we're the proposer for the first proposal block,
                             // we're responsible to broadcast the randomness decision
                             if Some(self.author) == item.get_first_proposer() {
-                                let rand_decisions = RandDecisions::new(item_id, rand_shares.epoch(), item.gen_dummy_rand_decision_vec());
                                 self.rand_msg_tx
                                     .broadcast_rand_decisions(rand_decisions)
                                     .await;
@@ -285,6 +290,9 @@ impl BufferManager {
                     if item.is_ordered() {
                         // add the randomness to block
                         item.update_rand_decisions(*rand_decisions.clone());
+                        if item.get_blocks().len() != rand_decisions.decisions().len() {
+                            println!("unequal length on received rand {} != {}", item.get_blocks().len(), rand_decisions.decisions().len());
+                        }
                         self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                         return true;
                     }
@@ -826,7 +834,7 @@ impl BufferManager {
                     });
                 },
                 _ = interval.tick().fuse() => {
-                    self.print_buffer();
+                    // self.print_buffer();
                     self.update_buffer_manager_metrics();
                     monitor!("buffer_manager_process_rebroadcast_commit_vote", {
                     self.rebroadcast_commit_votes_if_needed().await
