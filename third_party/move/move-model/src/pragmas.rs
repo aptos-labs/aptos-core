@@ -287,6 +287,10 @@ pub const CONDITION_CHECK_ABORT_CODES_PROP: &str = "check";
 /// enabled disabled by the disable_invariant_in_body pragma
 pub const CONDITION_SUSPENDABLE_PROP: &str = "suspendable";
 
+/// A property that can be attached to a loop invariant to indicate that the loop needs to
+/// be unrolled to a certain depth, a typical relaxation in bounded model checking.
+pub const CONDITION_UNROLL_PROP: &str = "unroll";
+
 /// A pragama defined in the spec block of a function or a struct
 /// to explicitly specify which argument or field will be translated into a bv type in the boogie file
 /// example: bv=b"0,1"
@@ -312,6 +316,9 @@ pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool
     }
     use crate::ast::ConditionKind::*;
     match kind {
+        LoopInvariant => {
+            matches!(prop, CONDITION_UNROLL_PROP)
+        },
         GlobalInvariant(..) | GlobalInvariantUpdate(..) => {
             matches!(
                 prop,
