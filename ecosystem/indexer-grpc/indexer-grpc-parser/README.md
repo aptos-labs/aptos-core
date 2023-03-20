@@ -3,12 +3,12 @@
 ## Example Yaml file
 
 ```yaml
-indexer_grpc_address: http://192.168.1.123:50051
-postgres_connection_string: postgres://postgres@localhost/indexer_v3
+indexer_grpc_address: "ADDRESS:PORT" # port typically 50051
+postgres_connection_string: "POSTGRES URL" # e.g. postgres://postgres@localhost/indexer_v3
 number_concurrent_processing_tasks: 20
 processor_name: default_processor
 health_check_port: 8089
-indexer_grpc_auth_token: "PUT YOUR OWN AUTH TOKEN"
+indexer_grpc_auth_token: "AUTH TOKEN"
 ```
 
 * Command to run the parser
