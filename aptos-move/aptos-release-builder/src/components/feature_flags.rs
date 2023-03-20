@@ -28,7 +28,7 @@ pub enum FeatureFlag {
     ResourceGroups,
     MultisigAccounts,
     DelegationPools,
-    GenericAlgebraicStructuresBasicOperations,
+    CryptographyAlgebraNatives,
     Bls12381Structures,
 }
 
@@ -130,9 +130,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
             FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
-            FeatureFlag::Bls12381BasicOperations => AptosFeatureFlag::BLS12381_BASIC_OPERATIONS,
-            FeatureFlag::GenericAlgebraicStructuresBasicOperations => {
-                AptosFeatureFlag::GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS
+            FeatureFlag::CryptographyAlgebraNatives => {
+                AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES
             },
             FeatureFlag::Bls12381Structures => AptosFeatureFlag::BLS12_381_STRUCTURES,
         }
@@ -160,8 +159,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
             AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
             AptosFeatureFlag::DELEGATION_POOLS => FeatureFlag::DelegationPools,
-            AptosFeatureFlag::GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS => {
-                FeatureFlag::GenericAlgebraicStructuresBasicOperations
+            AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES => {
+                FeatureFlag::CryptographyAlgebraNatives
             },
             AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
         }

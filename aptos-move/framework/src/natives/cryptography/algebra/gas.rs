@@ -11,7 +11,7 @@ fn log2_floor(n: usize) -> usize {
 }
 
 fn log2_ceil(n: usize) -> usize {
-    log2_floor(n-1)+1
+    log2_floor(n - 1) + 1
 }
 
 fn ark_msm_window_size(num_entries: usize) -> usize {
@@ -22,22 +22,6 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
     }
 }
 
-fn ark_msm_window_size_2(num_entries: usize) -> usize {
-    if num_entries < 32 {
-        3
-    } else {
-        (ark_std::log2(num_entries) * 69 / 100) as usize + 2
-    }
-}
-//
-#[test]
-fn window_size() {
-    for x in 0..100 {
-        let w1 = ark_msm_window_size(x);
-        let w2 = ark_msm_window_size_2(x);
-        println!("x={x}, w1={w1}, w2={w2}");
-    }
-}
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub ark_bls12_381_fr_add: InternalGasPerArg,
@@ -262,29 +246,25 @@ impl GasParameters {
         }
     }
 
-    fn ark_msm_window_size(&self, num_entries: usize) -> usize {
-        if num_entries < 32 {
-            3
-        } else {
-            (log2_ceil(num_entries) * 69 / 100) + 2
-        }
-    }
-
     pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
         match structure {
             Structure::BLS12381G1Affine => {
-                let window_size = self.ark_msm_window_size(num_entries);
+                let window_size = ark_msm_window_size(num_entries);
                 let num_windows = (255 + window_size - 1) / window_size;
                 let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g1_proj_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
-                    + self.ark_bls12_381_g1_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
+                self.ark_bls12_381_g1_proj_add
+                    * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
+                    + self.ark_bls12_381_g1_proj_double
+                        * NumArgs::from((num_buckets * num_windows) as u64)
             },
             Structure::BLS12381G2Affine => {
-                let window_size = self.ark_msm_window_size(num_entries);
+                let window_size = ark_msm_window_size(num_entries);
                 let num_windows = (255 + window_size - 1) / window_size;
                 let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g2_proj_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
-                    + self.ark_bls12_381_g2_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
+                self.ark_bls12_381_g2_proj_add
+                    * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
+                    + self.ark_bls12_381_g2_proj_double
+                        * NumArgs::from((num_buckets * num_windows) as u64)
             },
             _ => unreachable!(),
         }

@@ -23,7 +23,9 @@ spec aptos_framework::consensus_config {
         use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
 
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         let addr = signer::address_of(account);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if !exists<ConsensusConfig>(@aptos_framework);

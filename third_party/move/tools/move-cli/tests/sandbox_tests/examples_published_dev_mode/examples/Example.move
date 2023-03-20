@@ -1,0 +1,2 @@
+module Addr::Example {
+}

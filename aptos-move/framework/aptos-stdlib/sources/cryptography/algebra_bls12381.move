@@ -254,7 +254,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_fq12(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Serialization/deserialization.
         let val_0 = field_zero<Fq12>();
@@ -321,7 +321,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test__g1affine(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
         assert!(R_SERIALIZED == group_order<G1Affine>(), 1);
@@ -444,7 +444,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_g2affine(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
         assert!(R_SERIALIZED == group_order<G2Affine>(), 1);
@@ -548,7 +548,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_gt(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
         assert!(R_SERIALIZED == group_order<Gt>(), 1);
@@ -598,7 +598,7 @@ module aptos_std::algebra_bls12381 {
     }
 
     #[test_only]
-    use aptos_std::algebra::{field_zero, field_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_scalar_mul, group_add, group_multi_scalar_mul, group_double, group_neg, group_sub, hash_to, upcast, enable_initial_generic_algebraic_operations, pairing, multi_pairing, downcast};
+    use aptos_std::algebra::{field_zero, field_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_scalar_mul, group_add, group_multi_scalar_mul, group_double, group_neg, group_sub, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast};
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -613,7 +613,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_fr(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Serialization/deserialization.
         let val_0 = field_zero<Fr>();
@@ -670,7 +670,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_pairing(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
         let element_p = insecure_random_element<G1Affine>();
@@ -684,7 +684,7 @@ module aptos_std::algebra_bls12381 {
 
     #[test(fx = @std)]
     fun test_multi_pairing(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
 
         // Will compute e(a0*P0,b0*Q0)+e(a1*P1,b1*Q1)+e(a2*P2,b2*Q2).
         let a0 = insecure_random_element<Fr>();
@@ -723,7 +723,7 @@ module aptos_std::algebra_bls12381 {
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
         let g1_elements = vector[insecure_random_element<G1Affine>()];
         let g2_elements = vector[insecure_random_element<G2Affine>(), insecure_random_element<G2Affine>()];
         multi_pairing<G1Affine, G2Affine, Gt>(&g1_elements, &g2_elements);
@@ -732,7 +732,7 @@ module aptos_std::algebra_bls12381 {
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
-        enable_initial_generic_algebraic_operations(&fx);
+        enable_cryptography_algebra_natives(&fx);
         let elements = vector[insecure_random_element<G1Affine>()];
         let scalars = vector[insecure_random_element<Fr>(), insecure_random_element<Fr>()];
         group_multi_scalar_mul(&elements, &scalars);

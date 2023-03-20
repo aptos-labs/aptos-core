@@ -13,11 +13,11 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
+aptos-crypto-derive = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-std = { workspace = true }
-anyhow = { workspace = true }
-aptos-crypto-derive = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
 bytes = { workspace = true }
@@ -38,7 +38,7 @@ serde = { workspace = true }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
-sha2_0_10_6 = {workspace = true }
+sha2_0_10_6 = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
@@ -100,4 +100,3 @@ harness = false
 [[bench]]
 name = "secp256k1"
 harness = false
-

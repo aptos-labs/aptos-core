@@ -6,18 +6,25 @@
 #[macro_use]
 extern crate criterion;
 
-use std::cmp::min;
+use aptos_crypto::{
+    msm_all_bench_cases,
+    pippenger::{
+        find_best_window_size, generic_pippenger, probably_pippenger_signed_digits,
+        PippengerFriendlyStructure,
+    },
+    rand, serialize,
+};
 use ark_bls12_381::{Fr, G1Projective, G2Projective};
-use ark_ff::Zero;
-use ark_std::test_rng;
-use criterion::{BenchmarkId, Criterion};
-use std::ops::{Add, AddAssign, Neg};
-use std::time::Duration;
 use ark_ec::Group;
-use aptos_crypto::{msm_all_bench_cases, rand, serialize};
-use aptos_crypto::pippenger::{PippengerFriendlyStructure, generic_pippenger, probably_pippenger_signed_digits, find_best_window_size};
-use ark_std::UniformRand;
+use ark_ff::Zero;
 use ark_serialize::CanonicalSerialize;
+use ark_std::{test_rng, UniformRand};
+use criterion::{BenchmarkId, Criterion};
+use std::{
+    cmp::min,
+    ops::{Add, AddAssign, Neg},
+    time::Duration,
+};
 
 fn bits_from_lsb(buf: &[u8], num_bits_needed: usize) -> Vec<bool> {
     let num_bits_offered = 8 * buf.len();
@@ -26,7 +33,7 @@ fn bits_from_lsb(buf: &[u8], num_bits_needed: usize) -> Vec<bool> {
     for i in 0..p {
         let byte_id = i >> 3;
         let bit_id = i & 7;
-        let bit = (buf[byte_id] & (1<<bit_id)) != 0;
+        let bit = (buf[byte_id] & (1 << bit_id)) != 0;
         bits.push(bit);
     }
     for _i in p..num_bits_needed {
@@ -48,7 +55,7 @@ struct Bls12381G2ProjWrapper {
 impl PippengerFriendlyStructure for Bls12381G1ProjWrapper {
     fn add(&self, other: &Self) -> Self {
         Self {
-            inner: self.inner.add(&other.inner)
+            inner: self.inner.add(&other.inner),
         }
     }
 
@@ -58,7 +65,7 @@ impl PippengerFriendlyStructure for Bls12381G1ProjWrapper {
 
     fn double(&self) -> Self {
         Self {
-            inner: self.inner.double()
+            inner: self.inner.double(),
         }
     }
 
@@ -68,13 +75,13 @@ impl PippengerFriendlyStructure for Bls12381G1ProjWrapper {
 
     fn neg(&self) -> Self {
         Self {
-            inner: self.inner.neg()
+            inner: self.inner.neg(),
         }
     }
 
     fn zero() -> Self {
         Self {
-            inner: G1Projective::zero()
+            inner: G1Projective::zero(),
         }
     }
 }
@@ -82,7 +89,7 @@ impl PippengerFriendlyStructure for Bls12381G1ProjWrapper {
 impl PippengerFriendlyStructure for Bls12381G2ProjWrapper {
     fn add(&self, other: &Self) -> Self {
         Self {
-            inner: self.inner.add(&other.inner)
+            inner: self.inner.add(&other.inner),
         }
     }
 
@@ -92,7 +99,7 @@ impl PippengerFriendlyStructure for Bls12381G2ProjWrapper {
 
     fn double(&self) -> Self {
         Self {
-            inner: self.inner.double()
+            inner: self.inner.double(),
         }
     }
 
@@ -102,13 +109,13 @@ impl PippengerFriendlyStructure for Bls12381G2ProjWrapper {
 
     fn neg(&self) -> Self {
         Self {
-            inner: self.inner.neg()
+            inner: self.inner.neg(),
         }
     }
 
     fn zero() -> Self {
         Self {
-            inner: G2Projective::zero()
+            inner: G2Projective::zero(),
         }
     }
 }
@@ -124,87 +131,123 @@ fn bench_group(c: &mut Criterion) {
 
     for num_entries in msm_all_bench_cases() {
         let est_window_size = find_best_window_size(num_entries);
-        for window_bitlen in (est_window_size-1)..(est_window_size+3) {
-            group.bench_function(BenchmarkId::new(format!("basic_ws{window_bitlen}_arkg1"), num_entries), |b| {
-                b.iter_with_setup(
-                    || {
-                        let elements = (0..num_entries).map(|_i| {
-                            Bls12381G1ProjWrapper {
-                                inner: rand!(G1Projective)
-                            }
-                        }).collect::<Vec<_>>();
-                        let scalars = (0..num_entries).map(|_i| {
-                            let s = rand!(Fr);
-                            let buf = serialize!(s, serialize_uncompressed);
-                            bits_from_lsb(buf.as_slice(), 255)
-                        }).collect::<Vec<_>>();
-                        (elements, scalars)
-                    },
-                    |(elements, scalars)| {
-                        let _res = generic_pippenger(elements.as_slice(), scalars.as_slice(), window_bitlen);
-                    },
-                );
-            });
-            group.bench_function(BenchmarkId::new(format!("signed_ws{window_bitlen}_arkg1"), num_entries), |b| {
-                b.iter_with_setup(
-                    || {
-                        let elements = (0..num_entries).map(|_i| {
-                            Bls12381G1ProjWrapper {
-                                inner: rand!(G1Projective)
-                            }
-                        }).collect::<Vec<_>>();
-                        let scalars = (0..num_entries).map(|_i| {
-                            let s = rand!(Fr);
-                            let buf = serialize!(s, serialize_uncompressed);
-                            bits_from_lsb(buf.as_slice(), 255)
-                        }).collect::<Vec<_>>();
-                        (elements, scalars)
-                    },
-                    |(elements, scalars)| {
-                        let _res = probably_pippenger_signed_digits(elements.as_slice(), scalars.as_slice(), window_bitlen);
-                    },
-                );
-            });
-            group.bench_function(BenchmarkId::new(format!("basic_ws{window_bitlen}_arkg2"), num_entries), |b| {
-                b.iter_with_setup(
-                    || {
-                        let elements = (0..num_entries).map(|_i| {
-                            Bls12381G2ProjWrapper {
-                                inner: rand!(G2Projective)
-                            }
-                        }).collect::<Vec<_>>();
-                        let scalars = (0..num_entries).map(|_i| {
-                            let s = rand!(Fr);
-                            let buf = serialize!(s, serialize_uncompressed);
-                            bits_from_lsb(buf.as_slice(), 255)
-                        }).collect::<Vec<_>>();
-                        (elements, scalars)
-                    },
-                    |(elements, scalars)| {
-                        let _res = generic_pippenger(elements.as_slice(), scalars.as_slice(), window_bitlen);
-                    },
-                );
-            });
-            group.bench_function(BenchmarkId::new(format!("signed_ws{window_bitlen}_arkg2"), num_entries), |b| {
-                b.iter_with_setup(
-                    || {
-                        let elements = (0..num_entries).map(|_i| {
-                            Bls12381G2ProjWrapper {
-                                inner: rand!(G2Projective)
-                            }
-                        }).collect::<Vec<_>>();
-                        let scalars = (0..num_entries).map(|_i| {
-                            let s = rand!(Fr);
-                            let buf = serialize!(s, serialize_uncompressed);
-                            bits_from_lsb(buf.as_slice(), 255)
-                        }).collect::<Vec<_>>();
-                        (elements, scalars)
-                    },
-                    |(elements, scalars)| {
-                        let _res = probably_pippenger_signed_digits(elements.as_slice(), scalars.as_slice(), window_bitlen);
-                    },
-                );
-            });
+        for window_bitlen in (est_window_size - 1)..(est_window_size + 3) {
+            group.bench_function(
+                BenchmarkId::new(format!("basic_ws{window_bitlen}_arkg1"), num_entries),
+                |b| {
+                    b.iter_with_setup(
+                        || {
+                            let elements = (0..num_entries)
+                                .map(|_i| Bls12381G1ProjWrapper {
+                                    inner: rand!(G1Projective),
+                                })
+                                .collect::<Vec<_>>();
+                            let scalars = (0..num_entries)
+                                .map(|_i| {
+                                    let s = rand!(Fr);
+                                    let buf = serialize!(s, serialize_uncompressed);
+                                    bits_from_lsb(buf.as_slice(), 255)
+                                })
+                                .collect::<Vec<_>>();
+                            (elements, scalars)
+                        },
+                        |(elements, scalars)| {
+                            let _res = generic_pippenger(
+                                elements.as_slice(),
+                                scalars.as_slice(),
+                                window_bitlen,
+                            );
+                        },
+                    );
+                },
+            );
+            group.bench_function(
+                BenchmarkId::new(format!("signed_ws{window_bitlen}_arkg1"), num_entries),
+                |b| {
+                    b.iter_with_setup(
+                        || {
+                            let elements = (0..num_entries)
+                                .map(|_i| Bls12381G1ProjWrapper {
+                                    inner: rand!(G1Projective),
+                                })
+                                .collect::<Vec<_>>();
+                            let scalars = (0..num_entries)
+                                .map(|_i| {
+                                    let s = rand!(Fr);
+                                    let buf = serialize!(s, serialize_uncompressed);
+                                    bits_from_lsb(buf.as_slice(), 255)
+                                })
+                                .collect::<Vec<_>>();
+                            (elements, scalars)
+                        },
+                        |(elements, scalars)| {
+                            let _res = probably_pippenger_signed_digits(
+                                elements.as_slice(),
+                                scalars.as_slice(),
+                                window_bitlen,
+                            );
+                        },
+                    );
+                },
+            );
+            group.bench_function(
+                BenchmarkId::new(format!("basic_ws{window_bitlen}_arkg2"), num_entries),
+                |b| {
+                    b.iter_with_setup(
+                        || {
+                            let elements = (0..num_entries)
+                                .map(|_i| Bls12381G2ProjWrapper {
+                                    inner: rand!(G2Projective),
+                                })
+                                .collect::<Vec<_>>();
+                            let scalars = (0..num_entries)
+                                .map(|_i| {
+                                    let s = rand!(Fr);
+                                    let buf = serialize!(s, serialize_uncompressed);
+                                    bits_from_lsb(buf.as_slice(), 255)
+                                })
+                                .collect::<Vec<_>>();
+                            (elements, scalars)
+                        },
+                        |(elements, scalars)| {
+                            let _res = generic_pippenger(
+                                elements.as_slice(),
+                                scalars.as_slice(),
+                                window_bitlen,
+                            );
+                        },
+                    );
+                },
+            );
+            group.bench_function(
+                BenchmarkId::new(format!("signed_ws{window_bitlen}_arkg2"), num_entries),
+                |b| {
+                    b.iter_with_setup(
+                        || {
+                            let elements = (0..num_entries)
+                                .map(|_i| Bls12381G2ProjWrapper {
+                                    inner: rand!(G2Projective),
+                                })
+                                .collect::<Vec<_>>();
+                            let scalars = (0..num_entries)
+                                .map(|_i| {
+                                    let s = rand!(Fr);
+                                    let buf = serialize!(s, serialize_uncompressed);
+                                    bits_from_lsb(buf.as_slice(), 255)
+                                })
+                                .collect::<Vec<_>>();
+                            (elements, scalars)
+                        },
+                        |(elements, scalars)| {
+                            let _res = probably_pippenger_signed_digits(
+                                elements.as_slice(),
+                                scalars.as_slice(),
+                                window_bitlen,
+                            );
+                        },
+                    );
+                },
+            );
         }
     }
 

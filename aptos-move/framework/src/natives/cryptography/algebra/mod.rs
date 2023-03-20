@@ -156,14 +156,14 @@ impl AlgebraContext {
 
 macro_rules! structure_from_ty_arg {
     ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        let type_tag = $context.type_to_type_tag($typ)?;
         Structure::try_from(type_tag).ok()
     }};
 }
 
 macro_rules! format_from_ty_arg {
     ($context:expr, $typ:expr) => {{
-        let type_tag = $context.type_to_type_tag($typ).unwrap();
+        let type_tag = $context.type_to_type_tag($typ)?;
         SerializationFormat::try_from(type_tag).ok()
     }};
 }
@@ -363,6 +363,7 @@ macro_rules! safe_borrow_element {
     };
 }
 
+/// Macros that implements `serialize_internal()` using arkworks libraries.
 macro_rules! ark_serialize_internal {
     (
         $gas_params:expr,
@@ -377,7 +378,13 @@ macro_rules! ark_serialize_internal {
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
         $context.charge($gas_params.serialize($structure, $format))?;
-        element.$ark_ser_func(&mut buf).unwrap();
+        match element.$ark_ser_func(&mut buf) {
+            Ok(_) => {},
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
+        }
         buf
     }};
 }
@@ -397,7 +404,13 @@ macro_rules! ark_ec_point_serialize_internal {
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
         $context.charge($gas_params.serialize($structure, $format))?;
-        element_affine.$ark_ser_func(&mut buf).unwrap();
+        match element_affine.$ark_ser_func(&mut buf) {
+            Ok(_) => {},
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
+        }
         buf
     }};
 }
@@ -528,6 +541,7 @@ fn serialize_internal(
     }
 }
 
+/// Macros that implements `deserialize_internal()` using arkworks libraries.
 macro_rules! ark_deserialize_internal {
     (
         $gas_params:expr,
@@ -535,16 +549,23 @@ macro_rules! ark_deserialize_internal {
         $bytes:expr,
         $structure:expr,
         $format:expr,
-        $typ:ty,
-        $deser_func:ident
+        $ark_typ:ty,
+        $ark_deser_func:ident
     ) => {{
         $context.charge($gas_params.deserialize($structure, $format))?;
-        match <$typ>::$deser_func($bytes) {
+        match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
                 let handle = store_element!($context, element);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
-            _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
+            Err(ark_serialize::SerializationError::InvalidData)
+            | Err(ark_serialize::SerializationError::UnexpectedFlags) => {
+                Ok(smallvec![Value::bool(false), Value::u64(0)])
+            },
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
         }
     }};
 }
@@ -566,7 +587,14 @@ macro_rules! ark_ec_point_deserialize_internal {
                 let handle = store_element!($context, element_proj);
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
-            _ => Ok(smallvec![Value::bool(false), Value::u64(0)]),
+            Err(ark_serialize::SerializationError::InvalidData)
+            | Err(ark_serialize::SerializationError::UnexpectedFlags) => {
+                Ok(smallvec![Value::bool(false), Value::u64(0)])
+            },
+            _ => {
+                abort_invariant_violated();
+                unreachable!()
+            },
         }
     }};
 }

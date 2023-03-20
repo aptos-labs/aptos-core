@@ -6,17 +6,15 @@
 #[macro_use]
 extern crate criterion;
 
+use aptos_crypto::{msm_all_bench_cases, rand, serialize};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use ark_serialize::CanonicalSerialize;
+use ark_std::{test_rng, UniformRand};
 use blst::{blst_p1, blst_p1_add, blst_p1_affine, blst_p1_mult, blst_p2, blst_p2_affine};
-use criterion::{BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion};
 use rand::{distributions, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::ops::MulAssign;
-use std::time::Duration;
-use ark_std::UniformRand;
-use aptos_crypto::{msm_all_bench_cases, serialize, rand};
-use ark_std::test_rng;
-use ark_serialize::CanonicalSerialize;
+use std::{ops::MulAssign, time::Duration};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
@@ -358,10 +356,12 @@ fn bench_group(c: &mut Criterion) {
                 || {
                     let points = (0..num_entries).map(|_i| random_p1()).collect::<Vec<_>>();
                     let affine_points = blst::p1_affines::from(points.as_slice());
-                    let scalars_bytes = (0..num_entries).flat_map(|_i| {
-                        serialize!(rand!(ark_bls12_381::Fr), serialize_uncompressed).into_iter()
-                    }).collect::<Vec<_>>();
-                    assert_eq!(32*num_entries, scalars_bytes.len());
+                    let scalars_bytes = (0..num_entries)
+                        .flat_map(|_i| {
+                            serialize!(rand!(ark_bls12_381::Fr), serialize_uncompressed).into_iter()
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(32 * num_entries, scalars_bytes.len());
                     (affine_points, scalars_bytes)
                 },
                 |(affine_points, scalars_bytes)| {
@@ -374,10 +374,12 @@ fn bench_group(c: &mut Criterion) {
                 || {
                     let points = (0..num_entries).map(|_i| random_p2()).collect::<Vec<_>>();
                     let affine_points = blst::p2_affines::from(points.as_slice());
-                    let scalars_bytes = (0..num_entries).flat_map(|_i| {
-                        serialize!(rand!(ark_bls12_381::Fr), serialize_uncompressed).into_iter()
-                    }).collect::<Vec<_>>();
-                    assert_eq!(32*num_entries, scalars_bytes.len());
+                    let scalars_bytes = (0..num_entries)
+                        .flat_map(|_i| {
+                            serialize!(rand!(ark_bls12_381::Fr), serialize_uncompressed).into_iter()
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(32 * num_entries, scalars_bytes.len());
                     (affine_points, scalars_bytes)
                 },
                 |(affine_points, scalars_bytes)| {

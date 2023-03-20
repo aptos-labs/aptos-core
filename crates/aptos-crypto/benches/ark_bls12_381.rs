@@ -6,22 +6,23 @@
 #[macro_use]
 extern crate criterion;
 
+use aptos_crypto::{msm_all_bench_cases, rand, serialize, test_utils::random_bytes};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bls12_381::{Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_ec::{
+    hashing::HashToCurve, pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup,
+    Group,
+};
 use ark_ff::{BigInteger256, Field, One, UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
 use criterion::{BenchmarkId, Criterion};
-use serde::{Deserialize, Serialize};
-use std::ops::{Add, Div, Mul, Neg};
-use std::time::Duration;
-use ark_ec::{AffineRepr, CurveGroup, Group};
-use ark_ec::hashing::HashToCurve;
-use ark_ec::pairing::Pairing;
-use ark_ec::short_weierstrass::Projective;
 use rand::thread_rng;
-use aptos_crypto::{msm_all_bench_cases, rand, serialize};
-use aptos_crypto::test_utils::random_bytes;
+use serde::{Deserialize, Serialize};
+use std::{
+    ops::{Add, Div, Mul, Neg},
+    time::Duration,
+};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct TestAptosCrypto(String);
@@ -97,7 +98,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let k_1 = rand!(Fr);
-                let k_2 = k_1.clone();
+                let k_2 = k_1;
                 (k_1, k_2)
             },
             |(k_1, k_2)| {
@@ -108,9 +109,7 @@ fn bench_group(c: &mut Criterion) {
 
     group.bench_function("fr_from_u64", move |b| {
         b.iter_with_setup(
-            || {
-                rand!(u64)
-            },
+            || rand!(u64),
             |v| {
                 let _res: Fr = BigInteger256::from(v).into();
             },
@@ -155,7 +154,7 @@ fn bench_group(c: &mut Criterion) {
 
     group.bench_function("fr_one", move |b| {
         b.iter_with_setup(
-            || { },
+            || {},
             |_| {
                 let _k = Fr::one();
             },
@@ -191,7 +190,7 @@ fn bench_group(c: &mut Criterion) {
 
     group.bench_function("fr_zero", move |b| {
         b.iter_with_setup(
-            || { },
+            || {},
             |_| {
                 let _k = Fr::zero();
             },
@@ -220,7 +219,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || rand!(Fq12),
             |e| {
-                let _e_2 = e.clone();
+                let _e_2 = e;
             },
         )
     });
@@ -264,7 +263,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let e_1 = rand!(Fq12);
-                let e_2 = e_1.clone();
+                let e_2 = e_1;
                 (e_1, e_2)
             },
             |(e_1, e_2)| {
@@ -275,9 +274,7 @@ fn bench_group(c: &mut Criterion) {
 
     group.bench_function("fq12_from_u64", move |b| {
         b.iter_with_setup(
-            || {
-                rand!(u64)
-            },
+            || rand!(u64),
             |i| {
                 let _res = Fq12::from(i);
             },
@@ -416,7 +413,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p1 = rand!(G1Affine);
-                let p2 = p1.clone();
+                let p2 = p1;
                 (p1, p2)
             },
             |(p1, p2)| {
@@ -447,27 +444,39 @@ fn bench_group(c: &mut Criterion) {
     });
 
     group.bench_function("g1_affine_neg", move |b| {
-        b.iter_with_setup(|| rand!(G1Affine), |p| {
-            let _res = p.neg();
-        })
+        b.iter_with_setup(
+            || rand!(G1Affine),
+            |p| {
+                let _res = p.neg();
+            },
+        )
     });
 
     group.bench_function("g1_affine_serialize_comp", move |b| {
-        b.iter_with_setup(|| rand!(G1Affine), |p_affine| {
-            let _buf = serialize!(p_affine, serialize_compressed);
-        })
+        b.iter_with_setup(
+            || rand!(G1Affine),
+            |p_affine| {
+                let _buf = serialize!(p_affine, serialize_compressed);
+            },
+        )
     });
 
     group.bench_function("g1_affine_serialize_uncomp", move |b| {
-        b.iter_with_setup(||rand!(G1Affine), |p_affine| {
-            let _buf = serialize!(p_affine, serialize_uncompressed);
-        })
+        b.iter_with_setup(
+            || rand!(G1Affine),
+            |p_affine| {
+                let _buf = serialize!(p_affine, serialize_uncompressed);
+            },
+        )
     });
 
     group.bench_function("g1_affine_to_proj", move |b| {
-        b.iter_with_setup(||rand!(G1Affine), |p_affine| {
-            let _res = G1Projective::from(p_affine);
-        })
+        b.iter_with_setup(
+            || rand!(G1Affine),
+            |p_affine| {
+                let _res = G1Projective::from(p_affine);
+            },
+        )
     });
 
     group.bench_function("g1_proj_add", move |b| {
@@ -496,7 +505,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G1Projective);
-                let q = p.clone();
+                let q = p;
                 (p, q)
             },
             |(p, q)| {
@@ -600,7 +609,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p1 = rand!(G2Affine);
-                let p2 = p1.clone();
+                let p2 = p1;
                 (p1, p2)
             },
             |(p1, p2)| {
@@ -631,27 +640,39 @@ fn bench_group(c: &mut Criterion) {
     });
 
     group.bench_function("g2_affine_neg", move |b| {
-        b.iter_with_setup(||rand!(G2Affine), |p| {
-            let _res = p.neg();
-        })
+        b.iter_with_setup(
+            || rand!(G2Affine),
+            |p| {
+                let _res = p.neg();
+            },
+        )
     });
 
     group.bench_function("g2_affine_serialize_comp", move |b| {
-        b.iter_with_setup(||rand!(G2Affine), |p_affine| {
-            let _buf = serialize!(p_affine, serialize_compressed);
-        })
+        b.iter_with_setup(
+            || rand!(G2Affine),
+            |p_affine| {
+                let _buf = serialize!(p_affine, serialize_compressed);
+            },
+        )
     });
 
     group.bench_function("g2_affine_serialize_uncomp", move |b| {
-        b.iter_with_setup(||rand!(G2Affine), |p_affine| {
-            let _buf = serialize!(p_affine, serialize_uncompressed);
-        })
+        b.iter_with_setup(
+            || rand!(G2Affine),
+            |p_affine| {
+                let _buf = serialize!(p_affine, serialize_uncompressed);
+            },
+        )
     });
 
     group.bench_function("g2_affine_to_proj", move |b| {
-        b.iter_with_setup(||rand!(G2Affine), |p_affine| {
-            let _res = G2Projective::from(p_affine);
-        })
+        b.iter_with_setup(
+            || rand!(G2Affine),
+            |p_affine| {
+                let _res = G2Projective::from(p_affine);
+            },
+        )
     });
 
     group.bench_function("g2_proj_add", move |b| {
@@ -680,7 +701,7 @@ fn bench_group(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let p = rand!(G2Projective);
-                let q = p.clone();
+                let q = p;
                 (p, q)
             },
             |(p, q)| {
@@ -757,16 +778,19 @@ fn bench_group(c: &mut Criterion) {
     let linear_regression_max_num_datapoints = 20;
 
     let pairing_product_max_num_pairs = 100;
-    for num_pairs in (0..pairing_product_max_num_pairs).step_by(pairing_product_max_num_pairs / linear_regression_max_num_datapoints) {
+    for num_pairs in (0..pairing_product_max_num_pairs)
+        .step_by(pairing_product_max_num_pairs / linear_regression_max_num_datapoints)
+    {
         group.bench_function(BenchmarkId::new("pairing_product", num_pairs), |b| {
             b.iter_with_setup(
                 || {
-                    let g1_elements = (0..num_pairs).map(|_i|rand!(G1Affine)).collect::<Vec<_>>();
-                    let g2_elements = (0..num_pairs).map(|_i|rand!(G2Affine)).collect::<Vec<_>>();
+                    let g1_elements = (0..num_pairs).map(|_i| rand!(G1Affine)).collect::<Vec<_>>();
+                    let g2_elements = (0..num_pairs).map(|_i| rand!(G2Affine)).collect::<Vec<_>>();
                     (g1_elements, g2_elements)
                 },
                 |(g1_elements, g2_elements)| {
-                    let _product = ark_bls12_381::Bls12_381::multi_pairing(g1_elements, g2_elements).0;
+                    let _product =
+                        ark_bls12_381::Bls12_381::multi_pairing(g1_elements, g2_elements).0;
                 },
             );
         });
@@ -776,12 +800,16 @@ fn bench_group(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("g1_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
-                    let elements = (0..num_entries).map(|_i|rand!(G1Affine)).collect::<Vec<_>>();
-                    let scalars = (0..num_entries).map(|_i|rand!(Fr)).collect::<Vec<_>>();
+                    let elements = (0..num_entries)
+                        .map(|_i| rand!(G1Affine))
+                        .collect::<Vec<_>>();
+                    let scalars = (0..num_entries).map(|_i| rand!(Fr)).collect::<Vec<_>>();
                     (elements, scalars)
                 },
                 |(elements, scalars)| {
-                    let _res: G1Projective = ark_ec::VariableBaseMSM::msm(elements.as_slice(), scalars.as_slice()).unwrap();
+                    let _res: G1Projective =
+                        ark_ec::VariableBaseMSM::msm(elements.as_slice(), scalars.as_slice())
+                            .unwrap();
                 },
             );
         });
@@ -791,12 +819,16 @@ fn bench_group(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("g2_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
-                    let elements = (0..num_entries).map(|_i| rand!(G2Affine)).collect::<Vec<_>>();
-                    let scalars = (0..num_entries).map(|_i|rand!(Fr)).collect::<Vec<_>>();
+                    let elements = (0..num_entries)
+                        .map(|_i| rand!(G2Affine))
+                        .collect::<Vec<_>>();
+                    let scalars = (0..num_entries).map(|_i| rand!(Fr)).collect::<Vec<_>>();
                     (elements, scalars)
                 },
                 |(elements, scalars)| {
-                    let _res: G2Projective = ark_ec::VariableBaseMSM::msm(elements.as_slice(), scalars.as_slice()).unwrap();
+                    let _res: G2Projective =
+                        ark_ec::VariableBaseMSM::msm(elements.as_slice(), scalars.as_slice())
+                            .unwrap();
                 },
             );
         });
@@ -804,7 +836,9 @@ fn bench_group(c: &mut Criterion) {
 
     let hash_to_curve_max_msg_len = 1048576;
 
-    for msg_len in (0..hash_to_curve_max_msg_len).step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints) {
+    for msg_len in (0..hash_to_curve_max_msg_len)
+        .step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints)
+    {
         group.bench_function(BenchmarkId::new("hash_to_g1_proj", msg_len), |b| {
             b.iter_with_setup(
                 || {
@@ -817,14 +851,17 @@ fn bench_group(c: &mut Criterion) {
                         Projective<ark_bls12_381::g1::Config>,
                         ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                         ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>,
-                    >::new(dst.as_slice()).unwrap();
+                    >::new(dst.as_slice())
+                    .unwrap();
                     let _new_element = <G1Projective>::from(mapper.hash(msg.as_slice()).unwrap());
                 },
             );
         });
     }
 
-    for msg_len in (0..hash_to_curve_max_msg_len).step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints) {
+    for msg_len in (0..hash_to_curve_max_msg_len)
+        .step_by(hash_to_curve_max_msg_len / linear_regression_max_num_datapoints)
+    {
         group.bench_function(BenchmarkId::new("hash_to_g2_proj", msg_len), |b| {
             b.iter_with_setup(
                 || {
@@ -837,7 +874,8 @@ fn bench_group(c: &mut Criterion) {
                         Projective<ark_bls12_381::g2::Config>,
                         ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                         ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g2::Config>,
-                    >::new(dst.as_slice()).unwrap();
+                    >::new(dst.as_slice())
+                    .unwrap();
                     let _new_element = <G2Projective>::from(mapper.hash(msg.as_slice()).unwrap());
                 },
             );

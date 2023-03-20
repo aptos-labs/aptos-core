@@ -132,19 +132,20 @@ If the script above does not work for you, you can install these manually, but i
 <details>
 <summary>Windows</summary>
 
-:::tip
-The aptos-core codebase currently has no script similar to the `dev_setup.sh` script for
-Windows.  All dependencies must be manually installed.
-:::
+**> Using the automated script**
+
+1. Open a PowerShell terminal as an administrator. 
+1. Run the dev setup script to prepare your environment: `PowerShell -ExecutionPolicy Bypass -File ./scripts/windows_dev_setup.ps1`
 
 **> Manual installation of dependencies**
 
 1. Install [Rust](https://www.rust-lang.org/tools/install).
-1. Install [CMake](https://cmake.org/download/).
-1. If on Windows ARM, install [Visual Studio Preview](https://visualstudio.microsoft.com/vs/preview/).
-1. Install [C++ build tools for Windows](https://visualstudio.microsoft.com/downloads/#microsoft-visual-c-redistributable-for-visual-studio-2022). Note: This may be installed already with Rust.
-1. Install [LLVM](https://releases.llvm.org/).  The last prebuilt release is [11.0.0](https://releases.llvm.org/download.html#11.0.0)
-1. Open a new powershell terminal after installing all dependencies
+1. Install [LLVM](https://releases.llvm.org/).  Visit their GitHub repository for the [latest prebuilt release](https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.7).
+1. Install [Microsoft Visual Studio Build Tools for Windows](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022). During setup, select "Desktop development with C++" and three additional options: MSVC C++ build tools, Windows 10/11 SDK, and C++ CMake tools for Windows.
+1. If on Windows ARM, install [Visual Studio](https://visualstudio.microsoft.com/vs).
+1. If not already installed during Visual Studio/Build Tools installation, install [CMake](https://cmake.org/download/).
+
+1. Open a new PowerShell terminal after installing all dependencies
 
 </details>
 
@@ -155,21 +156,18 @@ Optionally, check out a release branch to install an Aptos node. We suggest you 
 <Tabs groupId="network">
     <TabItem value="devnet" label="Devnet">
 
-    ```
     git checkout --track origin/devnet
-    ```
+
 </TabItem>
     <TabItem value="testnet" label="Testnet" default>
 
-    ```
     git checkout --track origin/testnet
-    ```
+
 </TabItem>
 <TabItem value="mainnet" label="Mainnet">
 
-    ```
     git checkout --track origin/mainnet
-    ```
+
 </TabItem>
 </Tabs>
 

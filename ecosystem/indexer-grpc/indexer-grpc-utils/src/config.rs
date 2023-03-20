@@ -20,6 +20,9 @@ pub struct IndexerGrpcConfig {
     pub file_store_bucket_name: String,
     /// Health check port.
     pub health_check_port: u16,
+    /// Whitelisted auth tokens, e.g., "token1,token2". Only used by Data Service.
+    /// If this is not set, no tokens are allowed.
+    pub whitelisted_auth_tokens: Option<Vec<String>>,
 }
 
 /// Indexer GRPC Processor configuration. This is to configure the processors,
@@ -41,6 +44,8 @@ pub struct IndexerGrpcProcessorConfig {
     pub health_check_port: u16,
     /// Starting version.
     pub starting_version: Option<u64>,
+    /// Auth token to connect data service.
+    pub indexer_grpc_auth_token: String,
 }
 
 impl IndexerGrpcConfig {

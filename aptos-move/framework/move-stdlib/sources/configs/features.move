@@ -18,7 +18,7 @@ module std::features {
     //   is typically associated with the introduction of new native Move functions, and is only used
     //   from Move code. The owner of this feature is obliged to remove it once this can be done.
     //
-    // - an *ephemeral* feature flag is required to stay around forever. Typically, those flags guard
+    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
@@ -41,7 +41,7 @@ module std::features {
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
@@ -143,10 +143,10 @@ module std::features {
     /// Whether generic algebra basic operation support in `algebra.move` are enabled.
     ///
     /// Lifetime: transient
-    const GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS: u64 = 12;
-    public fun get_generic_agebraic_structures_basic_operations_feature(): u64 { GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS }
-    public fun generic_algebraic_structures_basic_operations_enabled(): bool acquires Features {
-        is_enabled(GENERIC_ALGEBRAIC_STRUCTURES_BASIC_OPERATIONS)
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+    public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+    public fun cryptography_algebra_natives_enabled(): bool acquires Features {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
 
     /// Whether the generic algebra implementation for BLS12381 operations are enabled.

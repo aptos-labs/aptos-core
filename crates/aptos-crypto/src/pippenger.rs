@@ -28,8 +28,8 @@ pub trait PippengerFriendlyStructure: Clone {
 pub fn usize_to_bits(mut v: usize, target_len: usize) -> Vec<bool> {
     let mut ret = vec![false; target_len];
     let mut i = 0;
-    while i<target_len && v>0 {
-        ret[i] = v%2==1;
+    while i < target_len && v > 0 {
+        ret[i] = v % 2 == 1;
         v /= 2;
         i += 1;
     }
@@ -41,13 +41,11 @@ pub fn usize_to_bits(mut v: usize, target_len: usize) -> Vec<bool> {
 /// bits_to_usize(0,0,0,0,0,0,0,0) == 0
 pub fn bits_to_usize(bits: &[bool]) -> usize {
     let mut ret = 0;
-    for (i,&bit) in bits.iter().enumerate() {
+    for (i, &bit) in bits.iter().enumerate() {
         ret += (bit as usize) << i;
     }
     ret
 }
-
-
 
 /// Finding the best `window_size`:
 ///
@@ -61,8 +59,11 @@ pub fn bits_to_usize(bits: &[bool]) -> usize {
 /// Only need to find w that minimize `(2^(w+1)+n+1)/w`.
 ///
 pub fn find_best_window_size(n: usize) -> usize {
-    let precalculated_size_table = vec![0, 0, 8, 32, 96, 256, 640, 1536, 3584, 8192, 18432, 40960, 90112, 196608, 425984, 917504, 1966080, 4194304, 8912896, 18874368, 39845888, 83886080, 176160768, 369098752];
-    for (i,&v) in precalculated_size_table.iter().enumerate() {
+    let precalculated_size_table = vec![
+        0, 0, 8, 32, 96, 256, 640, 1536, 3584, 8192, 18432, 40960, 90112, 196608, 425984, 917504,
+        1966080, 4194304, 8912896, 18874368, 39845888, 83886080, 176160768, 369098752,
+    ];
+    for (i, &v) in precalculated_size_table.iter().enumerate() {
         if n < v {
             return i;
         }
@@ -71,14 +72,21 @@ pub fn find_best_window_size(n: usize) -> usize {
 }
 
 /// TBD
-pub fn probably_pippenger_auto_window_size<S: PippengerFriendlyStructure>(elements: &[S], scalars: &[Vec<bool>]) -> S {
+pub fn probably_pippenger_auto_window_size<S: PippengerFriendlyStructure>(
+    elements: &[S],
+    scalars: &[Vec<bool>],
+) -> S {
     let num_elements = elements.len();
     let window_size_in_bits = find_best_window_size(num_elements);
     generic_pippenger(elements, scalars, window_size_in_bits)
 }
 
 /// TBD
-pub fn generic_pippenger<S: PippengerFriendlyStructure>(elements: &[S], scalars: &[Vec<bool>], window_size_in_bits: usize) -> S {
+pub fn generic_pippenger<S: PippengerFriendlyStructure>(
+    elements: &[S],
+    scalars: &[Vec<bool>],
+    window_size_in_bits: usize,
+) -> S {
     let num_elements = elements.len();
     let num_scalars = scalars.len();
     assert_eq!(num_elements, num_scalars);
@@ -86,8 +94,8 @@ pub fn generic_pippenger<S: PippengerFriendlyStructure>(elements: &[S], scalars:
         return S::zero();
     }
     let scalar_size_in_bits = scalars[0].len();
-    for i in 1..num_scalars {
-        assert_eq!(scalar_size_in_bits, scalars[i].len());
+    for scalar in scalars.iter() {
+        assert_eq!(scalar_size_in_bits, scalar.len());
     }
     assert!(window_size_in_bits >= 1);
 
@@ -129,7 +137,11 @@ pub fn generic_pippenger<S: PippengerFriendlyStructure>(elements: &[S], scalars:
 }
 
 /// TBD
-pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(elements: &[S], scalars: &[Vec<bool>], window_size_in_bits: usize) -> S {
+pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(
+    elements: &[S],
+    scalars: &[Vec<bool>],
+    window_size_in_bits: usize,
+) -> S {
     let num_elements = elements.len();
     let num_scalars = scalars.len();
     assert_eq!(num_elements, num_scalars);
@@ -137,8 +149,8 @@ pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(elements:
         return S::zero();
     }
     let scalar_size_in_bits = scalars[0].len();
-    for i in 1..num_scalars {
-        assert_eq!(scalar_size_in_bits, scalars[i].len());
+    for scalar in scalars.iter() {
+        assert_eq!(scalar_size_in_bits, scalar.len());
     }
 
     let mut num_windows = (scalar_size_in_bits + window_size_in_bits - 1) / window_size_in_bits;
@@ -150,11 +162,12 @@ pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(elements:
     let mut window_vecs: Vec<Vec<usize>> = Vec::with_capacity(num_elements);
     let mut carry = false;
     let mut extra_window = false;
-    for i in 0..num_elements {
+    for scalar in scalars.iter() {
         let mut window_vec = Vec::with_capacity(num_windows + 1);
         for cur_window_start in (0..scalar_size_in_bits).step_by(window_size_in_bits) {
             let cur_window_end = min(cur_window_start + window_size_in_bits, scalar_size_in_bits);
-            let mut window_value = bits_to_usize(&scalars[i][cur_window_start..cur_window_end]) + (carry as usize);
+            let mut window_value =
+                bits_to_usize(&scalar[cur_window_start..cur_window_end]) + (carry as usize);
             carry = (window_value >> (window_size_in_bits - 1)) > 0;
             window_value &= num_buckets - 1;
             window_vec.push(window_value);
@@ -183,9 +196,9 @@ pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(elements:
                 window_value as isize
             };
             if rotated_window_value < 0 {
-                buckets[(-rotated_window_value-1) as usize].add_assign(&element_negs[i]);
+                buckets[(-rotated_window_value - 1) as usize].add_assign(&element_negs[i]);
             } else if window_value > 0 {
-                buckets[(rotated_window_value-1) as usize].add_assign(&elements[i]);
+                buckets[(rotated_window_value - 1) as usize].add_assign(&elements[i]);
             }
         }
 
@@ -207,21 +220,19 @@ pub fn probably_pippenger_signed_digits<S: PippengerFriendlyStructure>(elements:
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 struct I64Wrapper {
-    val: i64
+    val: i64,
 }
 
 impl From<i64> for I64Wrapper {
     fn from(value: i64) -> Self {
-        Self {
-            val: value
-        }
+        Self { val: value }
     }
 }
 
 impl PippengerFriendlyStructure for I64Wrapper {
     fn add(&self, other: &Self) -> Self {
         Self {
-            val: self.val + other.val
+            val: self.val + other.val,
         }
     }
 
@@ -230,9 +241,7 @@ impl PippengerFriendlyStructure for I64Wrapper {
     }
 
     fn double(&self) -> Self {
-        Self {
-            val: self.val * 2
-        }
+        Self { val: self.val * 2 }
     }
 
     fn double_assign(&mut self) {
@@ -240,28 +249,46 @@ impl PippengerFriendlyStructure for I64Wrapper {
     }
 
     fn neg(&self) -> Self {
-        Self {
-            val: -self.val
-        }
+        Self { val: -self.val }
     }
 
     fn zero() -> Self {
-        Self {
-            val: 0
-        }
+        Self { val: 0 }
     }
 }
 
 #[test]
 fn test_probably_pippenger() {
-    let elements = vec![I64Wrapper::from(2), I64Wrapper::from(5), I64Wrapper::from(7)];
-    let scalars = vec![usize_to_bits(10, 8), usize_to_bits(20, 8), usize_to_bits(30, 8)];
-    assert_eq!(I64Wrapper::from(330), probably_pippenger_auto_window_size(elements.as_slice(), scalars.as_slice()));
+    let elements = vec![
+        I64Wrapper::from(2),
+        I64Wrapper::from(5),
+        I64Wrapper::from(7),
+    ];
+    let scalars = vec![
+        usize_to_bits(10, 8),
+        usize_to_bits(20, 8),
+        usize_to_bits(30, 8),
+    ];
+    assert_eq!(
+        I64Wrapper::from(330),
+        probably_pippenger_auto_window_size(elements.as_slice(), scalars.as_slice())
+    );
 }
 
 #[test]
 fn test_probably_pippenger_signed_digits() {
-    let elements = vec![I64Wrapper::from(2), I64Wrapper::from(5), I64Wrapper::from(7)];
-    let scalars = vec![usize_to_bits(10, 6), usize_to_bits(20, 6), usize_to_bits(30, 6)];
-    assert_eq!(I64Wrapper::from(330), probably_pippenger_signed_digits(elements.as_slice(), scalars.as_slice(), 3));
+    let elements = vec![
+        I64Wrapper::from(2),
+        I64Wrapper::from(5),
+        I64Wrapper::from(7),
+    ];
+    let scalars = vec![
+        usize_to_bits(10, 6),
+        usize_to_bits(20, 6),
+        usize_to_bits(30, 6),
+    ];
+    assert_eq!(
+        I64Wrapper::from(330),
+        probably_pippenger_signed_digits(elements.as_slice(), scalars.as_slice(), 3)
+    );
 }

@@ -14,11 +14,11 @@ pub mod hash;
 pub mod hkdf;
 pub mod multi_ed25519;
 pub mod noise;
+pub mod pippenger;
 pub mod test_utils;
 pub mod traits;
 pub mod validatable;
 pub mod x25519;
-pub mod pippenger;
 
 #[cfg(test)]
 mod unit_tests;
@@ -28,7 +28,10 @@ pub fn msm_all_bench_cases() -> Vec<usize> {
     let series_until_65 = (1..65).step_by(2);
     let series_until_129 = (64..129).step_by(4);
     let series_until_257 = (129..257).step_by(8);
-    series_until_65.chain(series_until_129).chain(series_until_257).collect::<Vec<_>>()
+    series_until_65
+        .chain(series_until_129)
+        .chain(series_until_257)
+        .collect::<Vec<_>>()
 }
 
 /// TBD.
@@ -36,7 +39,7 @@ pub fn msm_all_bench_cases() -> Vec<usize> {
 macro_rules! rand {
     ($typ:ty) => {{
         <$typ>::rand(&mut test_rng())
-    }}
+    }};
 }
 
 /// TBD.
@@ -46,9 +49,8 @@ macro_rules! serialize {
         let mut buf = vec![];
         $obj.$method(&mut buf).unwrap();
         buf
-    }}
+    }};
 }
-
 
 pub use self::traits::*;
 pub use hash::HashValue;
