@@ -81,23 +81,21 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
 
 #[test]
 fn object_args_good() {
-    let mut tests = vec![];
-
-    // ensure object exist
-    tests.push(("0xcafe::test::initialize", vec![], ""));
-
-    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], "hi"));
-
+    let mut tests = vec![
+        // ensure object exist
+        ("0xcafe::test::initialize", vec![], ""),
+        ("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], "hi"),
+    ];
 
     success(tests);
 }
 
 #[test]
 fn object_args_bad() {
-    let mut tests = vec![];
-
-    // object doesnt exist
-    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
+    let mut tests = vec![
+        // object doesnt exist
+        ("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT),
+    ];
 
     fail(tests);
 }
