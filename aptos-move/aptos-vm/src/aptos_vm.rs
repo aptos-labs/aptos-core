@@ -57,6 +57,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -70,7 +71,6 @@ use std::{
         Arc,
     },
 };
-use move_vm_runtime::session::SerializedReturnValues;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -334,28 +334,29 @@ impl AptosVM {
         session: &mut SessionExt<SS>,
         gas_meter: &mut AptosGasMeter,
         senders: Vec<AccountAddress>,
-        script_fn: &EntryFunction
+        script_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
         let function = session.load_function(
             script_fn.module(),
             script_fn.function(),
             script_fn.ty_args(),
         )?;
-        let args =
-            verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                session,
-                senders,
-                script_fn.args().to_vec(),
-                &function,
-                gas_meter
-            )?;
-        session.execute_entry_function(
-            script_fn.module(),
-            script_fn.function(),
-            script_fn.ty_args().to_vec(),
-            args,
+        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            senders,
+            script_fn.args().to_vec(),
+            &function,
             gas_meter,
-        ).map_err(|e| e.into_vm_status())
+        )?;
+        session
+            .execute_entry_function(
+                script_fn.module(),
+                script_fn.function(),
+                script_fn.ty_args().to_vec(),
+                args,
+                gas_meter,
+            )
+            .map_err(|e| e.into_vm_status())
     }
 
     fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
@@ -393,20 +394,22 @@ impl AptosVM {
                             senders,
                             convert_txn_args(script.args()),
                             &loaded_func,
-                            gas_meter
+                            gas_meter,
                         )?;
-                    session.execute_script(
-                        script.code(),
-                        script.ty_args().to_vec(),
-                        args,
-                        gas_meter,
-                    ).map_err(|e| e.into_vm_status())?;
+                    session
+                        .execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)
+                        .map_err(|e| e.into_vm_status())?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
-                    self.validate_and_execute_entry_function(&mut session, gas_meter, senders, script_fn)?;
+                    self.validate_and_execute_entry_function(
+                        &mut session,
+                        gas_meter,
+                        senders,
+                        script_fn,
+                    )?;
                 },
 
                 // Not reachable as this function should only be invoked for entry or script
@@ -586,7 +589,12 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
-        self.validate_and_execute_entry_function(session, gas_meter, vec![multisig_address], payload)?;
+        self.validate_and_execute_entry_function(
+            session,
+            gas_meter,
+            vec![multisig_address],
+            payload,
+        )?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
@@ -1111,7 +1119,7 @@ impl AptosVM {
                         senders,
                         convert_txn_args(script.args()),
                         &loaded_func,
-                        &mut gas_meter
+                        &mut gas_meter,
                     )
                     .map_err(Err)?;
 
@@ -1288,7 +1296,7 @@ impl AptosVM {
             func_name.as_ident_str(),
             &func_inst,
             metadata.as_ref(),
-            &mut gas_meter
+            &mut gas_meter,
         )?;
 
         Ok(session
