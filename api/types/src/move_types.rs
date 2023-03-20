@@ -30,6 +30,8 @@ use std::{
     str::FromStr,
 };
 
+pub type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
+
 /// A parsed Move resource
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
