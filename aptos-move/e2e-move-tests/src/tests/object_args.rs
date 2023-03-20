@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{
     language_storage::{TypeTag},
@@ -16,7 +16,7 @@ struct ModuleData {
     state: Vec<u8>,
 }
 
-const object_address: AccountAddress = AccountAddress::new([0x66, 0x2e, 0x50, 0x41, 0x8c, 0xe5, 0xf3, 0x5a, 0x6c, 0xa8, 0xb7, 0x9e, 0x28, 0x7c
+const OBJECT_ADDRESS: AccountAddress = AccountAddress::new([0x66, 0x2e, 0x50, 0x41, 0x8c, 0xe5, 0xf3, 0x5a, 0x6c, 0xa8, 0xb7, 0x9e, 0x28, 0x7c
     , 0x94, 0x12, 0x90, 0x71, 0xaa, 0x3f, 0xbd, 0x2a, 0xb9, 0x51, 0x37, 0xf7, 0xcb, 0xad, 0x13, 0x6f, 0x09, 0x2b]);
 
 fn success(tests: Vec<(&str, Vec<Vec<u8>>, &str)>) {
@@ -44,7 +44,7 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, &str)>
             ));
             assert_eq!(
                 String::from_utf8(
-                    h.read_resource::<ModuleData>(&object_address, module_data.clone())
+                    h.read_resource::<ModuleData>(&OBJECT_ADDRESS, module_data.clone())
                         .unwrap()
                         .state
                 )
@@ -86,7 +86,7 @@ fn object_args_good() {
     // ensure object exist
     tests.push(("0xcafe::test::initialize", vec![], ""));
 
-    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&object_address).unwrap()], "hi"));
+    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], "hi"));
 
 
     success(tests);
@@ -97,7 +97,7 @@ fn object_args_bad() {
     let mut tests = vec![];
 
     // object doesnt exist
-    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&object_address).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
+    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
 
     fail(tests);
 }

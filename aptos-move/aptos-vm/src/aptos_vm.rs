@@ -335,7 +335,7 @@ impl AptosVM {
         gas_meter: &mut AptosGasMeter,
         senders: Vec<AccountAddress>,
         script_fn: &EntryFunction
-    ) -> Result<VMResult<SerializedReturnValues>, VMStatus> {
+    ) -> Result<SerializedReturnValues, VMStatus> {
         let function = session.load_function(
             script_fn.module(),
             script_fn.function(),
@@ -349,13 +349,13 @@ impl AptosVM {
                 &function,
                 gas_meter
             )?;
-        Ok(session.execute_entry_function(
+        session.execute_entry_function(
             script_fn.module(),
             script_fn.function(),
             script_fn.ty_args().to_vec(),
             args,
             gas_meter,
-        ))
+        ).map_err(|e| e.into_vm_status())
     }
 
     fn execute_script_or_entry_function<S: MoveResolverExt, SS: MoveResolverExt>(
@@ -400,13 +400,13 @@ impl AptosVM {
                         script.ty_args().to_vec(),
                         args,
                         gas_meter,
-                    )
+                    ).map_err(|e| e.into_vm_status())?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
-                    self.validate_and_execute_entry_function(&mut session, gas_meter, senders, script_fn)?
+                    self.validate_and_execute_entry_function(&mut session, gas_meter, senders, script_fn)?;
                 },
 
                 // Not reachable as this function should only be invoked for entry or script
@@ -414,8 +414,7 @@ impl AptosVM {
                 _ => {
                     return Err(VMStatus::Error(StatusCode::UNREACHABLE, None));
                 },
-            }
-            .map_err(|e| e.into_vm_status())?;
+            };
 
             self.resolve_pending_code_publish(
                 &mut session,
@@ -530,7 +529,7 @@ impl AptosVM {
                     gas_meter,
                     txn_payload.multisig_address,
                     &entry_function,
-                    new_published_modules_loaded
+                    new_published_modules_loaded,
                 ),
         };
 
@@ -587,27 +586,7 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
     ) -> Result<(), VMStatus> {
-        let function =
-            session.load_function(payload.module(), payload.function(), payload.ty_args())?;
-        // This transaction is now being executed as the multisig account.
-        // If txn args are not valid, we'd still consider the multisig transaction as executed but
-        // failed. This is primarily because it's unrecoverable at this point.
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            vec![multisig_address],
-            payload.args().to_vec(),
-            &function,
-            gas_meter
-        )?;
-        session
-            .execute_entry_function(
-                payload.module(),
-                payload.function(),
-                payload.ty_args().to_vec(),
-                args,
-                gas_meter,
-            )
-            .map_err(|e| e.into_vm_status())?;
+        self.validate_and_execute_entry_function(session, gas_meter, vec![multisig_address], payload)?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
@@ -1691,7 +1670,7 @@ impl AptosSimulationVM {
                                     &mut gas_meter,
                                     multisig.multisig_address,
                                     &entry_function,
-                                    &mut new_published_modules_loaded
+                                    &mut new_published_modules_loaded,
                                 )
                                 .and_then(|_| {
                                     // TODO: Deduplicate this against execute_multisig_transaction
