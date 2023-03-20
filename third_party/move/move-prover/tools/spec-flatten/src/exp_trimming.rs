@@ -80,14 +80,14 @@ fn remove_redundant_aborts_ifs_since(
         None => {
             // no more aborts_if conditions to remove
             Ok(spec)
-        },
+        }
         Some((new_spec, true)) => {
             // removing one aborts_if does not affect the proving
             remove_redundant_aborts_ifs_since(options, fun_id, new_spec, pos)
-        },
+        }
         Some((_, false)) => {
             // removing one aborts_if makes the proving failed
             remove_redundant_aborts_ifs_since(options, fun_id, spec, pos + 1)
-        },
+        }
     }
 }

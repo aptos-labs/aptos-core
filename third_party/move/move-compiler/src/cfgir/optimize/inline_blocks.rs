@@ -47,7 +47,7 @@ fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Lab
             } => {
                 *counts.entry(*if_true).or_insert(0) += 1;
                 *counts.entry(*if_false).or_insert(0) += 1
-            },
+            }
             C::Jump { target, .. } => *counts.entry(*target).or_insert(0) += 1,
             _ => (),
         }
@@ -79,7 +79,7 @@ fn inline_single_target_blocks(
             None => {
                 next = labels.next();
                 continue;
-            },
+            }
             Some(b) => b,
         };
 
@@ -93,11 +93,11 @@ fn inline_single_target_blocks(
                 block.pop_back();
                 block.extend(target_block);
                 working_blocks.insert(cur, block);
-            },
+            }
             _ => {
                 finished_blocks.insert(cur, block);
                 next = labels.next();
-            },
+            }
         }
     }
 

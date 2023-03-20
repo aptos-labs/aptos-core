@@ -162,7 +162,7 @@ impl<'a> BinaryIndexedView<'a> {
             BinaryIndexedView::Module(module) => Ok(module.field_handle_at(idx)),
             BinaryIndexedView::Script(_) => {
                 Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT))
-            },
+            }
         }
     }
 
@@ -188,7 +188,7 @@ impl<'a> BinaryIndexedView<'a> {
             BinaryIndexedView::Module(module) => Ok(module.struct_instantiation_at(idx)),
             BinaryIndexedView::Script(_) => {
                 Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT))
-            },
+            }
         }
     }
 
@@ -207,7 +207,7 @@ impl<'a> BinaryIndexedView<'a> {
             BinaryIndexedView::Module(module) => Ok(module.field_instantiation_at(idx)),
             BinaryIndexedView::Script(_) => {
                 Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT))
-            },
+            }
         }
     }
 
@@ -223,7 +223,7 @@ impl<'a> BinaryIndexedView<'a> {
             BinaryIndexedView::Module(module) => Ok(module.struct_def_at(idx)),
             BinaryIndexedView::Script(_) => {
                 Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT))
-            },
+            }
         }
     }
 
@@ -242,7 +242,7 @@ impl<'a> BinaryIndexedView<'a> {
             BinaryIndexedView::Module(module) => Ok(module.function_def_at(idx)),
             BinaryIndexedView::Script(_) => {
                 Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT))
-            },
+            }
         }
     }
 
@@ -262,13 +262,15 @@ impl<'a> BinaryIndexedView<'a> {
             Reference(_) | MutableReference(_) => Ok(AbilitySet::REFERENCES),
             Signer => Ok(AbilitySet::SIGNER),
             TypeParameter(idx) => Ok(constraints[*idx as usize]),
-            Vector(ty) => AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                self.abilities(ty, constraints)?,
-            ]),
+            Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![self.abilities(ty, constraints)?],
+            ),
             Struct(idx) => {
                 let sh = self.struct_handle_at(*idx);
                 Ok(sh.abilities)
-            },
+            }
             StructInstantiation(idx, type_args) => {
                 let sh = self.struct_handle_at(*idx);
                 let declared_abilities = sh.abilities;
@@ -281,7 +283,7 @@ impl<'a> BinaryIndexedView<'a> {
                     sh.type_parameters.iter().map(|param| param.is_phantom),
                     type_arguments,
                 )
-            },
+            }
         }
     }
 

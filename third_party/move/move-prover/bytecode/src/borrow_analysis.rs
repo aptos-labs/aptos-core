@@ -114,7 +114,7 @@ impl BorrowInfo {
         match node {
             BorrowNode::LocalRoot(..) | BorrowNode::GlobalRoot(..) => {
                 trees.push(order);
-            },
+            }
             BorrowNode::Reference(index) => {
                 if next.is_in_use(node) {
                     // stop at a live reference
@@ -141,10 +141,10 @@ impl BorrowInfo {
                         }
                     }
                 }
-            },
+            }
             BorrowNode::ReturnPlaceholder(..) => {
                 unreachable!("placeholder node type is not expected here");
-            },
+            }
         }
     }
 
@@ -515,7 +515,7 @@ fn get_custom_annotation_or_none(
                 // this is a normal function and we can summarize its borrow semantics
                 None
             }
-        },
+        }
         Some(name) => Some(summarize_custom_borrow(
             IndexEdgeKind::Custom(name),
             &[0],
@@ -616,11 +616,11 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         assert!(!self.func_target.get_local_type(*src).is_reference());
                         assert!(!self.func_target.get_local_type(*dest).is_reference());
                         state.del_node(&src_node);
-                    },
+                    }
                     AssignKind::Copy => {
                         assert!(!self.func_target.get_local_type(*src).is_reference());
                         assert!(!self.func_target.get_local_type(*dest).is_reference());
-                    },
+                    }
                     AssignKind::Store => {
                         if self.func_target.get_local_type(*src).is_mutable_reference() {
                             assert!(self
@@ -629,9 +629,9 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                                 .is_mutable_reference());
                             state.add_edge(src_node, dest_node, BorrowEdge::Direct);
                         }
-                    },
+                    }
                 }
-            },
+            }
             Call(_, dests, oper, srcs, _) => {
                 use Operation::*;
                 match oper {
@@ -644,7 +644,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         let src_node = self.borrow_node(srcs[0]);
                         state.add_node(dest_node.clone());
                         state.add_edge(src_node, dest_node, BorrowEdge::Direct);
-                    },
+                    }
                     BorrowGlobal(mid, sid, inst)
                         if livevar_annotation_at.after.contains(&dests[0]) =>
                     {
@@ -656,7 +656,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         });
                         state.add_node(dest_node.clone());
                         state.add_edge(src_node, dest_node, BorrowEdge::Direct);
-                    },
+                    }
                     BorrowField(mid, sid, inst, field)
                         if livevar_annotation_at.after.contains(&dests[0]) =>
                     {
@@ -668,7 +668,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                             dest_node,
                             BorrowEdge::Field(mid.qualified_inst(*sid, inst.to_owned()), *field),
                         );
-                    },
+                    }
                     Function(mid, fid, targs) => {
                         let callee_env = &self
                             .func_target
@@ -693,11 +693,11 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                                         None => {
                                             // 1st iteration of the recursive case
                                             BorrowAnnotation::default()
-                                        },
+                                        }
                                         Some(annotation) => {
                                             // non-recursive case or Nth iteration of fixedpoint (N >= 1)
                                             annotation.clone()
-                                        },
+                                        }
                                     }
                                 });
 
@@ -708,18 +708,18 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                             srcs,
                             dests,
                         );
-                    },
+                    }
                     OpaqueCallBegin(_, _, _) | OpaqueCallEnd(_, _, _) => {
                         // just skip
-                    },
+                    }
                     _ => {
                         // Other operations do not create references.
-                    },
+                    }
                 }
-            },
+            }
             _ => {
                 // Other instructions do not create references
-            },
+            }
         }
 
         // Update live_vars.

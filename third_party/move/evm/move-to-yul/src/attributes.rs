@@ -254,22 +254,22 @@ pub(crate) fn construct_fun_attribute(fun: &FunctionEnv<'_>) -> Option<FunctionA
                             return None;
                         }
                         res = Some(FunctionAttribute::View);
-                    },
+                    }
                     PURE_ATTR => {
                         if res.is_some() {
                             return None;
                         }
                         res = Some(FunctionAttribute::Pure);
-                    },
+                    }
                     PAYABLE_ATTR => {
                         if res.is_some() {
                             return None;
                         }
                         res = Some(FunctionAttribute::Payable);
-                    },
+                    }
                     _ => (),
                 }
-            },
+            }
             _ => (),
         }
     }

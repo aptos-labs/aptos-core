@@ -220,10 +220,10 @@ impl CompiledUnit {
         match self {
             Self::Module(NamedCompiledModule { source_map, .. }) => {
                 bcs::to_bytes(source_map).unwrap()
-            },
+            }
             Self::Script(NamedCompiledScript { source_map, .. }) => {
                 bcs::to_bytes(source_map).unwrap()
-            },
+            }
         }
     }
 }
@@ -237,7 +237,7 @@ fn bytecode_verifier_mismatch_bug(
     let loc = match e.offsets().first() {
         Some((fdef_idx, offset)) if &location == e.location() => {
             sm.get_code_location(*fdef_idx, *offset).unwrap_or(loc)
-        },
+        }
         _ => loc,
     };
     Diagnostics::from(vec![diag!(
@@ -263,7 +263,7 @@ fn verify_script(sm: &SourceMap, loc: Loc, cs: &F::CompiledScript) -> Diagnostic
         Ok(_) => Diagnostics::new(),
         Err(e) => {
             bytecode_verifier_mismatch_bug(sm, loc, move_binary_format::errors::Location::Script, e)
-        },
+        }
     }
 }
 

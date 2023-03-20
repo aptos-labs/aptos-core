@@ -30,11 +30,11 @@ pub fn optimize(
                 None => {
                     changed = true;
                     None
-                },
+                }
                 Some(cmd_changed) => {
                     changed = cmd_changed || changed;
                     Some(cmd)
-                },
+                }
             })
             .collect();
     }
@@ -55,7 +55,7 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command) -> Option<bool> {
             let c1 = optimize_exp(er);
             let c2 = optimize_exp(el);
             c1 || c2
-        },
+        }
         C::Return { exp: e, .. } | C::Abort(e) | C::JumpIf { cond: e, .. } => optimize_exp(e),
         C::IgnoreAndPop { exp: e, .. } => {
             let c = optimize_exp(e);
@@ -64,7 +64,7 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command) -> Option<bool> {
                 Some(_) => return None,
                 None => c,
             }
-        },
+        }
 
         C::Jump { .. } => false,
         C::Break | C::Continue => panic!("ICE break/continue not translated to jumps"),
@@ -112,7 +112,7 @@ fn optimize_exp(e: &mut Exp) -> bool {
             };
             *e_ = fold_unary_op(e.exp.loc, op, v);
             true
-        },
+        }
 
         e_ @ E::BinopExp(_, _, _) => {
             let (e1, op, e2) = match e_ {
@@ -130,10 +130,10 @@ fn optimize_exp(e: &mut Exp) -> bool {
                 Some(folded) => {
                     *e_ = folded;
                     true
-                },
+                }
                 None => changed,
             }
-        },
+        }
 
         e_ @ E::Cast(_, _) => {
             let (e, bt) = match e_ {
@@ -149,10 +149,10 @@ fn optimize_exp(e: &mut Exp) -> bool {
                 Some(folded) => {
                     *e_ = folded;
                     true
-                },
+                }
                 None => changed,
             }
-        },
+        }
 
         e_ @ E::Vector(_, _, _, _) => {
             let (n, ty, eargs) = match e_ {
@@ -170,7 +170,7 @@ fn optimize_exp(e: &mut Exp) -> bool {
             debug_assert!(n == vs.len());
             *e_ = evalue_(e.exp.loc, Value_::Vector(ty.clone(), vs));
             true
-        },
+        }
     }
 }
 
@@ -185,7 +185,7 @@ fn is_valid_const_type(sp!(_, ty_): &BaseType) -> bool {
     match ty_ {
         T::Apply(_, tn, ty_args) if is_valid_const_type_name(tn) => {
             ty_args.iter().all(is_valid_const_type)
-        },
+        }
         T::Apply(_, _, _) | T::Param(_) | T::Unreachable | T::UnresolvedError => false,
     }
 }
@@ -203,7 +203,7 @@ fn is_valid_const_builtin_type(sp!(_, bt_): &BuiltinTypeName) -> bool {
     match bt_ {
         N::Address | N::U8 | N::U16 | N::U32 | N::U64 | N::U128 | N::U256 | N::Vector | N::Bool => {
             true
-        },
+        }
         N::Signer | N::Fun => false,
     }
 }
@@ -435,7 +435,7 @@ fn foldable_exps(e: &Exp) -> Option<Vec<Value>> {
                 }
             }
             Some(values)
-        },
+        }
         _ => Some(vec![sp(e.exp.loc, foldable_exp(e)?)]),
     }
 }

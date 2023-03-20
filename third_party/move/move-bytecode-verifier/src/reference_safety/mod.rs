@@ -88,7 +88,7 @@ fn call(
             } else {
                 BTreeSet::new()
             }
-        },
+        }
         None => BTreeSet::new(),
     };
     let return_ = verifier.resolver.signature_at(function_handle.return_);
@@ -163,51 +163,51 @@ fn execute_inner(
         Bytecode::CopyLoc(local) => {
             let value = state.copy_loc(offset, *local)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MoveLoc(local) => {
             let value = state.move_loc(offset, *local)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::StLoc(local) => {
             state.st_loc(offset, *local, safe_unwrap!(verifier.stack.pop()))?
-        },
+        }
 
         Bytecode::FreezeRef => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let frozen = state.freeze_ref(offset, id)?;
             verifier.stack.push(frozen)
-        },
+        }
         Bytecode::Eq | Bytecode::Neq => {
             let v1 = safe_unwrap!(verifier.stack.pop());
             let v2 = safe_unwrap!(verifier.stack.pop());
             let value = state.comparison(offset, v1, v2)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ReadRef => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.read_ref(offset, id)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::WriteRef => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let val_operand = safe_unwrap!(verifier.stack.pop());
             safe_assert!(val_operand.is_value());
             state.write_ref(offset, id)?
-        },
+        }
 
         Bytecode::MutBorrowLoc(local) => {
             let value = state.borrow_loc(offset, true, *local)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ImmBorrowLoc(local) => {
             let value = state.borrow_loc(offset, false, *local)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MutBorrowField(field_handle_index) => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.borrow_field(offset, true, id, *field_handle_index)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MutBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier
                 .resolver
@@ -215,12 +215,12 @@ fn execute_inner(
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.borrow_field(offset, true, id, field_inst.handle)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ImmBorrowField(field_handle_index) => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.borrow_field(offset, false, id, *field_handle_index)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ImmBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier
                 .resolver
@@ -228,51 +228,51 @@ fn execute_inner(
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.borrow_field(offset, false, id, field_inst.handle)?;
             verifier.stack.push(value)
-        },
+        }
 
         Bytecode::MutBorrowGlobal(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let value = state.borrow_global(offset, true, *idx)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MutBorrowGlobalGeneric(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let value = state.borrow_global(offset, true, struct_inst.def)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ImmBorrowGlobal(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let value = state.borrow_global(offset, false, *idx)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::ImmBorrowGlobalGeneric(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let value = state.borrow_global(offset, false, struct_inst.def)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MoveFrom(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let value = state.move_from(offset, *idx)?;
             verifier.stack.push(value)
-        },
+        }
         Bytecode::MoveFromGeneric(idx) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let value = state.move_from(offset, struct_inst.def)?;
             verifier.stack.push(value)
-        },
+        }
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
             call(verifier, state, offset, function_handle, meter)?
-        },
+        }
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
             call(verifier, state, offset, function_handle, meter)?
-        },
+        }
 
         Bytecode::Ret => {
             let mut return_values = vec![];
@@ -282,7 +282,7 @@ fn execute_inner(
             return_values.reverse();
 
             state.ret(offset, return_values)?
-        },
+        }
 
         Bytecode::Branch(_)
         | Bytecode::Nop
@@ -298,17 +298,17 @@ fn execute_inner(
 
         Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Abort => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
-        },
+        }
         Bytecode::MoveTo(_) | Bytecode::MoveToGeneric(_) => {
             // resource value
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             // signer reference
             state.release_value(safe_unwrap!(verifier.stack.pop()));
-        },
+        }
 
         Bytecode::LdTrue | Bytecode::LdFalse => {
             verifier.stack.push(state.value_for(&SignatureToken::Bool))
-        },
+        }
         Bytecode::LdU8(_) => verifier.stack.push(state.value_for(&SignatureToken::U8)),
         Bytecode::LdU16(_) => verifier.stack.push(state.value_for(&SignatureToken::U16)),
         Bytecode::LdU32(_) => verifier.stack.push(state.value_for(&SignatureToken::U32)),
@@ -318,7 +318,7 @@ fn execute_inner(
         Bytecode::LdConst(idx) => {
             let signature = &verifier.resolver.constant_at(*idx).type_;
             verifier.stack.push(state.value_for(signature))
-        },
+        }
 
         Bytecode::Add
         | Bytecode::Sub
@@ -340,26 +340,26 @@ fn execute_inner(
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             // TODO maybe call state.value_for
             verifier.stack.push(AbstractValue::NonReference)
-        },
+        }
 
         Bytecode::Pack(idx) => {
             let struct_def = verifier.resolver.struct_def_at(*idx)?;
             pack(verifier, struct_def)?
-        },
+        }
         Bytecode::PackGeneric(idx) => {
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let struct_def = verifier.resolver.struct_def_at(struct_inst.def)?;
             pack(verifier, struct_def)?
-        },
+        }
         Bytecode::Unpack(idx) => {
             let struct_def = verifier.resolver.struct_def_at(*idx)?;
             unpack(verifier, struct_def)?
-        },
+        }
         Bytecode::UnpackGeneric(idx) => {
             let struct_inst = verifier.resolver.struct_instantiation_at(*idx)?;
             let struct_def = verifier.resolver.struct_def_at(struct_inst.def)?;
             unpack(verifier, struct_def)?
-        },
+        }
 
         Bytecode::VecPack(idx, num) => {
             for _ in 0..*num {
@@ -370,32 +370,32 @@ fn execute_inner(
             verifier
                 .stack
                 .push(state.value_for(&SignatureToken::Vector(Box::new(element_type))));
-        },
+        }
 
         Bytecode::VecLen(_) => {
             let vec_ref = safe_unwrap!(verifier.stack.pop());
             state.vector_op(offset, vec_ref, false)?;
             verifier.stack.push(state.value_for(&SignatureToken::U64));
-        },
+        }
 
         Bytecode::VecImmBorrow(_) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let vec_ref = safe_unwrap!(verifier.stack.pop());
             let elem_ref = state.vector_element_borrow(offset, vec_ref, false)?;
             verifier.stack.push(elem_ref);
-        },
+        }
         Bytecode::VecMutBorrow(_) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let vec_ref = safe_unwrap!(verifier.stack.pop());
             let elem_ref = state.vector_element_borrow(offset, vec_ref, true)?;
             verifier.stack.push(elem_ref);
-        },
+        }
 
         Bytecode::VecPushBack(_) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let vec_ref = safe_unwrap!(verifier.stack.pop());
             state.vector_op(offset, vec_ref, true)?;
-        },
+        }
 
         Bytecode::VecPopBack(idx) => {
             let vec_ref = safe_unwrap!(verifier.stack.pop());
@@ -403,7 +403,7 @@ fn execute_inner(
 
             let element_type = vec_element_type(verifier, *idx)?;
             verifier.stack.push(state.value_for(&element_type));
-        },
+        }
 
         Bytecode::VecUnpack(idx, num) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
@@ -412,14 +412,14 @@ fn execute_inner(
             for _ in 0..*num {
                 verifier.stack.push(state.value_for(&element_type));
             }
-        },
+        }
 
         Bytecode::VecSwap(_) => {
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
             let vec_ref = safe_unwrap!(verifier.stack.pop());
             state.vector_op(offset, vec_ref, true)?;
-        },
+        }
     };
     Ok(())
 }

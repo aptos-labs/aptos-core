@@ -101,7 +101,7 @@ impl<'a> Instrumenter<'a> {
         use Operation::*;
         match bc {
             // Remove Unpack, we currently don't need it.
-            Call(_, _, UnpackRef, ..) | Call(_, _, UnpackRefDeep, ..) => {},
+            Call(_, _, UnpackRef, ..) | Call(_, _, UnpackRefDeep, ..) => {}
 
             // Instructions which lead to asserting data invariants.
             Call(id, dests, Pack(mid, sid, targs), srcs, aa) if self.for_verification => {
@@ -110,15 +110,15 @@ impl<'a> Instrumenter<'a> {
                     .emit(Call(id, dests, Pack(mid, sid, targs), srcs, aa));
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
-            },
+            }
             Call(_, _, PackRef, srcs, _) if self.for_verification => {
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, srcs[0]);
-            },
+            }
             Call(_, _, PackRefDeep, srcs, _) if self.for_verification => {
                 // Emit a deep assert of the data invariant.
                 self.emit_data_invariant_for_temp(true, PropKind::Assert, srcs[0]);
-            },
+            }
 
             // Augment WellFormed calls in assumptions. Currently those cannot appear in assertions.
             // We leave the old WellFormed check for the backend to process any type related
@@ -143,7 +143,7 @@ impl<'a> Instrumenter<'a> {
                 };
                 let exp = ExpData::rewrite(exp, &mut rewriter);
                 self.builder.emit(Prop(id, PropKind::Assume, exp));
-            },
+            }
             _ => self.builder.emit(bc),
         }
     }
@@ -206,7 +206,7 @@ impl<'a> Instrumenter<'a> {
                 } else {
                     self.translate_invariant_for_struct(deep, value, struct_env, targs)
                 }
-            },
+            }
             Type::Vector(ety) => {
                 // When dealing with a vector, we cannot maintain individual locations for
                 // invariants. Instead we choose just one as a representative.
@@ -227,7 +227,7 @@ impl<'a> Instrumenter<'a> {
                 } else {
                     vec![]
                 }
-            },
+            }
             _ => vec![],
         }
     }
@@ -255,7 +255,7 @@ impl<'a> Instrumenter<'a> {
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
                 Call(id, oper @ Select(..), args) if args.is_empty() => {
                     Ok(Call(*id, oper.to_owned(), vec![value.clone()]).into_exp())
-                },
+                }
                 _ => Err(e),
             };
             // Also instantiate types.

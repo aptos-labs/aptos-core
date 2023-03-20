@@ -118,7 +118,7 @@ pub trait AbstractInterpreter: TransferFunctions {
                             JoinResult::Unchanged => {
                                 // Pre is the same after join. Reanalyzing this block would produce
                                 // the same post
-                            },
+                            }
                             JoinResult::Changed => {
                                 // If the cur->successor is a back edge, jump back to the beginning
                                 // of the loop, instead of the normal next block
@@ -127,17 +127,20 @@ pub trait AbstractInterpreter: TransferFunctions {
                                 }
                                 // Pre has changed, the post condition is now unknown for the block
                                 next_block_invariant.post = BlockPostcondition::Unprocessed
-                            },
+                            }
                         }
-                    },
+                    }
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre
-                        inv_map.insert(*next_block_id, BlockInvariant {
-                            pre: post_state.clone(),
-                            post: BlockPostcondition::Success,
-                        });
-                    },
+                        inv_map.insert(
+                            *next_block_id,
+                            BlockInvariant {
+                                pre: post_state.clone(),
+                                post: BlockPostcondition::Success,
+                            },
+                        );
+                    }
                 }
             }
             next_block = next_block_candidate;

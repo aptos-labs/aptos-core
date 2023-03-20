@@ -110,7 +110,7 @@ fn invalid_type_param_in_field() {
                 BoundsChecker::verify_module(&m).unwrap_err().major_status(),
                 StatusCode::INDEX_OUT_OF_BOUNDS
             );
-        },
+        }
         _ => panic!("attempt to change a field that does not exist"),
     }
 }
@@ -127,7 +127,7 @@ fn invalid_struct_in_field() {
                 BoundsChecker::verify_module(&m).unwrap_err().major_status(),
                 StatusCode::INDEX_OUT_OF_BOUNDS
             );
-        },
+        }
         _ => panic!("attempt to change a field that does not exist"),
     }
 }
@@ -145,7 +145,7 @@ fn invalid_struct_with_actuals_in_field() {
                 BoundsChecker::verify_module(&m).unwrap_err().major_status(),
                 StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH
             );
-        },
+        }
         _ => panic!("attempt to change a field that does not exist"),
     }
 }

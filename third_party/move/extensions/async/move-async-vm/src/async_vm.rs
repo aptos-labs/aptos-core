@@ -245,7 +245,7 @@ impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
                         ext: native_extensions,
                     })
                 }
-            },
+            }
             Err(error) => Err(AsyncError { error, gas_used }),
         }
     }
@@ -340,7 +340,7 @@ impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
                         ext: native_extensions,
                     })
                 }
-            },
+            }
             Err(error) => Err(AsyncError { error, gas_used }),
         }
     }

@@ -66,7 +66,7 @@ impl Root {
                 } else {
                     panic!("Type parameter index out of bound")
                 }
-            },
+            }
         };
         Self {
             root: root_address,
@@ -166,7 +166,7 @@ impl TrieNode {
                 } else {
                     Some(lhs)
                 }
-            },
+            }
             (Some(_), None) => self.data,
             (None, _) => acc,
         };
@@ -188,10 +188,13 @@ impl ReadWriteSet {
             self.0
                 .iter()
                 .map(|(root, node)| {
-                    (root.clone(), TrieNode {
-                        data: node.get_access(),
-                        children: BTreeMap::new(),
-                    })
+                    (
+                        root.clone(),
+                        TrieNode {
+                            data: node.get_access(),
+                            children: BTreeMap::new(),
+                        },
+                    )
                 })
                 .collect(),
         )
@@ -242,14 +245,14 @@ impl ReadWriteSet {
                     } else {
                         access.is_read()
                     }
-                },
+                }
                 None => false,
             };
             if keep {
                 match key.root {
                     RootAddress::Const(addr) => {
                         results.push(ResourceKey::new(addr, key.type_.clone().into_struct_tag()?))
-                    },
+                    }
                     RootAddress::Formal(_) => return None,
                 }
             }

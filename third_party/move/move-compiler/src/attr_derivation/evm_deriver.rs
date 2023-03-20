@@ -50,11 +50,14 @@ fn derive_module_for_evm(mod_def: &mut ModuleDefinition) {
                 );
                 // Create new #[external(params)] attribute, taking over parameters given to
                 // #[callable].
-                let attrs = sp(loc, vec![new_attr(
+                let attrs = sp(
                     loc,
-                    EXTERNAL_ATTR,
-                    attr_params(attr).into_iter().cloned().collect(),
-                )]);
+                    vec![new_attr(
+                        loc,
+                        EXTERNAL_ATTR,
+                        attr_params(attr).into_iter().cloned().collect(),
+                    )],
+                );
                 new_funs.push(new_native_fun(
                     loc,
                     call_name,

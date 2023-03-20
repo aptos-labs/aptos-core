@@ -46,19 +46,19 @@ pub fn format_diff(expected: impl AsRef<str>, actual: impl AsRef<str>) -> String
             Difference::Same(x) => {
                 ret.push_str(x);
                 ret.push('\n');
-            },
+            }
             Difference::Add(x) => {
                 ret.push_str("\x1B[92m");
                 ret.push_str(x);
                 ret.push_str("\x1B[0m");
                 ret.push('\n');
-            },
+            }
             Difference::Rem(x) => {
                 ret.push_str("\x1B[91m");
                 ret.push_str(x);
                 ret.push_str("\x1B[0m");
                 ret.push('\n');
-            },
+            }
         }
     }
     ret

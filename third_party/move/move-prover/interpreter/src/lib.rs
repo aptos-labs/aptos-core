@@ -122,7 +122,7 @@ pub fn interpret_with_options(
             TransactionArgument::Address(v) => MoveValue::Address(v),
             TransactionArgument::U8Vector(v) => {
                 MoveValue::Vector(v.into_iter().map(MoveValue::U8).collect())
-            },
+            }
             TransactionArgument::U16(v) => MoveValue::U16(v),
             TransactionArgument::U32(v) => MoveValue::U32(v),
             TransactionArgument::U256(v) => MoveValue::U256(v),
@@ -259,7 +259,7 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
                     ChangeSet::new(),
                     global_state.clone(),
                 )
-            },
+            }
         };
 
         // run the actual interpretation
@@ -284,7 +284,7 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
                     ChangeSet::new(),
                     global_state.clone(),
                 )
-            },
+            }
         };
 
         // convert the args
@@ -300,7 +300,7 @@ impl<'env> StacklessBytecodeInterpreter<'env> {
                     ChangeSet::new(),
                     global_state.clone(),
                 )
-            },
+            }
         };
 
         // run the actual interpretation
@@ -421,7 +421,7 @@ fn convert_bcs_arguments_to_move_value_arguments(
                             ));
                         }
                         move_vals.push(MoveValue::Signer(senders[i]))
-                    },
+                    }
                     _ => {
                         if i != 0 && i != senders.len() {
                             return Err(PartialVMError::new(
@@ -429,11 +429,11 @@ fn convert_bcs_arguments_to_move_value_arguments(
                             ));
                         }
                         break;
-                    },
+                    }
                 }
             }
             move_vals.len()
-        },
+        }
     };
 
     if (num_signer_args + bcs_args.len()) != params.len() {
@@ -445,13 +445,13 @@ fn convert_bcs_arguments_to_move_value_arguments(
         match param.1.clone().into_type_tag(env) {
             None => {
                 return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH));
-            },
+            }
             Some(type_tag) => {
                 let ty = convert_move_type_tag(env, &type_tag)?;
                 let val = MoveValue::simple_deserialize(arg_bcs, &ty.to_move_type_layout())
                     .map_err(|_| PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT))?;
                 move_vals.push(val);
-            },
+            }
         }
     }
     Ok(move_vals)

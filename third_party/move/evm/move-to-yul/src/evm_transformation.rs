@@ -65,7 +65,7 @@ impl FunctionTargetProcessor for EvmTransformationProcessor {
                                     dst[0],
                                     Constant::U256(U256::from_words(hi, lo)),
                                 );
-                            },
+                            }
                             _ => {
                                 data.code[code_offset] = Bytecode::Call(
                                     *attr_id,
@@ -74,7 +74,7 @@ impl FunctionTargetProcessor for EvmTransformationProcessor {
                                     src.clone(),
                                     abort_condition.clone(),
                                 );
-                            },
+                            }
                         }
                     } else if let Some(new_op) = transform_u256_op(fun_name) {
                         data.code[code_offset] = Bytecode::Call(

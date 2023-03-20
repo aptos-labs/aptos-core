@@ -448,7 +448,7 @@ impl AstDebug for SequenceItem_ {
             I::Declare(sp!(_, bs)) => {
                 w.write("let ");
                 bs.ast_debug(w);
-            },
+            }
             I::Bind(sp!(_, bs), expected_types, e) => {
                 w.write("let ");
                 bs.ast_debug(w);
@@ -457,7 +457,7 @@ impl AstDebug for SequenceItem_ {
                 w.write(")");
                 w.write(" = ");
                 e.ast_debug(w);
-            },
+            }
         }
     }
 }
@@ -492,19 +492,19 @@ impl AstDebug for UnannotatedExp_ {
             E::Constant(Some(m), c) => w.write(&format!("{}::{}", m, c)),
             E::ModuleCall(mcall) => {
                 mcall.ast_debug(w);
-            },
+            }
             E::VarCall(var, rhs) => {
                 w.write(&format!("{}", var));
                 w.write("(");
                 rhs.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Builtin(bf, rhs) => {
                 bf.ast_debug(w);
                 w.write("(");
                 rhs.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Vector(_loc, usize, ty, elems) => {
                 w.write(format!("vector#{}", usize));
                 w.write("<");
@@ -513,7 +513,7 @@ impl AstDebug for UnannotatedExp_ {
                 w.write("[");
                 elems.ast_debug(w);
                 w.write("]");
-            },
+            }
             E::Pack(m, s, tys, fields) => {
                 w.write(&format!("{}::{}", m, s));
                 w.write("<");
@@ -528,7 +528,7 @@ impl AstDebug for UnannotatedExp_ {
                     e.ast_debug(w);
                 });
                 w.write("}");
-            },
+            }
             E::IfElse(b, t, f) => {
                 w.write("if (");
                 b.ast_debug(w);
@@ -536,13 +536,13 @@ impl AstDebug for UnannotatedExp_ {
                 t.ast_debug(w);
                 w.write(" else ");
                 f.ast_debug(w);
-            },
+            }
             E::While(b, e) => {
                 w.write("while (");
                 b.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
-            },
+            }
             E::Loop { has_break, body } => {
                 w.write("loop");
                 if *has_break {
@@ -550,19 +550,19 @@ impl AstDebug for UnannotatedExp_ {
                 }
                 w.write(" ");
                 body.ast_debug(w);
-            },
+            }
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
             E::Lambda(sp!(_, bs), e) => {
                 w.write("|");
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
-            },
+            }
             E::ExpList(es) => {
                 w.write("(");
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
-            },
+            }
 
             E::Assign(sp!(_, lvalues), expected_types, rhs) => {
                 lvalues.ast_debug(w);
@@ -570,34 +570,34 @@ impl AstDebug for UnannotatedExp_ {
                 expected_types.ast_debug(w);
                 w.write(") = ");
                 rhs.ast_debug(w);
-            },
+            }
 
             E::Mutate(lhs, rhs) => {
                 w.write("*");
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
-            },
+            }
 
             E::Return(e) => {
                 w.write("return ");
                 e.ast_debug(w);
-            },
+            }
             E::Abort(e) => {
                 w.write("abort ");
                 e.ast_debug(w);
-            },
+            }
             E::Break => w.write("break"),
             E::Continue => w.write("continue"),
             E::Dereference(e) => {
                 w.write("*");
                 e.ast_debug(w)
-            },
+            }
             E::UnaryExp(op, e) => {
                 op.ast_debug(w);
                 w.write(" ");
                 e.ast_debug(w);
-            },
+            }
             E::BinopExp(l, op, ty, r) => {
                 l.ast_debug(w);
                 w.write(" ");
@@ -606,7 +606,7 @@ impl AstDebug for UnannotatedExp_ {
                 ty.ast_debug(w);
                 w.write(" ");
                 r.ast_debug(w)
-            },
+            }
             E::Borrow(mut_, e, f) => {
                 w.write("&");
                 if *mut_ {
@@ -614,35 +614,35 @@ impl AstDebug for UnannotatedExp_ {
                 }
                 e.ast_debug(w);
                 w.write(&format!(".{}", f));
-            },
+            }
             E::TempBorrow(mut_, e) => {
                 w.write("&");
                 if *mut_ {
                     w.write("mut ");
                 }
                 e.ast_debug(w);
-            },
+            }
             E::BorrowLocal(mut_, v) => {
                 w.write("&");
                 if *mut_ {
                     w.write("mut ");
                 }
                 w.write(&format!("{}", v));
-            },
+            }
             E::Cast(e, ty) => {
                 w.write("(");
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Annotate(e, ty) => {
                 w.write("annot(");
                 e.ast_debug(w);
                 w.write(": ");
                 ty.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Spec(anchor) => {
                 let SpecAnchor {
                     id,
@@ -656,7 +656,7 @@ impl AstDebug for UnannotatedExp_ {
                     None => (),
                     Some(o) => {
                         w.write(&format!(" from {}", o));
-                    },
+                    }
                 }
                 if !used_locals.is_empty() {
                     w.write(" uses [");
@@ -677,7 +677,7 @@ impl AstDebug for UnannotatedExp_ {
                         w.writeln("}")
                     }
                 }
-            },
+            }
             E::UnresolvedError => w.write("_|_"),
         }
     }
@@ -759,7 +759,7 @@ impl AstDebug for ExpListItem {
             ExpListItem::Splat(_, e, ss) => {
                 w.write("~");
                 w.annotate(|w| e.ast_debug(w), ss)
-            },
+            }
         }
     }
 }
@@ -805,7 +805,7 @@ impl AstDebug for LValue_ {
                     a.ast_debug(w);
                 });
                 w.write("}");
-            },
+            }
             L::BorrowUnpack(mut_, m, s, tys, fields) => {
                 w.write("&");
                 if *mut_ {
@@ -823,7 +823,7 @@ impl AstDebug for LValue_ {
                     a.ast_debug(w);
                 });
                 w.write("}");
-            },
+            }
         }
     }
 }

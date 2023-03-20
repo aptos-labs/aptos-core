@@ -491,12 +491,12 @@ impl<'env> SpecTranslator<'env> {
                     emit!(new_spec_trans.writer, " && InRangeVec(");
                     new_spec_trans.translate_exp(&info.range);
                     emit!(new_spec_trans.writer, ", {})", &var_decl.0);
-                },
+                }
                 Type::Primitive(PrimitiveType::Range) => {
                     emit!(new_spec_trans.writer, " && $InRange(");
                     new_spec_trans.translate_exp(&info.range);
                     emit!(new_spec_trans.writer, ", {})", &var_decl.0);
-                },
+                }
                 Type::Primitive(_)
                 | Type::Tuple(_)
                 | Type::Struct(_, _, _)
@@ -506,7 +506,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
-                | Type::Var(_) => {},
+                | Type::Var(_) => {}
             }
             emitln!(new_spec_trans.writer, " &&");
             new_spec_trans.translate_exp(&info.condition);
@@ -643,22 +643,22 @@ impl<'env> SpecTranslator<'env> {
             ExpData::Value(node_id, val) => {
                 self.set_writer_location(*node_id);
                 self.translate_value(*node_id, val);
-            },
+            }
             ExpData::LocalVar(node_id, name) => {
                 self.set_writer_location(*node_id);
                 self.translate_local_var(*node_id, *name);
-            },
+            }
             ExpData::Temporary(node_id, idx) => {
                 self.set_writer_location(*node_id);
                 self.translate_temporary(*node_id, *idx);
-            },
+            }
             ExpData::Call(node_id, oper, args) => {
                 self.set_writer_location(*node_id);
                 self.translate_call(*node_id, oper, args);
-            },
+            }
             ExpData::Invoke(node_id, ..) => {
                 self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
-            },
+            }
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
                 "`|x|e` (lambda) currently only supported as argument for `all` or `any`",
@@ -668,15 +668,15 @@ impl<'env> SpecTranslator<'env> {
                 // not present.
                 self.set_writer_location(*node_id);
                 self.translate_choice(*node_id, *kind, &ranges[0], exp)
-            },
+            }
             ExpData::Quant(node_id, kind, ranges, triggers, condition, exp) => {
                 self.set_writer_location(*node_id);
                 self.translate_quant(*node_id, *kind, ranges, triggers, condition, exp)
-            },
+            }
             ExpData::Block(node_id, vars, scope) => {
                 self.set_writer_location(*node_id);
                 self.translate_block(vars, scope)
-            },
+            }
             ExpData::IfElse(node_id, cond, on_true, on_false) => {
                 self.set_writer_location(*node_id);
                 // The whole ITE is one expression so we wrap it with a parenthesis
@@ -688,7 +688,7 @@ impl<'env> SpecTranslator<'env> {
                 emit!(self.writer, " else ");
                 self.translate_exp_parenthesised(on_false);
                 emit!(self.writer, ")");
-            },
+            }
             ExpData::Invalid(_) => panic!("unexpected error expression"),
         }
     }
@@ -716,7 +716,7 @@ impl<'env> SpecTranslator<'env> {
             Value::Bool(val) => emit!(self.writer, "{}", val),
             Value::ByteArray(val) => {
                 emit!(self.writer, &boogie_byte_blob(self.options, val, bv_flag))
-            },
+            }
             Value::AddressArray(val) => emit!(self.writer, &boogie_address_blob(self.options, val)),
             Value::Vector(val) => emit!(self.writer, &boogie_value_blob(self.options, val)),
         }
@@ -776,18 +776,18 @@ impl<'env> SpecTranslator<'env> {
             // Regular expressions
             Operation::Function(module_id, fun_id, memory_labels) => {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
-            },
+            }
             Operation::Pack(mid, sid) => self.translate_pack(node_id, *mid, *sid, args),
             Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
-            },
+            }
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
-            },
+            }
             Operation::Result(pos) => {
                 emit!(self.writer, "$ret{}", pos);
-            },
+            }
             Operation::Index => self.translate_primitive_call("ReadVec", args),
             Operation::Slice => self.translate_primitive_call("$SliceVecByRange", args),
             Operation::Range => self.translate_primitive_call("$Range", args),
@@ -829,7 +829,7 @@ impl<'env> SpecTranslator<'env> {
                 if exp_arith_flag {
                     emit!(self.writer, ")");
                 }
-            },
+            }
             Operation::Bv2Int => {
                 let exp_bv_flag = global_state.get_node_num_oper(args[0].node_id()) == Bitwise;
                 if exp_bv_flag {
@@ -841,14 +841,14 @@ impl<'env> SpecTranslator<'env> {
                 if exp_bv_flag {
                     emit!(self.writer, ")");
                 }
-            },
+            }
             // Builtin functions
             Operation::Global(memory_label) => {
                 self.translate_resource_access(node_id, args, memory_label)
-            },
+            }
             Operation::Exists(memory_label) => {
                 self.translate_resource_exists(node_id, args, memory_label)
-            },
+            }
             Operation::CanModify => self.translate_can_modify(node_id, args),
             Operation::Len => self.translate_primitive_call("LenVec", args),
             Operation::TypeValue => self.translate_type_value(node_id),
@@ -862,10 +862,10 @@ impl<'env> SpecTranslator<'env> {
             Operation::SingleVec => self.translate_primitive_call("MakeVec1", args),
             Operation::IndexOfVec => {
                 self.translate_primitive_inst_call(node_id, "$IndexOfVec", args)
-            },
+            }
             Operation::ContainsVec => {
                 self.translate_primitive_inst_call(node_id, "$ContainsVec", args)
-            },
+            }
             Operation::RangeVec => self.translate_primitive_inst_call(node_id, "$RangeVec", args),
             Operation::InRangeVec => self.translate_primitive_call("InRangeVec", args),
             Operation::InRangeRange => self.translate_primitive_call("$InRange", args),
@@ -878,7 +878,7 @@ impl<'env> SpecTranslator<'env> {
             Operation::WellFormed => self.translate_well_formed(&args[0]),
             Operation::AbortCode => emit!(self.writer, "$abort_code"),
             Operation::AbortFlag => emit!(self.writer, "$abort_flag"),
-            Operation::NoOp => { /* do nothing. */ },
+            Operation::NoOp => { /* do nothing. */ }
             Operation::Trace(_) => {
                 // An unreduced trace means it has been used in a spec fun or let.
                 // Create an error about this.
@@ -886,7 +886,7 @@ impl<'env> SpecTranslator<'env> {
                     &loc,
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
-            },
+            }
             Operation::Old => panic!("operation unexpected: {:?}", oper),
         }
     }
@@ -1183,11 +1183,11 @@ impl<'env> SpecTranslator<'env> {
                         range_tmp,
                         quant_var,
                     );
-                },
+                }
                 Type::Primitive(PrimitiveType::Range) => {
                     let quant_var = quant_vars.get(&var.name).unwrap();
                     emit!(self.writer, "(var {} := {};\n", var_name, quant_var);
-                },
+                }
                 Type::ResourceDomain(mid, sid, inst_opt) => {
                     let memory = &mid.qualified_inst(*sid, inst_opt.to_owned().unwrap_or_default());
                     let addr_var = resource_vars.get(&var.name).unwrap();
@@ -1199,7 +1199,7 @@ impl<'env> SpecTranslator<'env> {
                         resource_name,
                         addr_var
                     );
-                },
+                }
                 _ => (),
             }
         }
@@ -1233,7 +1233,7 @@ impl<'env> SpecTranslator<'env> {
                 Type::Struct(mid, sid, ..) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP)
-                },
+                }
                 Type::Primitive(_)
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
@@ -1271,7 +1271,7 @@ impl<'env> SpecTranslator<'env> {
             match quant_ty.skip_reference() {
                 Type::TypeDomain(ty) => {
                     emit!(self.writer, "{}{}: {}", comma, var_name, ty_str(ty));
-                },
+                }
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
@@ -1279,17 +1279,17 @@ impl<'env> SpecTranslator<'env> {
                     } else {
                         panic!("unexpected type");
                     }
-                },
+                }
                 Type::ResourceDomain(..) => {
                     let addr_quant_var = self.fresh_var_name("a");
                     emit!(self.writer, "{}{}: int", comma, addr_quant_var);
                     resource_vars.insert(var.name, addr_quant_var);
-                },
+                }
                 _ => {
                     let quant_var = self.fresh_var_name("i");
                     emit!(self.writer, "{}{}: int", comma, quant_var);
                     quant_vars.insert(var.name, quant_var);
-                },
+                }
             }
             comma = ", ";
         }
@@ -1345,11 +1345,11 @@ impl<'env> SpecTranslator<'env> {
                         type_check = "true".to_string();
                     }
                     emit!(self.writer, "{}{}", separator, type_check);
-                },
+                }
                 Type::ResourceDomain(..) => {
                     // currently does not generate a constraint
                     continue;
-                },
+                }
                 Type::Vector(..) => {
                     let range_tmp = range_tmps.get(&var.name).unwrap();
                     let quant_var = quant_vars.get(&var.name).unwrap();
@@ -1360,7 +1360,7 @@ impl<'env> SpecTranslator<'env> {
                         range_tmp,
                         quant_var,
                     );
-                },
+                }
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
@@ -1375,7 +1375,7 @@ impl<'env> SpecTranslator<'env> {
                     } else {
                         panic!("unexpected type");
                     }
-                },
+                }
                 Type::Primitive(PrimitiveType::Range) => {
                     let range_tmp = range_tmps.get(&var.name).unwrap();
                     let quant_var = quant_vars.get(&var.name).unwrap();
@@ -1386,7 +1386,7 @@ impl<'env> SpecTranslator<'env> {
                         range_tmp,
                         quant_var,
                     );
-                },
+                }
                 Type::Primitive(_)
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
@@ -1528,7 +1528,7 @@ impl<'env> SpecTranslator<'env> {
                     && self.get_node_type(*id2).is_reference() =>
             {
                 emit!(self.writer, "$t{} == $t{}", idx1, idx2);
-            },
+            }
             _ => self.translate_rel_op("==", args),
         }
     }
@@ -1754,7 +1754,7 @@ impl<'env> SpecTranslator<'env> {
                         )
                     );
                 }
-            },
+            }
             ExpData::LocalVar(_, sym) => {
                 // For specification locals (which never can be references) directly emit them.
                 let check = boogie_well_formed_expr_bv(
@@ -1764,14 +1764,14 @@ impl<'env> SpecTranslator<'env> {
                     bv_flag,
                 );
                 emit!(self.writer, &check);
-            },
+            }
             _ => {
                 let check =
                     boogie_well_formed_expr_bv(self.env, "$val", ty.skip_reference(), bv_flag);
                 emit!(self.writer, "(var $val := ");
                 self.translate_exp(exp);
                 emit!(self.writer, "; {})", check);
-            },
+            }
         }
     }
 }

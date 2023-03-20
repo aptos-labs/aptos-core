@@ -82,12 +82,12 @@ impl<'a> EliminateImmRefs<'a> {
                 ReadRef if self.is_imm_ref(srcs[0]) => {
                     self.builder
                         .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Move));
-                },
+                }
                 FreezeRef => self.builder.emit(Call(attr_id, dests, ReadRef, srcs, None)),
                 BorrowLoc if self.is_imm_ref(dests[0]) => {
                     self.builder
                         .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Copy));
-                },
+                }
                 BorrowField(mid, sid, type_actuals, offset) if self.is_imm_ref(dests[0]) => {
                     self.builder.emit(Call(
                         attr_id,
@@ -96,7 +96,7 @@ impl<'a> EliminateImmRefs<'a> {
                         srcs,
                         aa,
                     ));
-                },
+                }
                 BorrowGlobal(mid, sid, type_actuals) if self.is_imm_ref(dests[0]) => {
                     self.builder.emit(Call(
                         attr_id,
@@ -105,10 +105,10 @@ impl<'a> EliminateImmRefs<'a> {
                         srcs,
                         aa,
                     ));
-                },
+                }
                 Destroy if self.is_imm_ref(srcs[0]) => {
                     // skip the destroy on an immutable ref
-                },
+                }
                 _ => self.builder.emit(Call(attr_id, dests, op, srcs, aa)),
             },
             _ => self.builder.emit(bytecode),

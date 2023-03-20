@@ -104,7 +104,7 @@ move run` must be applied to a module inside `storage/`",
                 vm_args,
                 &mut gas_status,
             )
-        },
+        }
         None => session.execute_script(
             bytecode.to_vec(),
             vm_type_args.clone(),

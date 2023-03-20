@@ -408,7 +408,7 @@ impl<'a> Instrumenter<'a> {
                     &addr_exp,
                     addr_exp.clone(),
                 );
-            },
+            }
             Call(id, _, MoveTo(mid, sid, targs), srcs, _) => {
                 let addr_exp = self.builder.mk_temporary(srcs[1]);
                 self.generate_modifies_check(
@@ -419,8 +419,8 @@ impl<'a> Instrumenter<'a> {
                     &addr_exp,
                     addr_exp.clone(),
                 );
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         // Instrument bytecode.
@@ -434,7 +434,7 @@ impl<'a> Instrumenter<'a> {
                 let ret_label = self.ret_label;
                 self.builder.emit_with(|id| Jump(id, ret_label));
                 self.can_return = true;
-            },
+            }
             Abort(id, code) => {
                 self.builder.set_loc_from_attr(id);
                 let abort_local = self.abort_local;
@@ -443,10 +443,10 @@ impl<'a> Instrumenter<'a> {
                     .emit_with(|id| Assign(id, abort_local, code, AssignKind::Move));
                 self.builder.emit_with(|id| Jump(id, abort_label));
                 self.can_abort = true;
-            },
+            }
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
                 self.instrument_call(id, dests, mid, fid, targs, srcs, aa);
-            },
+            }
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
                     id,
@@ -456,12 +456,12 @@ impl<'a> Instrumenter<'a> {
                     Some(AbortAction(self.abort_label, self.abort_local)),
                 ));
                 self.can_abort = true;
-            },
+            }
             Prop(id, kind @ PropKind::Assume, prop) | Prop(id, kind @ PropKind::Assert, prop) => {
                 match inlined_props.get(&id) {
                     None => {
                         self.builder.emit(Prop(id, kind, prop));
-                    },
+                    }
                     Some((translated_spec, exp)) => {
                         // Logic specifically for generating code of updating global spec variables in the function body
                         if *exp == prop && !translated_spec.updates.is_empty() {
@@ -470,9 +470,9 @@ impl<'a> Instrumenter<'a> {
                             self.emit_traces(translated_spec, exp);
                             self.builder.emit(Prop(id, kind, exp.clone()));
                         }
-                    },
+                    }
                 }
-            },
+            }
             _ => self.builder.emit(bc),
         }
     }
@@ -524,7 +524,7 @@ impl<'a> Instrumenter<'a> {
                         self.builder
                             .set_loc_and_vc_info(loc, REQUIRES_FAILS_MESSAGE);
                         Assert
-                    },
+                    }
                     FunctionVariant::Baseline => Assume,
                 };
                 self.builder.emit_with(|id| Prop(id, prop_kind, cond));
@@ -651,11 +651,11 @@ impl<'a> Instrumenter<'a> {
             // Emit placeholders for assuming well-formedness of return values and mutable ref
             // parameters.
             for idx in mut_srcs.into_iter().chain(dests.iter().cloned()) {
-                let exp = self
-                    .builder
-                    .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![self
-                        .builder
-                        .mk_temporary(idx)]);
+                let exp = self.builder.mk_call(
+                    &BOOL_TYPE,
+                    ast::Operation::WellFormed,
+                    vec![self.builder.mk_temporary(idx)],
+                );
                 self.builder.emit_with(move |id| Prop(id, Assume, exp));
             }
 

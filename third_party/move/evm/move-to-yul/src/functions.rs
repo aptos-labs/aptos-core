@@ -277,7 +277,7 @@ impl<'a> FunctionGenerator<'a> {
                     } else {
                         panic!("unexpected operand type")
                     }
-                },
+                }
                 _ => panic!("unexpected operand type"),
             }
         };
@@ -285,7 +285,7 @@ impl<'a> FunctionGenerator<'a> {
             Jump(_, l) => {
                 print_loc();
                 emitln!(ctx.writer, "$block := {}", get_block(l))
-            },
+            }
             Branch(_, if_t, if_f, cond) => {
                 print_loc();
                 emitln!(
@@ -297,15 +297,15 @@ impl<'a> FunctionGenerator<'a> {
                     get_block(if_f),
                     get_block(if_t),
                 )
-            },
+            }
             Assign(_, dest, src, _) => {
                 print_loc();
                 self.assign(ctx, target, *dest, local(src))
-            },
+            }
             Load(_, dest, cons) => {
                 print_loc();
                 self.constant(ctx, local(dest), cons)
-            },
+            }
             Ret(_, results) => {
                 print_loc();
                 for (idx, result) in results.iter().enumerate() {
@@ -331,12 +331,12 @@ impl<'a> FunctionGenerator<'a> {
                 if has_flow {
                     emitln!(ctx.writer, "leave")
                 }
-            },
+            }
             Abort(_, code) => {
                 print_loc();
                 self.parent
                     .call_builtin(ctx, YulFunction::Abort, std::iter::once(local(code)))
-            },
+            }
             Call(_, dest, op, srcs, _) => {
                 use Operation::*;
                 match op {
@@ -353,7 +353,7 @@ impl<'a> FunctionGenerator<'a> {
                             return;
                         }
                         self.move_call(ctx, target, dest, fun_id, srcs.iter().map(local))
-                    },
+                    }
 
                     // Packing and unpacking of structs
                     Pack(m, s, inst) => {
@@ -365,7 +365,7 @@ impl<'a> FunctionGenerator<'a> {
                             dest[0],
                             srcs.iter().map(local),
                         )
-                    },
+                    }
                     Unpack(m, s, inst) => {
                         print_loc();
                         self.unpack(
@@ -375,11 +375,11 @@ impl<'a> FunctionGenerator<'a> {
                             dest,
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     Destroy => {
                         print_loc();
                         self.destroy(ctx, &get_local_type(srcs[0]), local(&srcs[0]))
-                    },
+                    }
 
                     // Resource management
                     MoveTo(m, s, inst) => {
@@ -390,7 +390,7 @@ impl<'a> FunctionGenerator<'a> {
                             local(&srcs[1]),
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     MoveFrom(m, s, inst) => {
                         print_loc();
                         self.move_from(
@@ -400,7 +400,7 @@ impl<'a> FunctionGenerator<'a> {
                             dest[0],
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     Exists(m, s, inst) => {
                         print_loc();
                         self.exists(
@@ -410,7 +410,7 @@ impl<'a> FunctionGenerator<'a> {
                             dest[0],
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     BorrowGlobal(m, s, inst) => {
                         print_loc();
                         self.borrow_global(
@@ -420,13 +420,13 @@ impl<'a> FunctionGenerator<'a> {
                             dest[0],
                             local(&srcs[0]),
                         )
-                    },
+                    }
 
                     // References
                     BorrowLoc => {
                         print_loc();
                         self.borrow_loc(ctx, target, dest, srcs)
-                    },
+                    }
                     BorrowField(m, s, inst, f) => {
                         print_loc();
                         self.borrow_field(
@@ -437,7 +437,7 @@ impl<'a> FunctionGenerator<'a> {
                             local(&dest[0]),
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     ReadRef => {
                         print_loc();
                         self.read_ref(
@@ -447,7 +447,7 @@ impl<'a> FunctionGenerator<'a> {
                             dest[0],
                             local(&srcs[0]),
                         )
-                    },
+                    }
                     WriteRef => {
                         print_loc();
                         self.write_ref(
@@ -456,13 +456,13 @@ impl<'a> FunctionGenerator<'a> {
                             local(&srcs[0]),
                             local(&srcs[1]),
                         )
-                    },
+                    }
                     // FreezeRef transforms a mutable reference to an immutable one so just
                     // treat it as an assignment.
                     FreezeRef => {
                         print_loc();
                         self.assign(ctx, target, dest[0], local(&srcs[0]))
-                    },
+                    }
 
                     // Arithmetics
                     CastU8 => builtin(YulFunction::CastU8, dest, srcs),
@@ -520,7 +520,7 @@ impl<'a> FunctionGenerator<'a> {
                             local(&srcs[0]),
                             local(&srcs[1]),
                         );
-                    },
+                    }
                     Neq => {
                         print_loc();
                         let src_type = get_local_type(srcs[0]);
@@ -544,7 +544,7 @@ impl<'a> FunctionGenerator<'a> {
                         } else {
                             builtin(YulFunction::Neq, dest, srcs)
                         }
-                    },
+                    }
                     // Specification or other operations which can be ignored here
                     GetField(_, _, _, _)
                     | GetGlobal(_, _, _)
@@ -567,13 +567,13 @@ impl<'a> FunctionGenerator<'a> {
                     | Stop
                     | TraceGlobalMem(_)
                     | CastU16
-                    | CastU32 => {},
+                    | CastU32 => {}
                 }
-            },
+            }
 
             Label(_, _) | Nop(_) | SaveMem(_, _, _) | SaveSpecVar(_, _, _) | Prop(_, _, _) => {
                 // These opcodes are not needed, ignore them
-            },
+            }
         }
     }
 
@@ -599,22 +599,22 @@ impl<'a> FunctionGenerator<'a> {
                 } else {
                     "false".to_string()
                 }
-            },
+            }
             Constant::U8(v) => {
                 format!("{}", v)
-            },
+            }
             Constant::U64(v) => {
                 format!("{}", v)
-            },
+            }
             Constant::U128(v) => {
                 format!("{}", v)
-            },
+            }
             Constant::U256(v) => {
                 format!("{}", v)
-            },
+            }
             Constant::Address(a) => {
                 format!("0x{}", a.to_str_radix(16))
-            },
+            }
             Constant::ByteArray(_) => "".to_string(),
             Constant::AddressArray(_) => "".to_string(),
             Constant::Vector(_) => "".to_string(),
@@ -702,7 +702,7 @@ impl<'a> FunctionGenerator<'a> {
                         .join(", ");
                     emitln!(ctx.writer, "{} := {}", dest_str, call_str)
                 }
-            },
+            }
         }
     }
 }
@@ -948,13 +948,13 @@ impl<'a> FunctionGenerator<'a> {
                     YulFunction::Free,
                     vec![src, layout.size.to_string()].into_iter(),
                 )
-            },
+            }
             Vector(ty) => {
                 if ctx.type_allocates_memory(ty.as_ref()) {
                     // TODO: implement vectors
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 

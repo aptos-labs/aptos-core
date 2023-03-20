@@ -205,7 +205,7 @@ impl<'a> StackUsageVerifier<'a> {
             Bytecode::Ret => {
                 let return_count = self.return_.len();
                 (return_count as u64, 0)
-            },
+            }
 
             // Call performs `arg_count` pops and `return_count` pushes
             Bytecode::Call(idx) => {
@@ -213,14 +213,14 @@ impl<'a> StackUsageVerifier<'a> {
                 let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
-            },
+            }
             Bytecode::CallGeneric(idx) => {
                 let func_inst = self.resolver.function_instantiation_at(*idx);
                 let function_handle = self.resolver.function_handle_at(func_inst.handle);
                 let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
-            },
+            }
 
             // Pack performs `num_fields` pops and one push
             Bytecode::Pack(idx) => {
@@ -231,7 +231,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
                 (field_count as u64, 1)
-            },
+            }
             Bytecode::PackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                 let struct_definition = self.resolver.struct_def_at(struct_inst.def)?;
@@ -241,7 +241,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
                 (field_count as u64, 1)
-            },
+            }
 
             // Unpack performs one pop and `num_fields` pushes
             Bytecode::Unpack(idx) => {
@@ -252,7 +252,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
                 (1, field_count as u64)
-            },
+            }
             Bytecode::UnpackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                 let struct_definition = self.resolver.struct_def_at(struct_inst.def)?;
@@ -262,7 +262,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
                 (1, field_count as u64)
-            },
+            }
         })
     }
 

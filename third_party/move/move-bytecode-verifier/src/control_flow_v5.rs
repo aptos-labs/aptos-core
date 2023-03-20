@@ -45,7 +45,7 @@ fn verify_fallthrough(
         Some(last) if !last.is_unconditional_branch() => {
             Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
                 .at_code_offset(current_function, (code.len() - 1) as CodeOffset))
-        },
+        }
         Some(_) => Ok(()),
     }
 }
@@ -95,7 +95,7 @@ fn instruction_labels(context: &ControlFlowVerifier) -> Vec<Label> {
                 if is_back_edge(i, *prev) =>
             {
                 loop_continue(*prev, i)
-            },
+            }
             _ => (),
         }
     }
@@ -151,7 +151,7 @@ fn check_code<
                 if cur_instr == *last_continue {
                     loop_stack.pop();
                 }
-            },
+            }
             _ => (),
         }
     }
@@ -177,7 +177,7 @@ fn check_continues(context: &ControlFlowVerifier, labels: &[Label]) -> PartialVM
                 } else {
                     Ok(())
                 }
-            },
+            }
             _ => Ok(()),
         }
     })
@@ -197,10 +197,10 @@ fn check_breaks(context: &ControlFlowVerifier, labels: &[Label]) -> PartialVMRes
                         // Invalid loop break. Must break immediately to the instruction after
                         // the last continue
                         Err(context.error(StatusCode::INVALID_LOOP_BREAK, cur_instr))
-                    },
+                    }
                     _ => Ok(()),
                 }
-            },
+            }
             _ => Ok(()),
         }
     })
@@ -235,7 +235,7 @@ fn check_no_loop_splits(
                 } else {
                     Ok(())
                 }
-            },
+            }
             _ => Ok(()),
         }
     })

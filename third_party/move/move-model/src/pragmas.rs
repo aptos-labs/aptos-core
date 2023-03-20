@@ -322,7 +322,7 @@ pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool
                 prop,
                 CONDITION_GLOBAL_PROP | CONDITION_ISOLATED_PROP | CONDITION_SUSPENDABLE_PROP
             )
-        },
+        }
         SucceedsIf | AbortsIf => matches!(
             prop,
             CONDITION_ABORT_ASSERT_PROP | CONDITION_ABORT_ASSUME_PROP
@@ -331,6 +331,6 @@ pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool
         _ => {
             // every other condition can only take general properties
             false
-        },
+        }
     }
 }

@@ -64,7 +64,7 @@ pub fn on_text_document_sync_notification(
                 &parameters.text_document.text,
             );
             symbolicator_runner.run(parameters.text_document.uri.to_file_path().unwrap());
-        },
+        }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
@@ -73,7 +73,7 @@ pub fn on_text_document_sync_notification(
                 parameters.text_document.uri.to_file_path().unwrap(),
                 &parameters.content_changes.last().unwrap().text,
             );
-        },
+        }
         lsp_types::notification::DidSaveTextDocument::METHOD => {
             let parameters =
                 serde_json::from_value::<DidSaveTextDocumentParams>(notification.params.clone())
@@ -83,13 +83,13 @@ pub fn on_text_document_sync_notification(
                 &parameters.text.unwrap(),
             );
             symbolicator_runner.run(parameters.text_document.uri.to_file_path().unwrap());
-        },
+        }
         lsp_types::notification::DidCloseTextDocument::METHOD => {
             let parameters =
                 serde_json::from_value::<DidCloseTextDocumentParams>(notification.params.clone())
                     .expect("could not deserialize notification");
             files.remove(&parameters.text_document.uri.to_file_path().unwrap());
-        },
+        }
         _ => eprintln!("invalid notification '{}'", notification.method),
     }
     eprintln!("text document notification handled");

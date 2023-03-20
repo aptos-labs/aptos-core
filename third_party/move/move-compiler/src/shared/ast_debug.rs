@@ -153,7 +153,7 @@ impl AstWriter {
             (lower, None) => {
                 assert!(lower == 0);
                 return;
-            },
+            }
             (_, Some(len)) => len,
         };
         for (idx, item) in iter.enumerate() {

@@ -171,7 +171,7 @@ impl FunctionSourceMap {
         match possible_segment.map(|other_location| other_location != location) {
             Some(true) | None => {
                 self.code_map.insert(start_offset, location);
-            },
+            }
             _ => (),
         };
     }
@@ -501,7 +501,7 @@ impl SourceMap {
                 ));
                 let address = *view.address_identifier_at(module_handle.address);
                 Some(ModuleIdent::new(module_name, address))
-            },
+            }
         };
         let mut empty_source_map = Self::new(default_loc, module_ident);
 
@@ -525,7 +525,7 @@ impl SourceMap {
                         Some(script.code.clone()),
                         default_loc,
                     )?;
-            },
+            }
             BinaryIndexedView::Module(module) => {
                 for (function_idx, function_def) in module.function_defs.iter().enumerate() {
                     empty_source_map.add_top_level_function_mapping(
@@ -548,7 +548,7 @@ impl SourceMap {
                             default_loc,
                         )?;
                 }
-            },
+            }
         };
 
         for (struct_idx, struct_def) in view.struct_defs().into_iter().flatten().enumerate() {

@@ -260,7 +260,7 @@ impl fmt::Display for IdentType {
                 // It also seems like a reasonable idea to be able to tune user experience in the
                 // IDE independently on how compiler error messages are generated.
                 write!(f, "{}", type_to_ide_string(t))
-            },
+            }
             Self::FunctionType(mod_ident, name, type_args, arg_names, arg_types, ret, acquires) => {
                 let type_args_str = if !type_args.is_empty() {
                     let mut s = '<'.to_string();
@@ -293,7 +293,7 @@ impl fmt::Display for IdentType {
                     ret_str,
                     acquires_str
                 )
-            },
+            }
         }
     }
 }
@@ -313,18 +313,18 @@ fn type_to_ide_string(sp!(_, t): &Type) -> String {
         Type_::Ref(m, r) => format!("&{} {}", if *m { "mut" } else { "" }, type_to_ide_string(r)),
         Type_::Param(tp) => {
             format!("{}", tp.user_specified_name)
-        },
+        }
         Type_::Apply(_, sp!(_, type_name), ss) => match type_name {
             TypeName_::Multiple(_) => {
                 format!("({})", type_list_to_ide_string(ss))
-            },
+            }
             TypeName_::Builtin(name) => {
                 if ss.is_empty() {
                     format!("{}", name)
                 } else {
                     format!("{}<{}>", name, type_list_to_ide_string(ss))
                 }
-            },
+            }
             TypeName_::ModuleType(sp!(_, module_ident), struct_name) => {
                 let addr = addr_to_ide_string(&module_ident.address);
                 format!(
@@ -338,7 +338,7 @@ fn type_to_ide_string(sp!(_, t): &Type) -> String {
                         format!("<{}>", type_list_to_ide_string(ss))
                     }
                 )
-            },
+            }
         },
         Type_::Anything => "_".to_string(),
         Type_::Var(_) => "invalid type (var)".to_string(),
@@ -396,7 +396,7 @@ impl SymbolicatorRunner {
                             RunnerState::Run(root_dir) => {
                                 *symbolicate = RunnerState::Wait;
                                 Some(root_dir)
-                            },
+                            }
                             RunnerState::Wait => {
                                 // wait for next request
                                 symbolicate = cvar.wait(symbolicate).unwrap();
@@ -405,10 +405,10 @@ impl SymbolicatorRunner {
                                     RunnerState::Run(root_dir) => {
                                         *symbolicate = RunnerState::Wait;
                                         Some(root_dir)
-                                    },
+                                    }
                                     RunnerState::Wait => None,
                                 }
-                            },
+                            }
                         }
                     };
                     if let Some(starting_path) = starting_path_opt {
@@ -449,13 +449,13 @@ impl SymbolicatorRunner {
                                 if let Err(err) = sender.send(Ok(lsp_diagnostics)) {
                                     eprintln!("could not pass diagnostics: {:?}", err);
                                 }
-                            },
+                            }
                             Err(err) => {
                                 eprintln!("symbolication failed: {:?}", err);
                                 if let Err(err) = sender.send(Err(err)) {
                                     eprintln!("could not pass compiler error: {:?}", err);
                                 }
-                            },
+                            }
                         }
                     }
                 }
@@ -654,7 +654,7 @@ impl Symbolicator {
                     diagnostics = Some((diags, failure));
                     eprintln!("typed AST compilation failed");
                     return Ok((files, vec![]));
-                },
+                }
             };
             eprintln!("compiled to typed AST");
             let (compiler, typed_program) = compiler.into_ast();
@@ -668,7 +668,7 @@ impl Symbolicator {
                     diagnostics = Some((diags, failure));
                     eprintln!("bytecode compilation failed");
                     return Ok((files, vec![]));
-                },
+                }
             };
             // warning diagnostics (if any) since compilation succeeded
             if !diags.is_empty() {
@@ -814,7 +814,7 @@ impl Symbolicator {
                         None => {
                             debug_assert!(false);
                             continue;
-                        },
+                        }
                     };
                     field_defs.push(FieldDef {
                         name: *fname,
@@ -829,13 +829,16 @@ impl Symbolicator {
                 None => {
                     debug_assert!(false);
                     continue;
-                },
+                }
             };
 
-            structs.insert(*name, StructDef {
-                name_start,
-                field_defs,
-            });
+            structs.insert(
+                *name,
+                StructDef {
+                    name_start,
+                    field_defs,
+                },
+            );
         }
 
         for (pos, name, _) in &mod_def.constants {
@@ -844,7 +847,7 @@ impl Symbolicator {
                 None => {
                     debug_assert!(false);
                     continue;
-                },
+                }
             };
             constants.insert(*name, name_start);
         }
@@ -855,7 +858,7 @@ impl Symbolicator {
                 None => {
                     debug_assert!(false);
                     continue;
-                },
+                }
             };
             let ident_type = IdentType::FunctionType(
                 mod_ident.value,
@@ -881,17 +884,20 @@ impl Symbolicator {
                     .map(|(k, v)| Self::create_struct_type(*mod_ident, *k, *v, vec![]))
                     .collect(),
             );
-            functions.insert(*name, FunctionDef {
-                name: *name,
-                start: name_start,
-                attrs: fun
-                    .attributes
-                    .clone()
-                    .iter()
-                    .map(|(_loc, name, _attr)| name.to_string())
-                    .collect(),
-                ident_type,
-            });
+            functions.insert(
+                *name,
+                FunctionDef {
+                    name: *name,
+                    start: name_start,
+                    attrs: fun
+                        .attributes
+                        .clone()
+                        .iter()
+                        .map(|(_loc, name, _attr)| name.to_string())
+                        .collect(),
+                    ident_type,
+                },
+            );
         }
 
         let use_def_map = UseDefMap::new();
@@ -916,7 +922,7 @@ impl Symbolicator {
                     },
                     use_def_map,
                 );
-            },
+            }
         };
 
         let module_defs = ModuleDefs {
@@ -1096,7 +1102,7 @@ impl Symbolicator {
                 for seq_item in sequence {
                     self.seq_item_symbols(&mut scope, seq_item, references, use_defs);
                 }
-            },
+            }
             FunctionBody_::Native => (),
         }
 
@@ -1208,7 +1214,7 @@ impl Symbolicator {
             I::Seq(e) => self.exp_symbols(e, scope, references, use_defs),
             I::Declare(lvalues) => {
                 self.lvalue_list_symbols(true, lvalues, scope, references, use_defs)
-            },
+            }
             I::Bind(lvalues, opt_types, e) => {
                 // process RHS first to avoid accidentally binding its identifiers to LHS (which now
                 // will be put into the current scope only after RHS is processed)
@@ -1220,7 +1226,7 @@ impl Symbolicator {
                     }
                 }
                 self.lvalue_list_symbols(true, lvalues, scope, references, use_defs);
-            },
+            }
         }
     }
 
@@ -1268,17 +1274,17 @@ impl Symbolicator {
                         *t.clone(),
                     )
                 }
-            },
+            }
             LValue_::Unpack(ident, name, tparams, fields) => {
                 self.unpack_symbols(
                     define, ident, name, tparams, fields, scope, references, use_defs,
                 );
-            },
+            }
             LValue_::BorrowUnpack(_, ident, name, tparams, fields) => {
                 self.unpack_symbols(
                     define, ident, name, tparams, fields, scope, references, use_defs,
                 );
-            },
+            }
             LValue_::Ignore => (),
         }
     }
@@ -1385,30 +1391,30 @@ impl Symbolicator {
                     _ => (),
                 }
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::Vector(_, _, t, exp) => {
                 self.add_type_id_use_def(t, references, use_defs);
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::IfElse(cond, t, f) => {
                 self.exp_symbols(cond, scope, references, use_defs);
                 self.exp_symbols(t, scope, references, use_defs);
                 self.exp_symbols(f, scope, references, use_defs);
-            },
+            }
             E::While(cond, body) => {
                 self.exp_symbols(cond, scope, references, use_defs);
                 self.exp_symbols(body, scope, references, use_defs);
-            },
+            }
             E::Loop { has_break: _, body } => {
                 self.exp_symbols(body, scope, references, use_defs);
-            },
+            }
             E::Block(sequence) => {
                 // a block is a new var scope
                 let mut new_scope = scope.clone();
                 for seq_item in sequence {
                     self.seq_item_symbols(&mut new_scope, seq_item, references, use_defs);
                 }
-            },
+            }
             E::Assign(lvalues, opt_types, e) => {
                 self.lvalue_list_symbols(false, lvalues, scope, references, use_defs);
                 for opt_t in opt_types {
@@ -1418,30 +1424,30 @@ impl Symbolicator {
                     }
                 }
                 self.exp_symbols(e, scope, references, use_defs);
-            },
+            }
             E::Mutate(lhs, rhs) => {
                 self.exp_symbols(lhs, scope, references, use_defs);
                 self.exp_symbols(rhs, scope, references, use_defs);
-            },
+            }
             E::Return(exp) => {
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::Abort(exp) => {
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::Dereference(exp) => {
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::UnaryExp(_, exp) => {
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::BinopExp(lhs, _, _, rhs) => {
                 self.exp_symbols(lhs, scope, references, use_defs);
                 self.exp_symbols(rhs, scope, references, use_defs);
-            },
+            }
             E::Pack(ident, name, tparams, fields) => {
                 self.pack_symbols(ident, name, tparams, fields, scope, references, use_defs);
-            },
+            }
             E::ExpList(list_items) => {
                 for item in list_items {
                     let exp = match item {
@@ -1452,7 +1458,7 @@ impl Symbolicator {
                     };
                     self.exp_symbols(exp, scope, references, use_defs);
                 }
-            },
+            }
             E::Borrow(_, exp, field) => {
                 self.exp_symbols(exp, scope, references, use_defs);
                 // get expression type to match fname to a struct def
@@ -1463,10 +1469,10 @@ impl Symbolicator {
                     references,
                     use_defs,
                 );
-            },
+            }
             E::TempBorrow(_, exp) => {
                 self.exp_symbols(exp, scope, references, use_defs);
-            },
+            }
             E::BorrowLocal(_, var) => self.add_local_use_def(
                 &var.value(),
                 &var.loc(),
@@ -1478,11 +1484,11 @@ impl Symbolicator {
             E::Cast(exp, t) => {
                 self.exp_symbols(exp, scope, references, use_defs);
                 self.add_type_id_use_def(t, references, use_defs);
-            },
+            }
             E::Annotate(exp, t) => {
                 self.exp_symbols(exp, scope, references, use_defs);
                 self.add_type_id_use_def(t, references, use_defs);
-            },
+            }
 
             _ => (),
         }
@@ -1501,7 +1507,7 @@ impl Symbolicator {
         match typ {
             Type_::Ref(_, t) => {
                 self.add_field_type_use_def(t, use_name, use_pos, references, use_defs)
-            },
+            }
             Type_::Apply(_, sp!(_, TypeName_::ModuleType(sp!(_, mod_ident), struct_name)), _) => {
                 self.add_field_use_def(
                     mod_ident,
@@ -1512,7 +1518,7 @@ impl Symbolicator {
                     use_defs,
                     field_type,
                 );
-            },
+            }
             _ => (),
         }
     }
@@ -1634,10 +1640,10 @@ impl Symbolicator {
                 );
                 let exists = tp_scope.insert(tname, DefLoc { fhash, start });
                 debug_assert!(exists.is_none());
-            },
+            }
             None => {
                 debug_assert!(false);
-            },
+            }
         };
     }
 
@@ -1654,7 +1660,7 @@ impl Symbolicator {
             None => {
                 debug_assert!(false);
                 return;
-            },
+            }
         };
 
         let mod_defs = match self.mod_outer_defs.get(module_ident) {
@@ -1662,7 +1668,7 @@ impl Symbolicator {
             None => {
                 debug_assert!(false);
                 return;
-            },
+            }
         };
         add_fn(use_name, name_start, mod_defs);
     }
@@ -1707,7 +1713,7 @@ impl Symbolicator {
                             doc_string,
                         ),
                     );
-                },
+                }
                 None => debug_assert!(false),
             },
         );
@@ -1745,7 +1751,7 @@ impl Symbolicator {
                             doc_string,
                         ),
                     );
-                },
+                }
                 None => debug_assert!(false),
             },
         );
@@ -1786,7 +1792,7 @@ impl Symbolicator {
                             doc_string,
                         ),
                     );
-                },
+                }
                 None => debug_assert!(false),
             },
         );
@@ -1832,7 +1838,7 @@ impl Symbolicator {
                             );
                         }
                     }
-                },
+                }
                 None => debug_assert!(false),
             },
         );
@@ -1871,12 +1877,12 @@ impl Symbolicator {
                                     doc_string,
                                 ),
                             );
-                        },
+                        }
                         None => debug_assert!(false),
                     },
                     None => debug_assert!(false), // a type param should not be missing
                 }
-            },
+            }
             Type_::Apply(_, sp!(_, type_name), tparams) => {
                 if let TypeName_::ModuleType(mod_ident, struct_name) = type_name {
                     self.add_struct_use_def(
@@ -1891,7 +1897,7 @@ impl Symbolicator {
                 for t in tparams {
                     self.add_type_id_use_def(t, references, use_defs);
                 }
-            },
+            }
             _ => (), // nothing to be done for the other types
         }
     }
@@ -1936,10 +1942,10 @@ impl Symbolicator {
                         doc_string,
                     ),
                 );
-            },
+            }
             None => {
                 debug_assert!(false);
-            },
+            }
         }
     }
 
@@ -1959,7 +1965,7 @@ impl Symbolicator {
             None => {
                 debug_assert!(false);
                 return;
-            },
+            }
         };
 
         if let Some(def_loc) = scope.get(use_name) {
@@ -2021,7 +2027,7 @@ impl Symbolicator {
                         let start = struct_def.name_start;
                         DefLoc { fhash, start }
                     })
-            },
+            }
             _ => None,
         }
     }
@@ -2101,7 +2107,7 @@ pub fn on_go_to_type_def_request(context: &Context, request: &Request, symbols: 
                     range,
                 };
                 Some(serde_json::to_value(loc).unwrap())
-            },
+            }
             None => Some(serde_json::to_value(Option::<lsp_types::Location>::None).unwrap()),
         },
     );
@@ -2157,7 +2163,7 @@ pub fn on_references_request(context: &Context, request: &Request, symbols: &Sym
                 } else {
                     Some(serde_json::to_value(locs).unwrap())
                 }
-            },
+            }
             None => Some(serde_json::to_value(Option::<lsp_types::Location>::None).unwrap()),
         },
     );
@@ -2419,7 +2425,7 @@ fn assert_use_def_with_doc_string(
                 .unwrap()
                 .as_str()
                 .ends_with(tdef_file));
-        },
+        }
         None => assert!(type_def.is_none()),
     }
 }

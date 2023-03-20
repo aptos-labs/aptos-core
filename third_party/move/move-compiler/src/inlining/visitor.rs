@@ -49,7 +49,7 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
             self.visitor.var_decl(var)
         }
         match &mut fdef.body.value {
-            FunctionBody_::Native => {},
+            FunctionBody_::Native => {}
             FunctionBody_::Defined(seq) => self.sequence(seq),
         }
         self.visitor.exit_scope()
@@ -64,12 +64,12 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
             Type_::Apply(_, _, tys) => {
                 self.types(tys.iter_mut());
                 self.visitor.infer_abilities(ty)
-            },
+            }
             Type_::Unit
             | Type_::Param(_)
             | Type_::Var(_)
             | Type_::Anything
-            | Type_::UnresolvedError => {},
+            | Type_::UnresolvedError => {}
         }
     }
 
@@ -99,7 +99,7 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
                 self.types(type_arguments.iter_mut());
                 self.types(parameter_types.iter_mut());
                 self.exp(arguments)
-            },
+            }
             UnannotatedExp_::Use(var)
             | UnannotatedExp_::Copy { from_user: _, var }
             | UnannotatedExp_::Move { from_user: _, var }
@@ -108,67 +108,67 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
             UnannotatedExp_::VarCall(var, ex) => {
                 self.visitor.var_use(var);
                 self.exp(ex)
-            },
+            }
             UnannotatedExp_::Lambda(decls, body) => {
                 self.visitor.enter_scope();
                 self.lvalue_list(decls, /*declared*/ true);
                 self.exp(body);
                 self.visitor.exit_scope();
-            },
+            }
 
             UnannotatedExp_::IfElse(cex, iex, eex) => {
                 self.exp(cex.as_mut());
                 self.exp(iex.as_mut());
                 self.exp(eex.as_mut());
-            },
+            }
             UnannotatedExp_::While(cex, bex) => {
                 self.exp(cex.as_mut());
                 self.exp(bex.as_mut());
-            },
+            }
             UnannotatedExp_::Block(seq) => self.sequence(seq),
             UnannotatedExp_::Mutate(dex, sex) => {
                 self.exp(dex.as_mut());
                 self.exp(sex.as_mut());
-            },
+            }
             UnannotatedExp_::BinopExp(lex, _, ty, rex) => {
                 self.type_(ty.as_mut());
                 self.exp(lex.as_mut());
                 self.exp(rex.as_mut());
-            },
+            }
             UnannotatedExp_::Pack(_, _, tys, fields) => {
                 self.types(tys.iter_mut());
                 for (_, _, (_, (ty, ex))) in fields.iter_mut() {
                     self.type_(ty);
                     self.exp(ex);
                 }
-            },
+            }
             UnannotatedExp_::ExpList(items) => {
                 for item in items.iter_mut() {
                     match item {
                         ExpListItem::Single(ex, ty) => {
                             self.type_(ty.as_mut());
                             self.exp(ex)
-                        },
+                        }
                         ExpListItem::Splat(_, ex, tys) => {
                             self.types(tys.iter_mut());
                             self.exp(ex)
-                        },
+                        }
                     }
                 }
-            },
+            }
             UnannotatedExp_::Assign(lhs, tys, ex) => {
                 self.lvalue_list(lhs, /*declared*/ false);
                 self.types(tys.iter_mut().filter_map(|f| f.as_mut()));
                 self.exp(ex.as_mut());
-            },
+            }
             UnannotatedExp_::Vector(_, _, ty, ex) => {
                 self.type_(ty.as_mut());
                 self.exp(ex.as_mut())
-            },
+            }
             UnannotatedExp_::Cast(ex, ty) | UnannotatedExp_::Annotate(ex, ty) => {
                 self.type_(ty.as_mut());
                 self.exp(ex.as_mut())
-            },
+            }
 
             UnannotatedExp_::Loop { body: ex, .. }
             | UnannotatedExp_::Return(ex)
@@ -181,7 +181,7 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
             UnannotatedExp_::Builtin(fun, ex) => {
                 self.builtin_function(fun.as_mut());
                 self.exp(ex.as_mut())
-            },
+            }
 
             UnannotatedExp_::Spec(anchor) => {
                 let SpecAnchor {
@@ -224,14 +224,14 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
                     }
                     used_lambda_funs.append(&mut temp);
                 }
-            },
+            }
 
             UnannotatedExp_::Unit { .. }
             | UnannotatedExp_::Value(_)
             | UnannotatedExp_::Constant(_, _)
             | UnannotatedExp_::Break
             | UnannotatedExp_::Continue
-            | UnannotatedExp_::UnresolvedError => {},
+            | UnannotatedExp_::UnresolvedError => {}
         }
     }
 
@@ -242,7 +242,7 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
             | BuiltinFunction_::BorrowGlobal(_, ty)
             | BuiltinFunction_::Exists(ty)
             | BuiltinFunction_::Freeze(ty) => self.type_(ty),
-            BuiltinFunction_::Assert(_) => {},
+            BuiltinFunction_::Assert(_) => {}
         }
     }
 
@@ -256,12 +256,12 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
                     self.visitor.enter_scope();
                     self.lvalue_list(decls, /*declared*/ true);
                     scope_cnt += 1;
-                },
+                }
                 SequenceItem_::Declare(decls) => {
                     self.visitor.enter_scope();
                     self.lvalue_list(decls, /*declared*/ true);
                     scope_cnt += 1;
-                },
+                }
                 SequenceItem_::Seq(e) => self.exp(e.as_mut()),
             }
         }
@@ -286,15 +286,15 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
                 } else {
                     self.visitor.var_use(var)
                 }
-            },
+            }
             LValue_::Unpack(_, _, tys, fields) | LValue_::BorrowUnpack(_, _, _, tys, fields) => {
                 self.types(tys.iter_mut());
                 for (_, _, (_, (ty, slv))) in fields.iter_mut() {
                     self.type_(ty);
                     self.lvalue(slv, declared);
                 }
-            },
-            LValue_::Ignore => {},
+            }
+            LValue_::Ignore => {}
         }
     }
 }
@@ -330,7 +330,7 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
         }
         self.type_(&mut fdef.signature.return_type);
         match &mut fdef.body.value {
-            FunctionBody_::Native => {},
+            FunctionBody_::Native => {}
             FunctionBody_::Defined(seq) => self.sequence(seq),
         }
         self.visitor.exit_scope()
@@ -344,12 +344,12 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
             Type_::Ref(_, ty) => self.type_(ty.as_mut()),
             Type_::Apply(_, _, tys) => {
                 self.types(tys.iter_mut());
-            },
+            }
             Type_::Unit
             | Type_::Param(_)
             | Type_::Var(_)
             | Type_::Anything
-            | Type_::UnresolvedError => {},
+            | Type_::UnresolvedError => {}
         }
     }
 
@@ -377,7 +377,7 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
                 } = mc.as_mut();
                 self.types(type_arguments.iter_mut());
                 self.exp(arguments)
-            },
+            }
             UnannotatedExp_::Use(var)
             | UnannotatedExp_::Copy { from_user: _, var }
             | UnannotatedExp_::Move { from_user: _, var } => self.visitor.var_use(ty, var),
@@ -385,76 +385,76 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
             UnannotatedExp_::BorrowLocal(_, var) => match &mut ty.value {
                 Type_::Ref(_, base) => {
                     self.visitor.var_use(base, var);
-                },
+                }
                 _ => {
                     panic!("ICE invalid borrow type");
-                },
+                }
             },
 
             UnannotatedExp_::VarCall(var, ex) => {
                 self.visitor.var_use(&mut ex.ty.clone(), var);
                 self.exp(ex)
-            },
+            }
             UnannotatedExp_::Lambda(decls, body) => {
                 self.visitor.enter_scope();
                 self.lvalue_list(decls, /*declared*/ true);
                 self.exp(body);
                 self.visitor.exit_scope();
-            },
+            }
 
             UnannotatedExp_::IfElse(cex, iex, eex) => {
                 self.exp(cex.as_mut());
                 self.exp(iex.as_mut());
                 self.exp(eex.as_mut());
-            },
+            }
             UnannotatedExp_::While(cex, bex) => {
                 self.exp(cex.as_mut());
                 self.exp(bex.as_mut());
-            },
+            }
             UnannotatedExp_::Block(seq) => self.sequence(seq),
             UnannotatedExp_::Mutate(dex, sex) => {
                 self.exp(dex.as_mut());
                 self.exp(sex.as_mut());
-            },
+            }
             UnannotatedExp_::BinopExp(lex, _, ty, rex) => {
                 self.type_(ty);
                 self.exp(lex.as_mut());
                 self.exp(rex.as_mut());
-            },
+            }
             UnannotatedExp_::Pack(_, _, tys, fields) => {
                 self.types(tys.iter_mut());
                 for (_, _, (_, (ty, ex))) in fields.iter_mut() {
                     self.type_(ty);
                     self.exp(ex);
                 }
-            },
+            }
             UnannotatedExp_::ExpList(items) => {
                 for item in items.iter_mut() {
                     match item {
                         ExpListItem::Single(ex, ty) => {
                             self.type_(ty.as_mut());
                             self.exp(ex);
-                        },
+                        }
                         ExpListItem::Splat(_, ex, tys) => {
                             self.types(tys.iter_mut());
                             self.exp(ex);
-                        },
+                        }
                     }
                 }
-            },
+            }
             UnannotatedExp_::Assign(lhs, tys, ex) => {
                 self.lvalue_list(lhs, /*declared*/ false);
                 self.types(tys.iter_mut().filter_map(|f| f.as_mut()));
                 self.exp(ex.as_mut());
-            },
+            }
             UnannotatedExp_::Vector(_, _, ty, ex) => {
                 self.type_(ty.as_mut());
                 self.exp(ex.as_mut());
-            },
+            }
             UnannotatedExp_::Cast(ex, ty) | UnannotatedExp_::Annotate(ex, ty) => {
                 self.type_(ty.as_mut());
                 self.exp(ex.as_mut());
-            },
+            }
 
             UnannotatedExp_::Loop { body: ex, .. }
             | UnannotatedExp_::Return(ex)
@@ -467,7 +467,7 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
             UnannotatedExp_::Builtin(fun, ex) => {
                 self.builtin_function(fun.as_mut());
                 self.exp(ex.as_mut());
-            },
+            }
 
             UnannotatedExp_::Spec(anchor) => {
                 let SpecAnchor {
@@ -510,14 +510,14 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
                     }
                     used_lambda_funs.append(&mut temp);
                 }
-            },
+            }
 
             UnannotatedExp_::Unit { .. }
             | UnannotatedExp_::Value(_)
             | UnannotatedExp_::Constant(_, _)
             | UnannotatedExp_::Break
             | UnannotatedExp_::Continue
-            | UnannotatedExp_::UnresolvedError => {},
+            | UnannotatedExp_::UnresolvedError => {}
         }
     }
 
@@ -528,7 +528,7 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
             | BuiltinFunction_::BorrowGlobal(_, ty)
             | BuiltinFunction_::Exists(ty)
             | BuiltinFunction_::Freeze(ty) => self.type_(ty),
-            BuiltinFunction_::Assert(_) => {},
+            BuiltinFunction_::Assert(_) => {}
         }
     }
 
@@ -542,12 +542,12 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
                     self.visitor.enter_scope();
                     self.lvalue_list(decls, /*declared*/ true);
                     scoped = true;
-                },
+                }
                 SequenceItem_::Declare(decls) => {
                     self.visitor.enter_scope();
                     self.lvalue_list(decls, /*declared*/ true);
                     scoped = true;
-                },
+                }
                 SequenceItem_::Seq(e) => self.exp(e.as_mut()),
             }
         }
@@ -571,7 +571,7 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
                 } else {
                     self.visitor.var_use(ty, var)
                 }
-            },
+            }
             LValue_::Unpack(_, _, expected_tys, fields)
             | LValue_::BorrowUnpack(_, _, _, expected_tys, fields) => {
                 self.types(expected_tys.iter_mut());
@@ -579,8 +579,8 @@ impl<'l, V: TypedVisitor> TypedDispatcher<'l, V> {
                     self.type_(ty);
                     self.lvalue(slv, declared);
                 }
-            },
-            LValue_::Ignore => {},
+            }
+            LValue_::Ignore => {}
         }
     }
 }

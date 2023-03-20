@@ -558,7 +558,7 @@ fn serialize_struct_definition(
         StructFieldInformation::Declared(fields) => {
             binary.push(SerializedNativeStructFlag::DECLARED as u8)?;
             serialize_field_definitions(binary, fields)
-        },
+        }
     }
 }
 
@@ -650,26 +650,26 @@ fn serialize_signature_token_single_node_impl(
         SignatureToken::Signer => binary.push(SerializedType::SIGNER as u8)?,
         SignatureToken::Vector(_) => {
             binary.push(SerializedType::VECTOR as u8)?;
-        },
+        }
         SignatureToken::Struct(idx) => {
             binary.push(SerializedType::STRUCT as u8)?;
             serialize_struct_handle_index(binary, idx)?;
-        },
+        }
         SignatureToken::StructInstantiation(idx, type_params) => {
             binary.push(SerializedType::STRUCT_INST as u8)?;
             serialize_struct_handle_index(binary, idx)?;
             serialize_signature_size(binary, type_params.len())?;
-        },
+        }
         SignatureToken::Reference(_) => {
             binary.push(SerializedType::REFERENCE as u8)?;
-        },
+        }
         SignatureToken::MutableReference(_) => {
             binary.push(SerializedType::MUTABLE_REFERENCE as u8)?;
-        },
+        }
         SignatureToken::TypeParameter(idx) => {
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
-        },
+        }
     }
     Ok(())
 }
@@ -747,7 +747,7 @@ fn serialize_instruction_inner(
                 "Loading or casting u16, u32, u256 integers not supported in bytecode version {}",
                 major_version
             ));
-        },
+        }
         _ => (),
     };
 
@@ -758,96 +758,96 @@ fn serialize_instruction_inner(
         Bytecode::BrTrue(code_offset) => {
             binary.push(Opcodes::BR_TRUE as u8)?;
             serialize_bytecode_offset(binary, *code_offset)
-        },
+        }
         Bytecode::BrFalse(code_offset) => {
             binary.push(Opcodes::BR_FALSE as u8)?;
             serialize_bytecode_offset(binary, *code_offset)
-        },
+        }
         Bytecode::Branch(code_offset) => {
             binary.push(Opcodes::BRANCH as u8)?;
             serialize_bytecode_offset(binary, *code_offset)
-        },
+        }
         Bytecode::LdU8(value) => {
             binary.push(Opcodes::LD_U8 as u8)?;
             binary.push(*value)
-        },
+        }
         Bytecode::LdU64(value) => {
             binary.push(Opcodes::LD_U64 as u8)?;
             write_u64(binary, *value)
-        },
+        }
         Bytecode::LdU128(value) => {
             binary.push(Opcodes::LD_U128 as u8)?;
             write_u128(binary, *value)
-        },
+        }
         Bytecode::CastU8 => binary.push(Opcodes::CAST_U8 as u8),
         Bytecode::CastU64 => binary.push(Opcodes::CAST_U64 as u8),
         Bytecode::CastU128 => binary.push(Opcodes::CAST_U128 as u8),
         Bytecode::LdConst(const_idx) => {
             binary.push(Opcodes::LD_CONST as u8)?;
             serialize_constant_pool_index(binary, const_idx)
-        },
+        }
         Bytecode::LdTrue => binary.push(Opcodes::LD_TRUE as u8),
         Bytecode::LdFalse => binary.push(Opcodes::LD_FALSE as u8),
         Bytecode::CopyLoc(local_idx) => {
             binary.push(Opcodes::COPY_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
-        },
+        }
         Bytecode::MoveLoc(local_idx) => {
             binary.push(Opcodes::MOVE_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
-        },
+        }
         Bytecode::StLoc(local_idx) => {
             binary.push(Opcodes::ST_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
-        },
+        }
         Bytecode::MutBorrowLoc(local_idx) => {
             binary.push(Opcodes::MUT_BORROW_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
-        },
+        }
         Bytecode::ImmBorrowLoc(local_idx) => {
             binary.push(Opcodes::IMM_BORROW_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
-        },
+        }
         Bytecode::MutBorrowField(field_idx) => {
             binary.push(Opcodes::MUT_BORROW_FIELD as u8)?;
             serialize_field_handle_index(binary, field_idx)
-        },
+        }
         Bytecode::MutBorrowFieldGeneric(field_idx) => {
             binary.push(Opcodes::MUT_BORROW_FIELD_GENERIC as u8)?;
             serialize_field_inst_index(binary, field_idx)
-        },
+        }
         Bytecode::ImmBorrowField(field_idx) => {
             binary.push(Opcodes::IMM_BORROW_FIELD as u8)?;
             serialize_field_handle_index(binary, field_idx)
-        },
+        }
         Bytecode::ImmBorrowFieldGeneric(field_idx) => {
             binary.push(Opcodes::IMM_BORROW_FIELD_GENERIC as u8)?;
             serialize_field_inst_index(binary, field_idx)
-        },
+        }
         Bytecode::Call(method_idx) => {
             binary.push(Opcodes::CALL as u8)?;
             serialize_function_handle_index(binary, method_idx)
-        },
+        }
         Bytecode::Pack(class_idx) => {
             binary.push(Opcodes::PACK as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::Unpack(class_idx) => {
             binary.push(Opcodes::UNPACK as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::CallGeneric(method_idx) => {
             binary.push(Opcodes::CALL_GENERIC as u8)?;
             serialize_function_inst_index(binary, method_idx)
-        },
+        }
         Bytecode::PackGeneric(class_idx) => {
             binary.push(Opcodes::PACK_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::UnpackGeneric(class_idx) => {
             binary.push(Opcodes::UNPACK_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),
         Bytecode::Add => binary.push(Opcodes::ADD as u8),
@@ -874,89 +874,89 @@ fn serialize_instruction_inner(
         Bytecode::Exists(class_idx) => {
             binary.push(Opcodes::EXISTS as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::MutBorrowGlobal(class_idx) => {
             binary.push(Opcodes::MUT_BORROW_GLOBAL as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::ImmBorrowGlobal(class_idx) => {
             binary.push(Opcodes::IMM_BORROW_GLOBAL as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::MoveFrom(class_idx) => {
             binary.push(Opcodes::MOVE_FROM as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::MoveTo(class_idx) => {
             binary.push(Opcodes::MOVE_TO as u8)?;
             serialize_struct_def_index(binary, class_idx)
-        },
+        }
         Bytecode::ExistsGeneric(class_idx) => {
             binary.push(Opcodes::EXISTS_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::MutBorrowGlobalGeneric(class_idx) => {
             binary.push(Opcodes::MUT_BORROW_GLOBAL_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::ImmBorrowGlobalGeneric(class_idx) => {
             binary.push(Opcodes::IMM_BORROW_GLOBAL_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::MoveFromGeneric(class_idx) => {
             binary.push(Opcodes::MOVE_FROM_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::MoveToGeneric(class_idx) => {
             binary.push(Opcodes::MOVE_TO_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
-        },
+        }
         Bytecode::VecPack(sig_idx, num) => {
             binary.push(Opcodes::VEC_PACK as u8)?;
             serialize_signature_index(binary, sig_idx)?;
             write_u64(binary, *num)
-        },
+        }
         Bytecode::VecLen(sig_idx) => {
             binary.push(Opcodes::VEC_LEN as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::VecImmBorrow(sig_idx) => {
             binary.push(Opcodes::VEC_IMM_BORROW as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::VecMutBorrow(sig_idx) => {
             binary.push(Opcodes::VEC_MUT_BORROW as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::VecPushBack(sig_idx) => {
             binary.push(Opcodes::VEC_PUSH_BACK as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::VecPopBack(sig_idx) => {
             binary.push(Opcodes::VEC_POP_BACK as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::VecUnpack(sig_idx, num) => {
             binary.push(Opcodes::VEC_UNPACK as u8)?;
             serialize_signature_index(binary, sig_idx)?;
             write_u64(binary, *num)
-        },
+        }
         Bytecode::VecSwap(sig_idx) => {
             binary.push(Opcodes::VEC_SWAP as u8)?;
             serialize_signature_index(binary, sig_idx)
-        },
+        }
         Bytecode::LdU16(value) => {
             binary.push(Opcodes::LD_U16 as u8)?;
             write_u16(binary, *value)
-        },
+        }
         Bytecode::LdU32(value) => {
             binary.push(Opcodes::LD_U32 as u8)?;
             write_u32(binary, *value)
-        },
+        }
         Bytecode::LdU256(value) => {
             binary.push(Opcodes::LD_U256 as u8)?;
             write_u256(binary, *value)
-        },
+        }
         Bytecode::CastU16 => binary.push(Opcodes::CAST_U16 as u8),
         Bytecode::CastU32 => binary.push(Opcodes::CAST_U32 as u8),
         Bytecode::CastU256 => binary.push(Opcodes::CAST_U256 as u8),

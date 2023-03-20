@@ -28,20 +28,20 @@ impl RuntimeEventListener for RuntimeListener {
                 for i in (0..stack.len()).rev() {
                     println!("    {}", stack.data()[i])
                 }
-            },
+            }
             StepResult {
                 result,
                 return_value,
                 ..
             } => {
                 println!("==> {:?} (ret={:?})", result, return_value)
-            },
+            }
             SLoad { index, value, .. } => {
                 println!("==> storage {} -> {}", index, value)
-            },
+            }
             SStore { index, value, .. } => {
                 println!("==> storage {} <- {}", index, value)
-            },
+            }
         }
     }
 }

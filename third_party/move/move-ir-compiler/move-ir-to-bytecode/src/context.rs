@@ -607,12 +607,15 @@ impl<'a> Context<'a> {
     ) -> Result<StructHandleIndex> {
         let module = self.module_handle_index(&sname.module)?;
         let name = self.identifier_index(sname.name.0)?;
-        self.structs.insert(sname.clone(), StructHandle {
-            module,
-            name,
-            abilities,
-            type_parameters,
-        });
+        self.structs.insert(
+            sname.clone(),
+            StructHandle {
+                module,
+                name,
+                abilities,
+                type_parameters,
+            },
+        );
         Ok(StructHandleIndex(get_or_add_item_ref(
             &mut self.struct_handles,
             self.structs.get(&sname).unwrap(),
@@ -743,7 +746,7 @@ impl<'a> Context<'a> {
             None => {
                 let (abilities, type_parameters) = self.dep_struct_handle(&s)?;
                 self.declare_struct_handle_index_with_abilities(s, abilities, type_parameters)
-            },
+            }
         }
     }
 
@@ -766,15 +769,15 @@ impl<'a> Context<'a> {
             SignatureToken::Vector(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::Vector(Box::new(correct_inner))
-            },
+            }
             SignatureToken::Reference(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::Reference(Box::new(correct_inner))
-            },
+            }
             SignatureToken::MutableReference(inner) => {
                 let correct_inner = self.reindex_signature_token(dep, *inner)?;
                 SignatureToken::MutableReference(Box::new(correct_inner))
-            },
+            }
             SignatureToken::Struct(orig_sh_idx) => {
                 let dep_info = self.dependency(dep)?;
                 let (mident, sname) = dep_info
@@ -787,7 +790,7 @@ impl<'a> Context<'a> {
                 };
                 let correct_sh_idx = self.struct_handle_index(sident)?;
                 SignatureToken::Struct(correct_sh_idx)
-            },
+            }
             SignatureToken::StructInstantiation(orig_sh_idx, inners) => {
                 let dep_info = self.dependency(dep)?;
                 let (mident, sname) = dep_info
@@ -804,7 +807,7 @@ impl<'a> Context<'a> {
                     .map(|t| self.reindex_signature_token(dep, t))
                     .collect::<Result<_>>()?;
                 SignatureToken::StructInstantiation(correct_sh_idx, correct_inners)
-            },
+            }
         })
     }
 

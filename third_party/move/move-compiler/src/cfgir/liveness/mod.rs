@@ -87,11 +87,11 @@ fn command(state: &mut LivenessState, sp!(_, cmd_): &Command) {
         C::Assign(ls, e) => {
             lvalues(state, ls);
             exp(state, e);
-        },
+        }
         C::Mutate(el, er) => {
             exp(state, er);
             exp(state, el)
-        },
+        }
         C::Return { exp: e, .. }
         | C::Abort(e)
         | C::IgnoreAndPop { exp: e, .. }
@@ -112,7 +112,7 @@ fn lvalue(state: &mut LivenessState, sp!(_, l_): &LValue) {
         L::Ignore => (),
         L::Var(v, _) => {
             state.0.remove(v);
-        },
+        }
         L::Unpack(_, _, fields) => fields.iter().for_each(|(_, l)| lvalue(state, l)),
     }
 }
@@ -124,7 +124,7 @@ fn exp(state: &mut LivenessState, parent_e: &Exp) {
 
         E::BorrowLocal(_, var) | E::Copy { var, .. } | E::Move { var, .. } => {
             state.0.insert(*var);
-        },
+        }
 
         E::Spec(anchor) => anchor.used_locals.values().for_each(|(_, v)| {
             state.0.insert(*v);
@@ -142,7 +142,7 @@ fn exp(state: &mut LivenessState, parent_e: &Exp) {
         E::BinopExp(e1, _, e2) => {
             exp(state, e1);
             exp(state, e2)
-        },
+        }
 
         E::Pack(_, _, fields) => fields.iter().for_each(|(_, _, e)| exp(state, e)),
 
@@ -269,11 +269,11 @@ mod last_usage {
             C::Assign(ls, e) => {
                 lvalues(context, ls);
                 exp(context, e);
-            },
+            }
             C::Mutate(el, er) => {
                 exp(context, el);
                 exp(context, er)
-            },
+            }
             C::Return { exp: e, .. }
             | C::Abort(e)
             | C::IgnoreAndPop { exp: e, .. }
@@ -312,10 +312,10 @@ mod last_usage {
                             if context.has_drop(v) {
                                 l.value = L::Ignore
                             }
-                        },
+                        }
                     }
                 }
-            },
+            }
             L::Unpack(_, _, fields) => fields.iter_mut().for_each(|(_, l)| lvalue(context, l)),
         }
     }
@@ -328,14 +328,14 @@ mod last_usage {
             E::BorrowLocal(_, var) | E::Move { var, .. } => {
                 // remove it from context to prevent accidental dropping in previous usages
                 context.dropped_live.remove(var);
-            },
+            }
 
             E::Spec(anchor) => {
                 // remove it from context to prevent accidental dropping in previous usages
                 anchor.used_locals.values().for_each(|(_, var)| {
                     context.dropped_live.remove(var);
                 })
-            },
+            }
 
             E::Copy { var, from_user } => {
                 // Even if not switched to a move:
@@ -349,7 +349,7 @@ mod last_usage {
                         annotation: MoveOpAnnotation::InferredLastUsage,
                     }
                 }
-            },
+            }
 
             E::ModuleCall(mcall) => exp(context, &mut mcall.arguments),
             E::Builtin(_, e)
@@ -363,7 +363,7 @@ mod last_usage {
             E::BinopExp(e1, _, e2) => {
                 exp(context, e2);
                 exp(context, e1)
-            },
+            }
 
             E::Pack(_, _, fields) => fields
                 .iter_mut()

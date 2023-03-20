@@ -54,11 +54,11 @@ pub fn publish(
                     None => bail!("Invalid module name in publish ordering: {}", name),
                     Some(unit) => {
                         ordered_modules.push(*unit);
-                    },
+                    }
                 }
             }
             ordered_modules
-        },
+        }
         None => compiled_modules,
     };
 
@@ -103,12 +103,12 @@ pub fn publish(
                 match &sender_opt {
                     None => {
                         sender_opt = Some(module_address);
-                    },
+                    }
                     Some(val) => {
                         if val != &module_address {
                             bail!("All modules in the bundle must share the same address");
                         }
-                    },
+                    }
                 }
             }
             match sender_opt {
@@ -131,7 +131,7 @@ pub fn publish(
                         }
                         has_error = true;
                     }
-                },
+                }
             }
         } else {
             // publish modules sequentially, one module at a time

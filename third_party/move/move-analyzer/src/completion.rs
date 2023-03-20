@@ -137,7 +137,7 @@ fn get_cursor_token(buffer: &str, position: &Position) -> Option<Tok> {
             } else {
                 Some(Tok::Colon)
             }
-        },
+        }
         _ => None,
     }
 }
@@ -172,17 +172,17 @@ pub fn on_completion_request(context: &Context, request: &Request, symbols: &Sym
     match cursor {
         Some(Tok::Colon) => {
             items.extend_from_slice(&primitive_types());
-        },
+        }
         Some(Tok::Period) | Some(Tok::ColonColon) => {
             // `.` or `::` must be followed by identifiers, which are added to the completion items
             // below.
-        },
+        }
         _ => {
             // If the user's cursor is positioned anywhere other than following a `.`, `:`, or `::`,
             // offer them Move's keywords, operators, and builtins as completion items.
             items.extend_from_slice(&keywords());
             items.extend_from_slice(&builtins());
-        },
+        }
     }
 
     if let Some(buffer) = &buffer {

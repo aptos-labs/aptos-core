@@ -74,7 +74,7 @@ impl Coverage {
                     .compute_source_coverage(source_path)
                     .output_source_coverage(&mut std::io::stdout())
                     .unwrap();
-            },
+            }
             CoverageSummaryOptions::Summary {
                 functions,
                 output_csv,
@@ -97,13 +97,13 @@ impl Coverage {
                         functions,
                     )
                 }
-            },
+            }
             CoverageSummaryOptions::Bytecode { module_name } => {
                 let unit = package.get_module_by_name_from_root(&module_name)?;
                 let mut disassembler = Disassembler::from_unit(&unit.unit);
                 disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
                 println!("{}", disassembler.disassemble()?);
-            },
+            }
         }
         Ok(())
     }

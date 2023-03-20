@@ -231,24 +231,24 @@ impl<'a> TransferFunctions for EscapeAnalysis<'a> {
                             } else {
                                 AbsValue::OkRef
                             }
-                        },
+                        }
                         AbsValue::InternalRef => AbsValue::InternalRef,
                         AbsValue::NonRef => panic!("Invariant violation: expected reference"),
                     };
                     state.insert(rets[0], to_propagate);
-                },
+                }
                 BorrowGlobal(_mid, _sid, _types) => {
                     state.insert(rets[0], AbsValue::InternalRef);
-                },
+                }
                 ReadRef | MoveFrom(..) | Exists(..) | Pack(..) | Eq | Neq | CastU8 | CastU64
                 | CastU128 | Not | Add | Sub | Mul | Div | Mod | BitOr | BitAnd | Xor | Shl
                 | Shr | Lt | Gt | Le | Ge | Or | And => {
                     // These operations all produce a non-reference value
                     state.insert(rets[0], AbsValue::NonRef);
-                },
+                }
                 BorrowLoc => {
                     state.insert(rets[0], AbsValue::OkRef);
-                },
+                }
                 Function(mid, fid, _) => {
                     let callee_fun_env = self
                         .func_env
@@ -270,43 +270,43 @@ impl<'a> TransferFunctions for EscapeAnalysis<'a> {
                                         } else {
                                             AbsValue::OkRef
                                         }
-                                    },
+                                    }
                                     AbsValue::InternalRef => AbsValue::InternalRef,
                                     AbsValue::NonRef => {
                                         panic!("Invariant violation: expected reference")
-                                    },
+                                    }
                                 };
                                 state.insert(rets[0], to_propagate);
-                            },
+                            }
                             _ => {
                                 // unmodeled native, treat the same as ordinary call
                                 state.call(rets, args, &callee_fun_env)
-                            },
+                            }
                         }
                     } else {
                         state.call(rets, args, &callee_fun_env)
                     }
-                },
+                }
                 Unpack(..) => {
                     for ret_index in rets {
                         state.insert(*ret_index, AbsValue::NonRef);
                     }
-                },
+                }
                 FreezeRef => state.assign(rets[0], &args[0]),
                 WriteRef | MoveTo(..) => {
                     // these operations do not assign any locals
-                },
+                }
                 Uninit => {
                     // this operation is just a marker and does not assign any locals
-                },
+                }
                 Destroy => {
                     state.remove(&args[0]);
-                },
+                }
                 oper => panic!("unsupported oper {:?}", oper),
             },
             Load(_, lhs, _) => {
                 state.insert(*lhs, AbsValue::NonRef);
-            },
+            }
             Assign(_, lhs, rhs, _) => state.assign(*lhs, rhs),
             Ret(_, rets) => {
                 let ret_types = self.func_env.get_return_types();
@@ -319,11 +319,11 @@ impl<'a> TransferFunctions for EscapeAnalysis<'a> {
                         );
                     }
                 }
-            },
+            }
             Abort(..) | SaveMem(..) | Prop(..) | SaveSpecVar(..) | Branch(..) | Jump(..)
             | Label(..) | Nop(..) => {
                 // these operations do not assign any locals
-            },
+            }
         }
     }
 }

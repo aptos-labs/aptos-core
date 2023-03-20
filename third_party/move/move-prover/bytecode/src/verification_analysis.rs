@@ -254,8 +254,8 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                         ),
                     )
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         // Collect information for global invariant instrumentation

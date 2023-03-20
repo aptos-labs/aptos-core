@@ -177,14 +177,14 @@ impl<'a> NativeTableContext<'a> {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout, &val)?;
                         entries.insert(key, Op::New(bytes));
-                    },
+                    }
                     Op::Modify(val) => {
                         let bytes = serialize(&value_layout, &val)?;
                         entries.insert(key, Op::Modify(bytes));
-                    },
+                    }
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
-                    },
+                    }
                 }
             }
             if !entries.is_empty() {
@@ -220,7 +220,7 @@ impl TableData {
                     content: Default::default(),
                 };
                 e.insert(table)
-            },
+            }
             Entry::Occupied(e) => e.into_mut(),
         })
     }
@@ -246,11 +246,11 @@ impl Table {
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),
                         )
-                    },
+                    }
                     None => (GlobalValue::none(), None),
                 };
                 (entry.insert(gv), Some(loaded))
-            },
+            }
             Entry::Occupied(entry) => (entry.into_mut(), None),
         })
     }
@@ -360,9 +360,10 @@ fn native_new_table_handle(
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
         .is_none());
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![
-        Value::address(handle)
-    ]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::address(handle)],
+    ))
 }
 
 pub fn make_native_new_table_handle(gas_params: NewTableHandleGasParameters) -> NativeFunction {

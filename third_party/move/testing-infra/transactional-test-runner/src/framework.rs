@@ -104,7 +104,7 @@ fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
         (Some(mut left), Some(right)) => {
             left.push_str(&right);
             Some(left)
-        },
+        }
     }
 }
 
@@ -185,7 +185,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         match command {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
-            },
+            }
             TaskCommand::PrintBytecode(PrintBytecodeCommand { input }) => {
                 let state = self.compiled_state();
                 let data = match data {
@@ -199,10 +199,10 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let compiled = match input {
                     PrintBytecodeInputChoice::Script => {
                         Either::Left(compile_ir_script(state.dep_modules(), data_path)?)
-                    },
+                    }
                     PrintBytecodeInputChoice::Module => {
                         Either::Right(compile_ir_module(state.dep_modules(), data_path)?)
-                    },
+                    }
                 };
                 let source_mapping = SourceMapping::new_from_view(
                     match &compiled {
@@ -214,7 +214,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 .expect("Unable to build dummy source mapping");
                 let disassembler = Disassembler::new(source_mapping, DisassemblerOptions::new());
                 Ok(Some(disassembler.disassemble()?))
-            },
+            }
             TaskCommand::Publish(PublishCommand { gas_budget, syntax }, extra_args) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
                 let data = match data {
@@ -241,7 +241,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                                     named_addr_opt.map(|n| n.value),
                                     annot_module.named_module.module,
                                 )
-                            },
+                            }
                             AnnotatedCompiledUnit::Script(_) => panic!(
                                 "Expected a module text block, not a script, following 'publish' \
                                 starting on lines {}-{}",
@@ -249,11 +249,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                             ),
                         };
                         (named_addr_opt, module, warnings_opt)
-                    },
+                    }
                     SyntaxChoice::IR => {
                         let module = compile_ir_module(state.dep_modules(), data_path)?;
                         (None, module, None)
-                    },
+                    }
                 };
                 let (output, module) = self.publish_module(
                     module,
@@ -270,10 +270,10 @@ pub trait MoveTestAdapter<'a>: Sized {
                     SyntaxChoice::IR => {
                         self.compiled_state()
                             .add_and_generate_interface_file(module);
-                    },
+                    }
                 };
                 Ok(merge_output(warnings_opt, output))
-            },
+            }
             TaskCommand::Run(
                 RunCommand {
                     signers,
@@ -310,7 +310,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             start_line, command_lines_stop
                         ),
                     }
-                    },
+                    }
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
                 let args = self.compiled_state().resolve_args(args)?;
@@ -322,7 +322,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     warning_opt,
                     merge_output(output, rendered_return_value),
                 ))
-            },
+            }
             TaskCommand::Run(
                 RunCommand {
                     signers,
@@ -353,7 +353,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 )?;
                 let rendered_return_value = display_return_values(return_values);
                 Ok(merge_output(output, rendered_return_value))
-            },
+            }
             TaskCommand::View(ViewCommand { address, resource }) => {
                 let state: &CompiledState = self.compiled_state();
                 let StructTag {
@@ -372,7 +372,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     name.as_ident_str(),
                     type_arguments,
                 )?))
-            },
+            }
             TaskCommand::Subcommand(c) => self.handle_subcommand(TaskInput {
                 command: c,
                 name,
@@ -601,7 +601,7 @@ fn compile_source_unit(
             }
 
             Err(anyhow!(rendered_diags(&files, diags).unwrap()))
-        },
+        }
         Ok((mut units, warnings)) => {
             let warnings = rendered_diags(&files, warnings);
             let len = units.len();
@@ -610,7 +610,7 @@ fn compile_source_unit(
             }
             let unit = units.pop().unwrap();
             Ok((unit, warnings))
-        },
+        }
     }
 }
 
@@ -683,7 +683,7 @@ where
         _ => {
             tasks.push_front(first_task);
             None
-        },
+        }
     };
     let (mut adapter, result_opt) =
         Adapter::init(default_syntax, fully_compiled_program_opt, init_opt);

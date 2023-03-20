@@ -91,14 +91,14 @@ fn next_number(initial: char, mut it: impl Iterator<Item = char>) -> Result<(Tok
                                 _ => bail!("invalid suffix"),
                             };
                             return Ok((tok, len));
-                        },
+                        }
                     }
                 }
-            },
+            }
             _ => {
                 let len = num.len();
                 return Ok((Token::U64(num), len));
-            },
+            }
         }
     }
 }
@@ -133,10 +133,10 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                         }
                         let len = r.len();
                         (Token::Address(r), len)
-                    },
+                    }
                     _ => bail!("unrecognized token"),
                 }
-            },
+            }
             c if c.is_ascii_digit() => next_number(c, it)?,
             'b' if it.peek() == Some(&'"') => {
                 it.next().unwrap();
@@ -150,7 +150,7 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                 }
                 let len = r.len() + 3;
                 (Token::Bytes(hex::encode(r)), len)
-            },
+            }
             'x' if it.peek() == Some(&'"') => {
                 it.next().unwrap();
                 let mut r = String::new();
@@ -163,7 +163,7 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                 }
                 let len = r.len() + 3;
                 (Token::Bytes(r), len)
-            },
+            }
             c if c.is_ascii_whitespace() => {
                 let mut r = String::new();
                 r.push(c);
@@ -176,7 +176,7 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                 }
                 let len = r.len();
                 (Token::Whitespace(r), len)
-            },
+            }
             c if c.is_ascii_alphabetic() => {
                 let mut r = String::new();
                 r.push(c);
@@ -189,7 +189,7 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                 }
                 let len = r.len();
                 (name_token(r), len)
-            },
+            }
             _ => bail!("unrecognized token"),
         })),
     }
@@ -287,7 +287,7 @@ impl<I: Iterator<Item = Token>> Parser<I> {
                 let ty = self.parse_type_tag(depth + 1)?;
                 self.consume(Token::Gt)?;
                 TypeTag::Vector(Box::new(ty))
-            },
+            }
             Token::Address(addr) => {
                 self.consume(Token::ColonColon)?;
                 match self.next()? {
@@ -313,13 +313,13 @@ impl<I: Iterator<Item = Token>> Parser<I> {
                                     name: Identifier::new(name)?,
                                     type_params: ty_args,
                                 }))
-                            },
+                            }
                             t => bail!("expected name, got {:?}", t),
                         }
-                    },
+                    }
                     t => bail!("expected name, got {:?}", t),
                 }
-            },
+            }
             tok => bail!("unexpected token {:?}, expected type tag", tok),
         })
     }
@@ -336,7 +336,7 @@ impl<I: Iterator<Item = Token>> Parser<I> {
             Token::False => TransactionArgument::Bool(false),
             Token::Address(addr) => {
                 TransactionArgument::Address(AccountAddress::from_hex_literal(&addr)?)
-            },
+            }
             Token::Bytes(s) => TransactionArgument::U8Vector(hex::decode(s)?),
             tok => bail!("unexpected token {:?}, expected transaction argument", tok),
         })

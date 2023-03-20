@@ -290,7 +290,7 @@ impl<'a> Analyzer<'a> {
                                 "axioms cannot have more than two type parameters",
                             );
                             vec![]
-                        },
+                        }
                     };
                     axioms.push((cond.clone(), type_insts));
                 }
@@ -410,7 +410,7 @@ impl<'a> Analyzer<'a> {
                         self.todo_funs.push(entry);
                     }
                 }
-            },
+            }
             Call(_, _, WriteBack(_, edge), ..) => {
                 // In very rare occasions, not all types used in the function can appear in
                 // function parameters, locals, and return values. Types hidden in the write-back
@@ -419,14 +419,14 @@ impl<'a> Analyzer<'a> {
                 //
                 // TODO(mengxu): need to revisit this once the modeling for dynamic borrow is done
                 self.add_types_in_borrow_edge(edge)
-            },
+            }
             Prop(_, _, exp) => self.analyze_exp(exp),
             SaveMem(_, _, mem) => {
                 let mem = self.instantiate_mem(mem.to_owned());
                 let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
                 self.add_struct(struct_env, &mem.inst);
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
@@ -535,14 +535,14 @@ impl<'a> Analyzer<'a> {
         ty.visit(&mut |t| match t {
             Type::Vector(et) => {
                 self.info.vec_inst.insert(et.as_ref().clone());
-            },
+            }
             Type::Struct(mid, sid, targs) => {
                 self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs)
-            },
+            }
             Type::TypeParameter(idx) => {
                 self.info.type_params.insert(*idx);
-            },
-            _ => {},
+            }
+            _ => {}
         });
     }
 
@@ -579,12 +579,12 @@ impl<'a> Analyzer<'a> {
             BorrowEdge::Direct | BorrowEdge::Index(_) => (),
             BorrowEdge::Field(qid, _) => {
                 self.add_type_root(&qid.to_type());
-            },
+            }
             BorrowEdge::Hyper(edges) => {
                 for item in edges {
                     self.add_types_in_borrow_edge(item);
                 }
-            },
+            }
         }
     }
 }

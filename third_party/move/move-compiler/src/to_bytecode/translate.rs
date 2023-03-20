@@ -230,10 +230,13 @@ fn module(
         function_declarations,
     );
 
-    let sp!(ident_loc, ModuleIdent_ {
-        address: _,
-        module: module_name
-    }) = ident;
+    let sp!(
+        ident_loc,
+        ModuleIdent_ {
+            address: _,
+            module: module_name
+        }
+    ) = ident;
     let ir_module = IR::ModuleDefinition {
         loc: ident_loc,
         identifier: IR::ModuleIdent {
@@ -258,7 +261,7 @@ fn module(
                 (ident_loc, format!("IR ERROR: {}", e))
             ));
             return None;
-        },
+        }
     };
     let function_infos = module_function_infos(&module, &source_map, &collected_function_infos);
     let module = NamedCompiledModule {
@@ -326,7 +329,7 @@ fn script(
                 (loc, format!("IR ERROR: {}", e))
             ));
             return None;
-        },
+        }
     };
     let function_info = script_function_info(&source_map, info);
     let script = NamedCompiledScript {
@@ -465,7 +468,7 @@ fn used_local_info(
             DisplayVar::Tmp => panic!("ICE spec block captured a tmp"),
             DisplayVar::Orig(s) => {
                 assert_eq!(orig_var.value().as_str(), &s);
-            },
+            }
         };
         (*orig_var, info)
     }))
@@ -524,13 +527,16 @@ fn struct_def(
     let abilities = abilities(&abs);
     let type_formals = struct_type_parameters(tys);
     let fields = struct_fields(context, loc, fields);
-    sp(loc, IR::StructDefinition_ {
-        name,
-        abilities,
-        type_formals,
-        fields,
-        invariants: vec![],
-    })
+    sp(
+        loc,
+        IR::StructDefinition_ {
+            name,
+            abilities,
+            type_formals,
+            fields,
+            invariants: vec![],
+        },
+    )
 }
 
 fn struct_fields(
@@ -549,14 +555,14 @@ fn struct_fields(
                 H::BaseType_::bool(loc),
             )];
             struct_fields(context, loc, HF::Defined(fake_field))
-        },
+        }
         HF::Defined(field_vec) => {
             let fields = field_vec
                 .into_iter()
                 .map(|(f, ty)| (field(f), base_type(context, ty)))
                 .collect();
             IRF::Move { fields }
-        },
+        }
     }
 }
 
@@ -623,7 +629,7 @@ fn function(
                 blocks,
             );
             IR::FunctionBody::Bytecode { locals, code }
-        },
+        }
     };
     let loc = f.loc();
     let name = context.function_definition_name(m, f);
@@ -700,13 +706,13 @@ fn seen_structs_base_type(
     match bt_ {
         B::Unreachable | B::UnresolvedError => {
             panic!("ICE should not have reached compilation if there are errors")
-        },
+        }
         B::Apply(_, sp!(_, tn_), tys) => {
             if let TN::ModuleType(m, s) = tn_ {
                 seen.insert((*m, *s));
             }
             tys.iter().for_each(|st| seen_structs_base_type(seen, st))
-        },
+        }
         B::Param(TParam { .. }) => (),
     }
 }
@@ -789,7 +795,7 @@ fn struct_definition_name_single(
     match st_ {
         H::SingleType_::Ref(_, bt) | H::SingleType_::Base(bt) => {
             struct_definition_name_base(context, bt)
-        },
+        }
     }
 }
 
@@ -853,10 +859,10 @@ fn base_type(context: &mut Context, sp!(_, bt_): H::BaseType) -> IR::Type {
     match bt_ {
         B::Unreachable | B::UnresolvedError => {
             panic!("ICE should not have reached compilation if there are errors")
-        },
+        }
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::Fun))), _) => {
             panic!("ICE should not have reached compilation if there are function types")
-        },
+        }
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::Address))), _) => IRT::Address,
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::Signer))), _) => IRT::Signer,
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::U8))), _) => IRT::U8,
@@ -873,12 +879,12 @@ fn base_type(context: &mut Context, sp!(_, bt_): H::BaseType) -> IR::Type {
                 "ICE vector must have exactly 1 type argument"
             );
             IRT::Vector(Box::new(base_type(context, args.pop().unwrap())))
-        },
+        }
         B::Apply(_, sp!(_, TN::ModuleType(m, s)), tys) => {
             let n = context.qualified_struct_name(&m, s);
             let tys = base_types(context, tys);
             IRT::Struct(n, tys)
-        },
+        }
         B::Param(TParam {
             user_specified_name,
             ..
@@ -919,26 +925,26 @@ fn command(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, cmd_): 
         C::Assign(ls, e) => {
             exp(context, code, e);
             lvalues(context, code, ls);
-        },
+        }
         C::Mutate(eref, ervalue) => {
             exp(context, code, ervalue);
             exp(context, code, eref);
             code.push(sp(loc, B::WriteRef));
-        },
+        }
         C::Abort(ecode) => {
             exp_(context, code, ecode);
             code.push(sp(loc, B::Abort));
-        },
+        }
         C::Return { exp: e, .. } => {
             exp_(context, code, e);
             code.push(sp(loc, B::Ret));
-        },
+        }
         C::IgnoreAndPop { pop_num, exp: e } => {
             exp_(context, code, e);
             for _ in 0..pop_num {
                 code.push(sp(loc, B::Pop));
             }
-        },
+        }
         C::Jump { target, .. } => code.push(sp(loc, B::Branch(label(target)))),
         C::JumpIf {
             cond,
@@ -948,7 +954,7 @@ fn command(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, cmd_): 
             exp_(context, code, cond);
             code.push(sp(loc, B::BrFalse(label(if_false))));
             code.push(sp(loc, B::Branch(label(if_true))));
-        },
+        }
         C::Break | C::Continue => panic!("ICE break/continue not translated to jumps"),
     }
 }
@@ -973,23 +979,23 @@ fn lvalue(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, l_): H::
     match l_ {
         L::Ignore => {
             code.push(sp(loc, B::Pop));
-        },
+        }
         L::Var(v, _) => {
             code.push(sp(loc, B::StLoc(var(v))));
-        },
+        }
         L::Unpack(s, tys, field_ls) if field_ls.is_empty() => {
             let n = context.struct_definition_name(context.current_module().unwrap(), s);
             code.push(sp(loc, B::Unpack(n, base_types(context, tys))));
             // Pop off false
             code.push(sp(loc, B::Pop));
-        },
+        }
 
         L::Unpack(s, tys, field_ls) => {
             let n = context.struct_definition_name(context.current_module().unwrap(), s);
             code.push(sp(loc, B::Unpack(n, base_types(context, tys))));
 
             lvalues_(context, code, field_ls.into_iter().map(|(_, l)| l));
-        },
+        }
     }
 }
 
@@ -1026,19 +1032,19 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                     } else {
                         B::LdFalse
                     }
-                },
+                }
                 v_ @ V::Address(_) | v_ @ V::Vector(_, _) => {
                     let [ty]: [IR::Type; 1] = types(context, e.ty)
                         .try_into()
                         .expect("ICE value type should have one element");
                     B::LdConst(ty, move_value_from_value_(v_))
-                },
+                }
             };
             code.push(sp(loc, ld_value));
-        },
+        }
         E::Move { var: v, .. } => {
             code.push(sp(loc, B::MoveLoc(var(v))));
-        },
+        }
         E::Copy { var: v, .. } => code.push(sp(loc, B::CopyLoc(var(v)))),
 
         E::Constant(c) => code.push(sp(loc, B::LdNamedConst(context.constant_name(c)))),
@@ -1053,33 +1059,33 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                 mcall.name,
                 mcall.type_arguments,
             );
-        },
+        }
 
         E::Builtin(b, arg) => {
             exp(context, code, arg);
             builtin(context, code, *b);
-        },
+        }
 
         E::Freeze(er) => {
             exp(context, code, er);
             code.push(sp(loc, B::FreezeRef));
-        },
+        }
 
         E::Dereference(er) => {
             exp(context, code, er);
             code.push(sp(loc, B::ReadRef));
-        },
+        }
 
         E::UnaryExp(op, er) => {
             exp(context, code, er);
             unary_op(code, op);
-        },
+        }
 
         E::BinopExp(el, op, er) => {
             exp(context, code, el);
             exp(context, code, er);
             binary_op(code, op);
-        },
+        }
 
         E::Pack(s, tys, field_args) if field_args.is_empty() => {
             // empty fields are not allowed in the bytecode, add a dummy field
@@ -1090,7 +1096,7 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
 
             let n = context.struct_definition_name(context.current_module().unwrap(), s);
             code.push(sp(loc, B::Pack(n, base_types(context, tys))))
-        },
+        }
 
         E::Pack(s, tys, field_args) => {
             for (_, _, earg) in field_args {
@@ -1098,13 +1104,13 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
             }
             let n = context.struct_definition_name(context.current_module().unwrap(), s);
             code.push(sp(loc, B::Pack(n, base_types(context, tys))))
-        },
+        }
 
         E::Vector(_, n, bt, args) => {
             let ty = base_type(context, *bt);
             exp(context, code, args);
             code.push(sp(loc, B::VecPack(ty, n.try_into().unwrap())))
-        },
+        }
 
         E::ExpList(items) => {
             for item in items {
@@ -1113,7 +1119,7 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                 };
                 exp_(context, code, ei);
             }
-        },
+        }
 
         E::Borrow(mut_, el, f) => {
             let (n, tys) = struct_definition_name(context, el.ty.clone());
@@ -1124,7 +1130,7 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                 B::ImmBorrowField(n, tys, field(f))
             };
             code.push(sp(loc, instr));
-        },
+        }
 
         E::BorrowLocal(mut_, v) => {
             let instr = if mut_ {
@@ -1133,7 +1139,7 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                 B::ImmBorrowLoc(var(v))
             };
             code.push(sp(loc, instr));
-        },
+        }
 
         E::Cast(el, sp!(_, bt_)) => {
             use BuiltinTypeName_ as BT;
@@ -1147,10 +1153,10 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                 BT::U256 => B::CastU256,
                 BT::Address | BT::Signer | BT::Vector | BT::Bool | BT::Fun => {
                     panic!("ICE type checking failed. unexpected cast")
-                },
+                }
             };
             code.push(sp(loc, instr));
-        },
+        }
     }
 }
 
@@ -1167,76 +1173,85 @@ fn module_call(
         // TODO full evm support for vector bytecode instructions
         Some(mk_bytecode) if !cfg!(feature = "evm-backend") => {
             code.push(sp(loc, mk_bytecode(base_types(context, tys))))
-        },
+        }
         _ => {
             let (m, n) = context.qualified_function_name(&mident, fname);
             code.push(sp(loc, B::Call(m, n, base_types(context, tys))))
-        },
+        }
     }
 }
 
 fn builtin(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, b_): H::BuiltinFunction) {
     use H::BuiltinFunction_ as HB;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match b_ {
-        HB::MoveTo(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MoveTo(n, tys)
+    code.push(sp(
+        loc,
+        match b_ {
+            HB::MoveTo(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MoveTo(n, tys)
+            }
+            HB::MoveFrom(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MoveFrom(n, tys)
+            }
+            HB::BorrowGlobal(false, bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::ImmBorrowGlobal(n, tys)
+            }
+            HB::BorrowGlobal(true, bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::MutBorrowGlobal(n, tys)
+            }
+            HB::Exists(bt) => {
+                let (n, tys) = struct_definition_name_base(context, bt);
+                B::Exists(n, tys)
+            }
         },
-        HB::MoveFrom(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MoveFrom(n, tys)
-        },
-        HB::BorrowGlobal(false, bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::ImmBorrowGlobal(n, tys)
-        },
-        HB::BorrowGlobal(true, bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::MutBorrowGlobal(n, tys)
-        },
-        HB::Exists(bt) => {
-            let (n, tys) = struct_definition_name_base(context, bt);
-            B::Exists(n, tys)
-        },
-    }))
+    ))
 }
 
 fn unary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): UnaryOp) {
     use UnaryOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Not => B::Not,
-    }));
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Not => B::Not,
+        },
+    ));
 }
 
 fn binary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): BinOp) {
     use BinOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Add => B::Add,
-        O::Sub => B::Sub,
-        O::Mul => B::Mul,
-        O::Mod => B::Mod,
-        O::Div => B::Div,
-        O::BitOr => B::BitOr,
-        O::BitAnd => B::BitAnd,
-        O::Xor => B::Xor,
-        O::Shl => B::Shl,
-        O::Shr => B::Shr,
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Add => B::Add,
+            O::Sub => B::Sub,
+            O::Mul => B::Mul,
+            O::Mod => B::Mod,
+            O::Div => B::Div,
+            O::BitOr => B::BitOr,
+            O::BitAnd => B::BitAnd,
+            O::Xor => B::Xor,
+            O::Shl => B::Shl,
+            O::Shr => B::Shr,
 
-        O::And => B::And,
-        O::Or => B::Or,
+            O::And => B::And,
+            O::Or => B::Or,
 
-        O::Eq => B::Eq,
-        O::Neq => B::Neq,
+            O::Eq => B::Eq,
+            O::Neq => B::Neq,
 
-        O::Lt => B::Lt,
-        O::Gt => B::Gt,
+            O::Lt => B::Lt,
+            O::Gt => B::Gt,
 
-        O::Le => B::Le,
-        O::Ge => B::Ge,
+            O::Le => B::Le,
+            O::Ge => B::Ge,
 
-        O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
-    }));
+            O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
+        },
+    ));
 }

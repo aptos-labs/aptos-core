@@ -717,7 +717,7 @@ impl Generator {
             Primitive(_) => self.generate_abi_decoding_primitive_type(ty, from_memory),
             DynamicArray(_) | StaticArray(_, _) | Bytes | BytesStatic(_) | SolidityString => {
                 self.generate_abi_decoding_array_type(ctx, ty, move_ty, from_memory)
-            },
+            }
             Struct(_, _) => self.generate_abi_decoding_struct_type(ctx, ty, move_ty, from_memory),
             _ => "".to_string(),
         }
@@ -803,7 +803,7 @@ impl Generator {
                     } else {
                         panic!("wrong type")
                     }
-                },
+                }
                 _ => panic!("wrong type"),
             };
             let mut offset = "add(offset, 0x20)";
@@ -1107,7 +1107,7 @@ impl Generator {
             Primitive(_) => self.generate_abi_encoding_primitive_type(ty, options),
             DynamicArray(_) | StaticArray(_, _) | Bytes | BytesStatic(_) | SolidityString => {
                 self.generate_abi_encoding_array_type(ctx, ty, move_ty, options)
-            },
+            }
             Struct(_, _) => self.generate_abi_encoding_struct_type(ctx, ty, move_ty, options),
             _ => "NYI".to_string(),
         }
@@ -1130,10 +1130,10 @@ impl Generator {
             Primitive(_) => self.generate_abi_encoding_primitive_type(&ty, options.clone()),
             DynamicArray(_) | StaticArray(_, _) | Bytes | BytesStatic(_) | SolidityString => {
                 self.generate_abi_encoding_array_type(ctx, &ty, &move_ty, options.clone())
-            },
+            }
             Struct(_, _) => {
                 self.generate_abi_encoding_struct_type(ctx, &ty, &move_ty, options.clone())
-            },
+            }
             _ => "NYI".to_string(),
         };
         let function_name = format!("{}_with_updated_pos", encoding_function_name);
@@ -1266,7 +1266,7 @@ impl Generator {
                 DynamicArray(ref _inner_ty) => (_inner_ty.is_static(), _inner_ty.clone(), 0),
                 StaticArray(ref _inner_ty, _set_size) => {
                     (_inner_ty.is_static(), _inner_ty.clone(), _set_size)
-                },
+                }
                 _ => panic!("wrong type"),
             };
             let inner_move_ty = match move_ty {

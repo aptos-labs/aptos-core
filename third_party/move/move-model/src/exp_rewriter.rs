@@ -169,7 +169,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             LocalVar(id, sym) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 if let Some(new_exp) = self.rewrite_local_var(new_id, *sym) {
@@ -179,7 +179,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Temporary(id, idx) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 if let Some(new_exp) = self.rewrite_temporary(new_id, *idx) {
@@ -189,7 +189,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Call(id, oper, args) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let new_args_opt = self.internal_rewrite_vec(args);
@@ -210,7 +210,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Invoke(id, target, args) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (target_changed, new_target) = self.internal_rewrite_exp(target);
@@ -232,7 +232,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Lambda(id, vars, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (vars_changed, new_vars) = self.internal_rewrite_decls(vars);
@@ -246,7 +246,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Block(id, vars, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (vars_changed, new_vars) = self.internal_rewrite_decls(vars);
@@ -260,7 +260,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             Quant(id, kind, ranges, triggers, cond, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (ranges_changed, new_ranges) = self.internal_rewrite_quant_decls(ranges);
@@ -299,7 +299,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             IfElse(id, cond, then, else_) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (cond_changed, new_cond) = self.internal_rewrite_exp(cond);
@@ -313,7 +313,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     exp
                 }
-            },
+            }
             // This can happen since we are calling the rewriter during type checking, and
             // we may have encountered an error which is represented as an Invalid expression.
             Invalid(id) => Invalid(*id).into_exp(),
@@ -345,7 +345,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     None
                 }
-            },
+            }
             2 => {
                 let (c1, e1) = self.internal_rewrite_exp(&exps[0]);
                 let (c2, e2) = self.internal_rewrite_exp(&exps[1]);
@@ -354,7 +354,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     None
                 }
-            },
+            }
             3 => {
                 let (c1, e1) = self.internal_rewrite_exp(&exps[0]);
                 let (c2, e2) = self.internal_rewrite_exp(&exps[1]);
@@ -364,7 +364,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     None
                 }
-            },
+            }
             _ => {
                 // generic treatment
                 let mut change = false;
@@ -379,7 +379,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     None
                 }
-            },
+            }
         }
     }
 

@@ -62,12 +62,12 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                         });
                     }
                     builder.emit(bc);
-                },
+                }
                 Abort(id, l) => {
                     builder.set_loc_from_attr(*id);
                     builder.emit_with(|id| Call(id, vec![], Operation::TraceAbort, vec![*l], None));
                     builder.emit(bc);
-                },
+                }
                 Call(_, _, Operation::WriteRef, srcs, _) if srcs[0] < fun_env.get_local_count() => {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
@@ -80,7 +80,7 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                             None,
                         )
                     });
-                },
+                }
                 _ => {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
@@ -99,7 +99,7 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                             });
                         }
                     }
-                },
+                }
             }
         }
 

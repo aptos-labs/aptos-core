@@ -191,10 +191,10 @@ impl<'a> TransferFunctions for ReachingDefAnalysis<'a> {
                 if !self.borrowed_locals.contains(dest) && !self.borrowed_locals.contains(src) {
                     state.def_alias(*dest, *src);
                 }
-            },
+            }
             Load(_, dest, ..) => {
                 state.kill(*dest);
-            },
+            }
             Call(_, dests, oper, _, on_abort) => {
                 // generic kills
                 for dest in dests {
@@ -207,14 +207,14 @@ impl<'a> TransferFunctions for ReachingDefAnalysis<'a> {
                 match oper {
                     WriteBack(LocalRoot(local_root), ..) => {
                         state.kill(*local_root);
-                    },
+                    }
                     Havoc(_) => {
                         state.havoc(dests[0]);
-                    },
+                    }
                     _ => (),
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 }
@@ -302,7 +302,7 @@ pub fn format_reaching_def_annotation(
                                         } else {
                                             local_name
                                         }
-                                    },
+                                    }
                                 }
                             })
                             .join(", ")

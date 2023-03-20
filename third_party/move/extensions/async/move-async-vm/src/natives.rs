@@ -125,9 +125,10 @@ fn native_self(
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let ext = context.extensions().get::<AsyncExtension>();
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![
-        Value::address(ext.current_actor)
-    ]))
+    Ok(NativeResult::ok(
+        gas_params.base_cost,
+        smallvec![Value::address(ext.current_actor)],
+    ))
 }
 
 fn make_native_self(gas_params: SelfGasParameters) -> NativeFunction {
@@ -177,9 +178,10 @@ fn native_virtual_time(
     mut _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let ext = context.extensions().get::<AsyncExtension>();
-    Ok(NativeResult::ok(gas_params.base_cost, smallvec![
-        Value::u128(ext.virtual_time)
-    ]))
+    Ok(NativeResult::ok(
+        gas_params.base_cost,
+        smallvec![Value::u128(ext.virtual_time)],
+    ))
 }
 
 fn make_native_virtual_time(gas_params: VirtualTimeGasParameters) -> NativeFunction {

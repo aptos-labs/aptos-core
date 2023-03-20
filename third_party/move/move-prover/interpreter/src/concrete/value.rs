@@ -221,7 +221,7 @@ impl TypedValue {
                             .iter()
                             .zip(inst.fields.iter())
                             .all(|(field_val, field_info)| type_match(&field_info.ty, field_val))
-                },
+                }
                 _ => false,
             }
         }
@@ -722,14 +722,14 @@ impl TypedValue {
                 Pointer::ArgRef(_, _) => trace.push(cur.clone()),
                 Pointer::RefDirect(idx) => {
                     follow_return_pointers_recursive(ptrs.get(idx).unwrap(), ptrs, trace);
-                },
+                }
                 Pointer::RefField(idx, _) | Pointer::RefElement(idx, _) => {
                     trace.push(cur.clone());
                     follow_return_pointers_recursive(ptrs.get(idx).unwrap(), ptrs, trace);
-                },
+                }
                 Pointer::None | Pointer::Local(_) | Pointer::Global(_) | Pointer::RetRef(_) => {
                     unreachable!()
-                },
+                }
             }
         }
 
@@ -764,7 +764,7 @@ impl TypedValue {
                     Pointer::ArgRef(_, original_ptr) => *original_ptr,
                     _ => unreachable!(),
                 }
-            },
+            }
             _ => unreachable!(),
         };
         TypedValue {
@@ -798,7 +798,7 @@ impl TypedValue {
                     return None;
                 }
                 v.remove(elem_num)
-            },
+            }
             _ => unreachable!(),
         };
         Some(TypedValue {
@@ -826,7 +826,7 @@ impl TypedValue {
                     return None;
                 }
                 v.remove(elem_num)
-            },
+            }
             _ => unreachable!(),
         };
         Some(TypedValue {
@@ -872,7 +872,7 @@ impl TypedValue {
                     ptr: vec_ptr,
                 };
                 Some((new_vec, elem))
-            },
+            }
         }
     }
 
@@ -1015,7 +1015,7 @@ impl TypedValue {
                     }
                     MoveValue::U128(v.to_u128().unwrap())
                 }
-            },
+            }
             BaseValue::Address(v) => MoveValue::Address(v),
             BaseValue::Signer(v) => MoveValue::Signer(v),
             BaseValue::Vector(v) => {
@@ -1032,7 +1032,7 @@ impl TypedValue {
                     })
                     .collect();
                 MoveValue::Vector(move_elems)
-            },
+            }
             BaseValue::Struct(v) => {
                 let move_fields = v
                     .into_iter()
@@ -1047,7 +1047,7 @@ impl TypedValue {
                     })
                     .collect();
                 MoveValue::Struct(MoveStruct::new(move_fields))
-            },
+            }
         }
     }
 
@@ -1320,7 +1320,7 @@ impl GlobalState {
                                 )
                                 .unwrap();
                         }
-                    },
+                    }
                 }
             }
         }
@@ -1433,7 +1433,7 @@ impl EvalState {
                     None => (),
                     Some(v3) => {
                         resources.extend(v3.values().cloned());
-                    },
+                    }
                 },
             }
         }
@@ -1450,7 +1450,7 @@ impl EvalState {
                     for v3 in v2.values() {
                         resources.extend(v3.values().cloned());
                     }
-                },
+                }
             }
         }
         resources

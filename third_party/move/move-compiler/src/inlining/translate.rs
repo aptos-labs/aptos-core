@@ -177,7 +177,7 @@ impl<'l, 'r> Visitor for OuterVisitor<'l, 'r> {
                 } else {
                     VisitorContinuation::Descend
                 }
-            },
+            }
             UnannotatedExp_::Spec(anchor) => {
                 let SpecAnchor {
                     id,
@@ -197,7 +197,7 @@ impl<'l, 'r> Visitor for OuterVisitor<'l, 'r> {
                     self.inliner.current_spec_block_counter += 1;
                 }
                 VisitorContinuation::Descend
-            },
+            }
             _ => VisitorContinuation::Descend,
         }
     }
@@ -231,20 +231,20 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
                     ex.exp.value = repl;
                 }
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::ModuleCall(mcall) => {
                 if let Some(repl) = self.inliner.module_call(ex.exp.loc, mcall) {
                     ex.exp.value = repl;
                 }
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Return(_) => {
                 self.inliner.env.add_diag(diag!(
                     Inlining::Unsupported,
                     (ex.exp.loc, "return statements currently not supported")
                 ));
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Builtin(fun, _) => {
                 let ty = match &mut fun.value {
                     BuiltinFunction_::MoveTo(ty)
@@ -257,7 +257,7 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
                 self.type_(ty);
                 self.check_resource_usage(ex.exp.loc, ty, true);
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Pack(m, s, _, _) => {
                 if m.value != self.inliner.current_module.unwrap() {
                     self.inliner.env.add_diag(diag!(
@@ -272,16 +272,16 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
                     ))
                 }
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Borrow(_, ex, _) => {
                 self.type_(&mut ex.ty);
                 self.check_resource_usage(ex.exp.loc, &mut ex.ty, false);
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Spec(anchor) => {
                 self.rewrite_spec_anchor(anchor);
                 VisitorContinuation::Descend
-            },
+            }
             _ => VisitorContinuation::Descend,
         }
     }
@@ -344,10 +344,10 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         let mut items = VecDeque::from(decls_for_let);
                         items.push_back(sp(loc, SequenceItem_::Seq(body)));
                         Some(UnannotatedExp_::Block(items))
-                    },
+                    }
                     _ => panic!("ICE expected function parameter to be a lambda"),
                 }
-            },
+            }
             _ => None,
         }
     }
@@ -376,7 +376,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         ));
                     }
                 }
-            },
+            }
             Type_::Ref(_, bt) => self.check_resource_usage(loc, bt.as_mut(), needs_key),
             Type_::Unit
             | Type_::Param(_)
@@ -391,7 +391,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                             .to_owned()
                     )
                 ));
-            },
+            }
         }
     }
 
@@ -447,7 +447,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
             let lambda_body_exp = match self.bindings.get(&remapped_name.value()) {
                 None => {
                     panic!("ICE unknown function pointer");
-                },
+                }
                 Some(exp) => exp.clone(),
             };
 
@@ -467,7 +467,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         if t != ty {
                             panic!("ICE local variable type mismatch: {}", var);
                         }
-                    },
+                    }
                 }
                 used_locals.insert(*var, (ty.clone(), *var));
             }
@@ -564,7 +564,7 @@ impl<'l, 'r> TypedVisitor for SignatureExtractionVisitor<'l, 'r> {
                 if ty != &t {
                     panic!("ICE conflicting type for local variable {}", var);
                 }
-            },
+            }
         }
     }
 
@@ -703,7 +703,7 @@ impl<'l> Inliner<'l> {
                         ),
                     ),
                 }
-            },
+            }
         };
 
         let decl = sp(
@@ -790,14 +790,14 @@ impl<'l, 'r> Visitor for CheckerVisitor<'l, 'r> {
                     self.seen.insert(*s, *l);
                 }
                 VisitorContinuation::Descend
-            },
+            }
             UnannotatedExp_::Builtin(fun, _) => match &fun.value {
                 BuiltinFunction_::MoveFrom(ty) | BuiltinFunction_::BorrowGlobal(_, ty) => {
                     if let Some((_, sn)) = ty.value.struct_name() {
                         self.seen.insert(sn, ex.exp.loc);
                     }
                     VisitorContinuation::Descend
-                },
+                }
                 _ => VisitorContinuation::Descend,
             },
             _ => VisitorContinuation::Descend,
@@ -832,13 +832,13 @@ impl<'l> Inliner<'l> {
         match &mut ty.value {
             Type_::Apply(abls, ..) => {
                 *abls = None; // reset abilities
-            },
-            _ => {},
+            }
+            _ => {}
         }
         let abilities = infer_abilities(self, &Subst::empty(), ty.clone());
         match &mut ty.value {
             Type_::Apply(abls, ..) => *abls = Some(abilities),
-            _ => {},
+            _ => {}
         }
     }
 }
@@ -885,7 +885,7 @@ fn lift_lambda_as_function(
                             );
                         }
                         parameters.push((*var, ty.as_ref().clone()));
-                    },
+                    }
                     _ => panic!("ICE unexpected LValue type for lambda var declaration"),
                 }
             }
@@ -899,10 +899,10 @@ fn lift_lambda_as_function(
                 body,
                 preset_args: used_local_vars.keys().cloned().collect(),
             }
-        },
+        }
         _ => {
             panic!("a binding must be a lambda expression");
-        },
+        }
     };
 
     (used_local_vars, lifted_fun)
@@ -933,7 +933,7 @@ fn get_params_from_decls(decls: &LValueList) -> Vec<Symbol> {
             LValue_::Ignore => vec![],
             LValue_::Unpack(_, _, _, fields) | LValue_::BorrowUnpack(_, _, _, _, fields) => {
                 fields.iter().map(|(_, x, _)| *x).collect()
-            },
+            }
         })
         .collect()
 }

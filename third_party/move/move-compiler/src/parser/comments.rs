@@ -32,6 +32,6 @@ pub fn verify_string(file_hash: FileHash, string: &str) -> Result<(), Diagnostic
                 Syntax::InvalidCharacter,
                 (loc, msg)
             )]))
-        },
+        }
     }
 }

@@ -101,7 +101,7 @@ fn unbalanced_stack_crash() {
 
     module.function_defs.push(fun_def);
     match crate::verify_module(&module) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => assert_eq!(e.major_status(), StatusCode::GLOBAL_REFERENCE_ERROR),
     }
 }
@@ -157,7 +157,7 @@ fn too_many_locals() {
     let res = crate::verify_module(&module);
 
     match res {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => assert_eq!(e.major_status(), StatusCode::TOO_MANY_LOCALS),
     }
 }

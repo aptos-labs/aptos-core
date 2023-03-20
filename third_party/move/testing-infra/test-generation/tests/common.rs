@@ -83,7 +83,7 @@ pub fn run_instruction(
                 }),
                 instruction,
             )
-        },
+        }
         Effects::TyParamsCall(instantiation, effect, instantiation_application) => {
             let (fh_idx, instantiation) = instantiation(&initial_state);
             let index = initial_state.module.add_instantiation(instantiation);
@@ -101,7 +101,7 @@ pub fn run_instruction(
                 }),
                 instruction,
             )
-        },
+        }
         Effects::NoTyParams(effects) => (
             effects.iter().fold(initial_state, |acc, effect| {
                 effect(&acc)

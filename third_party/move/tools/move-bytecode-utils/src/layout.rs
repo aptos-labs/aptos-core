@@ -157,7 +157,7 @@ impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
                     .collect::<Result<Vec<Format>, T::Error>>()?;
                 let declaring_module = ModuleId::new(*address, module.clone());
                 self.build_struct_layout_(&declaring_module, name, &serde_type_args)?
-            },
+            }
             Vector(inner_t) => {
                 if matches!(inner_t.as_ref(), U8) {
                     // specialize vector<u8> as bytes
@@ -167,7 +167,7 @@ impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
                         self.build_normalized_type_layout(inner_t, input_type_args)?,
                     ))
                 }
-            },
+            }
             TypeParameter(i) => input_type_args[*i as usize].clone(),
             Reference(_) | MutableReference(_) => unreachable!(), // structs cannot store references
         })
@@ -354,10 +354,10 @@ impl TypeLayoutBuilder {
             Signer => bail!("Type layouts cannot contain signer"),
             Vector(elem_t) => {
                 MoveTypeLayout::Vector(Box::new(Self::build(elem_t, resolver, layout_type)?))
-            },
+            }
             Struct(s) => {
                 MoveTypeLayout::Struct(StructLayoutBuilder::build(s, resolver, layout_type)?)
-            },
+            }
         })
     }
 
@@ -404,7 +404,7 @@ impl TypeLayoutBuilder {
                     resolver,
                     layout_type,
                 )?)
-            },
+            }
             TypeParameter(i) => type_arguments[*i as usize].clone(),
             Bool => MoveTypeLayout::Bool,
             U8 => MoveTypeLayout::U8,
@@ -465,7 +465,7 @@ impl StructLayoutBuilder {
         match &s.field_information {
             StructFieldInformation::Native => {
                 bail!("Can't extract fields for native struct")
-            },
+            }
             StructFieldInformation::Declared(fields) => {
                 let layouts = fields
                     .iter()
@@ -507,9 +507,9 @@ impl StructLayoutBuilder {
                             .map(|(name, layout)| MoveFieldLayout::new(name, layout))
                             .collect();
                         MoveStructLayout::WithTypes { type_, fields }
-                    },
+                    }
                 })
-            },
+            }
         }
     }
 

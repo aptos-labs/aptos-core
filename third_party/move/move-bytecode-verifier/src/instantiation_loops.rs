@@ -117,7 +117,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                     msg_edges, msg_nodes
                 );
                 Err(PartialVMError::new(StatusCode::LOOP_IN_INSTANTIATION_GRAPH).with_message(msg))
-            },
+            }
         }
     }
 
@@ -130,7 +130,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                 let idx = self.graph.add_node(node);
                 entry.insert(idx);
                 idx
-            },
+            }
         }
     }
 
@@ -146,14 +146,14 @@ impl<'a> InstantiationLoopChecker<'a> {
                 Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Signer | Struct(_) => (),
                 TypeParameter(idx) => {
                     type_params.insert(*idx);
-                },
+                }
                 Vector(ty) => rec(type_params, ty),
                 Reference(ty) | MutableReference(ty) => rec(type_params, ty),
                 StructInstantiation(_, tys) => {
                     for ty in tys {
                         rec(type_params, ty);
                     }
-                },
+                }
             }
         }
 
@@ -195,7 +195,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                             Edge::TyConApp(ty),
                         );
                     }
-                },
+                }
             }
         }
     }

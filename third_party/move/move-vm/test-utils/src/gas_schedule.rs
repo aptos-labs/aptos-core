@@ -161,11 +161,11 @@ impl<'a> GasStatus<'a> {
             Some(gas_left) => {
                 self.gas_left = gas_left;
                 Ok(())
-            },
+            }
             None => {
                 self.gas_left = InternalGas::new(0);
                 Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
-            },
+            }
         }
     }
 
@@ -462,13 +462,11 @@ impl<'b> GasMeter for GasStatus<'b> {
     ) -> PartialVMResult<()> {
         use Opcodes::*;
 
-        self.charge_instr(
-            if is_mut {
-                VEC_MUT_BORROW
-            } else {
-                VEC_IMM_BORROW
-            },
-        )
+        self.charge_instr(if is_mut {
+            VEC_MUT_BORROW
+        } else {
+            VEC_IMM_BORROW
+        })
     }
 
     fn charge_vec_push_back(
