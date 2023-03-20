@@ -73,11 +73,7 @@ impl Cmd {
             AptosDB::open_dbs(&self.db_dir, rocksdb_config, /*readonly=*/ false)?;
 
         let ledger_db = Arc::new(ledger_db);
-        let state_kv_db = if let Some(state_kv_db) = state_kv_db {
-            Arc::new(state_kv_db)
-        } else {
-            Arc::clone(&ledger_db)
-        };
+        let state_kv_db = Arc::new(state_kv_db);
         let overall_version =
             get_overall_commit_progress(&ledger_db)?.expect("Overall commit progress must exist.");
         let ledger_db_version = get_ledger_commit_progress(&ledger_db)?
@@ -139,8 +135,11 @@ impl Cmd {
                 println!(
                     "Trying to catch up state merkle db, by replaying write set in ledger db."
                 );
-                let version =
-                    StateStore::catch_up_state_merkle_db(Arc::clone(&ledger_db), state_merkle_db)?;
+                let version = StateStore::catch_up_state_merkle_db(
+                    Arc::clone(&ledger_db),
+                    state_merkle_db,
+                    Arc::clone(&state_kv_db),
+                )?;
                 println!("Done! current_version: {:?}", version);
             }
         }

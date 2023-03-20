@@ -224,7 +224,10 @@ async fn loopback_commit_vote(
                 let event: UnverifiedEvent = msg.into();
                 // verify the message and send the message into self loop
                 msg_tx
-                    .push(author, event.verify(author, verifier, false).unwrap())
+                    .push(
+                        author,
+                        event.verify(author, verifier, false, false).unwrap(),
+                    )
                     .ok();
             }
         },
