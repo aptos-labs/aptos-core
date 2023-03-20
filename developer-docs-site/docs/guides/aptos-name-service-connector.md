@@ -1,13 +1,13 @@
 ---
-title: "Integrate with Aptos NameService UI Package"
-id: "ans-ui-package"
+title: "Aptos NameService UI Package"
+id: "aptos-nameservice-ui-package"
 ---
-# Aptos Name Service UI Package
+# Integrate with Aptos Name Service UI Package
 The Aptos Name Service provides a React UI package that provides developers with a customizable button and modal to enable users to search for and mint Aptos names directly from their website.
 
-## Usage
+## Use Aptos Name Service Connector
 
-To use the Aptos Name Service Connector component, you will need to install it using npm or yarn:
+To use the `aptos-name-connector` component, you will need to install it using npm or yarn:
 ```
 npm install "@aptos-labs/aptos-name-connector"
 ```
@@ -33,19 +33,17 @@ function MyComponent() {
 }
 ```
 
-## Props
+## Use `AnsConnector` properties
 The `AnsConnector` component accepts the following props:
 
-- onSignTransaction: A required callback function that is called when the user clicks the "Mint" button in the modal. This function should handle the signing of the transaction.
-- isWalletConnected: A boolean value that indicates whether the user's wallet is connected.
-- network: A string value that specifies whether the component should connect to the mainnet or testnet.
-- buttonLabel: A string value that specifies the text to display on the button.
+- `onSignTransaction`: A required callback function that is called when the user clicks the "Mint" button in the modal. This function should handle the signing of the transaction.
+- `isWalletConnected`: A boolean value that indicates whether the user's wallet is connected.
+- `network`: A string value that specifies whether the component should connect to the mainnet or testnet.
+- `buttonLabel`: A string value that specifies the text to display on the button.
 
-## Customization
+## Customize button label and appearance
 The button label can be customized by passing a string value to the buttonLabel prop.
-The appearance of the button in the `AnsConnector` component can be customized to fit in your website. The button has the following class names:
-
-ans_connector_button: The css class name for the button.
+The appearance of the button in the `AnsConnector` component can be customized to fit in your website. The button has the CSS class name of `ans_connector_button`:
 
 ```
 .ans-connector-button {
@@ -60,11 +58,11 @@ ans_connector_button: The css class name for the button.
 }
 ```
 
-## Supported Networks
+## Supported networks
 The `AnsConnector` component supports both mainnet and testnet. To connect to the mainnet, set the network prop to "mainnet". To connect to the testnet, set the network prop to "testnet".
 
 ## Example
-The following example shows how to use the AnsConnector component in a React application:
+The following example shows how to use the `AnsConnector` component in a React application:
 <last image>
 
 
