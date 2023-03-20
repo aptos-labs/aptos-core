@@ -21,7 +21,7 @@ repos:
     rev: v1.3.0
     hooks:
       - id: insert-license
-        files: \.rs$
+        files: ^(?!third_party/).*\.rs$
         args:
           - --license-filepath
           - devtools/assets/license_header.txt

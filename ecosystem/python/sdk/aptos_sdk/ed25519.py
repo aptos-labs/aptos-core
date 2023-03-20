@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import unittest
+from typing import List, Tuple
 
 from nacl.signing import SigningKey, VerifyKey
 
@@ -92,6 +94,67 @@ class PublicKey:
         serializer.to_bytes(self.key.encode())
 
 
+class MultiEd25519PublicKey:
+    keys: List[PublicKey]
+    threshold: int
+
+    MIN_KEYS = 2
+    MAX_KEYS = 32
+    MIN_THRESHOLD = 1
+
+    def __init__(self, keys: List[PublicKey], threshold: int, checked=True):
+        if checked:
+            assert (
+                self.MIN_KEYS <= len(keys) <= self.MAX_KEYS
+            ), f"Must have between {self.MIN_KEYS} and {self.MAX_KEYS} keys."
+            assert (
+                self.MIN_THRESHOLD <= threshold <= len(keys)
+            ), f"Threshold must be between {self.MIN_THRESHOLD} and {len(keys)}."
+        self.keys = keys
+        self.threshold = threshold
+
+    def __str__(self) -> str:
+        return f"{self.threshold}-of-{len(self.keys)} Multi-Ed25519 public key"
+
+    def auth_key(self) -> bytes:
+        hasher = hashlib.sha3_256()
+        hasher.update(self.to_bytes() + b"\x01")
+        return hasher.digest()
+
+    def to_bytes(self) -> bytes:
+        concatenated_keys = bytes()
+        for key in self.keys:
+            concatenated_keys += key.key.encode()
+        return concatenated_keys + bytes([self.threshold])
+
+    @staticmethod
+    def from_bytes(key: bytes) -> MultiEd25519PublicKey:
+        # Get key count and threshold limits.
+        min_keys = MultiEd25519PublicKey.MIN_KEYS
+        max_keys = MultiEd25519PublicKey.MAX_KEYS
+        min_threshold = MultiEd25519PublicKey.MIN_THRESHOLD
+        # Get number of signers.
+        n_signers = int(len(key) / PublicKey.LENGTH)
+        assert (
+            min_keys <= n_signers <= max_keys
+        ), f"Must have between {min_keys} and {max_keys} keys."
+        # Get threshold.
+        threshold = int(key[-1])
+        assert (
+            min_threshold <= threshold <= n_signers
+        ), f"Threshold must be between {min_threshold} and {n_signers}."
+        keys = []  # Initialize empty keys list.
+        for i in range(n_signers):  # Loop over all signers.
+            # Extract public key for signle signer.
+            start_byte = i * PublicKey.LENGTH
+            end_byte = (i + 1) * PublicKey.LENGTH
+            keys.append(PublicKey(VerifyKey(key[start_byte:end_byte])))
+        return MultiEd25519PublicKey(keys, threshold)
+
+    def serialize(self, serializer: Serializer):
+        serializer.to_bytes(self.to_bytes())
+
+
 class Signature:
     LENGTH: int = 64
 
@@ -121,6 +184,35 @@ class Signature:
 
     def serialize(self, serializer: Serializer):
         serializer.to_bytes(self.signature)
+
+
+class MultiEd25519Signature:
+    signatures: List[Signature]
+    bitmap: bytes
+
+    def __init__(
+        self,
+        public_key: MultiEd25519PublicKey,
+        signatures_map: List[Tuple[PublicKey, Signature]],
+    ):
+        self.signatures = list()
+        bitmap = 0
+        for entry in signatures_map:
+            self.signatures.append(entry[1])
+            index = public_key.keys.index(entry[0])
+            shift = 31 - index  # 32 bit positions, left to right.
+            bitmap = bitmap | (1 << shift)
+        # 4-byte big endian bitmap.
+        self.bitmap = bitmap.to_bytes(4, "big")
+
+    def to_bytes(self) -> bytes:
+        concatenated_signatures = bytes()
+        for signature in self.signatures:
+            concatenated_signatures += signature.data()
+        return concatenated_signatures + self.bitmap
+
+    def serialize(self, serializer: Serializer):
+        serializer.to_bytes(self.to_bytes())
 
 
 class Test(unittest.TestCase):
@@ -159,3 +251,107 @@ class Test(unittest.TestCase):
         signature.serialize(ser)
         ser_signature = Signature.deserialize(Deserializer(ser.output()))
         self.assertEqual(signature, ser_signature)
+
+    def test_multisig(self):
+        # Generate signatory private keys.
+        private_key_1 = PrivateKey.from_hex(
+            "4e5e3be60f4bbd5e98d086d932f3ce779ff4b58da99bf9e5241ae1212a29e5fe"
+        )
+        private_key_2 = PrivateKey.from_hex(
+            "1e70e49b78f976644e2c51754a2f049d3ff041869c669523ba95b172c7329901"
+        )
+        # Generate multisig public key with threshold of 1.
+        multisig_public_key = MultiEd25519PublicKey(
+            [private_key_1.public_key(), private_key_2.public_key()], 1
+        )
+        # Check expected authentication key.
+        expected_authentication_key = (
+            "835bb8c5ee481062946b18bbb3b42a40b998d6bf5316ca63834c959dc739acf0"
+        )
+        self.assertEqual(
+            multisig_public_key.auth_key().hex(), expected_authentication_key
+        )
+        # Get public key BCS representation.
+        serializer = Serializer()
+        multisig_public_key.serialize(serializer)
+        public_key_bcs = serializer.output().hex()
+        # Check against expected BCS representation.
+        expected_public_key_bcs = (
+            "41754bb6a4720a658bdd5f532995955db0971ad3519acbde2f1149c3857348006c"
+            "1634cd4607073f2be4a6f2aadc2b866ddb117398a675f2096ed906b20e0bf2c901"
+        )
+        self.assertEqual(public_key_bcs, expected_public_key_bcs)
+        # Get public key bytes representation.
+        public_key_bytes = multisig_public_key.to_bytes()
+        # Convert back to multisig class instance from bytes.
+        multisig_public_key = MultiEd25519PublicKey.from_bytes(public_key_bytes)
+        # Get public key BCS representation.
+        serializer = Serializer()
+        multisig_public_key.serialize(serializer)
+        public_key_bcs = serializer.output().hex()
+        # Assert BCS representation is the same.
+        self.assertEqual(public_key_bcs, expected_public_key_bcs)
+        # Have one signer sign arbitrary message.
+        signature = private_key_2.sign(b"multisig")
+        # Compose multisig signature.
+        multisig_signature = MultiEd25519Signature(
+            multisig_public_key, [(private_key_2.public_key(), signature)]
+        )
+        # Get signature BCS representation.
+        serializer = Serializer()
+        multisig_signature.serialize(serializer)
+        multisig_signature_bcs = serializer.output().hex()
+        # Check against expected BCS representation.
+        expected_multisig_signature_bcs = (
+            "4402e90d8f300d79963cb7159ffa6f620f5bba4af5d32a7176bfb5480b43897cf"
+            "4886bbb4042182f4647c9b04f02dbf989966f0facceec52d22bdcc7ce631bfc0c"
+            "40000000"
+        )
+        self.assertEqual(multisig_signature_bcs, expected_multisig_signature_bcs)
+
+    def test_multisig_range_checks(self):
+        # Generate public keys.
+        keys = [
+            PrivateKey.random().public_key()
+            for x in range(MultiEd25519PublicKey.MAX_KEYS + 1)
+        ]
+        # Verify failure for initializing multisig instance with too few keys.
+        with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
+            MultiEd25519PublicKey([keys[0]], 1)
+        # Verify failure for initializing multisig instance with too many keys.
+        with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
+            MultiEd25519PublicKey(keys, 1)
+        # Verify failure for initializing multisig instance with small threshold.
+        with self.assertRaisesRegex(
+            AssertionError, "Threshold must be between 1 and 4."
+        ):
+            MultiEd25519PublicKey(keys[0:4], 0)
+        # Verify failure for initializing multisig instance with large threshold.
+        with self.assertRaisesRegex(
+            AssertionError, "Threshold must be between 1 and 4."
+        ):
+            MultiEd25519PublicKey(keys[0:4], 5)
+        # Verify failure for initializing from bytes with too few keys.
+        with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
+            MultiEd25519PublicKey.from_bytes(
+                MultiEd25519PublicKey([keys[0]], 1, checked=False).to_bytes()
+            )
+        # Verify failure for initializing from bytes with too many keys.
+        with self.assertRaisesRegex(AssertionError, "Must have between 2 and 32 keys."):
+            MultiEd25519PublicKey.from_bytes(
+                MultiEd25519PublicKey(keys, 1, checked=False).to_bytes()
+            )
+        # Verify failure for initializing from bytes with small threshold.
+        with self.assertRaisesRegex(
+            AssertionError, "Threshold must be between 1 and 4."
+        ):
+            MultiEd25519PublicKey.from_bytes(
+                MultiEd25519PublicKey(keys[0:4], 0, checked=False).to_bytes()
+            )
+        # Verify failure for initializing from bytes with large threshold.
+        with self.assertRaisesRegex(
+            AssertionError, "Threshold must be between 1 and 4."
+        ):
+            MultiEd25519PublicKey.from_bytes(
+                MultiEd25519PublicKey(keys[0:4], 5, checked=False).to_bytes()
+            )

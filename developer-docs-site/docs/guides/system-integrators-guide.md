@@ -51,28 +51,28 @@ Either of these methods will expose a [REST API service](./aptos-apis.md) at `ht
   <TabItem value="devnet" label="Devnet">
     <ul>
       <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com">https://fullnode.devnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer Graphiql</a></li>
       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
   <TabItem value="testnet" label="Testnet">
     <ul>
       <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com">https://fullnode.testnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer Graphiql</a></li>
-      <li><a href="https://aptoslabs.com/testnet-faucet">Faucet Site</a></li>
+      <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
   <TabItem value="mainnet" label="Mainnet">
     <ul>
       <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com">https://fullnode.mainnet.aptoslabs.com</a></li>
-      <li><a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">REST API Spec</a></li>
+      <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
-      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer Graphiql</a></li>
       <li>Faucet: N/A</li>
+      <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
     </ul>
   </TabItem>
 </Tabs>

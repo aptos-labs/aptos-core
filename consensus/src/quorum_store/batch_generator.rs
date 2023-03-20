@@ -7,14 +7,11 @@ use crate::{
         counters,
         quorum_store_db::QuorumStoreStorage,
         types::Batch,
-        utils::{MempoolProxy, RoundExpirations},
+        utils::{MempoolProxy, TimeExpirations},
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{
-    common::TransactionSummary,
-    proof_of_store::{BatchId, LogicalTime},
-};
+use aptos_consensus_types::{common::TransactionSummary, proof_of_store::BatchId};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
@@ -29,7 +26,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(LogicalTime),
+    CommitNotification(u64),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -41,14 +38,15 @@ pub struct BackPressure {
 }
 
 pub struct BatchGenerator {
+    epoch: u64,
     my_peer_id: PeerId,
     batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
-    batch_round_expirations: RoundExpirations<BatchId>,
-    latest_logical_time: LogicalTime,
+    batch_expirations: TimeExpirations<BatchId>,
+    latest_block_timestamp: u64,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
     back_pressure: BackPressure,
@@ -80,14 +78,15 @@ impl BatchGenerator {
             .expect("Could not save to db");
 
         Self {
+            epoch,
             my_peer_id,
             batch_id,
             db,
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
-            batch_round_expirations: RoundExpirations::new(),
-            latest_logical_time: LogicalTime::new(epoch, 0),
+            batch_expirations: TimeExpirations::new(),
+            latest_block_timestamp: 0,
             last_end_batch_time: Instant::now(),
             back_pressure: BackPressure {
                 txn_count: false,
@@ -147,12 +146,11 @@ impl BatchGenerator {
         let batch_id = self.batch_id;
         self.batch_id.increment();
         self.db
-            .save_batch_id(self.latest_logical_time.epoch(), self.batch_id)
+            .save_batch_id(self.epoch, self.batch_id)
             .expect("Could not save to db");
 
-        let expiry_round =
-            self.latest_logical_time.round() + self.config.batch_expiry_round_gap_when_init;
-        let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
+        let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
+            + self.config.batch_expiry_gap_when_init_usecs;
         let txn_summaries: Vec<_> = pulled_txns
             .iter()
             .map(|txn| TransactionSummary {
@@ -161,11 +159,16 @@ impl BatchGenerator {
             })
             .collect();
 
-        let batch = Batch::new(batch_id, pulled_txns, logical_time, self.my_peer_id);
+        let batch = Batch::new(
+            batch_id,
+            pulled_txns,
+            self.epoch,
+            expiry_time,
+            self.my_peer_id,
+        );
 
         self.batches_in_progress.insert(batch_id, txn_summaries);
-        self.batch_round_expirations
-            .add_item(batch_id, expiry_round);
+        self.batch_expirations.add_item(batch_id, expiry_time);
 
         self.last_end_batch_time = Instant::now();
         Some(batch)
@@ -251,25 +254,19 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
-                        BatchGeneratorCommand::CommitNotification(logical_time) => {
+                        BatchGeneratorCommand::CommitNotification(block_timestamp) => {
                             trace!(
-                                "QS: got clean request from execution, epoch {}, round {}",
-                                logical_time.epoch(),
-                                logical_time.round()
-                            );
-                            assert_eq!(
-                                self.latest_logical_time.epoch(),
-                                logical_time.epoch(),
-                                "Wrong epoch"
+                                "QS: got clean request from execution, block timestamp {}",
+                                block_timestamp
                             );
                             assert!(
-                                self.latest_logical_time <= logical_time,
-                                "Decreasing logical time"
+                                self.latest_block_timestamp <= block_timestamp,
+                                "Decreasing block timestamp"
                             );
-                            self.latest_logical_time = logical_time;
-                            // Cleans up all batches that expire in rounds <= logical_time.round(). This is
+                            self.latest_block_timestamp = block_timestamp;
+                            // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
-                            for batch_id in self.batch_round_expirations.expire(logical_time.round()) {
+                            for batch_id in self.batch_expirations.expire(block_timestamp) {
                                 if self.batches_in_progress.remove(&batch_id).is_some() {
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
@@ -280,9 +277,6 @@ impl BatchGenerator {
                             }
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
-                            // Quorum store measurements
-                            counters::TIMEOUT_BATCHES_COUNT.inc();
-
                             for batch_id in batch_ids {
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",

@@ -1,0 +1,99 @@
+error[E04023]: invalid call target
+   ┌─ tests/move_check/typing/lambda.move:34:37
+   │
+34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 'reduce' is not a macro but a function
+
+error[E04017]: too many arguments
+   ┌─ tests/move_check/typing/lambda.move:40:13
+   │
+40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │             │     │
+   │             │     Found 2 argument(s) here
+   │             Invalid call of 'action'. The call expected 1 argument(s) but got 2
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda.move:48:13
+   │
+45 │     public inline fun wrong_local_call_arg_type<T>(v: &vector<T>, action: |&T|) {
+   │                                                                            -- Expected: '&T'
+   ·
+48 │             action(i); // expected to have wrong argument type
+   │             ^^^^^^^^^ Invalid call of 'action'. Invalid argument type
+   ·
+96 │     public fun length<T>(v: &vector<T>): u64 { abort(1) }
+   │                                          --- Given: 'u64'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda.move:56:19
+   │
+53 │     public inline fun wrong_local_call_result_type<T>(v: &vector<T>, action: |&T|) {
+   │                                                                              ---- Found: '()'. It is not compatible with the other type.
+   ·
+56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
+   │                   ^ Incompatible arguments to '+'
+   ·
+96 │     public fun length<T>(v: &vector<T>): u64 { abort(1) }
+   │                                          --- Found: 'u64'. It is not compatible with the other type.
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda.move:61:9
+   │
+61 │         x(1)
+   │         ^ Expected a function type but found 'u64'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda.move:67:9
+   │
+ 4 │     public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                                                          -- Given: '&{integer}'
+   ·
+67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │         │            │
+   │         │            Expected: integer
+   │         Invalid call of '0x8675309::M::foreach'. Invalid argument for parameter 'action'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda.move:73:9
+   │
+ 4 │     public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                                                         ---- Expected: '()'
+   ·
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │         │                                 │
+   │         │                                 Given: integer
+   │         Invalid call of '0x8675309::M::foreach'. Invalid argument for parameter 'action'
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda.move:77:18
+   │
+77 │         let _x = |i| i + 1; // expected lambda not allowed
+   │                  ^^^^^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda.move:81:12
+   │
+81 │         f: |u64|u64, // expected lambda not allowed
+   │            ^^^^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda.move:84:46
+   │
+84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
+   │                                              ^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda.move:86:58
+   │
+86 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                          ^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda.move:89:49
+   │
+89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                 ^^^^^ function type only allowed for inline function arguments
+
