@@ -70,10 +70,10 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data));
 
-    for (entry, args, _err) in tests {
+    for (entry, args, err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
         let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
-        assert_vm_status!(status, _err);
+        assert_vm_status!(status, err);
     }
 }
 
