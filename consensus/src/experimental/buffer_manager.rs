@@ -225,8 +225,12 @@ impl BufferManager {
             // otherwise all blocks are Nil/genesis blocks that do not need randomness
             let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
 
+            // self.rand_msg_tx
+            // .send_rand_shares(rand_shares, proposer)
+            // .await;
+
             self.rand_msg_tx
-            .send_rand_shares(rand_shares, proposer)
+            .broadcast_rand_shares(rand_shares)
             .await;
         }
 
@@ -266,11 +270,11 @@ impl BufferManager {
                             }
                             // if we're the proposer for the first proposal block,
                             // we're responsible to broadcast the randomness decision
-                            if Some(self.author) == item.get_first_proposer() {
-                                self.rand_msg_tx
-                                    .broadcast_rand_decisions(rand_decisions)
-                                    .await;
-                            }
+                            // if Some(self.author) == item.get_first_proposer() {
+                            //     self.rand_msg_tx
+                            //         .broadcast_rand_decisions(rand_decisions)
+                            //         .await;
+                            // }
                             self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                             return true;
                         }
