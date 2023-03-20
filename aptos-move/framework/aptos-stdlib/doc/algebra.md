@@ -3,51 +3,40 @@
 
 # Module `0x1::algebra`
 
-Module <code><a href="algebra.md#0x1_algebra">algebra</a></code> provides structs/functions for doing arithmetic and other common operations
-on algebraic structures (mostly groups and fields) that are widely used in cryptographic systems.
+This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
+which can be used to build generic cryptographic schemes atop.
 
-Different from existing modules like <code><a href="ristretto255.md#0x1_ristretto255">ristretto255</a>.<b>move</b></code>, the functions here are generic.
-Typically, each function represent an operation defined for ANY group/field
-and require some marker type(s) which represents the actual structure(s) to work with.
-See the test cases in <code>*_algebra.<b>move</b></code> for more examples.
+In general, a structure implements operations like (de)serialization, equality check, random sampling.
 
-The generic APIs should allow Move developers to build generic cryptographic schemes on top of them
-and use the schemes with different underlying algebraic structures by simply changing some type parameters.
-E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
+A group typically implements the following operations. (Additive notions are used.)
+- <code><a href="algebra.md#0x1_algebra_order">order</a>()</code> for group order.
+- <code><a href="algebra.md#0x1_algebra_zero">zero</a>()</code> for group identity.
+- <code><a href="algebra.md#0x1_algebra_one">one</a>()</code> for group generator (if exists).
+- <code><a href="algebra.md#0x1_algebra_neg">neg</a>()</code> for inverse.
+- <code><a href="algebra.md#0x1_algebra_add">add</a>()</code> for a basic group operation.
+- <code><a href="algebra.md#0x1_algebra_sub">sub</a>()</code> for group element subtraction.
+- <code><a href="algebra.md#0x1_algebra_double">double</a>()</code> for efficient doubling.
+- <code><a href="algebra.md#0x1_algebra_scalar_mul">scalar_mul</a>()</code> for group scalar multiplication.
+- <code><a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>()</code> for efficient group multi-scalar multiplication.
+- <code><a href="algebra.md#0x1_algebra_hash_to">hash_to</a>()</code> for hash-to-group.
 
-Currently supported structures can be found in <code>algebra_*.<b>move</b></code>.
+A field typically implements the following operations.
+- <code><a href="algebra.md#0x1_algebra_zero">zero</a>()</code> for the field additive identity.
+- <code><a href="algebra.md#0x1_algebra_one">one</a>()</code> for the field multiplicative identity.
+- <code><a href="algebra.md#0x1_algebra_add">add</a>()</code> for field addition.
+- <code><a href="algebra.md#0x1_algebra_sub">sub</a>()</code> for field subtraction.
+- <code><a href="algebra.md#0x1_algebra_mul">mul</a>()</code> for field multiplication.
+- <code><a href="algebra.md#0x1_algebra_div">div</a>()</code> for field division.
+- <code><a href="algebra.md#0x1_algebra_neg">neg</a>()</code> for field negation.
+- <code><a href="algebra.md#0x1_algebra_inv">inv</a>()</code> for field inversion.
+- <code><a href="algebra.md#0x1_algebra_sqr">sqr</a>()</code> for efficient field element squaring.
+- <code><a href="algebra.md#0x1_algebra_from_u64">from_u64</a>()</code> for quick conversion from u64 to field element.
 
-Below are the operations currently supported.
-- Serialization/deserialization.
-- Group operations.
-- Getting group order.
-- Getting group identity.
-- Getting group generator.
-- Addition.
-- Subtraction.
-- Negation.
-- Sclar multiplication.
-- Efficient multi-sclar multiplication.
-- Efficient doubling.
-- Equal-to-identity check.
-- Field operations.
-- Getting additive identity.
-- Getting multiplicative identity.
-- Conversion from integers.
-- Addition.
-- Negation.
-- Subtraction.
-- Multiplication.
-- Inversion.
-- Division.
-- Efficient squaring.
-- Equal-to-additive-identity check.
-- Equal-to-multiplicative-identity check.
-- Equality check.
-- Upcasting/downcasting between structures.
-- Hash-to-structure.
+A pairing typically implements <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> and <code><a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>()</code>.
 
-Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> additive group notions are used.
+<code>upcasting()</code> and <code>downcasting()</code> are implemented whenever there is a subset/superset relationship between 2 structures.
+
+See <code>algebra_*.<b>move</b></code> for currently implemented algebraic structures.
 
 
 -  [Struct `Element`](#0x1_algebra_Element)

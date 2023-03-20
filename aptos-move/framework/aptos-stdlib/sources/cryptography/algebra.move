@@ -1,48 +1,37 @@
-/// Module `algebra` provides structs/functions for doing arithmetic and other common operations
-/// on algebraic structures (mostly groups and fields) that are widely used in cryptographic systems.
+/// This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
+/// which can be used to build generic cryptographic schemes atop.
 ///
-/// Different from existing modules like `ristretto255.move`, the functions here are generic.
-/// Typically, each function represent an operation defined for ANY group/field
-/// and require some marker type(s) which represents the actual structure(s) to work with.
-/// See the test cases in `*_algebra.move` for more examples.
+/// In general, a structure implements operations like (de)serialization, equality check, random sampling.
 ///
-/// The generic APIs should allow Move developers to build generic cryptographic schemes on top of them
-/// and use the schemes with different underlying algebraic structures by simply changing some type parameters.
-/// E.g., Groth16 proof verifier that accepts a generic pairing is now possible.
+/// A group typically implements the following operations. (Additive notions are used.)
+/// - `order()` for group order.
+/// - `zero()` for group identity.
+/// - `one()` for group generator (if exists).
+/// - `neg()` for inverse.
+/// - `add()` for a basic group operation.
+/// - `sub()` for group element subtraction.
+/// - `double()` for efficient doubling.
+/// - `scalar_mul()` for group scalar multiplication.
+/// - `multi_scalar_mul()` for efficient group multi-scalar multiplication.
+/// - `hash_to()` for hash-to-group.
 ///
-/// Currently supported structures can be found in `algebra_*.move`.
+/// A field typically implements the following operations.
+/// - `zero()` for the field additive identity.
+/// - `one()` for the field multiplicative identity.
+/// - `add()` for field addition.
+/// - `sub()` for field subtraction.
+/// - `mul()` for field multiplication.
+/// - `div()` for field division.
+/// - `neg()` for field negation.
+/// - `inv()` for field inversion.
+/// - `sqr()` for efficient field element squaring.
+/// - `from_u64()` for quick conversion from u64 to field element.
 ///
-/// Below are the operations currently supported.
-/// - Serialization/deserialization.
-/// - Group operations.
-///   - Getting group order.
-///   - Getting group identity.
-///   - Getting group generator.
-///   - Addition.
-///   - Subtraction.
-///   - Negation.
-///   - Sclar multiplication.
-///   - Efficient multi-sclar multiplication.
-///   - Efficient doubling.
-///   - Equal-to-identity check.
-/// - Field operations.
-///   - Getting additive identity.
-///   - Getting multiplicative identity.
-///   - Conversion from integers.
-///   - Addition.
-///   - Negation.
-///   - Subtraction.
-///   - Multiplication.
-///   - Inversion.
-///   - Division.
-///   - Efficient squaring.
-///   - Equal-to-additive-identity check.
-///   - Equal-to-multiplicative-identity check.
-/// - Equality check.
-/// - Upcasting/downcasting between structures.
-/// - Hash-to-structure.
+/// A pairing typically implements `pairing()` and `multi_pairing()`.
 ///
-/// Note: in `algebra.move` additive group notions are used.
+/// `upcasting()` and `downcasting()` are implemented whenever there is a subset/superset relationship between 2 structures.
+///
+/// See `algebra_*.move` for currently implemented algebraic structures.
 module aptos_std::algebra {
     use std::option::{Option, some, none};
     use std::features;
