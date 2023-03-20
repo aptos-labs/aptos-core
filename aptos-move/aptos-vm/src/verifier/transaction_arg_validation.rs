@@ -25,6 +25,7 @@ use std::{
     collections::BTreeMap,
     io::{Cursor, Read},
 };
+use move_vm_types::gas::UnmeteredGasMeter;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
@@ -65,7 +66,6 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     senders: Vec<AccountAddress>,
     mut args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
-    gas_meter: &mut impl GasMeter,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
@@ -107,7 +107,9 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         if needs_construction {
             let mut cursor = Cursor::new(&args[idx][..]);
             let mut new_arg = vec![];
-            recursively_construct_arg(session, ty, &mut cursor, gas_meter, &mut new_arg)?;
+            // Perhaps in a future we should do proper gas metering here
+            let mut gas_meter = UnmeteredGasMeter;
+            recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
             // Check cursor has parsed everything
             // is_empty is not enabled
             if cursor.position() != args[idx].len() as u64 {

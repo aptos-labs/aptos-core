@@ -346,7 +346,6 @@ impl AptosVM {
             senders,
             script_fn.args().to_vec(),
             &function,
-            gas_meter,
         )?;
         session
             .execute_entry_function(
@@ -394,7 +393,6 @@ impl AptosVM {
                             senders,
                             convert_txn_args(script.args()),
                             &loaded_func,
-                            gas_meter,
                         )?;
                     session
                         .execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)
@@ -1119,7 +1117,6 @@ impl AptosVM {
                         senders,
                         convert_txn_args(script.args()),
                         &loaded_func,
-                        &mut gas_meter,
                     )
                     .map_err(Err)?;
 
@@ -1296,7 +1293,6 @@ impl AptosVM {
             func_name.as_ident_str(),
             &func_inst,
             metadata.as_ref(),
-            &mut gas_meter,
         )?;
 
         Ok(session
