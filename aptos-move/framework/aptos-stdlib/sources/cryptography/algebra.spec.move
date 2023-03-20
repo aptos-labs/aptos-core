@@ -4,7 +4,7 @@ spec aptos_std::algebra {
         pragma opaque;
     }
 
-    spec field_add_internal<F>(handle_1: u64, handle_2: u64): u64 {
+    spec add_internal<S>(handle_1: u64, handle_2: u64): u64 {
         pragma opaque;
     }
 

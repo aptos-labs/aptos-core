@@ -257,8 +257,8 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Serialization/deserialization.
-        let val_0 = field_zero<Fq12>();
-        let val_1 = field_one<Fq12>();
+        let val_0 = zero<Fq12>();
+        let val_1 = one<Fq12>();
         assert!(FQ12_VAL_0_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_0), 1);
         assert!(FQ12_VAL_1_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_1), 1);
         let val_7 = from_u64<Fq12>(7);
@@ -268,36 +268,36 @@ module aptos_std::algebra_bls12381 {
         assert!(std::option::is_none(&deserialize<Fq12, Fq12FormatLscLsb>(&x"ffff")), 1);
 
         // Negation.
-        let val_minus_7 = field_neg(&val_7);
+        let val_minus_7 = neg(&val_7);
         assert!(FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, Fq12FormatLscLsb>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<Fq12>(9);
         let val_2 = from_u64<Fq12>(2);
-        assert!(eq(&val_2, &field_add(&val_minus_7, &val_9)), 1);
+        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
 
         // Subtraction.
-        assert!(eq(&val_9, &field_sub(&val_2, &val_minus_7)), 1);
+        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
 
         // Multiplication.
         let val_63 = from_u64<Fq12>(63);
-        assert!(eq(&val_63, &field_mul(&val_7, &val_9)), 1);
+        assert!(eq(&val_63, &mul(&val_7, &val_9)), 1);
 
         // division.
         let val_0 = from_u64<Fq12>(0);
-        assert!(eq(&val_7, &std::option::extract(&mut field_div(&val_63, &val_9))), 1);
-        assert!(std::option::is_none(&field_div(&val_63, &val_0)), 1);
+        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
+        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
 
         // Inversion.
-        assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
-        assert!(std::option::is_none(&field_inv(&val_0)), 1);
+        assert!(eq(&val_minus_7, &neg(&val_7)), 1);
+        assert!(std::option::is_none(&inv(&val_0)), 1);
 
         // Squaring.
-        let val_x = insecure_random_element<Fq12>();
-        assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
+        let val_x = rand_insecure<Fq12>();
+        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
 
         // Downcasting.
-        assert!(eq(&group_identity<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))), 1);
+        assert!(eq(&zero<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))), 1);
     }
 
     #[test_only]
@@ -324,9 +324,9 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
-        assert!(R_SERIALIZED == group_order<G1Affine>(), 1);
-        let point_at_infinity = group_identity<G1Affine>();
-        let generator = group_generator<G1Affine>();
+        assert!(R_SERIALIZED == order<G1Affine>(), 1);
+        let point_at_infinity = zero<G1Affine>();
+        let generator = one<G1Affine>();
 
         // Serialization/deserialization.
         assert!(G1AFFINE_GENERATOR_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&generator), 1);
@@ -373,7 +373,7 @@ module aptos_std::algebra_bls12381 {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
-        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&point_7g_calc), 1);
         assert!(G1AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>( &point_7g_calc), 1);
@@ -382,38 +382,38 @@ module aptos_std::algebra_bls12381 {
         let scalar_a = from_u64<Fr>(0x0300);
         let scalar_b = from_u64<Fr>(0x0401);
         let scalar_c = from_u64<Fr>(0x0502);
-        let point_p = insecure_random_element<G1Affine>();
-        let point_q = insecure_random_element<G1Affine>();
-        let point_r = insecure_random_element<G1Affine>();
-        let expected = group_identity<G1Affine>();
-        let expected = group_add(&expected, &group_scalar_mul(&point_p, &scalar_a));
-        let expected = group_add(&expected, &group_scalar_mul(&point_q, &scalar_b));
-        let expected = group_add(&expected, &group_scalar_mul(&point_r, &scalar_c));
+        let point_p = rand_insecure<G1Affine>();
+        let point_q = rand_insecure<G1Affine>();
+        let point_r = rand_insecure<G1Affine>();
+        let expected = zero<G1Affine>();
+        let expected = add(&expected, &scalar_mul(&point_p, &scalar_a));
+        let expected = add(&expected, &scalar_mul(&point_q, &scalar_b));
+        let expected = add(&expected, &scalar_mul(&point_r, &scalar_c));
         let points = vector[point_p, point_q, point_r];
         let scalars = vector[scalar_a, scalar_b, scalar_c];
-        let actual = group_multi_scalar_mul(&points, &scalars);
+        let actual = multi_scalar_mul(&points, &scalars);
         assert!(eq(&expected, &actual), 1);
 
         // Doubling.
         let scalar_2 = from_u64<Fr>(2);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
-        let point_double_g = group_double(&generator);
+        let point_2g = scalar_mul(&generator, &scalar_2);
+        let point_double_g = double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
         // Negation.
-        let point_minus_7g_calc = group_neg(&point_7g_calc);
+        let point_minus_7g_calc = neg(&point_7g_calc);
         assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1Affine, G1AffineFormatCompressed>(&point_minus_7g_calc), 1);
         assert!(G1AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1Affine, G1AffineFormatUncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
-        let point_9g = group_scalar_mul(&generator, &scalar_9);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
-        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
+        let point_9g = scalar_mul(&generator, &scalar_9);
+        let point_2g = scalar_mul(&generator, &scalar_2);
+        let point_2g_calc = add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
+        assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
 
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
@@ -447,9 +447,9 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
-        assert!(R_SERIALIZED == group_order<G2Affine>(), 1);
-        let point_at_infinity = group_identity<G2Affine>();
-        let generator = group_generator<G2Affine>();
+        assert!(R_SERIALIZED == order<G2Affine>(), 1);
+        let point_at_infinity = zero<G2Affine>();
+        let generator = one<G2Affine>();
 
         // Serialization/deserialization.
         assert!(G2AFFINE_GENERATOR_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&generator), 1);
@@ -485,7 +485,7 @@ module aptos_std::algebra_bls12381 {
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
-        let point_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let point_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
         assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&point_7g_calc), 1);
         assert!(G2AFFINE_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_7g_calc), 1);
@@ -494,38 +494,38 @@ module aptos_std::algebra_bls12381 {
         let scalar_a = from_u64<Fr>(0x0300);
         let scalar_b = from_u64<Fr>(0x0401);
         let scalar_c = from_u64<Fr>(0x0502);
-        let point_p = insecure_random_element<G2Affine>();
-        let point_q = insecure_random_element<G2Affine>();
-        let point_r = insecure_random_element<G2Affine>();
-        let expected = group_identity<G2Affine>();
-        let expected = group_add(&expected, &group_scalar_mul(&point_p, &scalar_a));
-        let expected = group_add(&expected, &group_scalar_mul(&point_q, &scalar_b));
-        let expected = group_add(&expected, &group_scalar_mul(&point_r, &scalar_c));
+        let point_p = rand_insecure<G2Affine>();
+        let point_q = rand_insecure<G2Affine>();
+        let point_r = rand_insecure<G2Affine>();
+        let expected = zero<G2Affine>();
+        let expected = add(&expected, &scalar_mul(&point_p, &scalar_a));
+        let expected = add(&expected, &scalar_mul(&point_q, &scalar_b));
+        let expected = add(&expected, &scalar_mul(&point_r, &scalar_c));
         let points = vector[point_p, point_q, point_r];
         let scalars = vector[scalar_a, scalar_b, scalar_c];
-        let actual = group_multi_scalar_mul(&points, &scalars);
+        let actual = multi_scalar_mul(&points, &scalars);
         assert!(eq(&expected, &actual), 1);
 
         // Doubling.
         let scalar_2 = from_u64<Fr>(2);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
-        let point_double_g = group_double(&generator);
+        let point_2g = scalar_mul(&generator, &scalar_2);
+        let point_double_g = double(&generator);
         assert!(eq(&point_2g, &point_double_g), 1);
 
         // Negation.
-        let point_minus_7g_calc = group_neg(&point_7g_calc);
+        let point_minus_7g_calc = neg(&point_7g_calc);
         assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2Affine, G2AffineFormatCompressed>(&point_minus_7g_calc), 1);
         assert!(G2AFFINE_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2Affine, G2AffineFormatUncompressed>(&point_minus_7g_calc), 1);
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
-        let point_9g = group_scalar_mul(&generator, &scalar_9);
-        let point_2g = group_scalar_mul(&generator, &scalar_2);
-        let point_2g_calc = group_add(&point_minus_7g_calc, &point_9g);
+        let point_9g = scalar_mul(&generator, &scalar_9);
+        let point_2g = scalar_mul(&generator, &scalar_2);
+        let point_2g_calc = add(&point_minus_7g_calc, &point_9g);
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&point_9g, &group_sub(&point_2g, &point_minus_7g_calc)), 1);
+        assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
 
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
@@ -551,9 +551,9 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Special constants.
-        assert!(R_SERIALIZED == group_order<Gt>(), 1);
-        let identity = group_identity<Gt>();
-        let generator = group_generator<Gt>();
+        assert!(R_SERIALIZED == order<Gt>(), 1);
+        let identity = zero<Gt>();
+        let generator = one<Gt>();
 
         // Serialization/deserialization.
         assert!(GT_GENERATOR_SERIALIZED == serialize<Gt, GtFormat>(&generator), 1);
@@ -574,31 +574,31 @@ module aptos_std::algebra_bls12381 {
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
-        let element_7g_calc = group_scalar_mul(&generator, &scalar_7);
+        let element_7g_calc = scalar_mul(&generator, &scalar_7);
         assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
         assert!(GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize<Gt, GtFormat>(&element_7g_calc), 1);
 
         // Element negation.
-        let element_minus_7g_calc = group_neg(&element_7g_calc);
+        let element_minus_7g_calc = neg(&element_7g_calc);
         assert!(GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize<Gt, GtFormat>(&element_minus_7g_calc), 1);
 
         // Element addition.
         let scalar_9 = from_u64<Fr>(9);
-        let element_9g = group_scalar_mul(&generator, &scalar_9);
+        let element_9g = scalar_mul(&generator, &scalar_9);
         let scalar_2 = from_u64<Fr>(2);
-        let element_2g = group_scalar_mul(&generator, &scalar_2);
-        let element_2g_calc = group_add(&element_minus_7g_calc, &element_9g);
+        let element_2g = scalar_mul(&generator, &scalar_2);
+        let element_2g_calc = add(&element_minus_7g_calc, &element_9g);
         assert!(eq(&element_2g, &element_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&element_9g, &group_sub(&element_2g, &element_minus_7g_calc)), 1);
+        assert!(eq(&element_9g, &sub(&element_2g, &element_minus_7g_calc)), 1);
 
         // Upcasting to Fq12.
-        assert!(eq(&field_one<Fq12>(), &upcast<Gt, Fq12>(&identity)), 1);
+        assert!(eq(&one<Fq12>(), &upcast<Gt, Fq12>(&identity)), 1);
     }
 
     #[test_only]
-    use aptos_std::algebra::{field_zero, field_one, from_u64, eq, deserialize, serialize, field_neg, field_add, field_sub, field_mul, field_div, field_inv, insecure_random_element, field_sqr, group_order, group_identity, group_generator, group_scalar_mul, group_add, group_multi_scalar_mul, group_double, group_neg, group_sub, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast};
+    use aptos_std::algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast};
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -616,8 +616,8 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Serialization/deserialization.
-        let val_0 = field_zero<Fr>();
-        let val_1 = field_one<Fr>();
+        let val_0 = zero<Fr>();
+        let val_1 = one<Fr>();
         assert!(FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_0), 1);
         assert!(FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_1), 1);
         let val_7 = from_u64<Fr>(7);
@@ -639,33 +639,33 @@ module aptos_std::algebra_bls12381 {
         assert!(std::option::is_none(&deserialize<Fr, FrFormatMsb>(&x"ffff")), 1);
 
         // Negation.
-        let val_minus_7 = field_neg(&val_7);
+        let val_minus_7 = neg(&val_7);
         assert!(FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FrFormatLsb>(&val_minus_7), 1);
 
         // Addition.
         let val_9 = from_u64<Fr>(9);
         let val_2 = from_u64<Fr>(2);
-        assert!(eq(&val_2, &field_add(&val_minus_7, &val_9)), 1);
+        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
 
         // Subtraction.
-        assert!(eq(&val_9, &field_sub(&val_2, &val_minus_7)), 1);
+        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
 
         // Multiplication.
         let val_63 = from_u64<Fr>(63);
-        assert!(eq(&val_63, &field_mul(&val_7, &val_9)), 1);
+        assert!(eq(&val_63, &mul(&val_7, &val_9)), 1);
 
         // division.
         let val_0 = from_u64<Fr>(0);
-        assert!(eq(&val_7, &std::option::extract(&mut field_div(&val_63, &val_9))), 1);
-        assert!(std::option::is_none(&field_div(&val_63, &val_0)), 1);
+        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
+        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
 
         // Inversion.
-        assert!(eq(&val_minus_7, &field_neg(&val_7)), 1);
-        assert!(std::option::is_none(&field_inv(&val_0)), 1);
+        assert!(eq(&val_minus_7, &neg(&val_7)), 1);
+        assert!(std::option::is_none(&inv(&val_0)), 1);
 
         // Squaring.
-        let val_x = insecure_random_element<Fr>();
-        assert!(eq(&field_mul(&val_x, &val_x), &field_sqr(&val_x)), 1);
+        let val_x = rand_insecure<Fr>();
+        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
     }
 
     #[test(fx = @std)]
@@ -673,12 +673,12 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // pairing(a*P,b*Q) == (a*b)*pairing(P,Q)
-        let element_p = insecure_random_element<G1Affine>();
-        let element_q = insecure_random_element<G2Affine>();
-        let a = insecure_random_element<Fr>();
-        let b = insecure_random_element<Fr>();
-        let gt_element = pairing<G1Affine,G2Affine,Gt>(&group_scalar_mul(&element_p, &a), &group_scalar_mul(&element_q, &b));
-        let gt_element_another = group_scalar_mul(&pairing<G1Affine,G2Affine,Gt>(&element_p, &element_q), &field_mul(&a, &b));
+        let element_p = rand_insecure<G1Affine>();
+        let element_q = rand_insecure<G2Affine>();
+        let a = rand_insecure<Fr>();
+        let b = rand_insecure<Fr>();
+        let gt_element = pairing<G1Affine,G2Affine,Gt>(&scalar_mul(&element_p, &a), &scalar_mul(&element_q, &b));
+        let gt_element_another = scalar_mul(&pairing<G1Affine,G2Affine,Gt>(&element_p, &element_q), &mul(&a, &b));
         assert!(eq(&gt_element, &gt_element_another), 1);
     }
 
@@ -687,33 +687,33 @@ module aptos_std::algebra_bls12381 {
         enable_cryptography_algebra_natives(&fx);
 
         // Will compute e(a0*P0,b0*Q0)+e(a1*P1,b1*Q1)+e(a2*P2,b2*Q2).
-        let a0 = insecure_random_element<Fr>();
-        let a1 = insecure_random_element<Fr>();
-        let a2 = insecure_random_element<Fr>();
-        let element_p0 = insecure_random_element<G1Affine>();
-        let element_p1 = insecure_random_element<G1Affine>();
-        let element_p2 = insecure_random_element<G1Affine>();
-        let p0_a0 = group_scalar_mul(&element_p0, &a0);
-        let p1_a1 = group_scalar_mul(&element_p1, &a1);
-        let p2_a2 = group_scalar_mul(&element_p2, &a2);
-        let b0 = insecure_random_element<Fr>();
-        let b1 = insecure_random_element<Fr>();
-        let b2 = insecure_random_element<Fr>();
-        let element_q0 = insecure_random_element<G2Affine>();
-        let element_q1 = insecure_random_element<G2Affine>();
-        let element_q2 = insecure_random_element<G2Affine>();
-        let q0_b0 = group_scalar_mul(&element_q0, &b0);
-        let q1_b1 = group_scalar_mul(&element_q1, &b1);
-        let q2_b2 = group_scalar_mul(&element_q2, &b2);
+        let a0 = rand_insecure<Fr>();
+        let a1 = rand_insecure<Fr>();
+        let a2 = rand_insecure<Fr>();
+        let element_p0 = rand_insecure<G1Affine>();
+        let element_p1 = rand_insecure<G1Affine>();
+        let element_p2 = rand_insecure<G1Affine>();
+        let p0_a0 = scalar_mul(&element_p0, &a0);
+        let p1_a1 = scalar_mul(&element_p1, &a1);
+        let p2_a2 = scalar_mul(&element_p2, &a2);
+        let b0 = rand_insecure<Fr>();
+        let b1 = rand_insecure<Fr>();
+        let b2 = rand_insecure<Fr>();
+        let element_q0 = rand_insecure<G2Affine>();
+        let element_q1 = rand_insecure<G2Affine>();
+        let element_q2 = rand_insecure<G2Affine>();
+        let q0_b0 = scalar_mul(&element_q0, &b0);
+        let q1_b1 = scalar_mul(&element_q1, &b1);
+        let q2_b2 = scalar_mul(&element_q2, &b2);
 
         // Naive method.
         let n0 = pairing<G1Affine,G2Affine,Gt>(&p0_a0, &q0_b0);
         let n1 = pairing<G1Affine,G2Affine,Gt>(&p1_a1, &q1_b1);
         let n2 = pairing<G1Affine,G2Affine,Gt>(&p2_a2, &q2_b2);
-        let n = group_identity<Gt>();
-        n = group_add(&n, &n0);
-        n = group_add(&n, &n1);
-        n = group_add(&n, &n2);
+        let n = zero<Gt>();
+        n = add(&n, &n0);
+        n = add(&n, &n1);
+        n = add(&n, &n2);
 
         // Efficient API.
         let m = multi_pairing<G1Affine, G2Affine, Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
@@ -724,8 +724,8 @@ module aptos_std::algebra_bls12381 {
     #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let g1_elements = vector[insecure_random_element<G1Affine>()];
-        let g2_elements = vector[insecure_random_element<G2Affine>(), insecure_random_element<G2Affine>()];
+        let g1_elements = vector[rand_insecure<G1Affine>()];
+        let g2_elements = vector[rand_insecure<G2Affine>(), rand_insecure<G2Affine>()];
         multi_pairing<G1Affine, G2Affine, Gt>(&g1_elements, &g2_elements);
     }
 
@@ -733,9 +733,9 @@ module aptos_std::algebra_bls12381 {
     #[expected_failure(abort_code = 0x010000, location = aptos_std::algebra)]
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let elements = vector[insecure_random_element<G1Affine>()];
-        let scalars = vector[insecure_random_element<Fr>(), insecure_random_element<Fr>()];
-        group_multi_scalar_mul(&elements, &scalars);
+        let elements = vector[rand_insecure<G1Affine>()];
+        let scalars = vector[rand_insecure<Fr>(), rand_insecure<Fr>()];
+        multi_scalar_mul(&elements, &scalars);
     }
 
     //

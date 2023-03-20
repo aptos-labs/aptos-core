@@ -47,20 +47,22 @@ module aptos_std::algebra {
     use std::option::{Option, some, none};
     use std::features;
 
-    /// This struct represents an element of an algebraic structure `S`.
+    /// This struct represents an element of a structure `S`.
     struct Element<phantom S> has copy, drop {
         handle: u64
     }
 
+    //
     // Public functions begin.
+    //
 
-    /// Check if `x == y` for elements `x` and `y` of an algebraic structure `S`.
+    /// Check if `x == y` for elements `x` and `y` of a structure `S`.
     public fun eq<S>(x: &Element<S>, y: &Element<S>): bool {
         abort_unless_cryptography_algebra_natives_enabled();
         eq_internal<S>(x.handle, y.handle)
     }
 
-    /// Convert a u64 to an element of an algebraic structure `S`.
+    /// Convert a u64 to an element of a structure `S`.
     public fun from_u64<S>(value: u64): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
@@ -68,59 +70,59 @@ module aptos_std::algebra {
         }
     }
 
-    /// Return the additive identity of a field `S`.
-    public fun field_zero<S>(): Element<S> {
+    /// Return the 1st identity of a structure `S`.
+    public fun zero<S>(): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_zero_internal<S>()
+            handle: zero_internal<S>()
         }
     }
 
-    /// Return the multiplicative identity of a field `S`.
-    public fun field_one<S>(): Element<S> {
+    /// Return the 2nd identity of a structure `S`.
+    public fun one<S>(): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_one_internal<S>()
+            handle: one_internal<S>()
         }
     }
 
-    /// Compute `-x` for an element `x` of a field `S`.
-    public fun field_neg<S>(x: &Element<S>): Element<S> {
+    /// Compute `-x` for an element `x` of a structure `S`.
+    public fun neg<S>(x: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_neg_internal<S>(x.handle)
+            handle: neg_internal<S>(x.handle)
         }
     }
 
-    /// Compute `x + y` for elements `x` and `y` of a field `S`.
-    public fun field_add<S>(x: &Element<S>, y: &Element<S>): Element<S> {
+    /// Compute `x + y` for elements `x` and `y` of structure `S`.
+    public fun add<S>(x: &Element<S>, y: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_add_internal<S>(x.handle, y.handle)
+            handle: add_internal<S>(x.handle, y.handle)
         }
     }
 
-    /// Compute `x - y` for elements `x` and `y` of a field `S`.
-    public fun field_sub<S>(x: &Element<S>, y: &Element<S>): Element<S> {
+    /// Compute `x - y` for elements `x` and `y` of a structure `S`.
+    public fun sub<S>(x: &Element<S>, y: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_sub_internal<S>(x.handle, y.handle)
+            handle: sub_internal<S>(x.handle, y.handle)
         }
     }
 
-    /// Compute `x * y` for elements `x` and `y` of a field `S`.
-    public fun field_mul<S>(x: &Element<S>, y: &Element<S>): Element<S> {
+    /// Compute `x * y` for elements `x` and `y` of a structure `S`.
+    public fun mul<S>(x: &Element<S>, y: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_mul_internal<S>(x.handle, y.handle)
+            handle: mul_internal<S>(x.handle, y.handle)
         }
     }
 
-    /// Try computing `x / y` for elements `x` and `y` of a field `S`.
-    /// Return none if y is the additive identity of field `S`.
-    public fun field_div<S>(x: &Element<S>, y: &Element<S>): Option<Element<S>> {
+    /// Try computing `x / y` for elements `x` and `y` of a structure `S`.
+    /// Return none if y equals to `zero<S>()`.
+    public fun div<S>(x: &Element<S>, y: &Element<S>): Option<Element<S>> {
         abort_unless_cryptography_algebra_natives_enabled();
-        let (succ, handle) = field_div_internal<S>(x.handle, y.handle);
+        let (succ, handle) = div_internal<S>(x.handle, y.handle);
         if (succ) {
             some(Element<S> { handle })
         } else {
@@ -128,20 +130,19 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `x^2` for an element `x` of a field `S`.
-    ///
-    public fun field_sqr<S>(x: &Element<S>): Element<S> {
+    /// Compute `x^2` for an element `x` of a structure `S`. Faster and cheaper than `mul(x, x)`.
+    public fun sqr<S>(x: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: field_sqr_internal<S>(x.handle)
+            handle: sqr_internal<S>(x.handle)
         }
     }
 
-    /// Try computing `x^(-1)` for an element `x` of a field `S`.
-    /// Return none if `x` is the additive identity of field `S`.
-    public fun field_inv<S>(x: &Element<S>): Option<Element<S>> {
+    /// Try computing `x^(-1)` for an element `x` of a structure `S`.
+    /// Return none if `x` equals to `zero<S>()`.
+    public fun inv<S>(x: &Element<S>): Option<Element<S>> {
         abort_unless_cryptography_algebra_natives_enabled();
-        let (succeeded, handle) = field_inv_internal<S>(x.handle);
+        let (succeeded, handle) = inv_internal<S>(x.handle);
         if (succeeded) {
             let scalar = Element<S> { handle };
             some(scalar)
@@ -150,35 +151,11 @@ module aptos_std::algebra {
         }
     }
 
-    /// Compute `P + Q` for elements `P` and `Q` of a group `G`.
-    public fun group_add<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
+    /// Compute `2*P` for an element `P` of a structure `S`. Faster and cheaper than `P + P`.
+    public fun double<S>(element_p: &Element<S>): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_add_internal<G>(element_p.handle, element_q.handle)
-        }
-    }
-
-    /// Compute `2*P` for an element `P` of a group `G`. Faster and cheaper than `P + P`.
-    public fun group_double<G>(element_p: &Element<G>): Element<G> {
-        abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_double_internal<G>(element_p.handle)
-        }
-    }
-
-    /// Get the fixed generator of a cyclic group `G`.
-    public fun group_generator<G>(): Element<G> {
-        abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_generator_internal<G>()
-        }
-    }
-
-    /// Get the identity of a group `G`.
-    public fun group_identity<G>(): Element<G> {
-        abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_identity_internal<G>()
+        Element<S> {
+            handle: double_internal<S>(element_p.handle)
         }
     }
 
@@ -187,48 +164,20 @@ module aptos_std::algebra {
     /// `k[]` are `n` elements of the scalarfield `S` of group `G` represented by parameter `scalars`.
     ///
     /// Abort with code 0x010000 if the sizes of `elements` and `scalars` do not match.
-    public fun group_multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
+    public fun multi_scalar_mul<G, S>(elements: &vector<Element<G>>, scalars: &vector<Element<S>>): Element<G> {
         let element_handles = handles_from_elements(elements);
         let scalar_handles = handles_from_elements(scalars);
         Element<G> {
-            handle: group_multi_scalar_mul_internal<G, S>(element_handles, scalar_handles)
+            handle: multi_scalar_mul_internal<G, S>(element_handles, scalar_handles)
         }
     }
 
-    fun handles_from_elements<S>(elements: &vector<Element<S>>): vector<u64> {
-        let num_elements = std::vector::length(elements);
-        let element_handles = std::vector::empty();
-        let i = 0;
-        while (i < num_elements) {
-            std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
-            i = i + 1;
-        };
-        element_handles
-    }
-
-    /// Compute `-P` for an element `P` of a group `G`.
-    public fun group_neg<G>(element_p: &Element<G>): Element<G> {
+    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of a structure `G`.
+    public fun scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<G> {
-            handle: group_neg_internal<G>(element_p.handle)
+            handle: scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
         }
-    }
-
-    /// Compute `k*P`, where `P` is an element of a group `G` and `k` is an element of the scalar field `S` of group `G`.
-    public fun group_scalar_mul<G, S>(element_p: &Element<G>, scalar_k: &Element<S>): Element<G> {
-        abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_scalar_mul_internal<G, S>(element_p.handle, scalar_k.handle)
-        }
-    }
-
-    /// Compute `P - Q` for elements `P` and `Q` of a group `G`.
-    public fun group_sub<G>(element_p: &Element<G>, element_q: &Element<G>): Element<G> {
-        abort_unless_cryptography_algebra_natives_enabled();
-        Element<G> {
-            handle: group_sub_internal<G>(element_p.handle, element_q.handle)
-        }
-
     }
 
     /// Efficiently compute `e(P[0],Q[0])+...+e(P[n-1],Q[n-1])`,
@@ -274,9 +223,9 @@ module aptos_std::algebra {
     }
 
     /// Get the order of group `G`, a big integer little-endian encoded as a byte array.
-    public fun group_order<G>(): vector<u8> {
+    public fun order<S>(): vector<u8> {
         abort_unless_cryptography_algebra_natives_enabled();
-        group_order_internal<G>()
+        order_internal<S>()
     }
 
     /// Cast an element of a structure `S` to a parent structure `L`.
@@ -314,50 +263,17 @@ module aptos_std::algebra {
 
     #[test_only]
     /// Generate a random element of an algebraic structure `S`.
-    public fun insecure_random_element<S>(): Element<S> {
+    public fun rand_insecure<S>(): Element<S> {
         abort_unless_cryptography_algebra_natives_enabled();
         Element<S> {
-            handle: insecure_random_element_internal<S>()
+            handle: rand_insecure_internal<S>()
         }
     }
 
-    // Public functions end.
-
-    // Native functions begin.
-
-    native fun deserialize_internal<S, F>(bytes: &vector<u8>): (bool, u64);
-    native fun downcast_internal<L,S>(handle: u64): (bool, u64);
-    native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
-    native fun field_add_internal<F>(handle_1: u64, handle_2: u64): u64;
-    native fun field_div_internal<F>(handle_1: u64, handle_2: u64): (bool, u64);
-    native fun field_inv_internal<F>(handle: u64): (bool, u64);
-    native fun field_mul_internal<F>(handle_1: u64, handle_2: u64): u64;
-    native fun field_neg_internal<F>(handle: u64): u64;
-    native fun field_one_internal<S>(): u64;
-    native fun field_sqr_internal<G>(handle: u64): u64;
-    native fun field_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun field_zero_internal<S>(): u64;
-    native fun from_u64_internal<S>(value: u64): u64;
-    native fun group_add_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun group_double_internal<G>(element_handle: u64): u64;
-    native fun group_generator_internal<G>(): u64;
-    native fun group_identity_internal<G>(): u64;
-    native fun group_multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
-    native fun group_neg_internal<G>(handle: u64): u64;
-    native fun group_order_internal<G>(): vector<u8>;
-    native fun group_scalar_mul_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
-    native fun group_sub_internal<G>(handle_1: u64, handle_2: u64): u64;
-    native fun hash_to_internal<St, Su>(dst: &vector<u8>, bytes: &vector<u8>): u64;
-    #[test_only]
-    native fun insecure_random_element_internal<G>(): u64;
-    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
-    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
-    native fun serialize_internal<S, F>(handle: u64): vector<u8>;
-    native fun upcast_internal<S,L>(handle: u64): u64;
-
-    // Native functions end.
-
-    // private functions begin.
+    //
+    // (Public functions end here.)
+    // Private functions begin.
+    //
 
     fun abort_unless_cryptography_algebra_natives_enabled() {
         if (features::cryptography_algebra_natives_enabled()) return;
@@ -369,9 +285,52 @@ module aptos_std::algebra {
         std::features::change_feature_flags(fx, vector[std::features::get_cryptography_algebra_natives_feature()], vector[]);
     }
 
-    // Private functions end.
+    fun handles_from_elements<S>(elements: &vector<Element<S>>): vector<u64> {
+        let num_elements = std::vector::length(elements);
+        let element_handles = std::vector::empty();
+        let i = 0;
+        while (i < num_elements) {
+            std::vector::push_back(&mut element_handles, std::vector::borrow(elements, i).handle);
+            i = i + 1;
+        };
+        element_handles
+    }
 
+    //
+    // (Private functions end here.)
+    // Native functions begin.
+    //
+
+    native fun add_internal<S>(handle_1: u64, handle_2: u64): u64;
+    native fun deserialize_internal<S, F>(bytes: &vector<u8>): (bool, u64);
+    native fun div_internal<F>(handle_1: u64, handle_2: u64): (bool, u64);
+    native fun double_internal<G>(element_handle: u64): u64;
+    native fun downcast_internal<L,S>(handle: u64): (bool, u64);
+    native fun from_u64_internal<S>(value: u64): u64;
+    native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
+    native fun hash_to_internal<St, Su>(dst: &vector<u8>, bytes: &vector<u8>): u64;
+    native fun inv_internal<F>(handle: u64): (bool, u64);
+    #[test_only]
+    native fun rand_insecure_internal<S>(): u64;
+    native fun mul_internal<F>(handle_1: u64, handle_2: u64): u64;
+    native fun multi_pairing_internal<G1,G2,Gt>(g1_handles: vector<u64>, g2_handles: vector<u64>): u64;
+    native fun multi_scalar_mul_internal<G, S>(element_handles: vector<u64>, scalar_handles: vector<u64>): u64;
+    native fun neg_internal<F>(handle: u64): u64;
+    native fun one_internal<S>(): u64;
+    native fun order_internal<G>(): vector<u8>;
+    native fun pairing_internal<G1,G2,Gt>(g1_handle: u64, g2_handle: u64): u64;
+    native fun scalar_mul_internal<G, S>(element_handle: u64, scalar_handle: u64): u64;
+    native fun serialize_internal<S, F>(handle: u64): vector<u8>;
+    native fun sqr_internal<G>(handle: u64): u64;
+    native fun sub_internal<G>(handle_1: u64, handle_2: u64): u64;
+    native fun upcast_internal<S,L>(handle: u64): u64;
+    native fun zero_internal<S>(): u64;
+
+    //
+    // (Native functions end here.)
     // Tests begin.
+    //
+
     #[test_only]
     struct MysteriousGroup {}
 
@@ -379,7 +338,7 @@ module aptos_std::algebra {
     #[expected_failure(abort_code = 0x0c0000, location = Self)]
     fun test_unknown_group(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
-        let _ = group_order<MysteriousGroup>();
+        let _ = order<MysteriousGroup>();
     }
     // Tests end.
 }

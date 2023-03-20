@@ -53,63 +53,53 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 -  [Struct `Element`](#0x1_algebra_Element)
 -  [Function `eq`](#0x1_algebra_eq)
 -  [Function `from_u64`](#0x1_algebra_from_u64)
--  [Function `field_zero`](#0x1_algebra_field_zero)
--  [Function `field_one`](#0x1_algebra_field_one)
--  [Function `field_neg`](#0x1_algebra_field_neg)
--  [Function `field_add`](#0x1_algebra_field_add)
--  [Function `field_sub`](#0x1_algebra_field_sub)
--  [Function `field_mul`](#0x1_algebra_field_mul)
--  [Function `field_div`](#0x1_algebra_field_div)
--  [Function `field_sqr`](#0x1_algebra_field_sqr)
--  [Function `field_inv`](#0x1_algebra_field_inv)
--  [Function `group_add`](#0x1_algebra_group_add)
--  [Function `group_double`](#0x1_algebra_group_double)
--  [Function `group_generator`](#0x1_algebra_group_generator)
--  [Function `group_identity`](#0x1_algebra_group_identity)
--  [Function `group_multi_scalar_mul`](#0x1_algebra_group_multi_scalar_mul)
--  [Function `handles_from_elements`](#0x1_algebra_handles_from_elements)
--  [Function `group_neg`](#0x1_algebra_group_neg)
--  [Function `group_scalar_mul`](#0x1_algebra_group_scalar_mul)
--  [Function `group_sub`](#0x1_algebra_group_sub)
+-  [Function `zero`](#0x1_algebra_zero)
+-  [Function `one`](#0x1_algebra_one)
+-  [Function `neg`](#0x1_algebra_neg)
+-  [Function `add`](#0x1_algebra_add)
+-  [Function `sub`](#0x1_algebra_sub)
+-  [Function `mul`](#0x1_algebra_mul)
+-  [Function `div`](#0x1_algebra_div)
+-  [Function `sqr`](#0x1_algebra_sqr)
+-  [Function `inv`](#0x1_algebra_inv)
+-  [Function `double`](#0x1_algebra_double)
+-  [Function `multi_scalar_mul`](#0x1_algebra_multi_scalar_mul)
+-  [Function `scalar_mul`](#0x1_algebra_scalar_mul)
 -  [Function `multi_pairing`](#0x1_algebra_multi_pairing)
 -  [Function `pairing`](#0x1_algebra_pairing)
 -  [Function `deserialize`](#0x1_algebra_deserialize)
 -  [Function `serialize`](#0x1_algebra_serialize)
--  [Function `group_order`](#0x1_algebra_group_order)
+-  [Function `order`](#0x1_algebra_order)
 -  [Function `upcast`](#0x1_algebra_upcast)
 -  [Function `downcast`](#0x1_algebra_downcast)
 -  [Function `hash_to`](#0x1_algebra_hash_to)
--  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
--  [Function `downcast_internal`](#0x1_algebra_downcast_internal)
--  [Function `eq_internal`](#0x1_algebra_eq_internal)
--  [Function `field_add_internal`](#0x1_algebra_field_add_internal)
--  [Function `field_div_internal`](#0x1_algebra_field_div_internal)
--  [Function `field_inv_internal`](#0x1_algebra_field_inv_internal)
--  [Function `field_mul_internal`](#0x1_algebra_field_mul_internal)
--  [Function `field_neg_internal`](#0x1_algebra_field_neg_internal)
--  [Function `field_one_internal`](#0x1_algebra_field_one_internal)
--  [Function `field_sqr_internal`](#0x1_algebra_field_sqr_internal)
--  [Function `field_sub_internal`](#0x1_algebra_field_sub_internal)
--  [Function `field_zero_internal`](#0x1_algebra_field_zero_internal)
--  [Function `from_u64_internal`](#0x1_algebra_from_u64_internal)
--  [Function `group_add_internal`](#0x1_algebra_group_add_internal)
--  [Function `group_double_internal`](#0x1_algebra_group_double_internal)
--  [Function `group_generator_internal`](#0x1_algebra_group_generator_internal)
--  [Function `group_identity_internal`](#0x1_algebra_group_identity_internal)
--  [Function `group_multi_scalar_mul_internal`](#0x1_algebra_group_multi_scalar_mul_internal)
--  [Function `group_neg_internal`](#0x1_algebra_group_neg_internal)
--  [Function `group_order_internal`](#0x1_algebra_group_order_internal)
--  [Function `group_scalar_mul_internal`](#0x1_algebra_group_scalar_mul_internal)
--  [Function `group_sub_internal`](#0x1_algebra_group_sub_internal)
--  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
--  [Function `multi_pairing_internal`](#0x1_algebra_multi_pairing_internal)
--  [Function `pairing_internal`](#0x1_algebra_pairing_internal)
--  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
--  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
 -  [Function `abort_unless_cryptography_algebra_natives_enabled`](#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled)
+-  [Function `handles_from_elements`](#0x1_algebra_handles_from_elements)
+-  [Function `add_internal`](#0x1_algebra_add_internal)
+-  [Function `deserialize_internal`](#0x1_algebra_deserialize_internal)
+-  [Function `div_internal`](#0x1_algebra_div_internal)
+-  [Function `double_internal`](#0x1_algebra_double_internal)
+-  [Function `downcast_internal`](#0x1_algebra_downcast_internal)
+-  [Function `from_u64_internal`](#0x1_algebra_from_u64_internal)
+-  [Function `eq_internal`](#0x1_algebra_eq_internal)
+-  [Function `hash_to_internal`](#0x1_algebra_hash_to_internal)
+-  [Function `inv_internal`](#0x1_algebra_inv_internal)
+-  [Function `mul_internal`](#0x1_algebra_mul_internal)
+-  [Function `multi_pairing_internal`](#0x1_algebra_multi_pairing_internal)
+-  [Function `multi_scalar_mul_internal`](#0x1_algebra_multi_scalar_mul_internal)
+-  [Function `neg_internal`](#0x1_algebra_neg_internal)
+-  [Function `one_internal`](#0x1_algebra_one_internal)
+-  [Function `order_internal`](#0x1_algebra_order_internal)
+-  [Function `pairing_internal`](#0x1_algebra_pairing_internal)
+-  [Function `scalar_mul_internal`](#0x1_algebra_scalar_mul_internal)
+-  [Function `serialize_internal`](#0x1_algebra_serialize_internal)
+-  [Function `sqr_internal`](#0x1_algebra_sqr_internal)
+-  [Function `sub_internal`](#0x1_algebra_sub_internal)
+-  [Function `upcast_internal`](#0x1_algebra_upcast_internal)
+-  [Function `zero_internal`](#0x1_algebra_zero_internal)
 -  [Specification](#@Specification_0)
+    -  [Function `add_internal`](#@Specification_0_add_internal)
     -  [Function `deserialize_internal`](#@Specification_0_deserialize_internal)
-    -  [Function `field_add_internal`](#@Specification_0_field_add_internal)
     -  [Function `serialize_internal`](#@Specification_0_serialize_internal)
 
 
@@ -124,7 +114,7 @@ Note: in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code> a
 
 ## Struct `Element`
 
-This struct represents an element of an algebraic structure <code>S</code>.
+This struct represents an element of a structure <code>S</code>.
 
 
 <pre><code><b>struct</b> <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; <b>has</b> <b>copy</b>, drop
@@ -152,7 +142,7 @@ This struct represents an element of an algebraic structure <code>S</code>.
 
 ## Function `eq`
 
-Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of an algebraic structure <code>S</code>.
+Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq">eq</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): bool
@@ -178,7 +168,7 @@ Check if <code>x == y</code> for elements <code>x</code> and <code>y</code> of a
 
 ## Function `from_u64`
 
-Convert a u64 to an element of an algebraic structure <code>S</code>.
+Convert a u64 to an element of a structure <code>S</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_from_u64">from_u64</a>&lt;S&gt;(value: u64): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
@@ -202,14 +192,14 @@ Convert a u64 to an element of an algebraic structure <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_zero"></a>
+<a name="0x1_algebra_zero"></a>
 
-## Function `field_zero`
+## Function `zero`
 
-Return the additive identity of a field <code>S</code>.
+Return the 1st identity of a structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_zero">field_zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -218,10 +208,10 @@ Return the additive identity of a field <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_zero">field_zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_zero_internal">field_zero_internal</a>&lt;S&gt;()
+        handle: <a href="algebra.md#0x1_algebra_zero_internal">zero_internal</a>&lt;S&gt;()
     }
 }
 </code></pre>
@@ -230,14 +220,14 @@ Return the additive identity of a field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_one"></a>
+<a name="0x1_algebra_one"></a>
 
-## Function `field_one`
+## Function `one`
 
-Return the multiplicative identity of a field <code>S</code>.
+Return the 2nd identity of a structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_one">field_one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_one">one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -246,10 +236,10 @@ Return the multiplicative identity of a field <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_one">field_one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_one">one</a>&lt;S&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_one_internal">field_one_internal</a>&lt;S&gt;()
+        handle: <a href="algebra.md#0x1_algebra_one_internal">one_internal</a>&lt;S&gt;()
     }
 }
 </code></pre>
@@ -258,14 +248,14 @@ Return the multiplicative identity of a field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_neg"></a>
+<a name="0x1_algebra_neg"></a>
 
-## Function `field_neg`
+## Function `neg`
 
-Compute <code>-x</code> for an element <code>x</code> of a field <code>S</code>.
+Compute <code>-x</code> for an element <code>x</code> of a structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_neg">field_neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_neg">neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -274,10 +264,10 @@ Compute <code>-x</code> for an element <code>x</code> of a field <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_neg">field_neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_neg">neg</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_neg_internal">field_neg_internal</a>&lt;S&gt;(x.handle)
+        handle: <a href="algebra.md#0x1_algebra_neg_internal">neg_internal</a>&lt;S&gt;(x.handle)
     }
 }
 </code></pre>
@@ -286,14 +276,14 @@ Compute <code>-x</code> for an element <code>x</code> of a field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_add"></a>
+<a name="0x1_algebra_add"></a>
 
-## Function `field_add`
+## Function `add`
 
-Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a field <code>S</code>.
+Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add">add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -302,10 +292,10 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add">field_add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add">add</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;S&gt;(x.handle, y.handle)
+        handle: <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -314,14 +304,14 @@ Compute <code>x + y</code> for elements <code>x</code> and <code>y</code> of a f
 
 </details>
 
-<a name="0x1_algebra_field_sub"></a>
+<a name="0x1_algebra_sub"></a>
 
-## Function `field_sub`
+## Function `sub`
 
-Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a field <code>S</code>.
+Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sub">field_sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sub">sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -330,10 +320,10 @@ Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sub">field_sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sub">sub</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_sub_internal">field_sub_internal</a>&lt;S&gt;(x.handle, y.handle)
+        handle: <a href="algebra.md#0x1_algebra_sub_internal">sub_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -342,14 +332,14 @@ Compute <code>x - y</code> for elements <code>x</code> and <code>y</code> of a f
 
 </details>
 
-<a name="0x1_algebra_field_mul"></a>
+<a name="0x1_algebra_mul"></a>
 
-## Function `field_mul`
+## Function `mul`
 
-Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a field <code>S</code>.
+Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_mul">field_mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_mul">mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -358,10 +348,10 @@ Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_mul">field_mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_mul">mul</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_mul_internal">field_mul_internal</a>&lt;S&gt;(x.handle, y.handle)
+        handle: <a href="algebra.md#0x1_algebra_mul_internal">mul_internal</a>&lt;S&gt;(x.handle, y.handle)
     }
 }
 </code></pre>
@@ -370,15 +360,15 @@ Compute <code>x * y</code> for elements <code>x</code> and <code>y</code> of a f
 
 </details>
 
-<a name="0x1_algebra_field_div"></a>
+<a name="0x1_algebra_div"></a>
 
-## Function `field_div`
+## Function `div`
 
-Try computing <code>x / y</code> for elements <code>x</code> and <code>y</code> of a field <code>S</code>.
-Return none if y is the additive identity of field <code>S</code>.
+Try computing <code>x / y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
+Return none if y equals to <code><a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_div">field_div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_div">div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
 </code></pre>
 
 
@@ -387,9 +377,9 @@ Return none if y is the additive identity of field <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_div">field_div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_div">div</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;, y: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <b>let</b> (succ, handle) = <a href="algebra.md#0x1_algebra_field_div_internal">field_div_internal</a>&lt;S&gt;(x.handle, y.handle);
+    <b>let</b> (succ, handle) = <a href="algebra.md#0x1_algebra_div_internal">div_internal</a>&lt;S&gt;(x.handle, y.handle);
     <b>if</b> (succ) {
         some(<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle })
     } <b>else</b> {
@@ -402,14 +392,14 @@ Return none if y is the additive identity of field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_field_sqr"></a>
+<a name="0x1_algebra_sqr"></a>
 
-## Function `field_sqr`
+## Function `sqr`
 
-Compute <code>x^2</code> for an element <code>x</code> of a field <code>S</code>.
+Compute <code>x^2</code> for an element <code>x</code> of a structure <code>S</code>. Faster and cheaper than <code><a href="algebra.md#0x1_algebra_mul">mul</a>(x, x)</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr">field_sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sqr">sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -418,10 +408,10 @@ Compute <code>x^2</code> for an element <code>x</code> of a field <code>S</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr">field_sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sqr">sqr</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
-        handle: <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;S&gt;(x.handle)
+        handle: <a href="algebra.md#0x1_algebra_sqr_internal">sqr_internal</a>&lt;S&gt;(x.handle)
     }
 }
 </code></pre>
@@ -430,15 +420,15 @@ Compute <code>x^2</code> for an element <code>x</code> of a field <code>S</code>
 
 </details>
 
-<a name="0x1_algebra_field_inv"></a>
+<a name="0x1_algebra_inv"></a>
 
-## Function `field_inv`
+## Function `inv`
 
-Try computing <code>x^(-1)</code> for an element <code>x</code> of a field <code>S</code>.
-Return none if <code>x</code> is the additive identity of field <code>S</code>.
+Try computing <code>x^(-1)</code> for an element <code>x</code> of a structure <code>S</code>.
+Return none if <code>x</code> equals to <code><a href="algebra.md#0x1_algebra_zero">zero</a>&lt;S&gt;()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv">field_inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_inv">inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;
 </code></pre>
 
 
@@ -447,9 +437,9 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv">field_inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_inv">inv</a>&lt;S&gt;(x: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): Option&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;S&gt;(x.handle);
+    <b>let</b> (succeeded, handle) = <a href="algebra.md#0x1_algebra_inv_internal">inv_internal</a>&lt;S&gt;(x.handle);
     <b>if</b> (succeeded) {
         <b>let</b> scalar = <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; { handle };
         some(scalar)
@@ -463,14 +453,14 @@ Return none if <code>x</code> is the additive identity of field <code>S</code>.
 
 </details>
 
-<a name="0x1_algebra_group_add"></a>
+<a name="0x1_algebra_double"></a>
 
-## Function `group_add`
+## Function `double`
 
-Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a group <code>G</code>.
+Compute <code>2*P</code> for an element <code>P</code> of a structure <code>S</code>. Faster and cheaper than <code>P + P</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add">group_add</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_double">double</a>&lt;S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;
 </code></pre>
 
 
@@ -479,10 +469,10 @@ Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a g
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add">group_add</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_double">double</a>&lt;S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
+    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt; {
+        handle: <a href="algebra.md#0x1_algebra_double_internal">double_internal</a>&lt;S&gt;(element_p.handle)
     }
 }
 </code></pre>
@@ -491,93 +481,9 @@ Compute <code>P + Q</code> for elements <code>P</code> and <code>Q</code> of a g
 
 </details>
 
-<a name="0x1_algebra_group_double"></a>
+<a name="0x1_algebra_multi_scalar_mul"></a>
 
-## Function `group_double`
-
-Compute <code>2*P</code> for an element <code>P</code> of a group <code>G</code>. Faster and cheaper than <code>P + P</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double">group_double</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double">group_double</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_p.handle)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_generator"></a>
-
-## Function `group_generator`
-
-Get the fixed generator of a cyclic group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_generator">group_generator</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_generator">group_generator</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_generator_internal">group_generator_internal</a>&lt;G&gt;()
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_identity"></a>
-
-## Function `group_identity`
-
-Get the identity of a group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity">group_identity</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity">group_identity</a>&lt;G&gt;(): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;()
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_multi_scalar_mul"></a>
-
-## Function `group_multi_scalar_mul`
+## Function `multi_scalar_mul`
 
 Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code>, where
 <code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and
@@ -586,7 +492,7 @@ Compute <code>k[0]*P[0]+...+k[n-1]*P[n-1]</code>, where
 Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars</code> do not match.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -595,11 +501,11 @@ Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul">group_multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>&lt;G, S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;&gt;, scalars: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
     <b>let</b> element_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(elements);
     <b>let</b> scalar_handles = <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>(scalars);
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles, scalar_handles)
+        handle: <a href="algebra.md#0x1_algebra_multi_scalar_mul_internal">multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles, scalar_handles)
     }
 }
 </code></pre>
@@ -608,13 +514,14 @@ Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars
 
 </details>
 
-<a name="0x1_algebra_handles_from_elements"></a>
+<a name="0x1_algebra_scalar_mul"></a>
 
-## Function `handles_from_elements`
+## Function `scalar_mul`
+
+Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of a structure <code>G</code>.
 
 
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul">scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -623,100 +530,11 @@ Abort with code 0x010000 if the sizes of <code>elements</code> and <code>scalars
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>let</b> num_elements = std::vector::length(elements);
-    <b>let</b> element_handles = std::vector::empty();
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_elements) {
-        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
-        i = i + 1;
-    };
-    element_handles
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_neg"></a>
-
-## Function `group_neg`
-
-Compute <code>-P</code> for an element <code>P</code> of a group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg">group_neg</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg">group_neg</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul">scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
     <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(element_p.handle)
+        handle: <a href="algebra.md#0x1_algebra_scalar_mul_internal">scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_scalar_mul"></a>
-
-## Function `group_scalar_mul`
-
-Compute <code>k*P</code>, where <code>P</code> is an element of a group <code>G</code> and <code>k</code> is an element of the scalar field <code>S</code> of group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul">group_scalar_mul</a>&lt;G, S&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, scalar_k: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_p.handle, scalar_k.handle)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_sub"></a>
-
-## Function `group_sub`
-
-Compute <code>P - Q</code> for elements <code>P</code> and <code>Q</code> of a group <code>G</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_sub">group_sub</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;G&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_sub">group_sub</a>&lt;G&gt;(element_p: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;, element_q: &<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt;): <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-    <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_Element">Element</a>&lt;G&gt; {
-        handle: <a href="algebra.md#0x1_algebra_group_sub_internal">group_sub_internal</a>&lt;G&gt;(element_p.handle, element_q.handle)
-    }
-
 }
 </code></pre>
 
@@ -846,14 +664,14 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 </details>
 
-<a name="0x1_algebra_group_order"></a>
+<a name="0x1_algebra_order"></a>
 
-## Function `group_order`
+## Function `order`
 
 Get the order of group <code>G</code>, a big integer little-endian encoded as a byte array.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_order">order</a>&lt;S&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -862,9 +680,9 @@ Get the order of group <code>G</code>, a big integer little-endian encoded as a 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_order">group_order</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="algebra.md#0x1_algebra_order">order</a>&lt;S&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>();
-    <a href="algebra.md#0x1_algebra_group_order_internal">group_order_internal</a>&lt;G&gt;()
+    <a href="algebra.md#0x1_algebra_order_internal">order_internal</a>&lt;S&gt;()
 }
 </code></pre>
 
@@ -965,6 +783,84 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
+<a name="0x1_algebra_abort_unless_cryptography_algebra_natives_enabled"></a>
+
+## Function `abort_unless_cryptography_algebra_natives_enabled`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>() {
+    <b>if</b> (<a href="../../move-stdlib/doc/features.md#0x1_features_cryptography_algebra_natives_enabled">features::cryptography_algebra_natives_enabled</a>()) <b>return</b>;
+    <b>abort</b>(std::error::not_implemented(0))
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_handles_from_elements"></a>
+
+## Function `handles_from_elements`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">algebra::Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_handles_from_elements">handles_from_elements</a>&lt;S&gt;(elements: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="algebra.md#0x1_algebra_Element">Element</a>&lt;S&gt;&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>let</b> num_elements = std::vector::length(elements);
+    <b>let</b> element_handles = std::vector::empty();
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; num_elements) {
+        std::vector::push_back(&<b>mut</b> element_handles, std::vector::borrow(elements, i).handle);
+        i = i + 1;
+    };
+    element_handles
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_add_internal"></a>
+
+## Function `add_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): u64;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_deserialize_internal"></a>
 
 ## Function `deserialize_internal`
@@ -981,6 +877,50 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S, F&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_div_internal"></a>
+
+## Function `div_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_div_internal">div_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): (bool, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_div_internal">div_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): (bool, u64);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_double_internal"></a>
+
+## Function `double_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_double_internal">double_internal</a>&lt;G&gt;(element_handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_double_internal">double_internal</a>&lt;G&gt;(element_handle: u64): u64;
 </code></pre>
 
 
@@ -1009,226 +949,6 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
-<a name="0x1_algebra_eq_internal"></a>
-
-## Function `eq_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): bool;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_add_internal"></a>
-
-## Function `field_add_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_div_internal"></a>
-
-## Function `field_div_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_div_internal">field_div_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): (bool, u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_div_internal">field_div_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): (bool, u64);
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_inv_internal"></a>
-
-## Function `field_inv_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_inv_internal">field_inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64);
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_mul_internal"></a>
-
-## Function `field_mul_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_mul_internal">field_mul_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_mul_internal">field_mul_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_neg_internal"></a>
-
-## Function `field_neg_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_neg_internal">field_neg_internal</a>&lt;F&gt;(handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_neg_internal">field_neg_internal</a>&lt;F&gt;(handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_one_internal"></a>
-
-## Function `field_one_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_one_internal">field_one_internal</a>&lt;S&gt;(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_one_internal">field_one_internal</a>&lt;S&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_sqr_internal"></a>
-
-## Function `field_sqr_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;G&gt;(handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sqr_internal">field_sqr_internal</a>&lt;G&gt;(handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_sub_internal"></a>
-
-## Function `field_sub_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_sub_internal">field_sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_sub_internal">field_sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_field_zero_internal"></a>
-
-## Function `field_zero_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_zero_internal">field_zero_internal</a>&lt;S&gt;(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_field_zero_internal">field_zero_internal</a>&lt;S&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_algebra_from_u64_internal"></a>
 
 ## Function `from_u64_internal`
@@ -1251,13 +971,13 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
-<a name="0x1_algebra_group_add_internal"></a>
+<a name="0x1_algebra_eq_internal"></a>
 
-## Function `group_add_internal`
+## Function `eq_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): bool
 </code></pre>
 
 
@@ -1266,183 +986,7 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_add_internal">group_add_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_double_internal"></a>
-
-## Function `group_double_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_double_internal">group_double_internal</a>&lt;G&gt;(element_handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_generator_internal"></a>
-
-## Function `group_generator_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_generator_internal">group_generator_internal</a>&lt;G&gt;(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_generator_internal">group_generator_internal</a>&lt;G&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_identity_internal"></a>
-
-## Function `group_identity_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_identity_internal">group_identity_internal</a>&lt;G&gt;(): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_multi_scalar_mul_internal"></a>
-
-## Function `group_multi_scalar_mul_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_multi_scalar_mul_internal">group_multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_neg_internal"></a>
-
-## Function `group_neg_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_neg_internal">group_neg_internal</a>&lt;G&gt;(handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_order_internal"></a>
-
-## Function `group_order_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_order_internal">group_order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_order_internal">group_order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_scalar_mul_internal"></a>
-
-## Function `group_scalar_mul_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_scalar_mul_internal">group_scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_algebra_group_sub_internal"></a>
-
-## Function `group_sub_internal`
-
-
-
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_group_sub_internal">group_sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_group_sub_internal">group_sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_eq_internal">eq_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): bool;
 </code></pre>
 
 
@@ -1471,6 +1015,50 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
+<a name="0x1_algebra_inv_internal"></a>
+
+## Function `inv_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_inv_internal">inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_inv_internal">inv_internal</a>&lt;F&gt;(handle: u64): (bool, u64);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_mul_internal"></a>
+
+## Function `mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_mul_internal">mul_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_mul_internal">mul_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_multi_pairing_internal"></a>
 
 ## Function `multi_pairing_internal`
@@ -1487,6 +1075,94 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_pairing_internal">multi_pairing_internal</a>&lt;G1,G2,Gt&gt;(g1_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, g2_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_multi_scalar_mul_internal"></a>
+
+## Function `multi_scalar_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul_internal">multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_multi_scalar_mul_internal">multi_scalar_mul_internal</a>&lt;G, S&gt;(element_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, scalar_handles: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_neg_internal"></a>
+
+## Function `neg_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_neg_internal">neg_internal</a>&lt;F&gt;(handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_neg_internal">neg_internal</a>&lt;F&gt;(handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_one_internal"></a>
+
+## Function `one_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_one_internal">one_internal</a>&lt;S&gt;(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_one_internal">one_internal</a>&lt;S&gt;(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_order_internal"></a>
+
+## Function `order_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_order_internal">order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_order_internal">order_internal</a>&lt;G&gt;(): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1515,6 +1191,28 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
+<a name="0x1_algebra_scalar_mul_internal"></a>
+
+## Function `scalar_mul_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul_internal">scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_scalar_mul_internal">scalar_mul_internal</a>&lt;G, S&gt;(element_handle: u64, scalar_handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_algebra_serialize_internal"></a>
 
 ## Function `serialize_internal`
@@ -1531,6 +1229,50 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_serialize_internal">serialize_internal</a>&lt;S, F&gt;(handle: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_sqr_internal"></a>
+
+## Function `sqr_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_sqr_internal">sqr_internal</a>&lt;G&gt;(handle: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sqr_internal">sqr_internal</a>&lt;G&gt;(handle: u64): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_algebra_sub_internal"></a>
+
+## Function `sub_internal`
+
+
+
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_sub_internal">sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_sub_internal">sub_internal</a>&lt;G&gt;(handle_1: u64, handle_2: u64): u64;
 </code></pre>
 
 
@@ -1559,13 +1301,13 @@ Abort if <code>dst</code> is too long.
 
 </details>
 
-<a name="0x1_algebra_abort_unless_cryptography_algebra_natives_enabled"></a>
+<a name="0x1_algebra_zero_internal"></a>
 
-## Function `abort_unless_cryptography_algebra_natives_enabled`
+## Function `zero_internal`
 
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>()
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_zero_internal">zero_internal</a>&lt;S&gt;(): u64
 </code></pre>
 
 
@@ -1574,10 +1316,7 @@ Abort if <code>dst</code> is too long.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>() {
-    <b>if</b> (<a href="../../move-stdlib/doc/features.md#0x1_features_cryptography_algebra_natives_enabled">features::cryptography_algebra_natives_enabled</a>()) <b>return</b>;
-    <b>abort</b>(std::error::not_implemented(0))
-}
+<pre><code><b>native</b> <b>fun</b> <a href="algebra.md#0x1_algebra_zero_internal">zero_internal</a>&lt;S&gt;(): u64;
 </code></pre>
 
 
@@ -1589,12 +1328,12 @@ Abort if <code>dst</code> is too long.
 ## Specification
 
 
-<a name="@Specification_0_deserialize_internal"></a>
+<a name="@Specification_0_add_internal"></a>
 
-### Function `deserialize_internal`
+### Function `add_internal`
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S, F&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_add_internal">add_internal</a>&lt;S&gt;(handle_1: u64, handle_2: u64): u64
 </code></pre>
 
 
@@ -1605,12 +1344,12 @@ Abort if <code>dst</code> is too long.
 
 
 
-<a name="@Specification_0_field_add_internal"></a>
+<a name="@Specification_0_deserialize_internal"></a>
 
-### Function `field_add_internal`
+### Function `deserialize_internal`
 
 
-<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_field_add_internal">field_add_internal</a>&lt;F&gt;(handle_1: u64, handle_2: u64): u64
+<pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_deserialize_internal">deserialize_internal</a>&lt;S, F&gt;(bytes: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (bool, u64)
 </code></pre>
 
 

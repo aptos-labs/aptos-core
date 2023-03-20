@@ -512,15 +512,22 @@ fn serialize_internal(
             Some(Structure::BLS12381G2Affine),
             Some(SerializationFormat::BLS12381G2AffineCompressed),
         ) => {
-            let buf = ark_ec_point_serialize_internal!(
-                gas_params,
-                context,
-                args,
-                Structure::BLS12381G2Affine,
-                SerializationFormat::BLS12381G2AffineCompressed,
-                ark_bls12_381::G2Projective,
-                serialize_compressed
-            );
+            let buf = {
+                let handle = safely_pop_arg!( args , u64 ) as usize;
+                safe_borrow_element!( context , handle , ark_bls12_381::G2Projective , element_ptr , element );
+                let element_affine = element.into_affine();
+                let mut buf = Vec::new();
+                context.charge(gas_params.serialize(Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineCompressed))?;
+                match element_affine.serialize_compressed
+                (&mut buf) {
+                    Ok(_) => {}
+                    _ => {
+                        abort_invariant_violated();
+                        unreachable!()
+                    }
+                }
+                buf
+            };
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
@@ -791,193 +798,47 @@ fn from_u64_internal(
     }
 }
 
-macro_rules! ark_field_add_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+macro_rules! ark_binary_op_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.field_add($structure))?;
-        let new_element = element_1.add(element_2);
+        safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
+        $context.charge($gas)?;
+        let new_element = element_1.$ark_func(element_2);
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
-fn field_add_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_add_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_add_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_field_sub_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+macro_rules! ark_div_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.field_sub($structure))?;
-        let new_element = element_1.sub(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn field_sub_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_sub_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_sub_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_field_mul_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = safely_pop_arg!($args, u64) as usize;
-        let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.field_mul($structure))?;
-        let new_element = element_1.mul(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn field_mul_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_mul_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_mul_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_field_div_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle_2 = safely_pop_arg!($args, u64) as usize;
-        let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
+        safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
         if element_2.is_zero() {
             return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
         }
-        $context.charge($gas_params.field_div($structure))?;
-        let new_element = element_1.div(element_2);
+        $context.charge($gas)?;
+        let new_element = element_1.$ark_func(element_2);
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
     }};
 }
 
-fn field_div_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_div_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_div_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_neg_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+macro_rules! ark_unary_op_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.field_neg($structure))?;
-        let new_element = element.neg();
+        safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
+        $context.charge($gas)?;
+        let new_element = element.$ark_func();
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
-fn field_neg_internal(
+fn add_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -987,19 +848,40 @@ fn field_neg_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_neg_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fr) => ark_binary_op_internal!(
             context,
             args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            add,
+            gas_params.ark_bls12_381_fr_add * NumArgs::one()
         ),
-        Some(Structure::BLS12381Fq12) => ark_neg_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fq12) => ark_binary_op_internal!(
             context,
             args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            add,
+            gas_params.ark_bls12_381_fq12_add * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G1Affine) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G1Projective,
+            add,
+            gas_params.ark_bls12_381_g1_proj_add * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G2Projective,
+            add,
+            gas_params.ark_bls12_381_g2_proj_add * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            mul,
+            gas_params.ark_bls12_381_fq12_mul * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -1007,11 +889,246 @@ fn field_neg_internal(
     }
 }
 
-macro_rules! ark_field_inv_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+fn sub_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fr,
+            sub,
+            gas_params.ark_bls12_381_fr_sub * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Fq12) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            sub,
+            gas_params.ark_bls12_381_fq12_sub * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G1Affine) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G1Projective,
+            sub,
+            gas_params.ark_bls12_381_g1_proj_sub * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G2Projective,
+            sub,
+            gas_params.ark_bls12_381_g2_proj_sub * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            div,
+            gas_params.ark_bls12_381_fq12_div * NumArgs::one()
+        ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn mul_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fr,
+            mul,
+            gas_params.ark_bls12_381_fr_mul * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Fq12) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            mul,
+            gas_params.ark_bls12_381_fq12_mul * NumArgs::one()
+        ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn div_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => ark_div_internal!(
+            context,
+            args,
+            ark_bls12_381::Fr,
+            div,
+            gas_params.ark_bls12_381_fr_div * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Fq12) => ark_div_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            div,
+            gas_params.ark_bls12_381_fq12_div * NumArgs::one()
+        ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn neg_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fr,
+            neg,
+            gas_params.ark_bls12_381_fr_neg * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            neg,
+            gas_params.ark_bls12_381_fq12_neg * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G1Affine) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G1Projective,
+            neg,
+            gas_params.ark_bls12_381_g1_proj_neg * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G2Projective,
+            neg,
+            gas_params.ark_bls12_381_g2_proj_neg * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => {
+            let handle = safely_pop_arg!(args, u64) as usize;
+            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
+            context.charge(gas_params.ark_bls12_381_fq12_inv * NumArgs::one())?;
+            let new_element = match element.inverse() {
+                Some(e) => {e},
+                None => {
+                    abort_invariant_violated();
+                    unreachable!()
+                },
+            };
+            let new_handle = store_element!(context, new_element);
+            Ok(smallvec![Value::u64(new_handle as u64)])
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn sqr_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fr,
+            square,
+            gas_params.ark_bls12_381_fr_square * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            square,
+            gas_params.ark_bls12_381_fq12_square * NumArgs::one()
+        ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+fn double_internal(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
+    match structure_opt {
+        Some(Structure::BLS12381G1Affine) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G1Projective,
+            double,
+            gas_params.ark_bls12_381_g1_proj_double * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::G2Projective,
+            double,
+            gas_params.ark_bls12_381_g2_proj_double * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => ark_unary_op_internal!(
+            context,
+            args,
+            ark_bls12_381::Fq12,
+            square,
+            gas_params.ark_bls12_381_fq12_square * NumArgs::one()
+        ),
+        _ => Err(SafeNativeError::Abort {
+            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        }),
+    }
+}
+
+macro_rules! ark_inverse_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $gas:expr) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.field_inv($structure))?;
+        safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
+        $context.charge($gas)?;
         match element.inverse() {
             Some(new_element) => {
                 let new_handle = store_element!($context, new_element);
@@ -1022,7 +1139,7 @@ macro_rules! ark_field_inv_internal {
     }};
 }
 
-fn field_inv_internal(
+fn inv_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -1031,19 +1148,17 @@ fn field_inv_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_inv_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fr) => ark_inverse_internal!(
             context,
             args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            gas_params.ark_bls12_381_fr_inv * NumArgs::one()
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_inv_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fq12) => ark_inverse_internal!(
             context,
             args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            gas_params.ark_bls12_381_fq12_inv * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -1051,56 +1166,16 @@ fn field_inv_internal(
     }
 }
 
-macro_rules! ark_field_sqr_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.field_sqr($structure))?;
-        let new_element = element.square();
+macro_rules! ark_constant_op_internal {
+    ($context:expr, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
+        $context.charge($gas)?;
+        let new_element = <$ark_typ>::$ark_func();
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
-fn field_sqr_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_sqr_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
-        ),
-        Some(Structure::BLS12381Fq12) => ark_field_sqr_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_field_zero_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        $context.charge($gas_params.field_zero($structure))?;
-        let new_element = <$typ>::zero();
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn field_zero_internal(
+fn zero_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -1109,19 +1184,35 @@ fn field_zero_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_zero_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fr) => ark_constant_op_internal!(
             context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            zero,
+            gas_params.ark_bls12_381_fr_zero * NumArgs::one()
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_zero_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            zero,
+            gas_params.ark_bls12_381_fq12_zero * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G1Affine) => ark_constant_op_internal!(
+            context,
+            ark_bls12_381::G1Projective,
+            zero,
+            gas_params.ark_bls12_381_g1_proj_infinity * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_constant_op_internal!(
+            context,
+            ark_bls12_381::G2Projective,
+            zero,
+            gas_params.ark_bls12_381_g2_proj_infinity * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => ark_constant_op_internal!(
+            context,
+            ark_bls12_381::Fq12,
+            one,
+            gas_params.ark_bls12_381_fq12_one * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -1129,16 +1220,7 @@ fn field_zero_internal(
     }
 }
 
-macro_rules! ark_field_one_internal {
-    ($gas_params:ident, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
-        $context.charge($gas_params.field_one($structure))?;
-        let new_element = <$typ>::one();
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn field_one_internal(
+fn one_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -1147,20 +1229,36 @@ fn field_one_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
-        Some(Structure::BLS12381Fr) => ark_field_one_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fr) => ark_constant_op_internal!(
             context,
-            args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            one,
+            gas_params.ark_bls12_381_fr_one * NumArgs::one()
         ),
-        Some(Structure::BLS12381Fq12) => ark_field_one_internal!(
-            gas_params,
+        Some(Structure::BLS12381Fq12) => ark_constant_op_internal!(
             context,
-            args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            one,
+            gas_params.ark_bls12_381_fq12_one * NumArgs::one()
         ),
+        Some(Structure::BLS12381G1Affine) => ark_constant_op_internal!(
+            context,
+            ark_bls12_381::G1Projective,
+            generator,
+            gas_params.ark_bls12_381_g1_proj_generator * NumArgs::one()
+        ),
+        Some(Structure::BLS12381G2Affine) => ark_constant_op_internal!(
+            context,
+            ark_bls12_381::G2Projective,
+            generator,
+            gas_params.ark_bls12_381_g2_proj_generator * NumArgs::one()
+        ),
+        Some(Structure::BLS12381Gt) => {
+            context.charge(gas_params.ark_bls12_381_fq12_clone * NumArgs::one())?;
+            let element = Lazy::force(&BLS12381_GT_GENERATOR).clone();
+            let handle = store_element!(context, element);
+            Ok(smallvec![Value::u64(handle as u64)])
+        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
@@ -1168,12 +1266,12 @@ fn field_one_internal(
 }
 
 macro_rules! ark_eq_internal {
-    ($gas_params:ident, $context:ident, $args:ident, $structure:expr, $typ:ty) => {{
+    ($context:ident, $args:ident, $ark_typ:ty, $gas:expr) => {{
         let handle_2 = safely_pop_arg!($args, u64) as usize;
         let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.eq($structure))?;
+        safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
+        $context.charge($gas)?;
         let result = element_1 == element_2;
         Ok(smallvec![Value::bool(result)])
     }};
@@ -1190,85 +1288,34 @@ fn eq_internal(
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr) => ark_eq_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            gas_params.ark_bls12_381_fr_eq * NumArgs::one()
         ),
         Some(Structure::BLS12381Fq12) => ark_eq_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            gas_params.ark_bls12_381_fq12_eq * NumArgs::one()
         ),
         Some(Structure::BLS12381G1Affine) => ark_eq_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective
+            ark_bls12_381::G1Projective,
+            gas_params.ark_bls12_381_g1_proj_eq * NumArgs::one()
         ),
         Some(Structure::BLS12381G2Affine) => ark_eq_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective
+            ark_bls12_381::G2Projective,
+            gas_params.ark_bls12_381_g2_proj_eq * NumArgs::one()
         ),
         Some(Structure::BLS12381Gt) => ark_eq_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381Gt,
-            ark_bls12_381::Fq12
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_identity_internal {
-    ($gas_params:expr, $context:expr, $structure:expr, $typ:ty, $func:ident) => {{
-        $context.charge($gas_params.group_identity($structure))?;
-        let element = <$typ>::$func();
-        let handle = store_element!($context, element);
-        Ok(smallvec![Value::u64(handle as u64)])
-    }};
-}
-
-fn group_identity_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut _args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_identity_internal!(
-            gas_params,
-            context,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            zero
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_identity_internal!(
-            gas_params,
-            context,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            zero
-        ),
-        Some(Structure::BLS12381Gt) => ark_group_identity_internal!(
-            gas_params,
-            context,
-            Structure::BLS12381Gt,
             ark_bls12_381::Fq12,
-            one
+            gas_params.ark_bls12_381_fq12_eq * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -1276,7 +1323,7 @@ fn group_identity_internal(
     }
 }
 
-macro_rules! ark_multi_scalar_mul_internal {
+macro_rules! ark_msm_internal {
     (
         $gas_params:expr,
         $context:expr,
@@ -1318,19 +1365,19 @@ macro_rules! ark_multi_scalar_mul_internal {
     }};
 }
 
-fn group_multi_scalar_mul_internal(
+fn multi_scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     let scalar_opt = structure_from_ty_arg!(context, &ty_args[1]);
-    abort_unless_group_scalar_mul_enabled!(context, group_opt, scalar_opt);
-    match (group_opt, scalar_opt) {
+    abort_unless_group_scalar_mul_enabled!(context, structure_opt, scalar_opt);
+    match (structure_opt, scalar_opt) {
         (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr)) => {
-            ark_multi_scalar_mul_internal!(
+            ark_msm_internal!(
                 gas_params,
                 context,
                 args,
@@ -1340,7 +1387,7 @@ fn group_multi_scalar_mul_internal(
             )
         },
         (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr)) => {
-            ark_multi_scalar_mul_internal!(
+            ark_msm_internal!(
                 gas_params,
                 context,
                 args,
@@ -1368,50 +1415,7 @@ static BLS12381_R_SCALAR: Lazy<ark_ff::BigInteger256> = Lazy::new(|| {
     ark_ff::BigInteger256::deserialize_uncompressed(BLS12381_R_LENDIAN.as_slice()).unwrap()
 });
 
-macro_rules! ark_group_generator_internal {
-    ($gas_params:expr, $context:expr, $structure:expr, $typ:ty) => {{
-        $context.charge($gas_params.group_generator($structure))?;
-        let element = <$typ>::generator();
-        let handle = store_element!($context, element);
-        Ok(smallvec![Value::u64(handle as u64)])
-    }};
-}
-
-fn group_generator_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut _args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_generator_internal!(
-            gas_params,
-            context,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_generator_internal!(
-            gas_params,
-            context,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective
-        ),
-        Some(Structure::BLS12381Gt) => {
-            context.charge(gas_params.group_generator(Structure::BLS12381Gt))?;
-            let element = BLS12381_GT_GENERATOR.add(ark_bls12_381::Fq12::zero());
-            let handle = store_element!(context, element);
-            Ok(smallvec![Value::u64(handle as u64)])
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-fn group_order_internal(
+fn order_internal(
     _gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -1433,7 +1437,7 @@ fn group_order_internal(
 }
 
 #[cfg(feature = "testing")]
-macro_rules! ark_insecure_random_element_internal {
+macro_rules! ark_rand_internal {
     ($context:expr, $typ:ty) => {{
         let element = <$typ>::rand(&mut test_rng());
         let handle = store_element!($context, element);
@@ -1444,7 +1448,7 @@ macro_rules! ark_insecure_random_element_internal {
 }
 
 #[cfg(feature = "testing")]
-fn insecure_random_element_internal(
+fn rand_insecure_internal(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
@@ -1453,16 +1457,16 @@ fn insecure_random_element_internal(
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match structure_opt {
         Some(Structure::BLS12381Fr) => {
-            ark_insecure_random_element_internal!(context, ark_bls12_381::Fr)
+            ark_rand_internal!(context, ark_bls12_381::Fr)
         },
         Some(Structure::BLS12381Fq12) => {
-            ark_insecure_random_element_internal!(context, ark_bls12_381::Fq12)
+            ark_rand_internal!(context, ark_bls12_381::Fq12)
         },
         Some(Structure::BLS12381G1Affine) => {
-            ark_insecure_random_element_internal!(context, ark_bls12_381::G1Projective)
+            ark_rand_internal!(context, ark_bls12_381::G1Projective)
         },
         Some(Structure::BLS12381G2Affine) => {
-            ark_insecure_random_element_internal!(context, ark_bls12_381::G2Projective)
+            ark_rand_internal!(context, ark_bls12_381::G2Projective)
         },
         Some(Structure::BLS12381Gt) => {
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
@@ -1477,137 +1481,28 @@ fn insecure_random_element_internal(
     }
 }
 
-macro_rules! ark_group_add_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle_2 = safely_pop_arg!($args, u64) as usize;
-        let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.group_add($structure))?;
-
-        let new_element = element_1.$op(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn group_add_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_add_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            add
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_add_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            add
-        ),
-        Some(Structure::BLS12381Gt) => ark_group_add_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Gt,
-            ark_bls12_381::Fq12,
-            mul
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_sub_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle_2 = safely_pop_arg!($args, u64) as usize;
-        let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $typ, element_2_ptr, element_2);
-        $context.charge($gas_params.group_sub($structure))?;
-        let new_element = element_1.$op(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn group_sub_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_sub_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            sub
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_sub_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            sub
-        ),
-        Some(Structure::BLS12381Gt) => ark_group_sub_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Gt,
-            ark_bls12_381::Fq12,
-            div
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_scalar_mul_internal {
+macro_rules! ark_scalar_mul_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $args:ident,
-        $group_structure:expr,
-        $scalar_structure:expr,
         $group_typ:ty,
         $scalar_typ:ty,
-        $op:ident
+        $op:ident,
+        $gas:expr
     ) => {{
         let scalar_handle = safely_pop_arg!($args, u64) as usize;
         let element_handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, element_handle, $group_typ, element_ptr, element);
         safe_borrow_element!($context, scalar_handle, $scalar_typ, scalar_ptr, scalar);
         let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
-        $context.charge($gas_params.group_scalar_mul($group_structure))?;
+        $context.charge($gas)?;
         let new_element = element.$op(scalar_bigint);
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
 
-fn group_scalar_mul_internal(
+fn scalar_mul_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
@@ -1619,27 +1514,23 @@ fn group_scalar_mul_internal(
     abort_unless_group_scalar_mul_enabled!(context, group_opt, scalar_field_opt);
     match (group_opt, scalar_field_opt) {
         (Some(Structure::BLS12381G1Affine), Some(Structure::BLS12381Fr)) => {
-            ark_group_scalar_mul_internal!(
-                gas_params,
+            ark_scalar_mul_internal!(
                 context,
                 args,
-                Structure::BLS12381G1Affine,
-                Structure::BLS12381Fr,
                 ark_bls12_381::G1Projective,
                 ark_bls12_381::Fr,
-                mul_bigint
+                mul_bigint,
+                gas_params.ark_bls12_381_g1_proj_scalar_mul * NumArgs::one()
             )
         },
         (Some(Structure::BLS12381G2Affine), Some(Structure::BLS12381Fr)) => {
-            ark_group_scalar_mul_internal!(
-                gas_params,
+            ark_scalar_mul_internal!(
                 context,
                 args,
-                Structure::BLS12381G2Affine,
-                Structure::BLS12381Fr,
                 ark_bls12_381::G2Projective,
                 ark_bls12_381::Fr,
-                mul_bigint
+                mul_bigint,
+                gas_params.ark_bls12_381_g2_proj_scalar_mul * NumArgs::one()
             )
         },
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fr)) => {
@@ -1660,7 +1551,7 @@ fn group_scalar_mul_internal(
                 scalar
             );
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
-            context.charge(gas_params.group_scalar_mul(Structure::BLS12381Gt))?;
+            context.charge(gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one())?;
             let new_element = element.pow(scalar_bigint);
             let new_handle = store_element!(context, new_element);
             Ok(smallvec![Value::u64(new_handle as u64)])
@@ -1735,108 +1626,6 @@ fn hash_to_internal(
             ark_bls12_381::G2Projective,
             ark_bls12_381::g2::Config
         ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_double_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.group_double($structure))?;
-        let new_element = element.$op();
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn group_double_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_double_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            double
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_double_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            double
-        ),
-        Some(Structure::BLS12381Gt) => ark_group_double_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381Gt,
-            ark_bls12_381::Fq12,
-            square
-        ),
-        _ => Err(SafeNativeError::Abort {
-            abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        }),
-    }
-}
-
-macro_rules! ark_group_neg_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty, $op:ident) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $typ, element_ptr, element);
-        $context.charge($gas_params.group_neg($structure))?;
-        let new_element = element.$op();
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-fn group_neg_internal(
-    gas_params: &GasParameters,
-    context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    abort_unless_single_type_basic_op_enabled!(context, structure_opt);
-    match structure_opt {
-        Some(Structure::BLS12381G1Affine) => ark_group_neg_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G1Affine,
-            ark_bls12_381::G1Projective,
-            neg
-        ),
-        Some(Structure::BLS12381G2Affine) => ark_group_neg_internal!(
-            gas_params,
-            context,
-            args,
-            Structure::BLS12381G2Affine,
-            ark_bls12_381::G2Projective,
-            neg
-        ),
-        Some(Structure::BLS12381Gt) => {
-            let handle = safely_pop_arg!(args, u64) as usize;
-            safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
-            context.charge(gas_params.group_neg(Structure::BLS12381Gt))?;
-            let new_element = element.inverse().unwrap();
-            let new_handle = store_element!(context, new_element);
-            Ok(smallvec![Value::u64(new_handle as u64)])
-        },
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
@@ -2043,84 +1832,84 @@ pub fn make_all(
             ),
         ),
         (
-            "field_add_internal",
+            "add_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_add_internal,
+                add_internal,
             ),
         ),
         (
-            "field_div_internal",
+            "div_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_div_internal,
+                div_internal,
             ),
         ),
         (
-            "field_inv_internal",
+            "inv_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_inv_internal,
+                inv_internal,
             ),
         ),
         (
-            "field_mul_internal",
+            "mul_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_mul_internal,
+                mul_internal,
             ),
         ),
         (
-            "field_neg_internal",
+            "neg_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_neg_internal,
+                neg_internal,
             ),
         ),
         (
-            "field_one_internal",
+            "one_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_one_internal,
+                one_internal,
             ),
         ),
         (
-            "field_sqr_internal",
+            "sqr_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_sqr_internal,
+                sqr_internal,
             ),
         ),
         (
-            "field_sub_internal",
+            "sub_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_sub_internal,
+                sub_internal,
             ),
         ),
         (
-            "field_zero_internal",
+            "zero_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                field_zero_internal,
+                zero_internal,
             ),
         ),
         (
@@ -2133,84 +1922,39 @@ pub fn make_all(
             ),
         ),
         (
-            "group_add_internal",
+            "double_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                group_add_internal,
+                double_internal,
             ),
         ),
         (
-            "group_double_internal",
+            "multi_scalar_mul_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                group_double_internal,
+                multi_scalar_mul_internal,
             ),
         ),
         (
-            "group_generator_internal",
+            "order_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                group_generator_internal,
+                order_internal,
             ),
         ),
         (
-            "group_identity_internal",
+            "scalar_mul_internal",
             make_safe_native(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                group_identity_internal,
-            ),
-        ),
-        (
-            "group_multi_scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_multi_scalar_mul_internal,
-            ),
-        ),
-        (
-            "group_neg_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_neg_internal,
-            ),
-        ),
-        (
-            "group_order_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_order_internal,
-            ),
-        ),
-        (
-            "group_scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_scalar_mul_internal,
-            ),
-        ),
-        (
-            "group_sub_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                group_sub_internal,
+                scalar_mul_internal,
             ),
         ),
         (
@@ -2258,8 +2002,8 @@ pub fn make_all(
     // Test-only natives.
     #[cfg(feature = "testing")]
     natives.append(&mut vec![(
-        "insecure_random_element_internal",
-        make_test_only_native_from_func(insecure_random_element_internal),
+        "rand_insecure_internal",
+        make_test_only_native_from_func(rand_insecure_internal),
     )]);
 
     crate::natives::helpers::make_module_natives(natives)
