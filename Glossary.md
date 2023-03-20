@@ -1,10 +1,10 @@
 ## Address
  
- Address or account address refers to a specific destination on the Aptos network. Address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain. Aptos address is a 64 character hex string and sometimes it can be shortened by stripping leading 0s, and adding a 0x. This makes a hex encoded 32 byte Aptos account address. 
+Address or account address refers to a specific destination on the Aptos network. Address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain. An Aptos address is a 64-character hex string, and sometimes it can be shortened by stripping leading 0s and adding a 0x. This makes a hex-encoded 32 byte Aptos account address. 
 
 ## ANS
 
-Aptos Name Service (ANS) is a decentralized naming address service for the Aptos blockchain. Aptos name is a human-readable .apt domain name that is used in place of their public key. This service also allows users to register subdomain names in addition to the registered domain. ANS platform is built by the Aptos labs. https://www.aptosnames.com/ 
+Aptos Name Service (ANS) is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable .apt domain name that is used in place of a public key, for example *love.apt*. This service also allows users to register subdomain names in addition to the registered domain. The ANS platform is built by the Aptos labs. Find out more at: https://www.aptosnames.com/ 
 
 ## API
 
@@ -16,15 +16,15 @@ Aptos token (APT) is the Aptos blockchain native token used for paying network a
 
 ## Aptos
 
-Aptos is a Layer 1 blockchain for everyone. It uses the Move programming language. Its mainnet was launched on the 12th of October 2022 to ensure the redefine of the Web3 user experience. Aptos blockchain is dedicated to creating better user experience through increase in speed, security, scalability, reliability and usability with low transaction costs.  The word “Aptos" means "The People" in the Ohlone language.
+Aptos is a Layer 1 blockchain for everyone. It uses the Move programming language. Its mainnet was launched on the 12th of October 2022 to redefine of the Web3 user experience. Aptos blockchain is dedicated to creating better user experiences through increased speed, security, scalability, reliability and usability with low transaction costs.  The word “Aptos" means "The People" in the Ohlone language.
 
 ## Aptos ecosystem
 
-Aptos Ecosystem refers to various components of the Aptos blockchain network and their interactions.  It involves the community, community-driven projects, and events.
+Aptos ecosystem refers to various components of the Aptos blockchain network and their interactions.  It involves the community, community-driven projects, and events.
 
 ## Aptos Explorer
 
-Aptos explorer is a product that helps users to examine in detail the activities on the blockchain, which include account information, validators, and transactions. This tool help users to be certain of the work they do using Aptos wallets as well as other areas in the blockchain. https://aptos.dev/guides/use-aptos-explorer/
+Aptos Explorer is a product that helps users to examine in detail the activities on the blockchain, which include account information, validators, and transactions. This tool help users to be certain of the work they do using Aptos wallets as well as other areas in the blockchain. https://aptos.dev/guides/use-aptos-explorer/
 
 ## CLI
 
