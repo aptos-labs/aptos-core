@@ -69,13 +69,13 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
                 baseline_file_name.push(buf.strip_prefix(&temp_path)?);
                 verify_or_update_baseline(&baseline_file_name, &contents)?;
             }
-        },
+        }
         Err(err) => {
             let mut contents = format!("Move prover abigen returns: {}\n", err);
             contents += &String::from_utf8_lossy(&error_writer.into_inner());
             let baseline_path = path.with_extension(suffix);
             verify_or_update_baseline(&baseline_path, &contents)?;
-        },
+        }
     };
     Ok(())
 }

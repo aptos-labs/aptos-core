@@ -95,7 +95,7 @@ fn run_vm(module: CompiledModule) -> Result<(), VMStatus> {
             SignatureToken::Bool => MoveValue::Bool(true).simple_serialize().unwrap(),
             SignatureToken::Vector(inner_tok) if **inner_tok == SignatureToken::U8 => {
                 MoveValue::Vector(vec![]).simple_serialize().unwrap()
-            },
+            }
             SignatureToken::Vector(_)
             | SignatureToken::U8
             | SignatureToken::U128
@@ -176,10 +176,10 @@ fn output_error_case(module: CompiledModule, output_path: Option<String>, case_i
                 .unwrap_or_else(|err| panic!("Unable to open output file {}: {}", &path, err));
             f.write_all(&out)
                 .unwrap_or_else(|err| panic!("Unable to write to output file {}: {}", &path, err));
-        },
+        }
         None => {
             debug!("{:#?}", module);
-        },
+        }
     }
 }
 
@@ -194,10 +194,10 @@ fn seed(seed: Option<String>) -> [u8; 32] {
             for (i, byte) in vec.into_iter().enumerate() {
                 array[i] = byte;
             }
-        },
+        }
         None => {
             getrandom(&mut array).unwrap();
-        },
+        }
     };
     array
 }
@@ -295,7 +295,7 @@ pub fn bytecode_generation(
             Ok(verified_module) => {
                 status = Status::ExecutionFailure;
                 Some(verified_module)
-            },
+            }
             Err(e) => {
                 error!("{}", e);
                 let uid = rng.gen::<u64>();
@@ -305,7 +305,7 @@ pub fn bytecode_generation(
                 } else {
                     None
                 }
-            },
+            }
         };
 
         if let Some(verified_module) = verified_module {
@@ -316,23 +316,23 @@ pub fn bytecode_generation(
                     Ok(execution_result) => match execution_result {
                         Ok(_) => {
                             status = Status::Valid;
-                        },
+                        }
                         Err(e) => match e.status_code() {
                             StatusCode::ARITHMETIC_ERROR | StatusCode::OUT_OF_GAS => {
                                 status = Status::Valid;
-                            },
+                            }
                             _ => {
                                 error!("{}", e);
                                 let uid = rng.gen::<u64>();
                                 output_error_case(module.clone(), output_path.clone(), uid, tid);
-                            },
+                            }
                         },
                     },
                     Err(_) => {
                         // Save modules that cause the VM runtime to panic
                         let uid = rng.gen::<u64>();
                         output_error_case(module.clone(), output_path.clone(), uid, tid);
-                    },
+                    }
                 }
             } else {
                 status = Status::Valid;
@@ -413,7 +413,7 @@ pub(crate) fn substitute(token: &SignatureToken, tys: &[SignatureToken]) -> Sign
             // file and that this guarantees that type parameter indices are always in bounds.
             debug_assert!((*idx as usize) < tys.len());
             tys[*idx as usize].clone()
-        },
+        }
     }
 }
 
@@ -430,18 +430,16 @@ pub fn abilities(
         Reference(_) | MutableReference(_) => AbilitySet::REFERENCES,
         Signer => AbilitySet::SIGNER,
         TypeParameter(idx) => constraints[*idx as usize],
-        Vector(ty) => {
-            AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![abilities(
-                module,
-                ty,
-                constraints,
-            )])
-            .unwrap()
-        },
+        Vector(ty) => AbilitySet::polymorphic_abilities(
+            AbilitySet::VECTOR,
+            vec![false],
+            vec![abilities(module, ty, constraints)],
+        )
+        .unwrap(),
         Struct(idx) => {
             let sh = module.struct_handle_at(*idx);
             sh.abilities
-        },
+        }
         StructInstantiation(idx, type_args) => {
             let sh = module.struct_handle_at(*idx);
             let declared_abilities = sh.abilities;
@@ -456,7 +454,7 @@ pub fn abilities(
                 type_arguments,
             )
             .unwrap()
-        },
+        }
     }
 }
 

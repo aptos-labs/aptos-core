@@ -246,14 +246,14 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                         idx as TableIndex,
                     ));
                 }
-            },
+            }
             None => {
                 return Err(verification_error(
                     StatusCode::LOOKUP_FAILED,
                     IndexKind::StructHandle,
                     idx as TableIndex,
                 ))
-            },
+            }
         }
     }
     Ok(())
@@ -297,7 +297,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                             IndexKind::FunctionHandle,
                             idx as TableIndex,
                         ))
-                    },
+                    }
                 };
 
                 compare_cross_module_signatures(
@@ -318,7 +318,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                             IndexKind::FunctionHandle,
                             idx as TableIndex,
                         ))
-                    },
+                    }
                 };
 
                 compare_cross_module_signatures(
@@ -328,14 +328,14 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     owner_module,
                 )
                 .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
-            },
+            }
             None => {
                 return Err(verification_error(
                     StatusCode::LOOKUP_FAILED,
                     IndexKind::FunctionHandle,
                     idx as TableIndex,
                 ));
-            },
+            }
         }
     }
     Ok(())
@@ -452,28 +452,28 @@ fn compare_types(
         | (SignatureToken::Signer, SignatureToken::Signer) => Ok(()),
         (SignatureToken::Vector(ty1), SignatureToken::Vector(ty2)) => {
             compare_types(context, ty1, ty2, def_module)
-        },
+        }
         (SignatureToken::Struct(idx1), SignatureToken::Struct(idx2)) => {
             compare_structs(context, *idx1, *idx2, def_module)
-        },
+        }
         (
             SignatureToken::StructInstantiation(idx1, inst1),
             SignatureToken::StructInstantiation(idx2, inst2),
         ) => {
             compare_structs(context, *idx1, *idx2, def_module)?;
             compare_cross_module_signatures(context, inst1, inst2, def_module)
-        },
+        }
         (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2))
         | (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
             compare_types(context, ty1, ty2, def_module)
-        },
+        }
         (SignatureToken::TypeParameter(idx1), SignatureToken::TypeParameter(idx2)) => {
             if idx1 != idx2 {
                 Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
             } else {
                 Ok(())
             }
-        },
+        }
         (SignatureToken::Bool, _)
         | (SignatureToken::U8, _)
         | (SignatureToken::U64, _)
@@ -540,7 +540,7 @@ fn verify_all_script_visibility_usage(context: &Context) -> PartialVMResult<()> 
                 )?
             }
             Ok(())
-        },
+        }
         BinaryIndexedView::Script(s) => verify_script_visibility_usage(
             &context.resolver,
             script_functions,
@@ -564,7 +564,7 @@ fn verify_script_visibility_usage(
             Bytecode::Call(fhandle_idx) => fhandle_idx,
             Bytecode::CallGeneric(finst_idx) => {
                 &resolver.function_instantiation_at(*finst_idx).handle
-            },
+            }
             _ => continue,
         };
         match (current_is_entry, script_functions.contains(fhandle_idx)) {
@@ -579,7 +579,7 @@ fn verify_script_visibility_usage(
                     script-visible functions"
                         .to_string(),
                 ));
-            },
+            }
             _ => (),
         }
     }

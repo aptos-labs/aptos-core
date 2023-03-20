@@ -40,11 +40,11 @@ pub fn program(compilation_env: &mut CompilationEnv, prog: Program) -> Program {
             let (loc, msg) = match mem {
                 ModuleMember::Function(f) => {
                     (f.loc, "functions not allowed in specification module")
-                },
+                }
                 ModuleMember::Struct(s) => (s.loc, "structs not allowed in specification module"),
                 ModuleMember::Constant(c) => {
                     (c.loc, "constants not allowed in specification module")
-                },
+                }
                 ModuleMember::Use(_) | ModuleMember::Friend(_) | ModuleMember::Spec(_) => continue,
             };
             compilation_env.add_diag(diag!(Declarations::InvalidSpec, (loc, msg)))
@@ -83,7 +83,7 @@ fn extract_spec_modules(
                 let def = match def {
                     Definition::Module(m) => {
                         Definition::Module(extract_spec_module(spec_modules, None, m)?)
-                    },
+                    }
                     Definition::Address(mut a) => {
                         let addr_ = Some(&a.addr.value);
                         a.modules = a
@@ -92,7 +92,7 @@ fn extract_spec_modules(
                             .filter_map(|m| extract_spec_module(spec_modules, addr_, m))
                             .collect::<Vec<_>>();
                         Definition::Address(a)
-                    },
+                    }
                     Definition::Script(s) => Definition::Script(s),
                 };
                 Some(PackageDefinition {
@@ -133,8 +133,8 @@ fn merge_spec_modules(
                 for m in &mut a.modules {
                     merge_spec_module(spec_modules, addr_, m)
                 }
-            },
-            Script(_) => {},
+            }
+            Script(_) => {}
         }
     }
 }

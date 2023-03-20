@@ -199,7 +199,7 @@ fn write_struct_def(ctx: &mut Context, sdef: &StructDefinition) -> String {
         StructFieldInformation::Native => {
             push!(out, "    }");
             return out;
-        },
+        }
         StructFieldInformation::Declared(fields) => fields,
     };
     for field in fields {
@@ -363,11 +363,11 @@ fn write_signature_token(ctx: &mut Context, t: &SignatureToken) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{}<{}>", n, tys)
-        },
+        }
         SignatureToken::Reference(inner) => format!("&{}", write_signature_token(ctx, inner)),
         SignatureToken::MutableReference(inner) => {
             format!("&mut {}", write_signature_token(ctx, inner))
-        },
+        }
         SignatureToken::TypeParameter(idx) => write_type_parameter(*idx),
     }
 }

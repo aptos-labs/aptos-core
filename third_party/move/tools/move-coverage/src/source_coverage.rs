@@ -96,7 +96,7 @@ impl<'a> SourceCoverageBuilder<'a> {
                                     fn_is_native: false,
                                     uncovered_locations,
                                 }
-                            },
+                            }
                             Some(function_coverage) => {
                                 let uncovered_locations: Vec<_> = (0..code_unit.code.len())
                                     .flat_map(|code_offset| {
@@ -118,9 +118,9 @@ impl<'a> SourceCoverageBuilder<'a> {
                                     fn_is_native: false,
                                     uncovered_locations,
                                 }
-                            },
+                            }
                         })
-                    },
+                    }
                 };
                 coverage.map(|x| (fn_name, x))
             })
@@ -197,27 +197,27 @@ impl<'a> SourceCoverageBuilder<'a> {
                                 line_acc.push(StringSegment::Uncovered(uncovered.to_string()));
                                 line = rest.to_string();
                                 cursor = *end;
-                            },
+                            }
                             AbstractSegment::BoundedRight { end } => {
                                 let (uncovered, rest) = line.split_at((end - cursor) as usize);
                                 line_acc.push(StringSegment::Uncovered(uncovered.to_string()));
                                 line = rest.to_string();
                                 cursor = *end;
-                            },
+                            }
                             AbstractSegment::BoundedLeft { start } => {
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 line_acc.push(StringSegment::Covered(before.to_string()));
                                 line_acc.push(StringSegment::Uncovered(after.to_string()));
                                 line = "".to_string();
                                 cursor = 0;
-                            },
+                            }
                         }
                     }
                     if !line.is_empty() {
                         line_acc.push(StringSegment::Covered(line))
                     }
                     annotated_lines.push(line_acc)
-                },
+                }
             }
         }
 

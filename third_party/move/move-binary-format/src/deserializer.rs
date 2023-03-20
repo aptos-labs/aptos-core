@@ -396,7 +396,7 @@ fn read_table(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Table> {
         Err(_) => {
             return Err(PartialVMError::new(StatusCode::MALFORMED)
                 .with_message("Error reading table".to_string()))
-        },
+        }
     };
     let table_offset = load_table_offset(cursor)?;
     let count = load_table_size(cursor)?;
@@ -567,22 +567,22 @@ fn build_common_tables(
         match table.kind {
             TableType::MODULE_HANDLES => {
                 load_module_handles(binary, table, common.get_module_handles())?;
-            },
+            }
             TableType::STRUCT_HANDLES => {
                 load_struct_handles(binary, table, common.get_struct_handles())?;
-            },
+            }
             TableType::FUNCTION_HANDLES => {
                 load_function_handles(binary, table, common.get_function_handles())?;
-            },
+            }
             TableType::FUNCTION_INST => {
                 load_function_instantiations(binary, table, common.get_function_instantiations())?;
-            },
+            }
             TableType::SIGNATURES => {
                 load_signatures(binary, table, common.get_signatures())?;
-            },
+            }
             TableType::CONSTANT_POOL => {
                 load_constant_pool(binary, table, common.get_constant_pool())?;
-            },
+            }
             TableType::METADATA => {
                 if binary.version() < VERSION_5 {
                     return Err(
@@ -593,13 +593,13 @@ fn build_common_tables(
                     );
                 }
                 load_metadata(binary, table, common.get_metadata())?;
-            },
+            }
             TableType::IDENTIFIERS => {
                 load_identifiers(binary, table, common.get_identifiers())?;
-            },
+            }
             TableType::ADDRESS_IDENTIFIERS => {
                 load_address_identifiers(binary, table, common.get_address_identifiers())?;
-            },
+            }
             TableType::FUNCTION_DEFS
             | TableType::STRUCT_DEFS
             | TableType::STRUCT_DEF_INST
@@ -613,7 +613,7 @@ fn build_common_tables(
                     ));
                 }
                 continue;
-            },
+            }
         }
     }
     Ok(())
@@ -629,22 +629,22 @@ fn build_module_tables(
         match table.kind {
             TableType::STRUCT_DEFS => {
                 load_struct_defs(binary, table, &mut module.struct_defs)?;
-            },
+            }
             TableType::STRUCT_DEF_INST => {
                 load_struct_instantiations(binary, table, &mut module.struct_def_instantiations)?;
-            },
+            }
             TableType::FUNCTION_DEFS => {
                 load_function_defs(binary, table, &mut module.function_defs)?;
-            },
+            }
             TableType::FIELD_HANDLE => {
                 load_field_handles(binary, table, &mut module.field_handles)?;
-            },
+            }
             TableType::FIELD_INST => {
                 load_field_instantiations(binary, table, &mut module.field_instantiations)?;
-            },
+            }
             TableType::FRIEND_DECLS => {
                 load_module_handles(binary, table, &mut module.friend_decls)?;
-            },
+            }
             TableType::MODULE_HANDLES
             | TableType::STRUCT_HANDLES
             | TableType::FUNCTION_HANDLES
@@ -655,7 +655,7 @@ fn build_module_tables(
             | TableType::METADATA
             | TableType::SIGNATURES => {
                 continue;
-            },
+            }
         }
     }
     Ok(())
@@ -679,7 +679,7 @@ fn build_script_tables(
             | TableType::CONSTANT_POOL
             | TableType::METADATA => {
                 continue;
-            },
+            }
             TableType::STRUCT_DEFS
             | TableType::STRUCT_DEF_INST
             | TableType::FUNCTION_DEFS
@@ -688,7 +688,7 @@ fn build_script_tables(
             | TableType::FRIEND_DECLS => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
                     .with_message("Bad table in Script".to_string()));
-            },
+            }
         }
     }
     Ok(())
@@ -995,7 +995,7 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                 T::Reference => T::Saturated(SignatureToken::Reference(Box::new(tok))),
                 T::MutableReference => {
                     T::Saturated(SignatureToken::MutableReference(Box::new(tok)))
-                },
+                }
                 T::StructInst {
                     sh_idx,
                     arity,
@@ -1011,7 +1011,7 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                             ty_args,
                         }
                     }
-                },
+                }
                 _ => unreachable!("invalid type constructor application"),
             }
         }
@@ -1040,7 +1040,7 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                             cursor.version()
                         )),
                     );
-                },
+                }
                 _ => (),
             };
 
@@ -1060,7 +1060,7 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                 S::STRUCT => {
                     let sh_idx = load_struct_handle_index(cursor)?;
                     T::Saturated(SignatureToken::Struct(sh_idx))
-                },
+                }
                 S::STRUCT_INST => {
                     let sh_idx = load_struct_handle_index(cursor)?;
                     let arity = load_type_parameter_count(cursor)?;
@@ -1073,11 +1073,11 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         arity,
                         ty_args: vec![],
                     }
-                },
+                }
                 S::TYPE_PARAMETER => {
                     let idx = load_type_parameter_index(cursor)?;
                     T::Saturated(SignatureToken::TypeParameter(idx))
-                },
+                }
             })
         } else {
             Err(PartialVMError::new(StatusCode::MALFORMED)
@@ -1140,19 +1140,19 @@ fn load_ability_set(
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
                     .with_message("Unexpected EOF".to_string()))
-            },
+            }
         };
         match pos {
             AbilitySetPosition::StructHandle => {
                 Ok(match DeprecatedNominalResourceFlag::from_u8(byte)? {
                     DeprecatedNominalResourceFlag::NOMINAL_RESOURCE => {
                         AbilitySet::EMPTY | Ability::Store | Ability::Key
-                    },
+                    }
                     DeprecatedNominalResourceFlag::NORMAL_STRUCT => {
                         AbilitySet::EMPTY | Ability::Store | Ability::Copy | Ability::Drop
-                    },
+                    }
                 })
-            },
+            }
             AbilitySetPosition::FunctionTypeParameters
             | AbilitySetPosition::StructTypeParameters => {
                 let set = match DeprecatedKind::from_u8(byte)? {
@@ -1165,7 +1165,7 @@ fn load_ability_set(
                     AbilitySetPosition::FunctionTypeParameters => set | Ability::Store,
                     AbilitySetPosition::StructTypeParameters => set,
                 })
-            },
+            }
         }
     } else {
         // The uleb here doesn't really do anything as it is bounded currently to 0xF, but the
@@ -1233,14 +1233,14 @@ fn load_struct_defs(
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
                     .with_message("Invalid field info in struct".to_string()))
-            },
+            }
         };
         let field_information = match field_information_flag {
             SerializedNativeStructFlag::NATIVE => StructFieldInformation::Native,
             SerializedNativeStructFlag::DECLARED => {
                 let fields = load_field_defs(&mut cursor)?;
                 StructFieldInformation::Declared(fields)
-            },
+            }
         };
         struct_defs.push(StructDefinition {
             struct_handle,
@@ -1455,8 +1455,8 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                         )),
                     );
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         };
 
         match opcode {
@@ -1474,7 +1474,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                         cursor.version()
                     )),
                 );
-            },
+            }
             _ => (),
         };
 
@@ -1491,15 +1491,15 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                         .with_message("Unexpected EOF".to_string())
                 })?;
                 Bytecode::LdU8(value)
-            },
+            }
             Opcodes::LD_U64 => {
                 let value = read_u64_internal(cursor)?;
                 Bytecode::LdU64(value)
-            },
+            }
             Opcodes::LD_U128 => {
                 let value = read_u128_internal(cursor)?;
                 Bytecode::LdU128(value)
-            },
+            }
             Opcodes::CAST_U8 => Bytecode::CastU8,
             Opcodes::CAST_U64 => Bytecode::CastU64,
             Opcodes::CAST_U128 => Bytecode::CastU128,
@@ -1514,11 +1514,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::MUT_BORROW_FIELD => Bytecode::MutBorrowField(load_field_handle_index(cursor)?),
             Opcodes::MUT_BORROW_FIELD_GENERIC => {
                 Bytecode::MutBorrowFieldGeneric(load_field_inst_index(cursor)?)
-            },
+            }
             Opcodes::IMM_BORROW_FIELD => Bytecode::ImmBorrowField(load_field_handle_index(cursor)?),
             Opcodes::IMM_BORROW_FIELD_GENERIC => {
                 Bytecode::ImmBorrowFieldGeneric(load_field_inst_index(cursor)?)
-            },
+            }
             Opcodes::CALL => Bytecode::Call(load_function_handle_index(cursor)?),
             Opcodes::CALL_GENERIC => Bytecode::CallGeneric(load_function_inst_index(cursor)?),
             Opcodes::PACK => Bytecode::Pack(load_struct_def_index(cursor)?),
@@ -1553,23 +1553,23 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::MUT_BORROW_GLOBAL => Bytecode::MutBorrowGlobal(load_struct_def_index(cursor)?),
             Opcodes::MUT_BORROW_GLOBAL_GENERIC => {
                 Bytecode::MutBorrowGlobalGeneric(load_struct_def_inst_index(cursor)?)
-            },
+            }
             Opcodes::IMM_BORROW_GLOBAL => Bytecode::ImmBorrowGlobal(load_struct_def_index(cursor)?),
             Opcodes::IMM_BORROW_GLOBAL_GENERIC => {
                 Bytecode::ImmBorrowGlobalGeneric(load_struct_def_inst_index(cursor)?)
-            },
+            }
             Opcodes::MOVE_FROM => Bytecode::MoveFrom(load_struct_def_index(cursor)?),
             Opcodes::MOVE_FROM_GENERIC => {
                 Bytecode::MoveFromGeneric(load_struct_def_inst_index(cursor)?)
-            },
+            }
             Opcodes::MOVE_TO => Bytecode::MoveTo(load_struct_def_index(cursor)?),
             Opcodes::MOVE_TO_GENERIC => {
                 Bytecode::MoveToGeneric(load_struct_def_inst_index(cursor)?)
-            },
+            }
             Opcodes::FREEZE_REF => Bytecode::FreezeRef,
             Opcodes::VEC_PACK => {
                 Bytecode::VecPack(load_signature_index(cursor)?, read_u64_internal(cursor)?)
-            },
+            }
             Opcodes::VEC_LEN => Bytecode::VecLen(load_signature_index(cursor)?),
             Opcodes::VEC_IMM_BORROW => Bytecode::VecImmBorrow(load_signature_index(cursor)?),
             Opcodes::VEC_MUT_BORROW => Bytecode::VecMutBorrow(load_signature_index(cursor)?),
@@ -1577,20 +1577,20 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::VEC_POP_BACK => Bytecode::VecPopBack(load_signature_index(cursor)?),
             Opcodes::VEC_UNPACK => {
                 Bytecode::VecUnpack(load_signature_index(cursor)?, read_u64_internal(cursor)?)
-            },
+            }
             Opcodes::VEC_SWAP => Bytecode::VecSwap(load_signature_index(cursor)?),
             Opcodes::LD_U16 => {
                 let value = read_u16_internal(cursor)?;
                 Bytecode::LdU16(value)
-            },
+            }
             Opcodes::LD_U32 => {
                 let value = read_u32_internal(cursor)?;
                 Bytecode::LdU32(value)
-            },
+            }
             Opcodes::LD_U256 => {
                 let value = read_u256_internal(cursor)?;
                 Bytecode::LdU256(value)
-            },
+            }
             Opcodes::CAST_U16 => Bytecode::CastU16,
             Opcodes::CAST_U32 => Bytecode::CastU32,
             Opcodes::CAST_U256 => Bytecode::CastU256,

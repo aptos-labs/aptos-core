@@ -95,13 +95,11 @@ impl ProverTaskRunner {
         // Listens until one of the workers finishes.
         loop {
             // Result received from one worker.
-            let timeout = Duration::from_secs(
-                if hard_timeout_secs > 0 {
-                    hard_timeout_secs
-                } else {
-                    u64::MAX
-                },
-            );
+            let timeout = Duration::from_secs(if hard_timeout_secs > 0 {
+                hard_timeout_secs
+            } else {
+                u64::MAX
+            });
             let res = master_rx.recv_timeout(timeout);
             match res {
                 Ok((task_id, result)) => {
@@ -115,7 +113,7 @@ impl ProverTaskRunner {
                     }
                     debug!("previous instance failed, waiting for another worker to report...");
                     num_working_instances = usize::saturating_add(num_working_instances, 1);
-                },
+                }
                 Err(RecvTimeoutError::Timeout) => {
                     // recv timeout, i.e. boogie/underlying solver is hanging
                     let _ = master_tx.send(BroadcastMsg::Stop);
@@ -124,8 +122,8 @@ impl ProverTaskRunner {
                         hard_timeout_secs
                     );
                     return task.make_timeout();
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
     }
@@ -205,7 +203,7 @@ impl ProverTask for RunBoogieWithSeeds {
                 }
                 let output = String::from_utf8_lossy(&res.stdout);
                 self.contains_compilation_error(&output) || !self.contains_timeout(&output)
-            },
+            }
             Err(_) => true, // Count this as success so we terminate everything else
         }
     }

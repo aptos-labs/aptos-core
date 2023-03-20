@@ -123,7 +123,7 @@ impl<'a> LimitsVerifier<'a> {
                 match t {
                     SignatureToken::Struct(..) | SignatureToken::StructInstantiation(..) => {
                         size += STRUCT_SIZE_WEIGHT
-                    },
+                    }
                     SignatureToken::TypeParameter(..) => size += PARAM_SIZE_WEIGHT,
                     _ => size += 1,
                 }
@@ -163,7 +163,7 @@ impl<'a> LimitsVerifier<'a> {
                                     StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
                                 ));
                             }
-                        },
+                        }
                     }
                 }
             }

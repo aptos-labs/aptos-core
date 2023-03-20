@@ -47,7 +47,7 @@ fn optimize_cmd(sp!(_, cmd_): &mut Command) -> bool {
                 from_user: false,
             };
             true
-        },
+        }
         _ => false,
     }
 }

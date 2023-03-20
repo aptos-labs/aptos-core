@@ -176,15 +176,15 @@ impl VMControlFlowGraph {
                             // block as the loop head.
                             Some(Exploration::InProgress) => {
                                 loop_heads.entry(*succ).or_default().insert(block);
-                            },
+                            }
 
                             // Cross-edge detected, this block and its entire sub-graph (modulo
                             // cycles) has already been explored via a different path, and is
                             // already present in `post_order`.
-                            Some(Exploration::Done) => { /* skip */ },
+                            Some(Exploration::Done) => { /* skip */ }
                         };
                     }
-                },
+                }
 
                 Entry::Occupied(mut entry) => match entry.get() {
                     // Already traversed the sub-graph reachable from this block, so skip it.
@@ -195,7 +195,7 @@ impl VMControlFlowGraph {
                     Exploration::InProgress => {
                         post_order.push(block);
                         entry.insert(Exploration::Done);
-                    },
+                    }
                 },
             }
         }

@@ -69,13 +69,13 @@ impl VMError {
             (StatusCode::EXECUTED, sub_status, _) => {
                 debug_assert!(sub_status.is_none());
                 VMStatus::Executed
-            },
+            }
             (StatusCode::ABORTED, Some(code), Location::Script) => {
                 VMStatus::MoveAbort(vm_status::AbortLocation::Script, code)
-            },
+            }
             (StatusCode::ABORTED, Some(code), Location::Module(id)) => {
                 VMStatus::MoveAbort(vm_status::AbortLocation::Module(id), code)
-            },
+            }
 
             (StatusCode::ABORTED, sub_status, location) => {
                 debug_assert!(
@@ -84,7 +84,7 @@ impl VMError {
                     sub_status, location
                 );
                 VMStatus::Error(StatusCode::ABORTED, message)
-            },
+            }
 
             (major_status, sub_status, location)
                 if major_status.status_type() == StatusType::Execution =>
@@ -94,7 +94,7 @@ impl VMError {
                     Location::Module(id) => vm_status::AbortLocation::Module(id.clone()),
                     Location::Undefined => {
                         return VMStatus::Error(major_status, message);
-                    },
+                    }
                 };
                 // Errors for OUT_OF_GAS do not always have index set: if it does not, it should already return above.
                 debug_assert!(
@@ -111,7 +111,7 @@ impl VMError {
                 let (function, code_offset) = match offsets.pop() {
                     None => {
                         return VMStatus::Error(major_status, message);
-                    },
+                    }
                     Some((fdef_idx, code_offset)) => (fdef_idx.0, code_offset),
                 };
                 VMStatus::ExecutionFailure {
@@ -121,7 +121,7 @@ impl VMError {
                     code_offset,
                     message,
                 }
-            },
+            }
 
             (major_status, _, _) => VMStatus::Error(major_status, message),
         }
@@ -377,7 +377,7 @@ impl PartialVMError {
                     msg.push(separator);
                 }
                 msg.push_str(&additional_message);
-            },
+            }
             None => self.0.message = Some(additional_message),
         };
         self

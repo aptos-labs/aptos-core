@@ -393,52 +393,52 @@ impl<'a> BytecodeGenerator<'a> {
                     } else {
                         None
                     }
-                },
+                }
                 BytecodeType::CodeOffset(instruction) => {
                     // Set 0 as the offset. This will be set correctly during serialization
                     Some(instruction(0))
-                },
+                }
                 BytecodeType::U8(instruction) => {
                     // Generate a random u8 constant to load
                     Some(instruction(self.rng.gen_range(0..u8::max_value())))
-                },
+                }
                 BytecodeType::U16(instruction) => {
                     // Generate a random u16 constant to load
                     Some(instruction(self.rng.gen_range(0..u16::max_value())))
-                },
+                }
                 BytecodeType::U32(instruction) => {
                     // Generate a random u32 constant to load
                     Some(instruction(self.rng.gen_range(0..u32::max_value())))
-                },
+                }
                 BytecodeType::U64(instruction) => {
                     // Generate a random u64 constant to load
                     Some(instruction(self.rng.gen_range(0..u64::max_value())))
-                },
+                }
                 BytecodeType::U128(instruction) => {
                     // Generate a random u128 constant to load
                     Some(instruction(self.rng.gen_range(0..u128::max_value())))
-                },
+                }
                 BytecodeType::U256(instruction) => {
                     // Generate a random u256 constant to load
                     Some(instruction(
                         self.rng.gen_range(U256::zero()..U256::max_value()),
                     ))
-                },
+                }
                 BytecodeType::ConstantPoolIndex(instruction) => {
                     // Select a random address from the module's address pool
                     Self::index_or_none(&module.constant_pool, self.rng)
                         .map(|x| instruction(ConstantPoolIndex::new(x)))
-                },
+                }
                 BytecodeType::StructIndex(instruction) => {
                     // Select a random struct definition and local signature
                     Self::index_or_none(&module.struct_defs, self.rng)
                         .map(|x| instruction(StructDefinitionIndex::new(x)))
-                },
+                }
                 BytecodeType::FieldHandleIndex(instruction) => {
                     // Select a field definition from the module's field definitions
                     Self::index_or_none(&module.field_handles, self.rng)
                         .map(|x| instruction(FieldHandleIndex::new(x)))
-                },
+                }
                 BytecodeType::FunctionIndex(instruction) => {
                     // Select a random function handle and local signature
                     let callable_fns = &state.call_graph.can_call(fn_context.function_handle_index);
@@ -451,22 +451,22 @@ impl<'a> BytecodeGenerator<'a> {
                             )
                         })
                         .map(instruction)
-                },
+                }
                 BytecodeType::StructInstantiationIndex(instruction) => {
                     // Select a field definition from the module's field definitions
                     Self::index_or_none(&module.struct_def_instantiations, self.rng)
                         .map(|x| instruction(StructDefInstantiationIndex::new(x)))
-                },
+                }
                 BytecodeType::FunctionInstantiationIndex(instruction) => {
                     // Select a field definition from the module's field definitions
                     Self::index_or_none(&module.function_instantiations, self.rng)
                         .map(|x| instruction(FunctionInstantiationIndex::new(x)))
-                },
+                }
                 BytecodeType::FieldInstantiationIndex(instruction) => {
                     // Select a field definition from the module's field definitions
                     Self::index_or_none(&module.field_instantiations, self.rng)
                         .map(|x| instruction(FieldInstantiationIndex::new(x)))
-                },
+                }
             };
             if let Some(instruction) = instruction {
                 let summary = summaries::instruction_summary(instruction.clone(), false);
@@ -585,7 +585,7 @@ impl<'a> BytecodeGenerator<'a> {
                 let effects = effect(str_inst_idx);
                 let instruction = instantiation_application(str_inst_idx);
                 (apply_effects(state, effects), instruction)
-            },
+            }
             summaries::Effects::TyParamsCall(instantiation, effect, instantiation_application) => {
                 let (fh_idx, instantiation) = instantiation(&state);
                 let index = state.module.add_instantiation(instantiation);
@@ -597,7 +597,7 @@ impl<'a> BytecodeGenerator<'a> {
                 let effects = effect(func_inst_idx);
                 let instruction = instantiation_application(func_inst_idx);
                 (apply_effects(state, effects), instruction)
-            },
+            }
             summaries::Effects::NoTyParams(effects) => (apply_effects(state, effects), instruction),
         }
     }
@@ -681,12 +681,12 @@ impl<'a> BytecodeGenerator<'a> {
                         )?;
                         return Some((bytecode, state));
                     }
-                },
+                }
                 Err(err) => {
                     // Could not complete the bytecode sequence; reset to empty
                     error!("{}", err);
                     return Some((Vec::new(), abstract_state_in));
-                },
+                }
             }
         }
         // Fix local availability
@@ -941,7 +941,7 @@ impl<'a> BytecodeGenerator<'a> {
                     struct_def_idx as TableIndex,
                 )));
                 bytecodes
-            },
+            }
             SignatureToken::StructInstantiation(handle_idx, instantiation) => {
                 let struct_def_idx = module
                     .module
@@ -976,14 +976,14 @@ impl<'a> BytecodeGenerator<'a> {
                     si_idx.0 as TableIndex,
                 )));
                 bytecodes
-            },
+            }
             SignatureToken::Signer
             | SignatureToken::Vector(_)
             | SignatureToken::Reference(_)
             | SignatureToken::MutableReference(_)
             | SignatureToken::TypeParameter(_) => {
                 unimplemented!("Unsupported inhabitation. Type: {:#?}", token)
-            },
+            }
         }
     }
 }

@@ -329,7 +329,7 @@ impl BorrowEdge {
             Self::Hyper(edges) => {
                 let new_edges = edges.iter().map(|e| e.instantiate(params)).collect();
                 Self::Hyper(new_edges)
-            },
+            }
             _ => self.clone(),
         }
     }
@@ -431,7 +431,7 @@ impl Bytecode {
             Bytecode::Branch(_, then_label, else_label, _) => vec![*then_label, *else_label],
             Bytecode::Jump(_, label) | Bytecode::Call(_, _, _, _, Some(AbortAction(label, _))) => {
                 vec![*label]
-            },
+            }
             _ => vec![],
         }
     }
@@ -551,12 +551,12 @@ impl Bytecode {
             Ret(attr, rets) => Ret(attr, map(true, f, rets)),
             Branch(attr, if_label, else_label, cond) => {
                 Branch(attr, if_label, else_label, f(true, cond))
-            },
+            }
             Abort(attr, cond) => Abort(attr, f(true, cond)),
             Prop(attr, kind, exp) => {
                 let new_exp = Bytecode::remap_exp(func_target, &mut |idx| f(true, idx), exp);
                 Prop(attr, kind, new_exp)
-            },
+            }
             _ => self,
         }
     }
@@ -583,47 +583,47 @@ impl Bytecode {
                     // function
                     Function(mid, fid, tys) => {
                         Function(*mid, *fid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     OpaqueCallBegin(mid, fid, tys) => {
                         OpaqueCallBegin(*mid, *fid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     OpaqueCallEnd(mid, fid, tys) => {
                         OpaqueCallEnd(*mid, *fid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     // struct
                     Pack(mid, sid, tys) => Pack(*mid, *sid, Type::instantiate_slice(tys, params)),
                     Unpack(mid, sid, tys) => {
                         Unpack(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     BorrowField(mid, sid, tys, field_num) => {
                         BorrowField(*mid, *sid, Type::instantiate_slice(tys, params), *field_num)
-                    },
+                    }
                     GetField(mid, sid, tys, field_num) => {
                         GetField(*mid, *sid, Type::instantiate_slice(tys, params), *field_num)
-                    },
+                    }
                     // storage
                     MoveTo(mid, sid, tys) => {
                         MoveTo(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     MoveFrom(mid, sid, tys) => {
                         MoveFrom(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     Exists(mid, sid, tys) => {
                         Exists(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     BorrowGlobal(mid, sid, tys) => {
                         BorrowGlobal(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     GetGlobal(mid, sid, tys) => {
                         GetGlobal(*mid, *sid, Type::instantiate_slice(tys, params))
-                    },
+                    }
                     // memory model
                     IsParent(node, edge) => {
                         IsParent(node.instantiate(params), edge.instantiate(params))
-                    },
+                    }
                     WriteBack(node, edge) => {
                         WriteBack(node.instantiate(params), edge.instantiate(params))
-                    },
+                    }
                     // others
                     _ => op.clone(),
                 };
@@ -634,13 +634,13 @@ impl Bytecode {
                     srcs.clone(),
                     on_abort.clone(),
                 )
-            },
+            }
             Self::SaveMem(attr_id, label, qid) => {
                 Self::SaveMem(*attr_id, *label, qid.instantiate_ref(params))
-            },
+            }
             Self::SaveSpecVar(attr_id, label, qid) => {
                 Self::SaveSpecVar(*attr_id, *label, qid.instantiate_ref(params))
-            },
+            }
             Self::Prop(attr_id, kind, exp) => Self::Prop(
                 *attr_id,
                 *kind,
@@ -683,23 +683,23 @@ impl Bytecode {
                     // value assignment
                     (vec![*dest], vec![])
                 }
-            },
+            }
             Load(_, dest, _) => {
                 // constants can only be values, hence no modifications on the reference
                 (vec![*dest], vec![])
-            },
+            }
             Call(_, _, Operation::WriteBack(LocalRoot(dest), ..), _, aa) => {
                 // write-back to a local variable distorts the value
                 (add_abort(vec![*dest], aa), vec![])
-            },
+            }
             Call(_, _, Operation::WriteBack(Reference(dest), ..), _, aa) => {
                 // write-back to a reference only distorts the value, but not the pointer itself
                 (add_abort(vec![], aa), vec![(*dest, false)])
-            },
+            }
             Call(_, _, Operation::WriteRef, srcs, aa) => {
                 // write-ref only distorts the value of the reference, but not the pointer itself
                 (add_abort(vec![], aa), vec![(srcs[0], false)])
-            },
+            }
             Call(_, dests, Function(..), srcs, aa) => {
                 let mut val_targets = vec![];
                 let mut mut_targets = vec![];
@@ -719,7 +719,7 @@ impl Bytecode {
                     }
                 }
                 (add_abort(val_targets, aa), mut_targets)
-            },
+            }
             // *** Double-check that this is in Wolfgang's code
             Call(_, dests, _, _, aa) => {
                 let mut val_targets = vec![];
@@ -734,7 +734,7 @@ impl Bytecode {
                     }
                 }
                 (add_abort(val_targets, aa), mut_targets)
-            },
+            }
             _ => (vec![], vec![]),
         }
     }
@@ -771,13 +771,13 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
         match &self.bytecode {
             Assign(_, dst, src, AssignKind::Copy) => {
                 write!(f, "{} := copy({})", self.lstr(*dst), self.lstr(*src))?
-            },
+            }
             Assign(_, dst, src, AssignKind::Move) => {
                 write!(f, "{} := move({})", self.lstr(*dst), self.lstr(*src))?
-            },
+            }
             Assign(_, dst, src, AssignKind::Store) => {
                 write!(f, "{} := {}", self.lstr(*dst), self.lstr(*src))?
-            },
+            }
             Call(_, dsts, oper, args, aa) => {
                 if !dsts.is_empty() {
                     self.fmt_locals(f, dsts, false)?;
@@ -793,14 +793,14 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                         self.lstr(*code)
                     )?;
                 }
-            },
+            }
             Ret(_, srcs) => {
                 write!(f, "return ")?;
                 self.fmt_locals(f, srcs, false)?;
-            },
+            }
             Load(_, dst, cons) => {
                 write!(f, "{} := {}", self.lstr(*dst), cons)?;
-            },
+            }
             Branch(_, then_label, else_label, src) => {
                 write!(
                     f,
@@ -809,23 +809,23 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                     self.label_str(*then_label),
                     self.label_str(*else_label),
                 )?;
-            },
+            }
             Jump(_, label) => {
                 write!(f, "goto {}", self.label_str(*label))?;
-            },
+            }
             Label(_, label) => {
                 write!(f, "label L{}", label.as_usize())?;
-            },
+            }
             Abort(_, src) => {
                 write!(f, "abort({})", self.lstr(*src))?;
-            },
+            }
             Nop(_) => {
                 write!(f, "nop")?;
-            },
+            }
             SaveMem(_, label, qid) => {
                 let env = self.func_target.global_env();
                 write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
-            },
+            }
             SaveSpecVar(_, label, qid) => {
                 let env = self.func_target.global_env();
                 let module_env = env.get_module(qid.module_id);
@@ -837,7 +837,7 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                     module_env.get_name().display(env.symbol_pool()),
                     spec_var.name.display(env.symbol_pool())
                 )?;
-            },
+            }
             Prop(_, kind, exp) => {
                 let exp_display = exp.display(self.func_target.func_env.module_env.env);
                 match kind {
@@ -845,7 +845,7 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                     PropKind::Assert => write!(f, "assert {}", exp_display)?,
                     PropKind::Modifies => write!(f, "modifies {}", exp_display)?,
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -917,11 +917,15 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     .global_env()
                     .get_module(*mid)
                     .into_function(*fid);
-                write!(f, "{}", match self.oper {
-                    OpaqueCallBegin(_, _, _) => "opaque begin: ",
-                    OpaqueCallEnd(_, _, _) => "opaque end: ",
-                    _ => "",
-                })?;
+                write!(
+                    f,
+                    "{}",
+                    match self.oper {
+                        OpaqueCallBegin(_, _, _) => "opaque begin: ",
+                        OpaqueCallEnd(_, _, _) => "opaque end: ",
+                        _ => "",
+                    }
+                )?;
                 write!(
                     f,
                     "{}::{}",
@@ -932,20 +936,20 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     func_env.get_name().display(func_env.symbol_pool()),
                 )?;
                 self.fmt_type_args(f, targs)?;
-            },
+            }
 
             // Pack/Unpack
             Pack(mid, sid, targs) => {
                 write!(f, "pack {}", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
             Unpack(mid, sid, targs) => {
                 write!(f, "unpack {}", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
 
             // Borrow
             BorrowLoc => {
                 write!(f, "borrow_local")?;
-            },
+            }
             BorrowField(mid, sid, targs, offset) => {
                 write!(f, "borrow_field<{}>", self.struct_str(*mid, *sid, targs))?;
                 let struct_env = self
@@ -959,10 +963,10 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     ".{}",
                     field_env.get_name().display(struct_env.symbol_pool())
                 )?;
-            },
+            }
             BorrowGlobal(mid, sid, targs) => {
                 write!(f, "borrow_global<{}>", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
             GetField(mid, sid, targs, offset) => {
                 write!(f, "get_field<{}>", self.struct_str(*mid, *sid, targs))?;
                 let struct_env = self
@@ -976,52 +980,52 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     ".{}",
                     field_env.get_name().display(struct_env.symbol_pool())
                 )?;
-            },
+            }
             GetGlobal(mid, sid, targs) => {
                 write!(f, "get_global<{}>", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
 
             // Resources
             MoveTo(mid, sid, targs) => {
                 write!(f, "move_to<{}>", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
             MoveFrom(mid, sid, targs) => {
                 write!(f, "move_from<{}>", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
             Exists(mid, sid, targs) => {
                 write!(f, "exists<{}>", self.struct_str(*mid, *sid, targs))?;
-            },
+            }
 
             // Builtins
             Uninit => {
                 write!(f, "uninit")?;
-            },
+            }
             Destroy => {
                 write!(f, "destroy")?;
-            },
+            }
             ReadRef => {
                 write!(f, "read_ref")?;
-            },
+            }
             WriteRef => {
                 write!(f, "write_ref")?;
-            },
+            }
             FreezeRef => {
                 write!(f, "freeze_ref")?;
-            },
+            }
 
             // Memory model
             UnpackRef => {
                 write!(f, "unpack_ref")?;
-            },
+            }
             PackRef => {
                 write!(f, "pack_ref")?;
-            },
+            }
             PackRefDeep => {
                 write!(f, "pack_ref_deep")?;
-            },
+            }
             UnpackRefDeep => {
                 write!(f, "unpack_ref_deep")?;
-            },
+            }
             WriteBack(node, edge) => write!(
                 f,
                 "write_back[{}{}]",
@@ -1036,15 +1040,19 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             )?,
 
             Havoc(kind) => {
-                write!(f, "havoc[{}]", match kind {
-                    HavocKind::Value => "val",
-                    HavocKind::MutationValue => "mut",
-                    HavocKind::MutationAll => "mut_all",
-                })?;
-            },
+                write!(
+                    f,
+                    "havoc[{}]",
+                    match kind {
+                        HavocKind::Value => "val",
+                        HavocKind::MutationValue => "mut",
+                        HavocKind::MutationAll => "mut_all",
+                    }
+                )?;
+            }
             Stop => {
                 write!(f, "stop")?;
-            },
+            }
             // Unary
             CastU8 => write!(f, "(u8)")?,
             CastU16 => write!(f, "(u16)")?,
@@ -1082,7 +1090,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     "trace_local[{}]",
                     name.display(self.func_target.symbol_pool())
                 )?
-            },
+            }
             TraceAbort => write!(f, "trace_abort")?,
             TraceReturn(r) => write!(f, "trace_return[{}]", r)?,
             TraceExp(kind, node_id) => {
@@ -1093,7 +1101,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     kind,
                     loc.display(self.func_target.global_env())
                 )?
-            },
+            }
             EmitEvent => write!(f, "emit_event")?,
             EventStoreDiverge => write!(f, "event_store_diverge")?,
             TraceGlobalMem(_) => write!(f, "trace_global_mem")?,
@@ -1187,16 +1195,16 @@ impl<'env> fmt::Display for BorrowNodeDisplay<'env> {
                     type_param_names: None,
                 };
                 write!(f, "{}", ty.display(&tctx))?;
-            },
+            }
             LocalRoot(idx) => {
                 write!(f, "LocalRoot($t{})", idx)?;
-            },
+            }
             Reference(idx) => {
                 write!(f, "Reference($t{})", idx)?;
-            },
+            }
             ReturnPlaceholder(idx) => {
                 write!(f, "Return({})", idx)?;
-            },
+            }
         }
         Ok(())
     }
@@ -1230,7 +1238,7 @@ impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
                     field_env.get_name().display(self.env.symbol_pool()),
                     field_type.display(&tctx),
                 )
-            },
+            }
             Index(_) => write!(f, "[]"),
             Direct => write!(f, "@"),
             Hyper(es) => {
@@ -1241,7 +1249,7 @@ impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
                         .map(|e| format!("{}", e.display(self.env)))
                         .join("/")
                 )
-            },
+            }
         }
     }
 }

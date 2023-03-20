@@ -175,7 +175,7 @@ fn remap_labels_cmd(remapping: &BTreeMap<Label, Label>, sp!(_, cmd_): &mut Comma
         } => {
             *if_true = remapping[if_true];
             *if_false = remapping[if_false];
-        },
+        }
     }
 }
 
@@ -303,7 +303,7 @@ impl AstDebug for MoveValue {
                 w.write("vector[");
                 w.comma(vs, |w, v| v.ast_debug(w));
                 w.write("]");
-            },
+            }
             V::Struct(_) => panic!("ICE struct constants not supported"),
             V::Signer(_) => panic!("ICE signer constants not supported"),
         }

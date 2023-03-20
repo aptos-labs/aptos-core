@@ -102,16 +102,16 @@ impl<'r, 'l, S: MoveResolver> TransactionDataCache<'r, 'l, S> {
                             .simple_serialize(&layout)
                             .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
                         resources.insert(struct_tag, Op::New(resource_blob));
-                    },
+                    }
                     Op::Modify(val) => {
                         let resource_blob = val
                             .simple_serialize(&layout)
                             .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
                         resources.insert(struct_tag, Op::Modify(resource_blob));
-                    },
+                    }
                     Op::Delete => {
                         resources.insert(struct_tag, Op::Delete);
-                    },
+                    }
                 }
             }
             if !modules.is_empty() || !resources.is_empty() {
@@ -182,7 +182,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                 // non-struct top-level value; can't happen
                 {
                     return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
-                },
+                }
             };
             // TODO(Gas): Shall we charge for this?
             let ty_layout = self.loader.type_to_type_layout(ty)?;
@@ -199,22 +199,22 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                                 StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
                             )
                             .with_message(msg));
-                        },
+                        }
                     };
 
                     GlobalValue::cached(val)?
-                },
+                }
                 Ok(None) => {
                     load_res = Some(None);
                     GlobalValue::none()
-                },
+                }
                 Err(err) => {
                     let msg = format!("Unexpected storage error: {:?}", err);
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(msg),
                     );
-                },
+                }
             };
 
             account_cache.data_map.insert(ty.clone(), (ty_layout, gv));
@@ -248,7 +248,7 @@ impl<'r, 'l, S: MoveResolver> DataStore for TransactionDataCache<'r, 'l, S> {
                         .with_message(msg)
                         .finish(Location::Undefined),
                 )
-            },
+            }
         }
     }
 

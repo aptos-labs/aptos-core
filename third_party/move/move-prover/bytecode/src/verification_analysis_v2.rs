@@ -599,14 +599,14 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessorV2 {
                     (is_in_target_mod && fun_env.is_exposed())
                         || is_in_deps_and_modifies_inv
                         || is_in_friends
-                },
+                }
                 VerificationScope::All => is_normally_verified,
                 VerificationScope::Only(function_name) => {
                     fun_env.matches_name(function_name) && is_in_target_mod
-                },
+                }
                 VerificationScope::OnlyModule(module_name) => {
                     is_in_target_mod && fun_env.module_env.matches_name(module_name)
-                },
+                }
                 VerificationScope::None => false,
             };
             if is_verified {
@@ -652,8 +652,8 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessorV2 {
                         ),
                     )
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         let target_modules = global_env.get_target_modules();

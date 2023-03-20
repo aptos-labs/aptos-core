@@ -71,7 +71,7 @@ pub(crate) fn process_intrinsic_declaration(
         SpecBlockContext::Struct(qsym) => qsym.clone(),
         _ => {
             return;
-        },
+        }
     };
 
     // search for intrinsic declarations
@@ -81,7 +81,7 @@ pub(crate) fn process_intrinsic_declaration(
         None => {
             // this is not an intrinsic declaration
             return;
-        },
+        }
         Some(val) => {
             match val {
                 PropertyValue::Symbol(sym) => symbol_pool.string(*sym),
@@ -90,13 +90,13 @@ pub(crate) fn process_intrinsic_declaration(
                         .parent
                         .error(loc, "expect a boolean value or a valid intrinsic type");
                     return;
-                },
+                }
                 _ => {
                     // this is the true/false pragma
                     return;
-                },
+                }
             }
-        },
+        }
     };
 
     // obtain the associated functions map
@@ -107,7 +107,7 @@ pub(crate) fn process_intrinsic_declaration(
                 .parent
                 .error(loc, &format!("unknown intrinsic type: {}", target.as_str()));
             return;
-        },
+        }
     };
 
     // prepare the decl
@@ -145,14 +145,14 @@ fn populate_intrinsic_decl(
         let target_sym = match props.remove(&key_sym) {
             None => {
                 continue;
-            },
+            }
             Some(PropertyValue::Value(_)) => {
                 builder.parent.error(
                     loc,
                     &format!("invalid intrinsic function mapping: {}", name),
                 );
                 continue;
-            },
+            }
             Some(PropertyValue::Symbol(val_sym)) => val_sym,
             Some(PropertyValue::QualifiedSymbol(qual_sym)) => {
                 if qual_sym.module_name != builder.module_name {
@@ -167,7 +167,7 @@ fn populate_intrinsic_decl(
                     continue;
                 }
                 qual_sym.symbol
-            },
+            }
         };
         let qualified_sym = QualifiedSymbol {
             module_name: builder.module_name.clone(),
@@ -186,7 +186,7 @@ fn populate_intrinsic_decl(
                         ),
                     );
                     continue;
-                },
+                }
                 Some(entry) => {
                     // TODO: in theory, we should also do some type checking on the function
                     // signature. This is implicitly done by Boogie right now, but we may want to
@@ -203,7 +203,7 @@ fn populate_intrinsic_decl(
                         );
                         continue;
                     }
-                },
+                }
             }
         } else {
             match builder.parent.spec_fun_table.get(&qualified_sym) {
@@ -216,7 +216,7 @@ fn populate_intrinsic_decl(
                         ),
                     );
                     continue;
-                },
+                }
                 Some(entries) => {
                     if entries.len() != 1 {
                         builder.parent.error(
@@ -247,7 +247,7 @@ fn populate_intrinsic_decl(
                             continue;
                         }
                     }
-                },
+                }
             }
         }
     }

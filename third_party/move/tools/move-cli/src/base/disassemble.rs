@@ -68,7 +68,7 @@ impl Disassemble {
                 } else {
                     println!("{}", Disassembler::from_unit(&unit.unit).disassemble()?);
                 }
-            },
+            }
         }
         Ok(())
     }

@@ -134,7 +134,7 @@ impl<'a> ModuleGenerator<'a> {
                     QualifiedStructIdent::new(module_name, struct_name)
                 };
                 Type::Struct(struct_ident, ty_instants)
-            },
+            }
             6 => Type::U16,
             7 => Type::U32,
             8 => Type::U256,
@@ -142,7 +142,7 @@ impl<'a> ModuleGenerator<'a> {
                 let index = self.index(ty_param_context.len());
                 let ty_var = ty_param_context[index].value.clone();
                 Type::TypeParameter(ty_var)
-            },
+            }
         }
     }
 

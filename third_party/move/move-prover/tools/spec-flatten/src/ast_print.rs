@@ -84,19 +84,19 @@ impl SpecPrinter<'_> {
                 } else {
                     Self::mk_inst(base, tys, |t| self.print_type(t, ty_params))
                 }
-            },
+            }
             Type::TypeParameter(idx) => self.print_sym(ty_params.get(*idx as usize).unwrap().0),
             Type::Reference(false, ty) => {
                 Self::concat([Self::doc("&"), self.print_type(ty, ty_params)])
-            },
+            }
             Type::Reference(true, ty) => {
                 Self::concat([Self::doc("&mut"), self.print_type(ty, ty_params)])
-            },
+            }
             Type::Fun(arg_tys, ret_ty) => {
                 let doc_args = Self::mk_tuple(arg_tys, |t| self.print_type(t, ty_params));
                 let doc_retn = self.print_type(ret_ty, ty_params);
                 Self::sep_colon_space([doc_args, doc_retn])
-            },
+            }
             Type::TypeDomain(ty) => self.print_type(ty, ty_params),
             Type::ResourceDomain(mid, sid, tys_opt) => {
                 let struct_env = self.env.get_struct(mid.qualified(*sid));
@@ -109,7 +109,7 @@ impl SpecPrinter<'_> {
                     None => base,
                     Some(tys) => Self::mk_inst(base, tys, |t| self.print_type(t, ty_params)),
                 }
-            },
+            }
             // these types can't be declared in move/spec language
             Type::Primitive(PrimitiveType::Range) => Self::doc("<range>"),
             Type::Primitive(PrimitiveType::EventStore) => Self::doc("<event-store>"),
@@ -140,7 +140,7 @@ impl SpecPrinter<'_> {
                     None => Self::doc(format!("$t{}", idx)),
                     Some(param) => self.print_sym(param.0),
                 }
-            },
+            }
             ExpData::Invoke(_, lambda, args) => Self::sep_space([
                 Self::wrap("(", self.print_exp(lambda, ty_params), ")"),
                 Self::mk_tuple(args, |e| self.print_exp(e, ty_params)),
@@ -155,7 +155,7 @@ impl SpecPrinter<'_> {
                 });
                 let doc_body = self.print_exp(body, ty_params);
                 Self::sep_space([doc_head, doc_args, doc_body])
-            },
+            }
             ExpData::Quant(_, kind, vars, _triggers, cond_opt, body) => {
                 let doc_head = match kind {
                     QuantKind::Exists => Self::doc("exists"),
@@ -163,7 +163,7 @@ impl SpecPrinter<'_> {
                     QuantKind::Choose => Self::doc("choose"),
                     QuantKind::ChooseMin => {
                         Self::sep_space([Self::doc("choose"), Self::doc("min")])
-                    },
+                    }
                 };
                 let doc_vars = Self::sep_comma_space(vars.iter().map(|(v, e)| {
                     Self::sep_colon_space([self.print_sym(v.name), self.print_exp(e, ty_params)])
@@ -173,11 +173,11 @@ impl SpecPrinter<'_> {
                     None => Doc::nil(),
                     Some(cond) => {
                         Self::sep_space([Self::doc("where"), self.print_exp(cond, ty_params)])
-                    },
+                    }
                 };
                 let doc_body = self.print_exp(body, ty_params);
                 Self::sep_space([doc_head, doc_vars, doc_cond, doc_body])
-            },
+            }
             ExpData::Block(_, vars, body) => Self::sep_semicolon_line(
                 vars.iter()
                     .map(|v| {
@@ -245,7 +245,7 @@ impl SpecPrinter<'_> {
                             self.sym_str(callee_decl.name),
                         );
                         print_call_fun(&callee_name)
-                    },
+                    }
                     // primitive operations
                     Pack(mid, sid) => {
                         let struct_env = self.env.get_struct(mid.qualified(*sid));
@@ -263,7 +263,7 @@ impl SpecPrinter<'_> {
                             }),
                         );
                         Self::sep_space([doc_head, Self::doc("{"), doc_body, Self::doc("}")])
-                    },
+                    }
                     Tuple => Self::mk_tuple(args, |e| self.print_exp(e, ty_params)),
                     Select(mid, sid, fid) => {
                         let struct_env = self.env.get_struct(mid.qualified(*sid));
@@ -272,7 +272,7 @@ impl SpecPrinter<'_> {
                             self.print_exp(&args[0], ty_params),
                             self.print_sym(field_env.get_name()),
                         ])
-                    },
+                    }
                     Result(idx) => Self::sep_dot([Self::doc("result"), Self::doc(*idx)]),
                     Index => Self::concat([
                         self.print_exp(&args[0], ty_params),
@@ -345,7 +345,7 @@ impl SpecPrinter<'_> {
                     // unexpected
                     TypeValue => unreachable!("TypeValue is not currently supported"),
                 }
-            },
+            }
         }
     }
 
@@ -366,7 +366,7 @@ impl SpecPrinter<'_> {
                 SpecBlockTarget::Function(mid, fid) => {
                     let fun_env = self.env.get_function(mid.qualified(*fid));
                     fun_env.get_type_parameters()
-                },
+                }
                 _ => unreachable!(
                     "Condition kind `{}` is not allowed in the function spec context",
                     cond.kind
@@ -379,7 +379,7 @@ impl SpecPrinter<'_> {
                 SpecBlockTarget::FunctionCode(mid, fid, _) => {
                     let fun_env = self.env.get_function(mid.qualified(*fid));
                     fun_env.get_type_parameters()
-                },
+                }
                 _ => unreachable!(
                     "Condition kind `{}` is not allowed in the inlined spec context",
                     cond.kind
@@ -389,7 +389,7 @@ impl SpecPrinter<'_> {
                 SpecBlockTarget::Struct(mid, sid) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     struct_env.get_type_parameters()
-                },
+                }
                 _ => unreachable!(
                     "Condition kind `{}` is not allowed in the inlined spec context",
                     cond.kind
@@ -402,11 +402,11 @@ impl SpecPrinter<'_> {
                 syms.iter()
                     .map(|s| TypeParameter(*s, AbilityConstraint(AbilitySet::EMPTY)))
                     .collect()
-            },
+            }
             // not expected
             ConditionKind::SchemaInvariant => {
                 unreachable!("The `invariant` conditions in schema should have been flattened");
-            },
+            }
         };
 
         // produce the expression
@@ -418,7 +418,7 @@ impl SpecPrinter<'_> {
                     self.print_exp(&cond.exp, &ty_params),
                 );
                 Self::sep_space([Self::doc("let"), bind_doc])
-            },
+            }
             ConditionKind::LetPost(sym) => {
                 let bind_doc = Self::mk_binary_op(
                     self.print_sym(*sym),
@@ -426,16 +426,16 @@ impl SpecPrinter<'_> {
                     self.print_exp(&cond.exp, &ty_params),
                 );
                 Self::sep_space([Self::doc("let"), Self::doc("post"), bind_doc])
-            },
+            }
             ConditionKind::Assert => {
                 Self::sep_space([Self::doc("assert"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::Assume => {
                 Self::sep_space([Self::doc("assume"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::Requires => {
                 Self::sep_space([Self::doc("requires"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::AbortsIf => {
                 let base_doc = Self::sep_space([
                     Self::doc("aborts_if"),
@@ -450,20 +450,20 @@ impl SpecPrinter<'_> {
                         self.print_exp(&cond.additional_exps[0], &ty_params),
                     ])
                 }
-            },
+            }
             ConditionKind::AbortsWith => Self::sep_space([
                 Self::doc("aborts_with"),
                 self.print_exp(&cond.exp, &ty_params),
             ]),
             ConditionKind::Ensures => {
                 Self::sep_space([Self::doc("ensures"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::Modifies => {
                 Self::sep_space([Self::doc("modifies"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::Emits => {
                 Self::sep_space([Self::doc("emits"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::StructInvariant
             | ConditionKind::FunctionInvariant
             | ConditionKind::LoopInvariant => Self::sep_space([
@@ -478,7 +478,7 @@ impl SpecPrinter<'_> {
                     Self::mk_inst(base_doc, syms, |s| self.print_sym(*s))
                 };
                 Self::sep_space([head_doc, self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::GlobalInvariantUpdate(syms) => {
                 let base_doc = Self::doc("invariant");
                 let head_doc = if syms.is_empty() {
@@ -491,7 +491,7 @@ impl SpecPrinter<'_> {
                     Self::doc("update"),
                     self.print_exp(&cond.exp, &ty_params),
                 ])
-            },
+            }
             ConditionKind::Axiom(syms) => {
                 let base_doc = Self::doc("axiom");
                 let head_doc = if syms.is_empty() {
@@ -500,10 +500,10 @@ impl SpecPrinter<'_> {
                     Self::mk_inst(base_doc, syms, |s| self.print_sym(*s))
                 };
                 Self::sep_space([head_doc, self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             ConditionKind::Update => {
                 Self::sep_space([Self::doc("update"), self.print_exp(&cond.exp, &ty_params)])
-            },
+            }
             // not really supported
             ConditionKind::Decreases => Self::sep_space([
                 Self::doc("decreases"),
@@ -516,7 +516,7 @@ impl SpecPrinter<'_> {
             // should not see any more
             ConditionKind::SchemaInvariant => {
                 unreachable!("The `invariant` conditions in schema should have been flattened");
-            },
+            }
         };
         Self::mk_stmt(doc_stmt)
     }

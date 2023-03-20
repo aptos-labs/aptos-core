@@ -310,7 +310,7 @@ impl<'env> ModelBuilder<'env> {
             EA::Address::NamedUnassigned(name) => {
                 self.error(loc, &format!("Undeclared address `{}`", name));
                 NumericalAddress::DEFAULT_ERROR_ADDRESS
-            },
+            }
         }
     }
 

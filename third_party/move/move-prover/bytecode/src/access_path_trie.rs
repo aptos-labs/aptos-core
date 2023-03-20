@@ -65,7 +65,7 @@ impl<T: FootprintDomain> TrieNode<T> {
             (None, Some(d)) => {
                 *data = Some(d.clone());
                 JoinResult::Changed
-            },
+            }
             (_, None) => JoinResult::Unchanged,
         }
     }
@@ -237,14 +237,14 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
                     let mut new_data = data1.clone();
                     new_data.join(data2);
                     self.update_access_path_weak(ap.clone(), Some(new_data));
-                },
+                }
                 (None, Some(data)) | (Some(data), None) => {
                     let mut new_data = data.clone();
                     if let Some(footprint) = T::make_footprint(ap.clone()) {
                         new_data.join(&footprint);
                     }
                     self.update_access_path_weak(ap.clone(), Some(new_data));
-                },
+                }
                 (None, None) => (),
             }
         })

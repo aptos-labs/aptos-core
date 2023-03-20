@@ -152,10 +152,10 @@ impl<'env> FunctionDataBuilder<'env> {
                 if !no_fallthrough_jump_removal && label1 == label2 =>
             {
                 *self.data.code.last_mut().unwrap() = bc;
-            },
+            }
             _ => {
                 self.data.code.push(bc);
-            },
+            }
         }
     }
 

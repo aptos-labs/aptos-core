@@ -55,7 +55,7 @@ fn remap_labels(blocks: &mut IR::BytecodeBlocks, map: &HashMap<IR::BlockLabel_, 
             match &mut instr.value {
                 B::Branch(lbl) | B::BrTrue(lbl) | B::BrFalse(lbl) => {
                     *lbl = map[lbl].clone();
-                },
+                }
                 _ => (),
             }
         }

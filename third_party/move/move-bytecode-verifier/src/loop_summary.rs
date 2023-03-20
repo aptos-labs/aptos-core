@@ -106,7 +106,7 @@ impl LoopSummary {
                 } => {
                     descs[usize::from(parent)] += 1 + descs[usize::from(node_id)];
                     *exploration.get_mut(&block).unwrap() = Done(node_id);
-                },
+                }
 
                 Visit {
                     from_node,
@@ -140,7 +140,7 @@ impl LoopSummary {
                             from_node: to_node,
                             to_block: *succ,
                         }));
-                    },
+                    }
                 },
             }
         }

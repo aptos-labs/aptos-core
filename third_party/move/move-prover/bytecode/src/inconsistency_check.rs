@@ -59,7 +59,7 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
             | FunctionVariant::Verification(VerificationFlavor::Inconsistency(..)) => {
                 // instrumentation only applies to non-inconsistency verification variants
                 return data;
-            },
+            }
             FunctionVariant::Verification(flavor) => flavor.clone(),
         };
 

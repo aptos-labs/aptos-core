@@ -190,12 +190,12 @@ impl<'env> Abigen<'env> {
                 ty::Type::Primitive(ty::PrimitiveType::Signer) => false,
                 ty::Type::Reference(false, inner) => {
                     !matches!(&**inner, ty::Type::Primitive(ty::PrimitiveType::Signer))
-                },
+                }
                 ty::Type::Struct(module_id, struct_id, _) => {
                     let struct_module_env = module_env.env.get_module(*module_id);
                     let abilities = struct_module_env.get_struct(*struct_id).get_abilities();
                     abilities.has_ability(Ability::Copy) && !abilities.has_ability(Ability::Key)
-                },
+                }
                 _ => true,
             })
             .map(|param| {
@@ -235,7 +235,7 @@ impl<'env> Abigen<'env> {
                         .to_string_lossy()
                         .to_string();
                 Ok(map.get(&path).unwrap().clone())
-            },
+            }
             None => {
                 let mut path = PathBuf::from(&self.options.compiled_script_directory);
                 path.push(
@@ -251,7 +251,7 @@ impl<'env> Abigen<'env> {
                 let mut bytes = Vec::new();
                 f.read_to_end(&mut bytes)?;
                 Ok(bytes)
-            },
+            }
         }
     }
 
@@ -275,16 +275,16 @@ impl<'env> Abigen<'env> {
                     Signer => TypeTag::Signer,
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
-                    },
+                    }
                 }
-            },
+            }
             Vector(ty) => {
                 let tag = match Self::get_type_tag(ty, module_env)? {
                     Some(tag) => tag,
                     None => return Ok(None),
                 };
                 TypeTag::Vector(Box::new(tag))
-            },
+            }
             Struct(module_id, struct_id, vec_type) => {
                 let struct_module_env = module_env.env.get_module(*module_id);
                 let abilities = struct_module_env.get_struct(*struct_id).get_abilities();
@@ -311,7 +311,7 @@ impl<'env> Abigen<'env> {
                 } else {
                     return Ok(None);
                 }
-            },
+            }
             Tuple(_)
             | TypeParameter(_)
             | Fun(_, _)

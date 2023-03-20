@@ -193,22 +193,22 @@ impl std::fmt::Display for ConditionKind {
             GlobalInvariant(ty_params) => {
                 write!(f, "invariant")?;
                 display_ty_params(f, ty_params)
-            },
+            }
             GlobalInvariantUpdate(ty_params) => {
                 write!(f, "invariant")?;
                 display_ty_params(f, ty_params)?;
                 write!(f, " update")
-            },
+            }
             SchemaInvariant => {
                 write!(f, "invariant")
-            },
+            }
             Axiom(ty_params) => {
                 write!(f, "axiom")?;
                 display_ty_params(f, ty_params)
-            },
+            }
             Update => {
                 write!(f, "update")
-            },
+            }
         }
     }
 }
@@ -510,7 +510,7 @@ impl ExpData {
             let decls = match e {
                 Lambda(_, decls, _) | Block(_, decls, _) => {
                     decls.iter().map(|d| d.name).collect_vec()
-                },
+                }
                 Quant(_, _, decls, ..) => decls.iter().map(|(d, _)| d.name).collect_vec(),
                 _ => vec![],
             };
@@ -566,7 +566,7 @@ impl ExpData {
                     let inst = &env.get_node_instantiation(*id);
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
-                },
+                }
                 Call(id, Function(mid, fid, labels), _) => {
                     let inst = &env.get_node_instantiation(*id);
                     let module = env.get_module(*mid);
@@ -577,8 +577,8 @@ impl ExpData {
                             labels.as_ref().map(|l| l[i]),
                         ));
                     }
-                },
-                _ => {},
+                }
+                _ => {}
             }
         };
         self.visit(&mut visitor);
@@ -641,13 +641,13 @@ impl ExpData {
                 for exp in args {
                     exp.visit_pre_post(visitor);
                 }
-            },
+            }
             Invoke(_, target, args) => {
                 target.visit_pre_post(visitor);
                 for exp in args {
                     exp.visit_pre_post(visitor);
                 }
-            },
+            }
             Lambda(_, _, body) => body.visit_pre_post(visitor),
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (decl, range) in ranges {
@@ -665,7 +665,7 @@ impl ExpData {
                     exp.visit_pre_post(visitor);
                 }
                 body.visit_pre_post(visitor);
-            },
+            }
             Block(_, decls, body) => {
                 for decl in decls {
                     if let Some(def) = &decl.binding {
@@ -673,14 +673,14 @@ impl ExpData {
                     }
                 }
                 body.visit_pre_post(visitor)
-            },
+            }
             IfElse(_, c, t, e) => {
                 c.visit_pre_post(visitor);
                 t.visit_pre_post(visitor);
                 e.visit_pre_post(visitor);
-            },
+            }
             // Explicitly list all enum variants
-            Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
+            Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {}
         }
         visitor(true, self);
     }
@@ -761,8 +761,8 @@ impl ExpData {
                 match oper {
                     Function(mid, ..) | Pack(mid, ..) | Select(mid, ..) | UpdateField(mid, ..) => {
                         usage.insert(*mid);
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         });
@@ -802,8 +802,8 @@ impl ExpData {
                 match oper {
                     Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid) => {
                         usage.insert(mid.qualified(*sid));
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         });
@@ -817,8 +817,8 @@ impl ExpData {
                 match oper {
                     Select(mid, sid, fid) | UpdateField(mid, sid, fid) => {
                         usage.insert((mid.qualified(*sid), *fid));
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         });
@@ -833,8 +833,8 @@ impl ExpData {
                     Index | Slice | ConcatVec | EmptyVec | SingleVec | UpdateVec | IndexOfVec
                     | ContainsVec | InRangeVec | RangeVec => {
                         usage.insert(oper.clone());
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         });
@@ -1046,7 +1046,7 @@ impl ExpData {
                     if env.get_node_type(*id).is_mutable_reference() {
                         is_pure = false;
                     }
-                },
+                }
                 Call(_, oper, _) => match oper {
                     Exists(..) | Global(..) => is_pure = false,
                     Function(mid, fid, _) => {
@@ -1055,10 +1055,10 @@ impl ExpData {
                         if !fun.used_memory.is_empty() {
                             is_pure = false;
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 },
-                _ => {},
+                _ => {}
             }
         };
         self.visit(&mut visitor);
@@ -1245,10 +1245,10 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     oper.display(self.env, *node_id),
                     self.fmt_exps(args)
                 )
-            },
+            }
             Lambda(_, decls, body) => {
                 write!(f, "|{}| {}", self.fmt_decls(decls), body.display(self.env))
-            },
+            }
             Block(_, decls, body) => {
                 write!(
                     f,
@@ -1256,7 +1256,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_decls(decls),
                     body.display(self.env)
                 )
-            },
+            }
             Quant(_, kind, decls, triggers, opt_where, body) => {
                 let triggers_str = triggers
                     .iter()
@@ -1277,10 +1277,10 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     where_str,
                     body.display(self.env)
                 )
-            },
+            }
             Invoke(_, fun, args) => {
                 write!(f, "({})({})", fun.display(self.env), self.fmt_exps(args))
-            },
+            }
             IfElse(_, cond, if_exp, else_exp) => {
                 write!(
                     f,
@@ -1289,7 +1289,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     if_exp.display(self.env),
                     else_exp.display(self.env)
                 )
-            },
+            }
         }
     }
 }
@@ -1361,28 +1361,28 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     )?;
                 }
                 Ok(())
-            },
+            }
             Global(label_opt) => {
                 write!(f, "global")?;
                 if let Some(label) = label_opt {
                     write!(f, "[{}]", label)?
                 }
                 Ok(())
-            },
+            }
             Exists(label_opt) => {
                 write!(f, "exists")?;
                 if let Some(label) = label_opt {
                     write!(f, "[{}]", label)?
                 }
                 Ok(())
-            },
+            }
             Pack(mid, sid) => write!(f, "pack {}", self.struct_str(mid, sid)),
             Select(mid, sid, fid) => {
                 write!(f, "select {}", self.field_str(mid, sid, fid))
-            },
+            }
             UpdateField(mid, sid, fid) => {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
-            },
+            }
             Result(t) => write!(f, "result{}", t),
             _ => write!(f, "{:?}", self.oper),
         }?;
@@ -1469,7 +1469,7 @@ impl<'a> fmt::Display for EnvDisplay<'a, Condition> {
                     write!(f, "if {}", exps[2].display(self.env))?;
                 }
                 write!(f, ";")?
-            },
+            }
             ConditionKind::Update => write!(
                 f,
                 "update {} = {};",

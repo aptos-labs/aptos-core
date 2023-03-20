@@ -39,7 +39,7 @@ impl<'a> InstructionConsistency<'a> {
                         current_function: Some(FunctionDefinitionIndex(idx as TableIndex)),
                     };
                     checker.check_instructions(code)?
-                },
+                }
             }
         }
         Ok(())
@@ -64,81 +64,81 @@ impl<'a> InstructionConsistency<'a> {
             match instr {
                 MutBorrowField(field_handle_index) => {
                     self.check_field_op(offset, *field_handle_index, /* generic */ false)?;
-                },
+                }
                 MutBorrowFieldGeneric(field_inst_index) => {
                     let field_inst = self.resolver.field_instantiation_at(*field_inst_index)?;
                     self.check_field_op(offset, field_inst.handle, /* generic */ true)?;
-                },
+                }
                 ImmBorrowField(field_handle_index) => {
                     self.check_field_op(offset, *field_handle_index, /* generic */ false)?;
-                },
+                }
                 ImmBorrowFieldGeneric(field_inst_index) => {
                     let field_inst = self.resolver.field_instantiation_at(*field_inst_index)?;
                     self.check_field_op(offset, field_inst.handle, /* non_ */ true)?;
-                },
+                }
                 Call(idx) => {
                     self.check_function_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 CallGeneric(idx) => {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
                     self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
-                },
+                }
                 Pack(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 PackGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 Unpack(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 UnpackGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 MutBorrowGlobal(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 MutBorrowGlobalGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 ImmBorrowGlobal(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 ImmBorrowGlobalGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 Exists(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 ExistsGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 MoveFrom(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 MoveFromGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 MoveTo(idx) => {
                     self.check_type_op(offset, *idx, /* generic */ false)?;
-                },
+                }
                 MoveToGeneric(idx) => {
                     let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
                     self.check_type_op(offset, struct_inst.def, /* generic */ true)?;
-                },
+                }
                 VecPack(_, num) | VecUnpack(_, num) => {
                     if *num > u16::MAX as u64 {
                         return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
                             .at_code_offset(self.current_function(), offset as CodeOffset)
                             .with_message("VecPack/VecUnpack argument out of range".to_string()));
                     }
-                },
+                }
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.

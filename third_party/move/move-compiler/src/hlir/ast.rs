@@ -389,7 +389,7 @@ impl Command_ {
             Break | Continue => panic!("ICE break/continue not translated to jumps"),
             Assign(_, _) | Mutate(_, _) | IgnoreAndPop { .. } | Jump { .. } | JumpIf { .. } => {
                 false
-            },
+            }
             Abort(_) | Return { .. } => true,
         }
     }
@@ -413,17 +413,17 @@ impl Command_ {
             Break | Continue => panic!("ICE break/continue not translated to jumps"),
             Mutate(_, _) | Assign(_, _) | IgnoreAndPop { .. } => {
                 panic!("ICE Should not be last command in block")
-            },
+            }
             Abort(_) | Return { .. } => (),
             Jump { target, .. } => {
                 successors.insert(*target);
-            },
+            }
             JumpIf {
                 if_true, if_false, ..
             } => {
                 successors.insert(*if_true);
                 successors.insert(*if_false);
-            },
+            }
         }
         successors
     }
@@ -460,7 +460,7 @@ impl BaseType_ {
                         .filter(|ab| ty_arg_abilities.has_ability_(ab.value.requires())),
                 )
                 .unwrap()
-            },
+            }
             Fun => panic!("ICE unexpected function type"),
         };
         let n = sp(loc, TypeName_::Builtin(sp(loc, b_)));
@@ -471,7 +471,7 @@ impl BaseType_ {
         match self {
             BaseType_::Apply(abilities, _, _) | BaseType_::Param(TParam { abilities, .. }) => {
                 abilities.clone()
-            },
+            }
             BaseType_::Unreachable | BaseType_::UnresolvedError => AbilitySet::all(loc),
         }
     }
@@ -601,11 +601,11 @@ impl Type_ {
             Type_::Single(s) => {
                 assert!(idx == 0);
                 s
-            },
+            }
             Type_::Multiple(ss) => {
                 assert!(idx < ss.len());
                 ss.get(idx).unwrap()
-            },
+            }
         }
     }
 
@@ -882,7 +882,7 @@ impl AstDebug for BaseType_ {
                         })
                     },
                 );
-            },
+            }
             BaseType_::Unreachable => w.write("_|_"),
             BaseType_::UnresolvedError => w.write("_"),
         }
@@ -899,7 +899,7 @@ impl AstDebug for SingleType_ {
                     w.write("mut ");
                 }
                 s.ast_debug(w)
-            },
+            }
         }
     }
 }
@@ -913,7 +913,7 @@ impl AstDebug for Type_ {
                 w.write("(");
                 ss.ast_debug(w);
                 w.write(")")
-            },
+            }
         }
     }
 }
@@ -967,13 +967,13 @@ impl AstDebug for Statement_ {
                 w.block(|w| if_block.ast_debug(w));
                 w.write(" else ");
                 w.block(|w| else_block.ast_debug(w));
-            },
+            }
             S::While { cond, block } => {
                 w.write("while (");
                 cond.ast_debug(w);
                 w.write(")");
                 w.block(|w| block.ast_debug(w))
-            },
+            }
             S::Loop { block, has_break } => {
                 w.write("loop");
                 if *has_break {
@@ -981,7 +981,7 @@ impl AstDebug for Statement_ {
                 }
                 w.write(" ");
                 w.block(|w| block.ast_debug(w))
-            },
+            }
         }
     }
 }
@@ -994,25 +994,25 @@ impl AstDebug for Command_ {
                 lvalues.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
-            },
+            }
             C::Mutate(lhs, rhs) => {
                 w.write("*");
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
-            },
+            }
             C::Abort(e) => {
                 w.write("abort ");
                 e.ast_debug(w);
-            },
+            }
             C::Return { exp: e, from_user } if *from_user => {
                 w.write("return@");
                 e.ast_debug(w);
-            },
+            }
             C::Return { exp: e, .. } => {
                 w.write("return ");
                 e.ast_debug(w);
-            },
+            }
             C::Break => w.write("break"),
             C::Continue => w.write("continue"),
             C::IgnoreAndPop { pop_num, exp } => {
@@ -1020,7 +1020,7 @@ impl AstDebug for Command_ {
                 w.comma(0..*pop_num, |w, _| w.write("_"));
                 w.write(" = ");
                 exp.ast_debug(w);
-            },
+            }
             C::Jump { target, from_user } if *from_user => w.write(&format!("jump@{}", target.0)),
             C::Jump { target, .. } => w.write(&format!("jump {}", target.0)),
             C::JumpIf {
@@ -1031,7 +1031,7 @@ impl AstDebug for Command_ {
                 w.write("jump_if(");
                 cond.ast_debug(w);
                 w.write(&format!(") {} else {}", if_true.0, if_false.0));
-            },
+            }
         }
     }
 }
@@ -1056,7 +1056,7 @@ impl AstDebug for Value_ {
                 w.write("[");
                 w.comma(elems, |w, e| e.ast_debug(w));
                 w.write("]");
-            },
+            }
         }
     }
 }
@@ -1089,7 +1089,7 @@ impl AstDebug for UnannotatedExp_ {
                     MoveOpAnnotation::InferredNoCopy => "#no-copy ",
                 };
                 w.write(&format!("move{}{}", case, v))
-            },
+            }
             E::Copy {
                 from_user: false,
                 var: v,
@@ -1101,13 +1101,13 @@ impl AstDebug for UnannotatedExp_ {
             E::Constant(c) => w.write(&format!("{}", c)),
             E::ModuleCall(mcall) => {
                 mcall.ast_debug(w);
-            },
+            }
             E::Builtin(bf, rhs) => {
                 bf.ast_debug(w);
                 w.write("(");
                 rhs.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Vector(_loc, n, ty, elems) => {
                 w.write(&format!("vector#{}", n));
                 w.write("<");
@@ -1116,12 +1116,12 @@ impl AstDebug for UnannotatedExp_ {
                 w.write("[");
                 elems.ast_debug(w);
                 w.write("]");
-            },
+            }
             E::Freeze(e) => {
                 w.write("freeze(");
                 e.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Pack(s, tys, fields) => {
                 w.write(&format!("{}", s));
                 w.write("<");
@@ -1134,30 +1134,30 @@ impl AstDebug for UnannotatedExp_ {
                     e.ast_debug(w);
                 });
                 w.write("}");
-            },
+            }
 
             E::ExpList(es) => {
                 w.write("(");
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
-            },
+            }
 
             E::Dereference(e) => {
                 w.write("*");
                 e.ast_debug(w)
-            },
+            }
             E::UnaryExp(op, e) => {
                 op.ast_debug(w);
                 w.write(" ");
                 e.ast_debug(w);
-            },
+            }
             E::BinopExp(l, op, r) => {
                 l.ast_debug(w);
                 w.write(" ");
                 op.ast_debug(w);
                 w.write(" ");
                 r.ast_debug(w)
-            },
+            }
             E::Borrow(mut_, e, f) => {
                 w.write("&");
                 if *mut_ {
@@ -1165,21 +1165,21 @@ impl AstDebug for UnannotatedExp_ {
                 }
                 e.ast_debug(w);
                 w.write(&format!(".{}", f));
-            },
+            }
             E::BorrowLocal(mut_, v) => {
                 w.write("&");
                 if *mut_ {
                     w.write("mut ");
                 }
                 w.write(&format!("{}", v));
-            },
+            }
             E::Cast(e, bt) => {
                 w.write("(");
                 e.ast_debug(w);
                 w.write(" as ");
                 bt.ast_debug(w);
                 w.write(")");
-            },
+            }
             E::Spec(anchor) => {
                 let SpecAnchor {
                     id,
@@ -1206,7 +1206,7 @@ impl AstDebug for UnannotatedExp_ {
                     });
                     w.writeln("]");
                 }
-            },
+            }
             E::UnresolvedError => w.write("_|_"),
             E::Unreachable => w.write("unreachable"),
         }
@@ -1262,7 +1262,7 @@ impl AstDebug for ExpListItem {
             ExpListItem::Splat(_, e, ss) => {
                 w.write("~");
                 w.annotate(|w| e.ast_debug(w), ss)
-            },
+            }
         }
     }
 }
@@ -1289,7 +1289,7 @@ impl AstDebug for LValue_ {
                 w.write(&format!("({}: ", v));
                 st.ast_debug(w);
                 w.write(")");
-            },
+            }
             L::Unpack(s, tys, fields) => {
                 w.write(&format!("{}", s));
                 w.write("<");
@@ -1301,7 +1301,7 @@ impl AstDebug for LValue_ {
                     l.ast_debug(w)
                 });
                 w.write("}");
-            },
+            }
         }
     }
 }

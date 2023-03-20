@@ -289,7 +289,7 @@ impl<'a> Context<'a> {
                     "only one #[storage] struct allowed per contract module",
                 );
                 None
-            },
+            }
         };
         // Identify special functions.
         let constructor = self.identify_function(module, is_create_fun, "#[create]/#[init]");
@@ -342,7 +342,7 @@ impl<'a> Context<'a> {
                     &format!("only one {} function allowed per contract module", attr_str),
                 );
                 None
-            },
+            }
         }
     }
 
@@ -578,7 +578,7 @@ impl<'a> Context<'a> {
             Vector(et) => format!("vec{}", self.mangle_types(&[et.as_ref().to_owned()])),
             Struct(mid, sid, inst) => {
                 self.mangle_struct(&mid.qualified(*sid).instantiate(inst.clone()))
-            },
+            }
             TypeParameter(..) | Fun(..) | Tuple(..) | TypeDomain(..) | ResourceDomain(..)
             | Error | Var(..) | Reference(..) => format!("<<unsupported {:?}>>", ty),
         }
@@ -654,7 +654,7 @@ impl<'a> Context<'a> {
             Type::Struct(m, s, _) => {
                 let struct_id = m.qualified(*s);
                 self.is_u256(struct_id)
-            },
+            }
             _ => false,
         }
     }
@@ -666,7 +666,7 @@ impl<'a> Context<'a> {
                 let struct_env = self.env.get_struct(struct_id);
                 struct_env.get_full_name_with_address()
                     == format!("{}::Evm::Unit", EVM_MODULE_ADDRESS)
-            },
+            }
             _ => false,
         }
     }
@@ -775,7 +775,7 @@ impl<'a> Context<'a> {
                 Address | Signer => 32,
                 Num | Range | EventStore | U16 | U32 | U256 => {
                     panic!("unexpected field type")
-                },
+                }
             },
             Struct(..) | Vector(..) => 32,
             Tuple(_)
@@ -787,7 +787,7 @@ impl<'a> Context<'a> {
             | Error
             | Var(_) => {
                 panic!("unexpected field type")
-            },
+            }
         }
     }
 

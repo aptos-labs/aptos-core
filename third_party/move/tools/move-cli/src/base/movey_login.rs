@@ -30,10 +30,10 @@ impl MoveyLogin {
                         break;
                     }
                     println!("Invalid API Token. Try again!");
-                },
+                }
                 Err(err) => {
                     bail!("Error reading file: {}", err);
-                },
+                }
             }
         }
         Self::save_credential(line, MOVE_HOME.clone())?;

@@ -112,13 +112,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
-                    if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
+                    Some(if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    },
-                ),
+                    })
+                }
             }
         });
     let (_, mut path) = shortest_path.unwrap();
@@ -476,13 +476,13 @@ pub mod known_attributes {
                 TestingAttribute::TEST_ONLY => Self::Testing(TestingAttribute::TestOnly),
                 TestingAttribute::EXPECTED_FAILURE => {
                     Self::Testing(TestingAttribute::ExpectedFailure)
-                },
+                }
                 VerificationAttribute::VERIFY_ONLY => {
                     Self::Verification(VerificationAttribute::VerifyOnly)
-                },
+                }
                 NativeAttribute::BYTECODE_INSTRUCTION => {
                     Self::Native(NativeAttribute::BytecodeInstruction)
-                },
+                }
                 _ => return None,
             })
         }

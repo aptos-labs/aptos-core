@@ -379,22 +379,22 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     ),
                     BrTrue(_) => {
                         code_bytecode!(code_len, current_fdef, bytecode_idx, offset, BrTrue)
-                    },
+                    }
                     BrFalse(_) => {
                         code_bytecode!(code_len, current_fdef, bytecode_idx, offset, BrFalse)
-                    },
+                    }
                     Branch(_) => {
                         code_bytecode!(code_len, current_fdef, bytecode_idx, offset, Branch)
-                    },
+                    }
                     CopyLoc(_) => {
                         locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, CopyLoc)
-                    },
+                    }
                     MoveLoc(_) => {
                         locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, MoveLoc)
-                    },
+                    }
                     StLoc(_) => {
                         locals_bytecode!(locals_len, current_fdef, bytecode_idx, offset, StLoc)
-                    },
+                    }
                     MutBorrowLoc(_) => locals_bytecode!(
                         locals_len,
                         current_fdef,
@@ -484,7 +484,7 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     | Div | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt
                     | Gt | Le | Ge | Abort | Nop => {
                         panic!("Bytecode has no internal index: {:?}", code[bytecode_idx])
-                    },
+                    }
                 };
 
                 code[bytecode_idx] = new_bytecode;

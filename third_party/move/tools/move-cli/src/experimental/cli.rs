@@ -111,7 +111,7 @@ impl ExperimentalCommand {
                     *concretize,
                     move_args.verbose,
                 )
-            },
+            }
         }
     }
 }

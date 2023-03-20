@@ -88,7 +88,7 @@ fn struct_def(context: &mut Context, sname: StructName, sdef: &N::StructDefiniti
         N::StructFields::Native(_) => (),
         N::StructFields::Defined(fields) => {
             fields.iter().for_each(|(_, _, (_, ty))| type_(context, ty))
-        },
+        }
     };
     context.current_struct = None;
 }
@@ -104,7 +104,7 @@ fn type_(context: &mut Context, sp!(loc, ty_): &N::Type) {
                 context.add_usage(*loc, m, s)
             }
             tys.iter().for_each(|t| type_(context, t))
-        },
+        }
     }
 }
 
@@ -149,6 +149,6 @@ fn best_cycle_loc<'a>(
             assert!(first == used);
             let used_loc = get_loc(user, used);
             (used_loc, user, used)
-        },
+        }
     }
 }

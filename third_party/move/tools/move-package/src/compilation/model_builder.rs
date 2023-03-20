@@ -108,7 +108,7 @@ impl ModelBuilder {
                     }
                 }
                 (new_targets, new_deps)
-            },
+            }
             None => (
                 all_targets,
                 all_deps.into_iter().map(|(p, _)| p).collect_vec(),

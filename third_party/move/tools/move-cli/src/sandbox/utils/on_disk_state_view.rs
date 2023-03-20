@@ -144,7 +144,7 @@ impl OnDiskStateView {
                     AccountAddress::from_hex_literal(parent.file_stem().unwrap().to_str().unwrap())
                         .unwrap();
                 Some(ModuleId::new(addr, name))
-            },
+            }
             None => None,
         }
     }
@@ -213,7 +213,7 @@ impl OnDiskStateView {
                 match Self::get_bytes(resource_path)? {
                     Some(resource_data) => {
                         Some(MoveValueAnnotator::new(self).view_resource(&id, &resource_data)?)
-                    },
+                    }
                     None => None,
                 }
             }),
@@ -261,7 +261,7 @@ impl OnDiskStateView {
                 let d: Disassembler =
                     Disassembler::from_view(view, Spanned::unsafe_no_loc(()).loc)?;
                 Some(d.disassemble()?)
-            },
+            }
             None => None,
         })
     }

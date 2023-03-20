@@ -58,7 +58,7 @@ fn native_to_bytes(
         None => {
             cost += gas_params.failure;
             return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
-        },
+        }
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
@@ -67,7 +67,7 @@ fn native_to_bytes(
         None => {
             cost += gas_params.failure;
             return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
-        },
+        }
     };
     cost += gas_params.per_byte_serialized
         * std::cmp::max(
@@ -75,9 +75,10 @@ fn native_to_bytes(
             gas_params.legacy_min_output_size,
         );
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        serialized_value
-    )]))
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::vector_u8(serialized_value)],
+    ))
 }
 
 pub fn make_native_to_bytes(gas_params: ToBytesGasParameters) -> NativeFunction {

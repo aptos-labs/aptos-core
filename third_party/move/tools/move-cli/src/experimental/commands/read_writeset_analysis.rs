@@ -61,7 +61,7 @@ pub fn analyze_read_write_set(
                 state,
             )?;
             println!("{}", results)
-        },
+        }
         ConcretizeMode::Reads => {
             let results = normalized_rw.get_keys_read(
                 &module_id,
@@ -74,7 +74,7 @@ pub fn analyze_read_write_set(
             for key in results {
                 println!("{}", key)
             }
-        },
+        }
         ConcretizeMode::Writes => {
             let results = normalized_rw.get_keys_written(
                 &module_id,
@@ -87,7 +87,7 @@ pub fn analyze_read_write_set(
             for key in results {
                 println!("{}", key)
             }
-        },
+        }
         ConcretizeMode::Dont => {
             // don't try try to concretize; just print the R/W set
             // safe to unwrap here because every function must be analyzed
@@ -101,7 +101,7 @@ pub fn analyze_read_write_set(
                         .expect("Invariant violation: couldn't find the env for defined function")
                 )
             )
-        },
+        }
     }
     Ok(())
 }

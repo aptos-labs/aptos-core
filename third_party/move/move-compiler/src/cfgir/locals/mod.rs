@@ -135,11 +135,11 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
         C::Assign(ls, e) => {
             exp(context, e);
             lvalues(context, ls);
-        },
+        }
         C::Mutate(el, er) => {
             exp(context, er);
             exp(context, el)
-        },
+        }
         C::Abort(e) | C::IgnoreAndPop { exp: e, .. } | C::JumpIf { cond: e, .. } => exp(context, e),
 
         C::Return { exp: e, .. } => {
@@ -167,7 +167,7 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
                                     } else {
                                         format!("The local variable '{}' {} a value", l, verb,)
                                     }
-                                },
+                                }
                             };
                             let msg = format!(
                                 "{}. The value does not have the '{}' ability and must be \
@@ -183,11 +183,11 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
                             add_drop_ability_tip(context, &mut diag, ty.clone());
                             diags.add(diag);
                         }
-                    },
+                    }
                 }
             }
             context.extend_diags(diags)
-        },
+        }
         C::Jump { .. } => (),
         C::Break | C::Continue => panic!("ICE break/continue not translated to jumps"),
     }
@@ -234,11 +234,11 @@ fn lvalue(context: &mut Context, sp!(loc, l_): &LValue) {
                         );
                         add_drop_ability_tip(context, &mut diag, ty.clone());
                         context.add_diag(diag)
-                    },
+                    }
                 }
             }
             context.set_state(*v, LocalState::Available(*loc))
-        },
+        }
         L::Unpack(_, _, fields) => fields.iter().for_each(|(_, l)| lvalue(context, l)),
     }
 }
@@ -257,7 +257,7 @@ fn exp(context: &mut Context, parent_e: &Exp) {
                 *var,
                 LocalState::Unavailable(*eloc, UnavailableReason::Moved),
             )
-        },
+        }
 
         E::ModuleCall(mcall) => exp(context, &mcall.arguments),
         E::Builtin(_, e)
@@ -271,7 +271,7 @@ fn exp(context: &mut Context, parent_e: &Exp) {
         E::BinopExp(e1, _, e2) => {
             exp(context, e1);
             exp(context, e2)
-        },
+        }
 
         E::Pack(_, _, fields) => fields.iter().for_each(|(_, _, e)| exp(context, e)),
 
@@ -281,7 +281,7 @@ fn exp(context: &mut Context, parent_e: &Exp) {
             for (_, var) in anchor.used_locals.values() {
                 use_local(context, eloc, var);
             }
-        },
+        }
 
         E::Unreachable => panic!("ICE should not analyze dead code"),
     }
@@ -329,7 +329,7 @@ fn use_local(context: &mut Context, loc: &Loc, local: &Var) {
                         ),
                         (unavailable, msg),
                     ));
-                },
+                }
                 UnavailableReason::Moved => {
                     let verb = match state {
                         LocalState::Available(_) => unreachable!(),
@@ -353,9 +353,9 @@ fn use_local(context: &mut Context, loc: &Loc, local: &Var) {
                         (unavailable, reason),
                         (unavailable, suggestion),
                     ));
-                },
+                }
             };
-        },
+        }
     }
 }
 
@@ -376,7 +376,7 @@ fn add_drop_ability_tip(context: &Context, diag: &mut Diagnostic, st: SingleType
         T::Apply(_, sp!(_, TN::Builtin(b)), ty_args) => {
             owned_abilities = b.value.declared_abilities(b.loc);
             (None, &owned_abilities, ty_args.clone())
-        },
+        }
         T::Apply(_, sp!(_, TN::ModuleType(m, s)), ty_args) => {
             let decl_loc = *context
                 .struct_declared_abilities
@@ -391,7 +391,7 @@ fn add_drop_ability_tip(context: &Context, diag: &mut Diagnostic, st: SingleType
                 .get(s)
                 .unwrap();
             (Some(decl_loc), declared_abilities, ty_args.clone())
-        },
+        }
         t => panic!(
             "ICE either the type did not have 'drop' when it should have or it was converted \
              incorrectly {:?}",
@@ -412,7 +412,7 @@ fn add_drop_ability_tip(context: &Context, diag: &mut Diagnostic, st: SingleType
                 T::UnresolvedError | T::Anything => AbilitySet::all(ty_arg.loc),
                 T::Param(TParam { abilities, .. }) | T::Apply(Some(abilities), _, _) => {
                     abilities.clone()
-                },
+                }
                 T::Var(_) | T::Apply(None, _, _) => panic!("ICE expansion failed"),
             };
             (ty_arg, abilities)

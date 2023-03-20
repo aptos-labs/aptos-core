@@ -81,7 +81,7 @@ fn verify_fallthrough(
         Some(last) if !last.is_unconditional_branch() => {
             Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
                 .at_code_offset(current_function, (code.code.len() - 1) as CodeOffset))
-        },
+        }
         Some(_) => Ok(()),
     }
 }

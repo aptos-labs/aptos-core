@@ -78,10 +78,13 @@ impl StacklessControlFlowGraph {
             blocks: block_id_to_predecessors
                 .into_iter()
                 .map(|(block_id, predecessors)| {
-                    (block_id, Block {
-                        successors: predecessors,
-                        content: blocks[&block_id].content,
-                    })
+                    (
+                        block_id,
+                        Block {
+                            successors: predecessors,
+                            content: blocks[&block_id].content,
+                        },
+                    )
                 })
                 .collect(),
             backward: true,
@@ -99,18 +102,27 @@ impl StacklessControlFlowGraph {
             lower: 0,
             upper: code.len() as u16 - 1,
         };
-        blocks.insert(entry_bb, Block {
-            successors,
-            content: bb,
-        });
-        blocks.insert(DUMMY_ENTRANCE, Block {
-            successors: vec![entry_bb],
-            content: BlockContent::Dummy,
-        });
-        blocks.insert(DUMMY_EXIT, Block {
-            successors: Vec::new(),
-            content: BlockContent::Dummy,
-        });
+        blocks.insert(
+            entry_bb,
+            Block {
+                successors,
+                content: bb,
+            },
+        );
+        blocks.insert(
+            DUMMY_ENTRANCE,
+            Block {
+                successors: vec![entry_bb],
+                content: BlockContent::Dummy,
+            },
+        );
+        blocks.insert(
+            DUMMY_EXIT,
+            Block {
+                successors: Vec::new(),
+                content: BlockContent::Dummy,
+            },
+        );
         Self {
             entry_block_id: DUMMY_ENTRANCE,
             blocks,
@@ -157,23 +169,32 @@ impl StacklessControlFlowGraph {
                 };
                 let key = *offset_to_key.entry(block_entry).or_insert(bcounter);
                 bcounter = std::cmp::max(key + 1, bcounter);
-                blocks.insert(key, Block {
-                    successors,
-                    content: bb,
-                });
+                blocks.insert(
+                    key,
+                    Block {
+                        successors,
+                        content: bb,
+                    },
+                );
                 block_entry = co_pc + 1;
             }
         }
         assert_eq!(block_entry, code.len() as CodeOffset);
         let entry_bb = *offset_to_key.get(&0).unwrap();
-        blocks.insert(DUMMY_ENTRANCE, Block {
-            successors: vec![entry_bb],
-            content: BlockContent::Dummy,
-        });
-        blocks.insert(DUMMY_EXIT, Block {
-            successors: Vec::new(),
-            content: BlockContent::Dummy,
-        });
+        blocks.insert(
+            DUMMY_ENTRANCE,
+            Block {
+                successors: vec![entry_bb],
+                content: BlockContent::Dummy,
+            },
+        );
+        blocks.insert(
+            DUMMY_EXIT,
+            Block {
+                successors: Vec::new(),
+                content: BlockContent::Dummy,
+            },
+        );
         blocks
     }
 
@@ -279,8 +300,8 @@ impl<'env> std::fmt::Display for DotCFGBlock<'env> {
                     );
                     writeln!(f, "{}", text)?;
                 }
-            },
-            BlockContent::Dummy => {},
+            }
+            BlockContent::Dummy => {}
         }
         Ok(())
     }

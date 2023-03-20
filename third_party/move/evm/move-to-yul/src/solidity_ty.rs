@@ -139,7 +139,7 @@ impl fmt::Display for SolidityType {
                     .collect::<Vec<String>>()
                     .join(",");
                 write!(f, "({})", s)
-            },
+            }
             DynamicArray(ty) => write!(f, "{}[]", ty),
             StaticArray(ty, n) => write!(f, "{}[{}]", ty, n),
             SolidityString => f.write_str("string"),
@@ -152,7 +152,7 @@ impl fmt::Display for SolidityType {
                     .collect::<Vec<String>>()
                     .join(",");
                 write!(f, "({})", s)
-            },
+            }
         }
     }
 }
@@ -177,7 +177,7 @@ impl SolidityType {
             StaticArray(ty, _) => ty.is_static(),
             Struct(_, tys) => {
                 conjunction(&tys.iter().map(|(_, _, _, _, t)| t.clone()).collect_vec())
-            },
+            }
             _ => false,
         }
     }
@@ -337,7 +337,7 @@ impl SolidityType {
                 Signer => SolidityType::Primitive(SolidityPrimitiveType::Address(false)),
                 Num | Range | EventStore | U16 | U32 | U256 => {
                     panic!("unexpected field type")
-                },
+                }
             },
             Vector(ety) => {
                 if bytes_flag {
@@ -349,7 +349,7 @@ impl SolidityType {
                 SolidityType::DynamicArray(Box::new(Self::translate_from_move(
                     ctx, ety, bytes_flag,
                 )))
-            },
+            }
             Tuple(tys) => generate_tuple(tys),
             Struct(mid, sid, _) => {
                 if ctx.is_u256(mid.qualified(*sid)) {
@@ -365,7 +365,7 @@ impl SolidityType {
                         generate_tuple(&tys) // translate into tuple type
                     }
                 }
-            },
+            }
             TypeParameter(_)
             | Reference(_, _)
             | Fun(_, _)
@@ -374,7 +374,7 @@ impl SolidityType {
             | Error
             | Var(_) => {
                 panic!("unexpected field type")
-            },
+            }
         }
     }
 
@@ -540,21 +540,21 @@ impl SolidityType {
                         } else {
                             1
                         }
-                    },
+                    }
                     Int(size) | Uint(size) | Fixed(size, _) | Ufixed(size, _) => {
                         if padded {
                             32
                         } else {
                             size / 8
                         }
-                    },
+                    }
                     Address(_) => {
                         if padded {
                             32
                         } else {
                             20
                         }
-                    },
+                    }
                 },
                 StaticArray(ty, size) => {
                     let mut size = ty.abi_head_size(true) * size;
@@ -562,14 +562,14 @@ impl SolidityType {
                         size = ((size + 31) / 32) * 32;
                     }
                     size
-                },
+                }
                 BytesStatic(size) => {
                     if padded {
                         32
                     } else {
                         size * 8
                     }
-                },
+                }
                 Tuple(tys) => abi_head_sizes_sum(tys, padded),
                 Struct(_, ty_tuples) => {
                     let tys = ty_tuples
@@ -577,7 +577,7 @@ impl SolidityType {
                         .map(|(_, _, _, _, ty)| ty.clone())
                         .collect_vec();
                     abi_head_sizes_sum(&tys, padded)
-                },
+                }
                 _ => panic!("wrong types"),
             }
         } else {
@@ -597,7 +597,7 @@ impl SolidityType {
                 } else {
                     false
                 }
-            },
+            }
             SolidityType::SolidityString => {
                 // For simplifying type checking, string is only compatible with vector<u8>
                 // ASCII::String is compatible with the tuple (bytes)
@@ -611,14 +611,14 @@ impl SolidityType {
                 } else {
                     false
                 }
-            },
+            }
             SolidityType::Bytes | SolidityType::BytesStatic(_) => {
                 if let Type::Vector(ety) = move_ty {
                     matches!(**ety, Type::Primitive(PrimitiveType::U8))
                 } else {
                     false
                 }
-            },
+            }
             SolidityType::Struct(struct_name, ty_tuples) => {
                 if let Type::Struct(mid, sid, _) = move_ty {
                     let abi_struct_name_map_ref = ctx.abi_struct_name_map.borrow();
@@ -639,7 +639,7 @@ impl SolidityType {
                     }
                 }
                 false
-            },
+            }
             SolidityType::Tuple(_) => panic!("unexpected solidity type"),
         }
     }

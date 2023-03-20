@@ -96,7 +96,7 @@ Or check the rudimentary diff below:
             DiffOp::Replace(old, new) => {
                 print_lines(&mut result, old, "- ");
                 print_lines(&mut result, new, "+ ");
-            },
+            }
         }
     }
     Err(anyhow!(result.join("\n")))

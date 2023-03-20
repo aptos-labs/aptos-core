@@ -55,7 +55,7 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
                 let mut builder = TextBuilder::new();
                 builder.add(self.source_viewer.backing_string(), Style::default());
                 builder.finish()
-            },
+            }
             Some(info) => {
                 let source_context = self.source_viewer.source_for_code_location(info).unwrap();
 
@@ -64,7 +64,7 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
                 builder.add(source_context.highlight, style);
                 builder.add(source_context.remainder, Style::default());
                 builder.finish()
-            },
+            }
         };
 
         TUIOutput {

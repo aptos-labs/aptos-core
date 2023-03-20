@@ -260,15 +260,15 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
         Tok::AccountAddressValue => {
             let addr = parse_account_address(tokens)?;
             CopyableVal_::Address(addr)
-        },
+        }
         Tok::True => {
             tokens.advance()?;
             CopyableVal_::Bool(true)
-        },
+        }
         Tok::False => {
             tokens.advance()?;
             CopyableVal_::Bool(false)
-        },
+        }
         Tok::U8Value => {
             let mut s = tokens.content();
             if s.ends_with("u8") {
@@ -277,7 +277,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u8::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U8(i)
-        },
+        }
         Tok::U16Value => {
             let mut s = tokens.content();
             if s.ends_with("u16") {
@@ -286,7 +286,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u16::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U16(i)
-        },
+        }
         Tok::U32Value => {
             let mut s = tokens.content();
             if s.ends_with("u32") {
@@ -295,7 +295,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u32::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U32(i)
-        },
+        }
         Tok::U64Value => {
             let mut s = tokens.content();
             if s.ends_with("u64") {
@@ -304,7 +304,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u64::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U64(i)
-        },
+        }
         Tok::U128Value => {
             let mut s = tokens.content();
             if s.ends_with("u128") {
@@ -313,7 +313,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u128::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U128(i)
-        },
+        }
         Tok::U256Value => {
             let mut s = tokens.content();
             if s.ends_with("256") {
@@ -322,7 +322,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             let i = u256::U256::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U256(i)
-        },
+        }
         Tok::ByteArrayValue => {
             let s = tokens.content();
             let buf = hex::decode(&s[2..s.len() - 1]).unwrap_or_else(|_| {
@@ -331,13 +331,13 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             });
             tokens.advance()?;
             CopyableVal_::ByteArray(buf)
-        },
+        }
         t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
                 message: format!("unrecognized token kind {:?}", t),
             })
-        },
+        }
     };
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(tokens.file_hash(), start_loc, end_loc, val))
@@ -474,7 +474,7 @@ fn parse_qualified_function_name(
         | Tok::ToU256 => {
             let f = parse_builtin(tokens)?;
             FunctionCall_::Builtin(f)
-        },
+        }
         Tok::DotNameValue => {
             let module_dot_name = parse_dot_name(tokens)?;
             let type_actuals = parse_type_actuals(tokens)?;
@@ -485,7 +485,7 @@ fn parse_qualified_function_name(
                 name: FunctionName(Symbol::from(v[1])),
                 type_actuals,
             }
-        },
+        }
         t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
@@ -494,7 +494,7 @@ fn parse_qualified_function_name(
                     t
                 ),
             })
-        },
+        }
     };
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(tokens.file_hash(), start_loc, end_loc, call))
@@ -549,20 +549,20 @@ fn parse_unary_exp_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyhow::
             tokens.advance()?;
             let e = parse_unary_exp(tokens)?;
             Ok(Exp_::UnaryExp(UnaryOp::Not, Box::new(e)))
-        },
+        }
         Tok::Star => {
             tokens.advance()?;
             let e = parse_unary_exp(tokens)?;
             Ok(Exp_::Dereference(Box::new(e)))
-        },
+        }
         Tok::AmpMut => {
             tokens.advance()?;
             parse_borrow_field_(tokens, true)
-        },
+        }
         Tok::Amp => {
             tokens.advance()?;
             parse_borrow_field_(tokens, false)
-        },
+        }
         _ => parse_call_or_term_(tokens),
     }
 }
@@ -622,7 +622,7 @@ fn parse_call_or_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyho
             let f = parse_qualified_function_name(tokens)?;
             let exp = parse_call_or_term(tokens)?;
             Ok(Exp_::FunctionCall(f, Box::new(exp)))
-        },
+        }
         _ => parse_term_(tokens),
     }
 }
@@ -677,23 +677,23 @@ fn parse_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyhow::Error
             let v = parse_var(tokens)?;
             consume_token(tokens, Tok::RParen)?;
             Ok(Exp_::Move(v))
-        },
+        }
         Tok::Copy => {
             tokens.advance()?;
             let v = parse_var(tokens)?;
             consume_token(tokens, Tok::RParen)?;
             Ok(Exp_::Copy(v))
-        },
+        }
         Tok::AmpMut => {
             tokens.advance()?;
             let v = parse_var(tokens)?;
             Ok(Exp_::BorrowLocal(true, v))
-        },
+        }
         Tok::Amp => {
             tokens.advance()?;
             let v = parse_var(tokens)?;
             Ok(Exp_::BorrowLocal(false, v))
-        },
+        }
         Tok::AccountAddressValue
         | Tok::True
         | Tok::False
@@ -707,13 +707,13 @@ fn parse_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyhow::Error
         Tok::NameValue | Tok::NameBeginTyValue => {
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             parse_pack_(tokens, name, type_actuals)
-        },
+        }
         Tok::LParen => {
             tokens.advance()?;
             let exps = parse_comma_list(tokens, &[Tok::RParen], parse_exp, true)?;
             consume_token(tokens, Tok::RParen)?;
             Ok(Exp_::ExprList(exps))
-        },
+        }
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
             message: format!("unrecognized token kind for term {:?}", t),
@@ -759,7 +759,7 @@ fn consume_end_of_generics(tokens: &mut Lexer) -> Result<(), ParseError<Loc, any
             tokens.replace_token(Tok::Greater, 1)?;
             tokens.advance()?;
             Ok(())
-        },
+        }
         _ => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
             message: "expected Tok::Greater or Tok::GreaterGreater".to_string(),
@@ -784,99 +784,99 @@ fn parse_builtin(tokens: &mut Lexer) -> Result<Builtin, ParseError<Loc, anyhow::
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             consume_end_of_generics(tokens)?;
             Ok(Builtin::Exists(StructName(name), type_actuals))
-        },
+        }
         Tok::BorrowGlobal => {
             tokens.advance()?;
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             consume_end_of_generics(tokens)?;
             Ok(Builtin::BorrowGlobal(false, StructName(name), type_actuals))
-        },
+        }
         Tok::BorrowGlobalMut => {
             tokens.advance()?;
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             consume_end_of_generics(tokens)?;
             Ok(Builtin::BorrowGlobal(true, StructName(name), type_actuals))
-        },
+        }
         Tok::MoveFrom => {
             tokens.advance()?;
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             consume_end_of_generics(tokens)?;
             Ok(Builtin::MoveFrom(StructName(name), type_actuals))
-        },
+        }
         Tok::MoveTo => {
             tokens.advance()?;
             let (name, type_actuals) = parse_name_and_type_actuals(tokens)?;
             consume_end_of_generics(tokens)?;
             Ok(Builtin::MoveTo(StructName(name), type_actuals))
-        },
+        }
         Tok::VecPack(num) => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecPack(type_actuals, num))
-        },
+        }
         Tok::VecLen => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecLen(type_actuals))
-        },
+        }
         Tok::VecImmBorrow => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecImmBorrow(type_actuals))
-        },
+        }
         Tok::VecMutBorrow => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecMutBorrow(type_actuals))
-        },
+        }
         Tok::VecPushBack => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecPushBack(type_actuals))
-        },
+        }
         Tok::VecPopBack => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecPopBack(type_actuals))
-        },
+        }
         Tok::VecUnpack(num) => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecUnpack(type_actuals, num))
-        },
+        }
         Tok::VecSwap => {
             tokens.advance()?;
             let type_actuals = parse_type_actuals(tokens)?;
             Ok(Builtin::VecSwap(type_actuals))
-        },
+        }
         Tok::Freeze => {
             tokens.advance()?;
             Ok(Builtin::Freeze)
-        },
+        }
         Tok::ToU8 => {
             tokens.advance()?;
             Ok(Builtin::ToU8)
-        },
+        }
         Tok::ToU16 => {
             tokens.advance()?;
             Ok(Builtin::ToU16)
-        },
+        }
         Tok::ToU32 => {
             tokens.advance()?;
             Ok(Builtin::ToU32)
-        },
+        }
         Tok::ToU64 => {
             tokens.advance()?;
             Ok(Builtin::ToU64)
-        },
+        }
         Tok::ToU128 => {
             tokens.advance()?;
             Ok(Builtin::ToU128)
-        },
+        }
         Tok::ToU256 => {
             tokens.advance()?;
             Ok(Builtin::ToU256)
-        },
+        }
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
             message: format!("unrecognized token kind for builtin {:?}", t),
@@ -895,16 +895,16 @@ fn parse_lvalue_(tokens: &mut Lexer) -> Result<LValue_, ParseError<Loc, anyhow::
         Tok::NameValue => {
             let l = parse_var(tokens)?;
             Ok(LValue_::Var(l))
-        },
+        }
         Tok::Star => {
             tokens.advance()?;
             let e = parse_exp(tokens)?;
             Ok(LValue_::Mutate(e))
-        },
+        }
         Tok::Underscore => {
             tokens.advance()?;
             Ok(LValue_::Pop)
-        },
+        }
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
             message: format!("unrecognized token kind for lvalue {:?}", t),
@@ -933,10 +933,13 @@ fn parse_field_bindings(
         let v = parse_var(tokens)?;
         Ok((f, v))
     } else {
-        Ok((f.clone(), Spanned {
-            loc: f.loc,
-            value: Var_(f.value.0),
-        }))
+        Ok((
+            f.clone(),
+            Spanned {
+                loc: f.loc,
+                value: Var_(f.value.0),
+            },
+        ))
     }
 }
 
@@ -993,7 +996,7 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
                 Some(Box::new(parse_exp(tokens)?))
             };
             Ok(Statement_::Abort(val))
-        },
+        }
         Tok::Assert => {
             tokens.advance()?;
             let e = parse_exp(tokens)?;
@@ -1005,18 +1008,18 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
                 sp(loc, Exp_::UnaryExp(UnaryOp::Not, Box::new(e)))
             };
             Ok(Statement_::Assert(Box::new(cond), Box::new(err)))
-        },
+        }
         Tok::Jump => {
             consume_token(tokens, Tok::Jump)?;
             Ok(Statement_::Jump(parse_label(tokens)?))
-        },
+        }
         Tok::JumpIf => {
             consume_token(tokens, Tok::JumpIf)?;
             consume_token(tokens, Tok::LParen)?;
             let cond = parse_exp(tokens)?;
             consume_token(tokens, Tok::RParen)?;
             Ok(Statement_::JumpIf(Box::new(cond), parse_label(tokens)?))
-        },
+        }
         Tok::JumpIfFalse => {
             consume_token(tokens, Tok::JumpIfFalse)?;
             consume_token(tokens, Tok::LParen)?;
@@ -1026,7 +1029,7 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
                 Box::new(cond),
                 parse_label(tokens)?,
             ))
-        },
+        }
         Tok::NameValue => {
             // This could be either an LValue for an assignment or
             // NameAndTypeActuals (with no type_actuals) for an unpack.
@@ -1036,7 +1039,7 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
             } else {
                 parse_assign_(tokens)
             }
-        },
+        }
         Tok::Return => {
             tokens.advance()?;
             let start = tokens.start_loc();
@@ -1048,12 +1051,12 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
                 end,
                 Exp_::ExprList(v),
             ))))
-        },
+        }
         Tok::Star | Tok::Underscore => parse_assign_(tokens),
         Tok::NameBeginTyValue => {
             let (name, tys) = parse_name_and_type_actuals(tokens)?;
             parse_unpack_(tokens, name, tys)
-        },
+        }
         Tok::Exists
         | Tok::BorrowGlobal
         | Tok::BorrowGlobalMut
@@ -1087,7 +1090,7 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
                 end,
                 Exp_::ExprList(v),
             ))))
-        },
+        }
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
             message: format!("invalid token kind for statement {:?}", t),
@@ -1214,7 +1217,7 @@ fn parse_ability(tokens: &mut Lexer) -> Result<(Ability, Loc), ParseError<Loc, a
                 location: current_token_loc(tokens),
                 message: "could not parse ability".to_string(),
             })
-        },
+        }
     };
     tokens.advance()?;
     Ok(a)
@@ -1237,66 +1240,66 @@ fn parse_type(tokens: &mut Lexer) -> Result<Type, ParseError<Loc, anyhow::Error>
         Tok::NameValue if matches!(tokens.content(), "address") => {
             tokens.advance()?;
             Type::Address
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u8") => {
             tokens.advance()?;
             Type::U8
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u16") => {
             tokens.advance()?;
             Type::U16
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u32") => {
             tokens.advance()?;
             Type::U32
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u64") => {
             tokens.advance()?;
             Type::U64
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u128") => {
             tokens.advance()?;
             Type::U128
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "u256") => {
             tokens.advance()?;
             Type::U256
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "bool") => {
             tokens.advance()?;
             Type::Bool
-        },
+        }
         Tok::NameValue if matches!(tokens.content(), "signer") => {
             tokens.advance()?;
             Type::Signer
-        },
+        }
         Tok::NameBeginTyValue if matches!(tokens.content(), "vector<") => {
             tokens.advance()?;
             let ty = parse_type(tokens)?;
             adjust_token(tokens, &[Tok::Greater])?;
             consume_token(tokens, Tok::Greater)?;
             Type::Vector(Box::new(ty))
-        },
+        }
         Tok::DotNameValue => {
             let s = parse_qualified_struct_ident(tokens)?;
             let tys = parse_type_actuals(tokens)?;
             Type::Struct(s, tys)
-        },
+        }
         Tok::Amp => {
             tokens.advance()?;
             Type::Reference(false, Box::new(parse_type(tokens)?))
-        },
+        }
         Tok::AmpMut => {
             tokens.advance()?;
             Type::Reference(true, Box::new(parse_type(tokens)?))
-        },
+        }
         Tok::NameValue => Type::TypeParameter(TypeVar_(parse_name(tokens)?)),
         t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
                 message: format!("invalid token kind for type {:?}", t),
             })
-        },
+        }
     };
     Ok(t)
 }
@@ -1519,7 +1522,7 @@ fn parse_storage_location(
             };
 
             StorageLocation::Ret(i)
-        },
+        }
         Tok::AccountAddressValue => StorageLocation::Address(parse_account_address(tokens)?),
         Tok::Global => {
             consume_token(tokens, Tok::Global)?;
@@ -1535,7 +1538,7 @@ fn parse_storage_location(
                 type_actuals,
                 address,
             }
-        },
+        }
         _ => StorageLocation::Formal(parse_name(tokens)?),
     };
 
@@ -1592,29 +1595,29 @@ fn parse_unary_spec_exp(tokens: &mut Lexer) -> Result<SpecExp, ParseError<Loc, a
                 type_actuals,
                 address,
             }
-        },
+        }
         Tok::Star => {
             tokens.advance()?;
             let stloc = parse_storage_location(tokens)?;
             SpecExp::Dereference(stloc)
-        },
+        }
         Tok::Amp => {
             tokens.advance()?;
             let stloc = parse_storage_location(tokens)?;
             SpecExp::Reference(stloc)
-        },
+        }
         Tok::Exclaim => {
             tokens.advance()?;
             let exp = parse_unary_spec_exp(tokens)?;
             SpecExp::Not(Box::new(exp))
-        },
+        }
         Tok::Old => {
             tokens.advance()?;
             consume_token(tokens, Tok::LParen)?;
             let exp = parse_spec_exp(tokens)?;
             consume_token(tokens, Tok::RParen)?;
             SpecExp::Old(Box::new(exp))
-        },
+        }
         Tok::NameValue => {
             let next = tokens.lookahead();
             if next.is_err() || next.unwrap() != Tok::LParen {
@@ -1634,7 +1637,7 @@ fn parse_unary_spec_exp(tokens: &mut Lexer) -> Result<SpecExp, ParseError<Loc, a
                 consume_token(tokens, Tok::RParen)?;
                 SpecExp::Call(name, args)
             }
-        },
+        }
         _ => SpecExp::StorageLocation(parse_storage_location(tokens)?),
     })
 }
@@ -1718,26 +1721,26 @@ fn parse_spec_condition(tokens: &mut Lexer) -> Result<Condition_, ParseError<Loc
         Tok::AbortsIf => {
             tokens.advance()?;
             Condition_::AbortsIf(parse_spec_exp(tokens)?)
-        },
+        }
         Tok::Ensures => {
             tokens.advance()?;
             Condition_::Ensures(parse_spec_exp(tokens)?)
-        },
+        }
         Tok::Requires => {
             tokens.advance()?;
             Condition_::Requires(parse_spec_exp(tokens)?)
-        },
+        }
         Tok::SucceedsIf => {
             tokens.advance()?;
             Condition_::SucceedsIf(parse_spec_exp(tokens)?)
-        },
+        }
         t => {
             tokens.spec_mode = false;
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
                 message: format!("invalid token kind for spec condition {:?}", t),
             });
-        },
+        }
     });
     tokens.spec_mode = false;
     retval
@@ -1832,7 +1835,7 @@ fn parse_function_visibility(
                         location: current_token_loc(tokens),
                         message: format!("expected Tok::Script or Tok::Friend, not {:?}", t),
                     });
-                },
+                }
             }
             tokens.advance()?;
             consume_token(tokens, Tok::RParen)?;
