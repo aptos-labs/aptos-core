@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
-    runtime::VMRuntime,
+    data_cache::TransactionDataCache,
     loader::{Function, Module},
+    native_extensions::NativeContextExtensions,
+    runtime::VMRuntime,
 };
 use move_binary_format::{
     compatibility::Compatibility,
@@ -121,9 +122,16 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<SerializedReturnValues> {
-        self.runtime.execute_function_instantiation(module, func, instantiation,
-                                                    args, &mut self.data_cache, gas_meter ,
-        &mut self.native_extensions, true)
+        self.runtime.execute_function_instantiation(
+            module,
+            func,
+            instantiation,
+            args,
+            &mut self.data_cache,
+            gas_meter,
+            &mut self.native_extensions,
+            true,
+        )
     }
 
     /// Execute a transaction script.
@@ -293,12 +301,15 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
         function_name: &IdentStr,
         expected_return_type: &Type,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, instantiation) = self.runtime.loader().load_function_with_type_arg_inference(
-            module_id,
-            function_name,
-            expected_return_type,
-            &self.data_cache,
-        )?;
+        let (module, func, instantiation) = self
+            .runtime
+            .loader()
+            .load_function_with_type_arg_inference(
+                module_id,
+                function_name,
+                expected_return_type,
+                &self.data_cache,
+            )?;
         Ok((module, func, instantiation))
     }
 

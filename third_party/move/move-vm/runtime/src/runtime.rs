@@ -212,7 +212,7 @@ impl VMRuntime {
                 return Err(PartialVMError::new(
                     StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
                 ));
-            }
+            },
         };
 
         match Value::simple_deserialize(arg.borrow(), &layout) {
@@ -394,21 +394,20 @@ impl VMRuntime {
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
-
         // load the function
-        let (
+        let (module, func, instantiation) =
+            self.loader
+                .load_function(module, function_name, &ty_args, data_store)?;
+
+        self.execute_function_instantiation(
             module,
             func,
             instantiation,
-        ) = self
-            .loader
-            .load_function(module, function_name, &ty_args, data_store)?;
-
-        self.execute_function_instantiation(module, func, instantiation, serialized_args,
-                                            data_store,
-                                            gas_meter,
-                                            extensions,
-                                            bypass_declared_entry_check,
+            serialized_args,
+            data_store,
+            gas_meter,
+            extensions,
+            bypass_declared_entry_check,
         )
     }
 
@@ -424,12 +423,11 @@ impl VMRuntime {
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
         // load the function
-        let
-            LoadedFunctionInstantiation {
-                type_arguments,
-                parameters,
-                return_,
-            } = function_instantiation;
+        let LoadedFunctionInstantiation {
+            type_arguments,
+            parameters,
+            return_,
+        } = function_instantiation;
 
         use move_binary_format::{binary_views::BinaryIndexedView, file_format::SignatureIndex};
         fn check_is_entry(

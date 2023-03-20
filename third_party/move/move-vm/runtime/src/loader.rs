@@ -747,10 +747,14 @@ impl Loader {
 
     // Matches the actual returned type to the expected type, binding any type args to the
     // necessary type as stored in the map. Returns true if a successful match is made.
-    fn match_return_type<'a>(returned: &Type, expected: &'a Type, map: &mut BTreeMap<usize, &'a Type>) -> bool {
+    fn match_return_type<'a>(
+        returned: &Type,
+        expected: &'a Type,
+        map: &mut BTreeMap<usize, &'a Type>,
+    ) -> bool {
         match (returned, expected) {
             // The important case, deduce the type params
-            (Type::TyParam(idx), _) =>
+            (Type::TyParam(idx), _) => {
                 if let Option::Some(bounded_type) = map.get(idx) {
                     // The type argument was already bound, so to be consistent they have to equal
                     *bounded_type == expected
@@ -759,18 +763,26 @@ impl Loader {
                     // must be expected
                     map.insert(*idx, expected);
                     true
-                },
+                }
+            },
             // Recursive types we need to recurse the matching types
-            (Type::Reference(ret_inner), Type::Reference(expected_inner)) |
-            (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) |
-            (Type::Vector(ret_inner), Type::Vector(expected_inner)) =>
-                Self::match_return_type(ret_inner, expected_inner, map),
+            (Type::Reference(ret_inner), Type::Reference(expected_inner))
+            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner))
+            | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
+                Self::match_return_type(ret_inner, expected_inner, map)
+            },
             // For struct instantiations we need to match all fields
-            (Type::StructInstantiation(ret_idx, ret_fields),
-            Type::StructInstantiation(expected_idx, expected_fields)) =>
-                *ret_idx == *expected_idx && ret_fields.len() == expected_fields.len() &&
-                        ret_fields.iter().zip(expected_fields.iter()).all(
-                            |types| Self::match_return_type(types.0, types.1, map)),
+            (
+                Type::StructInstantiation(ret_idx, ret_fields),
+                Type::StructInstantiation(expected_idx, expected_fields),
+            ) => {
+                *ret_idx == *expected_idx
+                    && ret_fields.len() == expected_fields.len()
+                    && ret_fields
+                        .iter()
+                        .zip(expected_fields.iter())
+                        .all(|types| Self::match_return_type(types.0, types.1, map))
+            },
             // For the rest we need to assure the types match
             _ => std::mem::discriminant(returned) == std::mem::discriminant(expected),
         }
@@ -791,15 +803,15 @@ impl Loader {
             self.load_function_without_type_args(module_id, function_name, data_store)?;
 
         if return_vec.len() != 1 {
-            return Err(PartialVMError::new(
-                StatusCode::ABORTED).finish(Location::Undefined));
+            return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
         }
         let return_type = &return_vec[0];
 
         let mut map = BTreeMap::new();
         if !Self::match_return_type(return_type, expected_return_type, &mut map) {
-            return Err(PartialVMError::new(
-                StatusCode::ACCOUNT_NOT_MULTISIG).finish(Location::Undefined));
+            return Err(
+                PartialVMError::new(StatusCode::ACCOUNT_NOT_MULTISIG).finish(Location::Undefined)
+            );
         }
 
         // Construct the type arguments from the match
@@ -810,8 +822,9 @@ impl Loader {
                 type_arguments.push((*t).clone());
             } else {
                 // Unknown type argument
-                return Err(PartialVMError::new(
-                    StatusCode::BAD_CHAIN_ID).finish(Location::Undefined));
+                return Err(
+                    PartialVMError::new(StatusCode::BAD_CHAIN_ID).finish(Location::Undefined)
+                );
             }
         }
 
@@ -842,7 +855,8 @@ impl Loader {
             .map(|ty| self.load_type(ty, data_store))
             .collect::<VMResult<Vec<_>>>()?;
 
-        let (module, func, parameters, return_) = self.load_function_without_type_args(module_id, function_name, data_store)?;
+        let (module, func, parameters, return_) =
+            self.load_function_without_type_args(module_id, function_name, data_store)?;
 
         // verify type arguments
         self.verify_ty_args(func.type_parameters(), &type_arguments)
