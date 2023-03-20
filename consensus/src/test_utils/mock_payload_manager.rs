@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, PayloadFilter},
     request_response::GetPayloadCommand,
 };
 use aptos_types::{
@@ -52,7 +52,6 @@ impl PayloadClient for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
-        _round: Round,
         _max_size: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,

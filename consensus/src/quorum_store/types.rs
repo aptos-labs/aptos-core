@@ -3,7 +3,7 @@
 
 use crate::quorum_store::batch_store::PersistRequest;
 use anyhow::ensure;
-use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo, LogicalTime};
+use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -128,13 +128,15 @@ impl Batch {
     pub fn new(
         batch_id: BatchId,
         payload: Vec<SignedTransaction>,
-        expiration: LogicalTime,
+        epoch: u64,
+        expiration: u64,
         batch_author: PeerId,
     ) -> Self {
         let payload = BatchPayload::new(payload);
         let batch_info = BatchInfo::new(
             batch_author,
             batch_id,
+            epoch,
             expiration,
             payload.hash(),
             payload.num_txns() as u64,

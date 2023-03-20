@@ -16,8 +16,12 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOp,
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::CodeOffset,
+};
 use move_core_types::{
+    account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
     language_storage::ModuleId,
     vm_status::StatusCode,
@@ -333,6 +337,18 @@ impl GasMeter for AptosGasMeter {
         self.balance
     }
 
+    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.br_false)
+    }
+
+    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.br_true)
+    }
+
+    fn charge_branch(&mut self, _target_offset: CodeOffset) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.branch)
+    }
+
     #[inline]
     fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
         let cost = self.gas_params.instr.simple_instr_cost(instr)?;
@@ -383,6 +399,8 @@ impl GasMeter for AptosGasMeter {
     #[inline]
     fn charge_load_resource(
         &mut self,
+        _addr: AccountAddress,
+        _ty: impl TypeView,
         loaded: Option<(NumBytes, impl ValueView)>,
     ) -> PartialVMResult<()> {
         if self.feature_version != 0 {
