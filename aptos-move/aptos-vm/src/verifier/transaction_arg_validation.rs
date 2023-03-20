@@ -11,13 +11,15 @@ use crate::{
     VMStatus,
 };
 use move_binary_format::file_format_common::read_uleb128_as_u64;
-use move_core_types::identifier::IdentStr;
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::ModuleId;
-use move_core_types::{account_address::AccountAddress, value::MoveValue, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
+    value::MoveValue,
+    vm_status::StatusCode,
+};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::gas::GasMeter;
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::{gas::GasMeter, loaded_data::runtime_types::Type};
 use once_cell::sync::Lazy;
 use std::{
     collections::BTreeMap,
@@ -31,26 +33,20 @@ pub(crate) struct FunctionId {
 
 static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
     [
-        (
-            "0x1::string::String",
-            FunctionId {
-                module_id: ModuleId::new(
-                    AccountAddress::ONE,
-                    Identifier::new("string").expect("cannot fail"),
-                ),
-                func_name: "utf8",
-            },
-        ),
-        (
-            "0x1::object::Object",
-            FunctionId {
-                module_id: ModuleId::new(
-                    AccountAddress::ONE,
-                    Identifier::new("object").expect("cannot fail"),
-                ),
-                func_name: "address_to_object",
-            },
-        ),
+        ("0x1::string::String", FunctionId {
+            module_id: ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("string").expect("cannot fail"),
+            ),
+            func_name: "utf8",
+        }),
+        ("0x1::object::Object", FunctionId {
+            module_id: ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("object").expect("cannot fail"),
+            ),
+            func_name: "address_to_object",
+        }),
     ]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
