@@ -214,7 +214,7 @@ fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
 fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
     while x > 128 {
         dest.push((x | 128) as u8);
-        x = x >> 7;
+        x >>= 7;
     }
     dest.push(x as u8);
 }
