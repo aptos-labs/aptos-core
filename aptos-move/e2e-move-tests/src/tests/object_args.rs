@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness, assert_vm_status};
+use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
