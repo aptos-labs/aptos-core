@@ -15,6 +15,7 @@ To add your own resource, click **Edit this page** at the bottom, add your resou
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
+| [Ansible playbook for Node Management (Bare Metal)](https://github.com/RhinoStake/ansible-aptos) | This Ansible Playbook is for the initialization, configuration, planned and hotfix upgrades of Aptos Validators, VFNs and PFNs on bare metal servers. | [RHINO](https://rhinostake.com) | 2023-03-14 |
 | [Ansible playbook for Node Management (Docker)](https://github.com/LavenderFive/aptos-ansible) | This Ansible Playbook is intended for node management, including initial launch and handling upgrades of nodes. | [Lavender.Five Nodes](https://github.com/LavenderFive) | 2023-03-13 |
 | [Aptos Staking Dashboard](https://dashboard.stakeaptos.com) · [Repo](https://github.com/pakaplace/swtb-frontend/) | A dashboard to monitor your Aptos validator performance, view network stats, or request delegation commissions. By [Paymagic Labs](https://paymagic.xyz/). | [pakaplace](https://github.com/pakaplace/) | 2023-03-10 |
 | [Aptos Validator/Staking Postman Collection](https://github.com/pakaplace/aptos-validator-staking-postman) | A Postman collection for querying staking pool, staking contract, and account resources/events. | [pakaplace](https://github.com/pakaplace/) | 2023-03-10 |

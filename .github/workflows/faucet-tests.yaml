@@ -3,8 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - devnet
-      - testnet
+      - main
 
 jobs:
   run-tests-devnet:
