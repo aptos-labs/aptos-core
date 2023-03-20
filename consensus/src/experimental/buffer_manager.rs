@@ -40,15 +40,15 @@ use std::{sync::{
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 500;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 1500;
 pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 1500;
 
-pub const LOOP_INTERVAL_MS: u64 = 500;
+pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 100;
+pub const RAND_NUM: usize = 1000;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
