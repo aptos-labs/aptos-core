@@ -20,12 +20,15 @@ pub fn initialize_fee_collection_and_distribution(harness: &mut MoveHarness, bur
 }
 
 pub fn upgrade_burn_percentage(harness: &mut MoveHarness, burn_percentage: u8) {
-    harness
-        .executor
-        .exec("transaction_fee", "upgrade_burn_percentage", vec![], vec![
+    harness.executor.exec(
+        "transaction_fee",
+        "upgrade_burn_percentage",
+        vec![],
+        vec![
             MoveValue::Signer(AccountAddress::ONE)
                 .simple_serialize()
                 .unwrap(),
             MoveValue::U8(burn_percentage).simple_serialize().unwrap(),
-        ]);
+        ],
+    );
 }
