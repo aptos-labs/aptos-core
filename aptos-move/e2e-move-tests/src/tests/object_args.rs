@@ -73,7 +73,9 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
     for (entry, args, _err) in tests {
         // Now send hi transaction, after that resource should exist and carry value
         let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
-        assert_vm_status!(status, _err);
+        use aptos_types::transaction::{TransactionStatus, ExecutionStatus};
+        let x = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(_err)));
+        assert!(&status == &x);
     }
 }
 
@@ -95,7 +97,7 @@ fn object_args_bad() {
     let mut tests = vec![];
 
     // object doesnt exist
-    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&object_address).unwrap()], StatusCode::VALUE_DESERIALIZATION_ERROR));
+    tests.push(("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&object_address).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT));
 
     fail(tests);
 }
