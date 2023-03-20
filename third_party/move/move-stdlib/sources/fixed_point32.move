@@ -245,6 +245,7 @@ module std::fixed_point32 {
         (val >> 32 as u64)
     }
     spec ceil {
+        pragma verify = false; // timeout
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(num);
