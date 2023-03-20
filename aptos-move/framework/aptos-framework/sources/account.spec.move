@@ -118,12 +118,12 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
-        
+
         include from_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
         aborts_if from_scheme == ED25519_SCHEME && ({
             let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
             account_resource.authentication_key != expected_auth_key
-        }); 
+        });
         include from_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
         aborts_if from_scheme == MULTI_ED25519_SCHEME && ({
             let from_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
@@ -154,7 +154,7 @@ spec aptos_framework::account {
             signature: cap_update_table,
             challenge: challenge,
         };
-        
+
         let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
         // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
