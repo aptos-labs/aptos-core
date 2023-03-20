@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aptos-sdk"
-version = "0.6.0"
+version = "0.7.0"
 description = "Aptos SDK"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
@@ -10,6 +10,9 @@ httpx = "^0.23.0"
 mypy = "^0.982"
 PyNaCl = "^1.5.0"
 python = ">=3.7,<4.0"
+cryptography = "^39.0.0"
+toml = "^0.10.2"
+requests = "^2.27.1"
 
 [tool.poetry.dev-dependencies]
 autoflake = "1.4.0"

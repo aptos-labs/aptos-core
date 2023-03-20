@@ -5,6 +5,7 @@ AIP
 AIP
 AIPs
 AIT
+AMEE
 AN
 ANs
 API
@@ -134,6 +135,7 @@ JPG
 JSON
 Jetbrains
 Kubernetes
+Keyfiles
 LLVM
 Labs's
 Leaderboard
@@ -143,6 +145,7 @@ Mainnet
 Mainnnet
 ManagedCoin
 Merkle
+Metafiles
 MiB
 Modularity
 Monterey
@@ -354,6 +357,9 @@ ips
 isConnected
 json
 jsx
+keyfile
+keyfile's
+keyfiles
 kickstart
 korean
 kubernetes
@@ -373,6 +379,8 @@ mdash
 mempool
 mempools
 merkle
+metafile
+metafiles
 monorepo
 multinode
 multisig
