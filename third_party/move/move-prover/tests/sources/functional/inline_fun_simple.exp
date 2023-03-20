@@ -1,0 +1,16 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+  ┌─ tests/sources/functional/inline_fun_simple.move:4:13
+  │
+4 │             assert v >= 42;
+  │             ^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/inline_fun_simple.move:22: test_apply_error
+  =         v#6 = <redacted>
+  =     at tests/sources/functional/inline_fun_simple.move:4
+  =     at tests/sources/functional/inline_fun_simple.move:22: test_apply_error
+  =         r1 = <redacted>
+  =     at tests/sources/functional/inline_fun_simple.move:24: test_apply_error
+  =     at tests/sources/functional/inline_fun_simple.move:27: test_apply_error
+  =         v#9 = <redacted>
+  =     at tests/sources/functional/inline_fun_simple.move:4

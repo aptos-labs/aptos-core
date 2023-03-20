@@ -34,6 +34,12 @@ To run the faucet, the simplest way to start is with this command:
 cargo run -p aptos-faucet-service -- run-simple --key <private_key> --node-url <api_url> --chain-id TESTING
 ```
 
+Another example, running alongside a local testnet (without `--use-faucet`):
+```
+cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
+cargo run -p aptos-faucet-service -- run-simple --key ~/.aptos/testnet/mint.key --node-url http://127.0.0.1:8080 --chain-id TESTING
+```
+
 This command lets you configure only a subset of the full functionality of the faucet. You cannot enable any checkers / bypassers, and it supports only the MintFunder. Generally it is intended for use with some kind of local swarm-based testnet or other such uses.
 
 For running the faucet in production, you will instead want to build a configuration file and run it like this:
@@ -52,34 +58,13 @@ aptos move compile
 
 If you have issues with this, try deleting `~/.move`, updating your Aptos CLI, and changing the AptosFramework version.
 
-Then build the tap as normal (from the root of the repo):
+Then build the faucet as normal (from the root of the repo):
 ```
 cargo build
 ```
 
 ## Testing
-If you want to run the tests manually, follow these steps. Note that this is **not necessary** for release safety as the tests are run as part of continuous integration (CI) already.
-
-For the test suite to pass, you must spin up a local testnet, notably without a faucet running (since we're testing the faucet here):
-```
-cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
-```
-
-You must then copy the mint key for that local testnet to the location the tests expect:
-```
-cp ~/.aptos/testnet/mint.key /tmp
-```
-
-As well as spin up a local Redis 6 ([installation guide](https://redis.io/docs/getting-started/)):
-```
-redis-server
-redis-cli flushall
-```
-
-Finally you can run the tests:
-```
-cargo test -p aptos-faucet-core --features integration-tests
-```
+If you want to run the tests manually, follow the steps in [integration-tests/README.md](integration-tests/README.md). Note that this is **not necessary** for release safety as the tests are run as part of continuous integration (CI) already.
 
 ## Validating configs
 To ensure all the configs are valid, run this:
@@ -98,5 +83,5 @@ cargo run -- generate-openapi -o doc/spec.json -f json
 ## Generating the TS client
 From `ts-client`:
 ```
-yarn generate-client
+pnpm generate-client
 ```

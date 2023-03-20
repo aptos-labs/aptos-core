@@ -10,12 +10,14 @@
 !docker/experimental/*.sh
 !docker/tools/boto.cfg
 
+
 !.cargo/
 !**/Cargo.toml
 !**/Cargo.lock
 !**/*.mv
 !**/*.rs
 !**/*.mrb
+!**/*.errmap
 !config/src/config/test_data
 !aptos-move/aptos-release-builder/data/release.yaml
 !aptos-move/framework/
@@ -27,3 +29,4 @@
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/
+!third_party/move/move-prover/boogie-backend/**/*.bpl

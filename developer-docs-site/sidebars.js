@@ -132,6 +132,7 @@ const sidebars = {
         "tutorials/first-transaction",
         "tutorials/first-dapp",
         "tutorials/first-coin",
+        "tutorials/first-multisig",
         "concepts/coin-and-token/propertymap-offchain",
       ],
     },

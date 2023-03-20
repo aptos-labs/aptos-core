@@ -728,7 +728,7 @@ Drains the aggregatable coin, setting it to zero and returning a standard coin.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_drain_aggregatable_coin">drain_aggregatable_coin</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
     <b>spec</b> {
         // TODO: The data <b>invariant</b> is not properly assumed from CollectedFeesPerBlock.
-        <b>assume</b> <a href="coin.md#0x1_coin">coin</a>.value.limit == <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+        <b>assume</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="coin.md#0x1_coin">coin</a>.value) == <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
     };
     <b>let</b> amount = <a href="aggregator.md#0x1_aggregator_read">aggregator::read</a>(&<a href="coin.md#0x1_coin">coin</a>.value);
     <b>assert</b>!(amount &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="coin.md#0x1_coin_EAGGREGATABLE_COIN_VALUE_TOO_LARGE">EAGGREGATABLE_COIN_VALUE_TOO_LARGE</a>));
@@ -1787,7 +1787,7 @@ Destroy a burn capability.
 
 
 
-<pre><code><b>invariant</b> value.limit == <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+<pre><code><b>invariant</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(value) == <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
 </code></pre>
 
 
@@ -1882,6 +1882,7 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 <pre><code><b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(<a href="coin.md#0x1_coin">coin</a>.value) &gt; <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+<b>ensures</b> result.value == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value);
 </code></pre>
 
 
@@ -1897,7 +1898,11 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code><b>let</b> aggr = dst_coin.value;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
+    + <a href="coin.md#0x1_coin">coin</a>.value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
+    + <a href="coin.md#0x1_coin">coin</a>.value &gt; <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>;
 </code></pre>
 
 
@@ -1913,9 +1918,14 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+<pre><code><b>let</b> aggr = dst_coin.value;
+<b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> amount &gt; 0 && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> amount &gt; 0 && coin_store.<a href="coin.md#0x1_coin">coin</a>.<a href="coin.md#0x1_coin_value">value</a> &lt; amount;
+<b>aborts_if</b> amount &gt; 0 && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
+    + amount &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
+<b>aborts_if</b> amount &gt; 0 && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
+    + amount &gt; <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>;
 </code></pre>
 
 
@@ -1968,6 +1978,36 @@ Get address by reflection.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_coin_get_coin_supply_opt"></a>
+
+
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_get_coin_supply_opt">get_coin_supply_opt</a>&lt;CoinType&gt;(): Option&lt;OptionalAggregator&gt; {
+   <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).supply
+}
+</code></pre>
+
+
+
+
+<a name="0x1_coin_AbortsIfAggregator"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_AbortsIfAggregator">AbortsIfAggregator</a>&lt;CoinType&gt; {
+    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;;
+    <b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr).supply;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply))
+        && <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply).<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &lt;
+        <a href="coin.md#0x1_coin">coin</a>.value;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply) && !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply))
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(maybe_supply).integer).<a href="coin.md#0x1_coin_value">value</a> &lt;
+        <a href="coin.md#0x1_coin">coin</a>.value;
+}
 </code></pre>
 
 
@@ -2060,11 +2100,11 @@ Get address by reflection.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+<pre><code><b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
 <b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
 <b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
 <b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.value == 0;
+<b>include</b> <a href="coin.md#0x1_coin_AbortsIfAggregator">AbortsIfAggregator</a>&lt;CoinType&gt;;
 </code></pre>
 
 

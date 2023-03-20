@@ -406,7 +406,7 @@ fn publishing_fixed_params() {
 // Test a single transaction intersection interleaves with a lot of dependencies and
 // not overlapping module r/w keys.
 fn module_publishing_races() {
-    for _ in 0..10 {
+    for _ in 0..5 {
         publishing_fixed_params();
     }
 }

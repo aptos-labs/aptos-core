@@ -5,7 +5,13 @@
 use serde::{Deserialize, Serialize};
 
 // The maximum message size per state sync message
-pub const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+
+// The maximum chunk sizes for data client requests and response
+const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
+const MAX_STATE_CHUNK_SIZE: u64 = 4000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -120,14 +126,14 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_concurrent_requests: 4000,
-            max_epoch_chunk_size: 200,
+            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_state_chunk_size: 4000,
+            max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_period_ms: 5000,
-            max_transaction_chunk_size: 2000,
-            max_transaction_output_chunk_size: 1000,
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -179,10 +185,14 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    pub max_epoch_chunk_size: u64, // Max num of epoch ending ledger infos per chunk
     pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
-    pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
+    pub max_num_in_flight_regular_polls: u64, // Max num of in-flight polls for regular peers
     pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
     pub max_response_timeout_ms: u64, // Max timeout (in ms) when waiting for a response (after exponential increases)
+    pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
+    pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
+    pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
     pub response_timeout_ms: u64,     // First timeout (in ms) when waiting for a response
     pub subscription_timeout_ms: u64, // Timeout (in ms) when waiting for a subscription response
     pub summary_poll_interval_ms: u64, // Interval (in ms) between data summary polls
@@ -192,12 +202,16 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
             max_response_timeout_ms: 60000, // 60 seconds
-            response_timeout_ms: 10000,     // 10 seconds
-            subscription_timeout_ms: 5000,  // 5 seconds
+            max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            response_timeout_ms: 10000,    // 10 seconds
+            subscription_timeout_ms: 5000, // 5 seconds
             summary_poll_interval_ms: 200,
             use_compression: true,
         }
