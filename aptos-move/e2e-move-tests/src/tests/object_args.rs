@@ -75,13 +75,13 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, StatusCod
         let status = h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args);
         use aptos_types::transaction::{TransactionStatus, ExecutionStatus};
         let x = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(_err)));
-        assert!(&status == &x);
+        assert!(status == x);
     }
 }
 
 #[test]
 fn object_args_good() {
-    let mut tests = vec![
+    let tests = vec![
         // ensure object exist
         ("0xcafe::test::initialize", vec![], ""),
         ("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], "hi"),
@@ -92,7 +92,7 @@ fn object_args_good() {
 
 #[test]
 fn object_args_bad() {
-    let mut tests = vec![
+    let tests = vec![
         // object doesnt exist
         ("0xcafe::test::object_arg", vec![bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&OBJECT_ADDRESS).unwrap()], StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT),
     ];
