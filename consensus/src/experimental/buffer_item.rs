@@ -17,7 +17,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 
 use super::buffer_manager::{DECISION_SIZE, SHARE_SIZE};
 
@@ -419,10 +419,11 @@ impl BufferItem {
         }
     }
 
-    pub fn get_first_proposer(&self) -> Option<Author> {
+    pub fn get_first_k_proposers(&self, k: usize) -> Vec<Author> {
         self.get_blocks().iter()
             .filter_map(|block| block.block().author())
-            .next()
+            .take(k)
+            .collect_vec()
     }
 
     pub fn gen_dummy_rand_share_vec(&self, author: Author) -> Vec<Option<RandShare>> {

@@ -220,17 +220,13 @@ impl BufferManager {
 
         // todo: if the unhappy path is too bad, can try multiple proposers or retry with more proposers
 
-        if let Some(proposer) = item.get_first_proposer() {
-            // Send the randomness shares through the first proposer,
+        for proposer in item.get_first_k_proposers(self.verifier.len() / 5) {
+            // Send the randomness shares through the first k proposers,
             // otherwise all blocks are Nil/genesis blocks that do not need randomness
             let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
 
-            // self.rand_msg_tx
-            // .send_rand_shares(rand_shares, proposer)
-            // .await;
-
             self.rand_msg_tx
-            .broadcast_rand_shares(rand_shares)
+            .send_rand_shares(rand_shares, proposer)
             .await;
         }
 
@@ -268,13 +264,13 @@ impl BufferManager {
                             if item.get_blocks().len() != rand_decisions.decisions().len() {
                                 println!("unequal length on generated rand {} != {}", item.get_blocks().len(), rand_decisions.decisions().len());
                             }
-                            // if we're the proposer for the first proposal block,
+                            // if we're one of the proposer for the first k proposal block,
                             // we're responsible to broadcast the randomness decision
-                            // if Some(self.author) == item.get_first_proposer() {
-                            //     self.rand_msg_tx
-                            //         .broadcast_rand_decisions(rand_decisions)
-                            //         .await;
-                            // }
+                            if item.get_first_k_proposers(self.verifier.len() / 5).contains(&self.author) {
+                                self.rand_msg_tx
+                                    .broadcast_rand_decisions(rand_decisions)
+                                    .await;
+                            }
                             self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                             return true;
                         }
