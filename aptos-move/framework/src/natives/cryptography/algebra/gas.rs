@@ -276,14 +276,14 @@ impl GasParameters {
                 let window_size = self.ark_msm_window_size(num_entries);
                 let num_windows = (255 + window_size - 1) / window_size;
                 let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g1_proj_add * NumArgs::from(((num_entries + 2 * num_buckets + 1) * num_windows) as u64)
+                self.ark_bls12_381_g1_proj_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
                     + self.ark_bls12_381_g1_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
             },
             Structure::BLS12381G2Affine => {
                 let window_size = self.ark_msm_window_size(num_entries);
                 let num_windows = (255 + window_size - 1) / window_size;
                 let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g2_proj_add * NumArgs::from(((num_entries + 2 * num_buckets + 1) * num_windows) as u64)
+                self.ark_bls12_381_g2_proj_add * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
                     + self.ark_bls12_381_g2_proj_double * NumArgs::from((num_buckets * num_windows) as u64)
             },
             _ => unreachable!(),

@@ -124,7 +124,7 @@ fn bench_group(c: &mut Criterion) {
 
     for num_entries in msm_all_bench_cases() {
         let est_window_size = find_best_window_size(num_entries);
-        for window_bitlen in (est_window_size-1)..(est_window_size+2) {
+        for window_bitlen in (est_window_size-1)..(est_window_size+3) {
             group.bench_function(BenchmarkId::new(format!("basic_ws{window_bitlen}_arkg1"), num_entries), |b| {
                 b.iter_with_setup(
                     || {

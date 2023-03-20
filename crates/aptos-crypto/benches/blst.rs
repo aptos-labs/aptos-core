@@ -352,7 +352,7 @@ fn bench_group(c: &mut Criterion) {
         )
     });
 
-    for num_entries in msm_a2ll_bench_cases() {
+    for num_entries in msm_all_bench_cases() {
         group.bench_function(BenchmarkId::new("g1_msm", num_entries), move |b| {
             b.iter_with_setup(
                 || {

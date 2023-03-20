@@ -19,7 +19,7 @@ class ArkMsmModel:
         window_size = 3 if x < 32 else (ceil(log2(x)) * 69 // 100 + 2)
         num_windows = ceil(self.scalar_field_bitlen / window_size)
         num_buckets = 1 << window_size
-        cost = self.addition_cost * (x+2*num_buckets+1) * num_windows + self.doubling_cost * (num_buckets*num_windows)
+        cost = self.addition_cost * (x+num_buckets+1) * num_windows + self.doubling_cost * (window_size*num_windows)
         return cost
 
 class LinearModel:
