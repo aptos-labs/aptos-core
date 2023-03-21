@@ -522,7 +522,11 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
 /// Histogram of the time it requires to wait before inserting blocks into block store.
 /// Measured as the block's timestamp minus local timestamp.
 pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
-    DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s", "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.").unwrap())
+    DurationHistogram::new(
+        register_histogram!("aptos_consensus_wait_duration_s",
+            "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp."
+        ).unwrap()
+    )
 });
 
 ///////////////////
@@ -670,4 +674,25 @@ pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
         "Time it takes for proposer election to compute proposer (when not cached)"
     )
     .unwrap()
+});
+
+/// Count of the number of blocks that have ready batches to execute.
+pub static QUORUM_BATCH_READY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_quorum_store_batch_ready_count",
+        "Count of the number of blocks that have ready batches to execute"
+    )
+    .unwrap()
+});
+
+/// Histogram of the time durations waiting for batch when executing.
+pub static BATCH_WAIT_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_batch_wait_duration",
+            "Histogram of the time durations for waiting batches.",
+            // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        )
+        .unwrap(),
+    )
 });

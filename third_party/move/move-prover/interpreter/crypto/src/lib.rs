@@ -13,8 +13,9 @@
 //! longer need to worry about depending on diem-crypto.
 
 use anyhow::{bail, Result};
+#[allow(unused)]
 use ed25519_dalek::{
-    PublicKey as Ed25519PublicKey, Signature as Ed25519Signature,
+    ed25519::signature::Signature, PublicKey as Ed25519PublicKey, Signature as Ed25519Signature,
     PUBLIC_KEY_LENGTH as ED25519_PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH as ED25519_SIGNATURE_LENGTH,
 };
 use sha2::{Digest, Sha256};

@@ -20,6 +20,7 @@ Start here to learn how the Move language works on the Aptos blockchain.
 - ### [Aptos Move Book](book/SUMMARY.md)
 - ### [Move on Aptos](./move-on-aptos.md)
 - ### [Move Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial)
+- ### [Use Bytecode for Dependencies](./bytecode-dependencies.md)
 - ### [Gas and Transaction Fees](../../concepts/gas-txn-fee.md)
 - ### [How Base Gas Works](../../concepts/base-gas.md)
 - ### [Interact with the Move VM](../interacting-with-the-blockchain.md)
