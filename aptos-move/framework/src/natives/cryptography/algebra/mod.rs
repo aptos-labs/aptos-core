@@ -366,18 +366,16 @@ macro_rules! safe_borrow_element {
 /// Macros that implements `serialize_internal()` using arkworks libraries.
 macro_rules! ark_serialize_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $args:ident,
-        $structure:expr,
-        $format:expr,
         $ark_type:ty,
-        $ark_ser_func:ident
+        $ark_ser_func:ident,
+        $gas:expr
     ) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let mut buf = vec![];
-        $context.charge($gas_params.serialize($structure, $format))?;
+        $context.charge($gas)?;
         match element.$ark_ser_func(&mut buf) {
             Ok(_) => {},
             _ => {
@@ -391,19 +389,17 @@ macro_rules! ark_serialize_internal {
 
 macro_rules! ark_ec_point_serialize_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $args:ident,
-        $structure:expr,
-        $format:expr,
         $ark_type:ty,
-        $ark_ser_func:ident
+        $ark_ser_func:ident,
+        $gas:expr
     ) => {{
         let handle = safely_pop_arg!($args, u64) as usize;
         safe_borrow_element!($context, handle, $ark_type, element_ptr, element);
         let element_affine = element.into_affine();
         let mut buf = Vec::new();
-        $context.charge($gas_params.serialize($structure, $format))?;
+        $context.charge($gas)?;
         match element_affine.$ark_ser_func(&mut buf) {
             Ok(_) => {},
             _ => {
@@ -428,38 +424,32 @@ fn serialize_internal(
     match (structure_opt, format_opt) {
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrLsb)) => {
             let buf = ark_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381Fr,
-                SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_fr_serialize * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrMsb)) => {
             let mut buf = ark_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381Fr,
-                SerializationFormat::BLS12381FrMsb,
                 ark_bls12_381::Fr,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_fr_serialize * NumArgs::one()
             );
             buf.reverse();
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12LscLsb)) => {
             let buf = ark_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381Fq12,
-                SerializationFormat::BLS12381Fq12LscLsb,
                 ark_bls12_381::Fq12,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -468,13 +458,11 @@ fn serialize_internal(
             Some(SerializationFormat::BLS12381G1AffineUncompressed),
         ) => {
             let buf = ark_ec_point_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381G1Affine,
-                SerializationFormat::BLS12381G1AffineUncompressed,
                 ark_bls12_381::G1Projective,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -483,13 +471,11 @@ fn serialize_internal(
             Some(SerializationFormat::BLS12381G1AffineCompressed),
         ) => {
             let buf = ark_ec_point_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381G1Affine,
-                SerializationFormat::BLS12381G1AffineCompressed,
                 ark_bls12_381::G1Projective,
-                serialize_compressed
+                serialize_compressed,
+                gas_params.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -498,13 +484,11 @@ fn serialize_internal(
             Some(SerializationFormat::BLS12381G2AffineUncompressed),
         ) => {
             let buf = ark_ec_point_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381G2Affine,
-                SerializationFormat::BLS12381G2AffineUncompressed,
                 ark_bls12_381::G2Projective,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -512,33 +496,22 @@ fn serialize_internal(
             Some(Structure::BLS12381G2Affine),
             Some(SerializationFormat::BLS12381G2AffineCompressed),
         ) => {
-            let buf = {
-                let handle = safely_pop_arg!( args , u64 ) as usize;
-                safe_borrow_element!( context , handle , ark_bls12_381::G2Projective , element_ptr , element );
-                let element_affine = element.into_affine();
-                let mut buf = Vec::new();
-                context.charge(gas_params.serialize(Structure::BLS12381G2Affine, SerializationFormat::BLS12381G2AffineCompressed))?;
-                match element_affine.serialize_compressed
-                (&mut buf) {
-                    Ok(_) => {}
-                    _ => {
-                        abort_invariant_violated();
-                        unreachable!()
-                    }
-                }
-                buf
-            };
+            let buf = ark_ec_point_serialize_internal!(
+                context,
+                args,
+                ark_bls12_381::G2Projective,
+                serialize_compressed,
+                gas_params.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one()
+            );
             Ok(smallvec![Value::vector_u8(buf)])
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
             let buf = ark_serialize_internal!(
-                gas_params,
                 context,
                 args,
-                Structure::BLS12381Gt,
-                SerializationFormat::BLS12381Gt,
                 ark_bls12_381::Fq12,
-                serialize_uncompressed
+                serialize_uncompressed,
+                gas_params.ark_bls12_381_fq12_serialize * NumArgs::one()
             );
             Ok(smallvec![Value::vector_u8(buf)])
         },
@@ -551,15 +524,13 @@ fn serialize_internal(
 /// Macros that implements `deserialize_internal()` using arkworks libraries.
 macro_rules! ark_deserialize_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $bytes:expr,
-        $structure:expr,
-        $format:expr,
         $ark_typ:ty,
-        $ark_deser_func:ident
+        $ark_deser_func:ident,
+        $gas:expr
     ) => {{
-        $context.charge($gas_params.deserialize($structure, $format))?;
+        $context.charge($gas)?;
         match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
                 let handle = store_element!($context, element);
@@ -579,15 +550,13 @@ macro_rules! ark_deserialize_internal {
 
 macro_rules! ark_ec_point_deserialize_internal {
     (
-        $gas_params:expr,
         $context:expr,
         $bytes:expr,
-        $structure:expr,
-        $format:expr,
         $typ:ty,
-        $deser_func:ident
+        $deser_func:ident,
+        $gas:expr
     ) => {{
-        $context.charge($gas_params.deserialize($structure, $format))?;
+        $context.charge($gas)?;
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = Projective::from(element);
@@ -625,13 +594,11 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381Fr,
-                SerializationFormat::BLS12381FrLsb,
                 ark_bls12_381::Fr,
-                deserialize_uncompressed
+                deserialize_uncompressed,
+                gas_params.ark_bls12_381_fr_deser * NumArgs::one()
             )
         },
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrMsb)) => {
@@ -642,13 +609,11 @@ fn deserialize_internal(
             lendian.reverse();
             let bytes = lendian.as_slice();
             ark_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381Fr,
-                SerializationFormat::BLS12381FrMsb,
                 ark_bls12_381::Fr,
-                deserialize_uncompressed
+                deserialize_uncompressed,
+                gas_params.ark_bls12_381_fr_deser * NumArgs::one()
             )
         },
         (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12LscLsb)) => {
@@ -656,13 +621,11 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381Fq12,
-                SerializationFormat::BLS12381Fq12LscLsb,
                 ark_bls12_381::Fq12,
-                deserialize_uncompressed
+                deserialize_uncompressed,
+                gas_params.ark_bls12_381_fq12_deser * NumArgs::one()
             )
         },
         (
@@ -673,13 +636,11 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381G1Affine,
-                SerializationFormat::BLS12381G1AffineUncompressed,
                 ark_bls12_381::G1Affine,
-                deserialize_uncompressed
+                deserialize_uncompressed,
+                gas_params.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
             )
         },
         (
@@ -690,13 +651,11 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381G1Affine,
-                SerializationFormat::BLS12381G1AffineCompressed,
                 ark_bls12_381::G1Affine,
-                deserialize_compressed
+                deserialize_compressed,
+                gas_params.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
             )
         },
         (
@@ -707,13 +666,11 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381G2Affine,
-                SerializationFormat::BLS12381G2AffineUncompressed,
                 ark_bls12_381::G2Affine,
-                deserialize_uncompressed
+                deserialize_uncompressed,
+                gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
             )
         },
         (
@@ -724,24 +681,21 @@ fn deserialize_internal(
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
             ark_ec_point_deserialize_internal!(
-                gas_params,
                 context,
                 bytes,
-                Structure::BLS12381G2Affine,
-                SerializationFormat::BLS12381G2AffineCompressed,
                 ark_bls12_381::G2Affine,
-                deserialize_compressed
+                deserialize_compressed,
+                gas_params.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
             )
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
-            context.charge(
-                gas_params.deserialize(Structure::BLS12381Gt, SerializationFormat::BLS12381Gt),
-            )?;
+            context.charge(gas_params.ark_bls12_381_fq12_deser * NumArgs::one())?;
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
+                    context.charge((gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq) * NumArgs::one())?;
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_element!(context, element);
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
@@ -759,9 +713,9 @@ fn deserialize_internal(
 }
 
 macro_rules! from_u64_internal {
-    ($gas_params:expr, $context:expr, $args:ident, $structure:expr, $typ:ty) => {{
+    ($context:expr, $args:ident, $typ:ty, $gas:expr) => {{
         let value = safely_pop_arg!($args, u64);
-        $context.charge($gas_params.from_u64($structure))?;
+        $context.charge($gas)?;
         let element = <$typ>::from(value as u64);
         let handle = store_element!($context, element);
         Ok(smallvec![Value::u64(handle as u64)])
@@ -779,18 +733,16 @@ fn from_u64_internal(
     abort_unless_single_type_basic_op_enabled!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr) => from_u64_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381Fr,
-            ark_bls12_381::Fr
+            ark_bls12_381::Fr,
+            gas_params.ark_bls12_381_fr_from_u64 * NumArgs::one()
         ),
         Some(Structure::BLS12381Fq12) => from_u64_internal!(
-            gas_params,
             context,
             args,
-            Structure::BLS12381Fq12,
-            ark_bls12_381::Fq12
+            ark_bls12_381::Fq12,
+            gas_params.ark_bls12_381_fq12_from_u64 * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
@@ -806,33 +758,6 @@ macro_rules! ark_binary_op_internal {
         safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
         $context.charge($gas)?;
         let new_element = element_1.$ark_func(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::u64(new_handle as u64)])
-    }};
-}
-
-macro_rules! ark_div_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
-        let handle_2 = safely_pop_arg!($args, u64) as usize;
-        let handle_1 = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
-        safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
-        if element_2.is_zero() {
-            return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
-        }
-        $context.charge($gas)?;
-        let new_element = element_1.$ark_func(element_2);
-        let new_handle = store_element!($context, new_element);
-        Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
-    }};
-}
-
-macro_rules! ark_unary_op_internal {
-    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
-        let handle = safely_pop_arg!($args, u64) as usize;
-        safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
-        $context.charge($gas)?;
-        let new_element = element.$ark_func();
         let new_handle = store_element!($context, new_element);
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
@@ -970,6 +895,23 @@ fn mul_internal(
     }
 }
 
+macro_rules! ark_div_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas_eq:expr, $gas_div:expr) => {{
+        let handle_2 = safely_pop_arg!($args, u64) as usize;
+        let handle_1 = safely_pop_arg!($args, u64) as usize;
+        safe_borrow_element!($context, handle_1, $ark_typ, element_1_ptr, element_1);
+        safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
+        $context.charge($gas_eq)?;
+        if element_2.is_zero() {
+            return Ok(smallvec![Value::bool(false), Value::u64(0_u64)]);
+        }
+        $context.charge($gas_div)?;
+        let new_element = element_1.$ark_func(element_2);
+        let new_handle = store_element!($context, new_element);
+        Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
+    }};
+}
+
 fn div_internal(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
@@ -985,6 +927,7 @@ fn div_internal(
             args,
             ark_bls12_381::Fr,
             div,
+            gas_params.ark_bls12_381_fr_eq * NumArgs::one(),
             gas_params.ark_bls12_381_fr_div * NumArgs::one()
         ),
         Some(Structure::BLS12381Fq12) => ark_div_internal!(
@@ -992,12 +935,24 @@ fn div_internal(
             args,
             ark_bls12_381::Fq12,
             div,
+            gas_params.ark_bls12_381_fq12_eq * NumArgs::one(),
             gas_params.ark_bls12_381_fq12_div * NumArgs::one()
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),
     }
+}
+
+macro_rules! ark_unary_op_internal {
+    ($context:expr, $args:ident, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
+        let handle = safely_pop_arg!($args, u64) as usize;
+        safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
+        $context.charge($gas)?;
+        let new_element = element.$ark_func();
+        let new_handle = store_element!($context, new_element);
+        Ok(smallvec![Value::u64(new_handle as u64)])
+    }};
 }
 
 fn neg_internal(
