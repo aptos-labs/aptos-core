@@ -11,13 +11,7 @@ use crate::{
     VMStatus,
 };
 use move_binary_format::file_format_common::read_uleb128_as_u64;
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    value::MoveValue,
-    vm_status::StatusCode,
-};
+use move_core_types::{account_address::AccountAddress, ident_str, identifier::{IdentStr, Identifier}, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::{gas::GasMeter, loaded_data::runtime_types::Type};
 use once_cell::sync::Lazy;
@@ -29,7 +23,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
-    func_name: &'static str,
+    func_name: &'static IdentStr,
 }
 
 static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
@@ -37,16 +31,16 @@ static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
         ("0x1::string::String", FunctionId {
             module_id: ModuleId::new(
                 AccountAddress::ONE,
-                Identifier::new("string").expect("cannot fail"),
+                Identifier::from(ident_str!("string")),
             ),
-            func_name: "utf8",
+            func_name: ident_str!("utf8"),
         }),
         ("0x1::object::Object", FunctionId {
             module_id: ModuleId::new(
                 AccountAddress::ONE,
-                Identifier::new("object").expect("cannot fail"),
+                Identifier::from(ident_str!("object")),
             ),
-            func_name: "address_to_object",
+            func_name: ident_str!("address_to_object"),
         }),
     ]
     .into_iter()
@@ -256,7 +250,7 @@ fn validate_and_construct<S: MoveResolverExt>(
 ) -> Result<Vec<u8>, VMStatus> {
     let (module, function, instantiation) = session.load_function_with_type_arg_inference(
         &constructor.module_id,
-        IdentStr::new(constructor.func_name).expect(""),
+        constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];

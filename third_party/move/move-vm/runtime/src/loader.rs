@@ -803,14 +803,16 @@ impl Loader {
             self.load_function_without_type_args(module_id, function_name, data_store)?;
 
         if return_vec.len() != 1 {
+            // For functions that are marked constructor this should not happen.
             return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
         }
         let return_type = &return_vec[0];
 
         let mut map = BTreeMap::new();
         if !Self::match_return_type(return_type, expected_return_type, &mut map) {
+            // For functions that are marked constructor this should not happen.
             return Err(
-                PartialVMError::new(StatusCode::ACCOUNT_NOT_MULTISIG).finish(Location::Undefined)
+                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(Location::Undefined)
             );
         }
 
@@ -821,14 +823,15 @@ impl Loader {
             if let Option::Some(t) = map.get(&i) {
                 type_arguments.push((*t).clone());
             } else {
-                // Unknown type argument
+                // Unknown type argument we are not able to infer the type arguments.
+                // For functions that are marked constructor this should not happen.
                 return Err(
-                    PartialVMError::new(StatusCode::BAD_CHAIN_ID).finish(Location::Undefined)
+                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(Location::Undefined)
                 );
             }
         }
 
-        // verify type arguments
+        // verify type arguments for capability constraints
         self.verify_ty_args(func.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
