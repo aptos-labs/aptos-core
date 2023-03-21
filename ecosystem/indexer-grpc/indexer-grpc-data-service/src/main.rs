@@ -5,13 +5,18 @@ use aptos_indexer_grpc_data_service::service::DatastreamServer;
 use aptos_protos::datastream::v1::indexer_stream_server::IndexerStreamServer;
 use clap::Parser;
 use std::{
+    collections::HashSet,
     net::ToSocketAddrs,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
-use tonic::transport::Server;
+use tonic::{
+    metadata::{Ascii, MetadataValue},
+    transport::Server,
+    Request, Status,
+};
 use warp::Filter;
 
 #[derive(Parser)]
@@ -37,13 +42,28 @@ fn main() {
         .expect("grpc_address not set");
     let health_port = config.health_check_port;
 
+    let token_set = build_auth_token_set(config.whitelisted_auth_tokens.clone());
+    let authentication_inceptor = move |req: Request<()>| {
+        let metadata = req.metadata();
+        if let Some(token) =
+            metadata.get(aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER)
+        {
+            if token_set.contains(token) {
+                Ok(req)
+            } else {
+                Err(Status::unauthenticated("Invalid token"))
+            }
+        } else {
+            Err(Status::unauthenticated("Missing token"))
+        }
+    };
     let runtime = aptos_runtimes::spawn_named_runtime("indexerdata".to_string(), None);
-    // Start serving.
+    // Add authentication interceptor.
     runtime.spawn(async move {
         let server = DatastreamServer::new(config);
-
+        let svc = IndexerStreamServer::with_interceptor(server, authentication_inceptor);
         Server::builder()
-            .add_service(IndexerStreamServer::new(server))
+            .add_service(svc)
             .serve(grpc_address.to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
@@ -62,4 +82,17 @@ fn main() {
     while !term.load(Ordering::Acquire) {
         std::thread::park();
     }
+}
+
+pub fn build_auth_token_set(
+    whitelisted_auth_tokens: Option<Vec<String>>,
+) -> HashSet<MetadataValue<Ascii>> {
+    whitelisted_auth_tokens
+        .unwrap_or_default()
+        .into_iter()
+        .map(|token| {
+            let token: MetadataValue<Ascii> = token.parse().unwrap();
+            token
+        })
+        .collect::<HashSet<_>>()
 }

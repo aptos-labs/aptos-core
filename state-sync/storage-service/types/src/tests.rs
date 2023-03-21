@@ -219,17 +219,17 @@ fn test_protocol_metadata_can_service() {
     };
 
     for compression in [true, false] {
-        assert!(metadata.can_service(&txns_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&txns_request(200, 100, 200, compression)));
-
+        // Requests with smaller chunk sizes can be serviced
+        assert!(metadata.can_service(&txns_request(200, 100, 101, compression)));
         assert!(metadata.can_service(&epochs_request(100, 199, compression)));
-        assert!(!metadata.can_service(&epochs_request(100, 200, compression)));
-
-        assert!(metadata.can_service(&outputs_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&outputs_request(200, 100, 200, compression)));
-
+        assert!(metadata.can_service(&outputs_request(200, 100, 100, compression)));
         assert!(metadata.can_service(&state_values_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&state_values_request(200, 100, 200, compression)));
+
+        // Requests with larger chunk sizes (beyond the max) can also be serviced
+        assert!(metadata.can_service(&txns_request(200, 100, 1000, compression)));
+        assert!(metadata.can_service(&epochs_request(100, 10000, compression)));
+        assert!(metadata.can_service(&outputs_request(200, 100, 9999989, compression)));
+        assert!(metadata.can_service(&state_values_request(200, 100, 200, compression)));
     }
 }
 

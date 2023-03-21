@@ -10,16 +10,19 @@ use crate::{
     storage::{BackupStorage, ShellSafeName, TextLine},
     utils::{error_notes::ErrorNotes, path_exists, PathToString},
 };
-use anyhow::Result;
+use anyhow::{bail, format_err, Result};
+use aptos_logger::info;
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsStr,
+    io,
     path::{Path, PathBuf},
     str::FromStr,
 };
 use tokio::{
-    fs::{create_dir_all, read_dir, OpenOptions},
+    fs::{create_dir_all, read_dir, rename, OpenOptions},
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 
@@ -50,6 +53,7 @@ pub struct LocalFs {
 }
 
 impl LocalFs {
+    const METADATA_BACKUP_DIR: &'static str = "metadata_backup";
     const METADATA_DIR: &'static str = "metadata";
 
     pub fn new(dir: PathBuf) -> Self {
@@ -62,6 +66,10 @@ impl LocalFs {
 
     pub fn metadata_dir(&self) -> PathBuf {
         self.dir.join(Self::METADATA_DIR)
+    }
+
+    pub fn metadata_backup_dir(&self) -> PathBuf {
+        self.dir.join(Self::METADATA_BACKUP_DIR)
     }
 }
 
@@ -106,22 +114,8 @@ impl BackupStorage for LocalFs {
     }
 
     async fn save_metadata_line(&self, name: &ShellSafeName, content: &TextLine) -> Result<()> {
-        let dir = self.metadata_dir();
-        create_dir_all(&dir).await.err_notes(name)?; // in case not yet created
-
-        let path = dir.join(name.as_ref());
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .await
-            .err_notes(&path)?;
-        file.write_all(content.as_ref().as_bytes())
-            .await
-            .err_notes(&path)?;
-        file.shutdown().await.err_notes(&path)?;
-
-        Ok(())
+        let txt = TextLine::new(content.as_ref().trim_end_matches('\n'))?;
+        self.save_metadata_lines(name, vec![txt].as_slice()).await
     }
 
     async fn list_metadata_files(&self) -> Result<Vec<FileHandle>> {
@@ -136,5 +130,57 @@ impl BackupStorage for LocalFs {
             }
         }
         Ok(res)
+    }
+
+    /// file_handle are expected to be the return results from list_metadata_files
+    /// file_handle is a path with `metadata` in the path, Ex: metadata/epoch_ending_1.meta
+    async fn backup_metadata_file(&self, file_handle: &FileHandleRef) -> Result<()> {
+        let dir = self.metadata_backup_dir();
+
+        // Check if the backup directory exists, create it if it doesn't
+        if !dir.exists() {
+            create_dir_all(&dir).await?;
+        }
+
+        // Get the file name and the backup file path
+        let name = Path::new(file_handle)
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| format_err!("cannot extract filename from {}", file_handle))?;
+        let mut backup_path = PathBuf::from(&dir);
+        backup_path.push(name);
+
+        // Move the file to the backup directory
+        rename(&self.dir.join(file_handle), &backup_path).await?;
+
+        Ok(())
+    }
+
+    async fn save_metadata_lines(&self, name: &ShellSafeName, lines: &[TextLine]) -> Result<()> {
+        let dir = self.metadata_dir();
+        create_dir_all(&dir).await.err_notes(name)?; // in case not yet created
+        let content = lines
+            .iter()
+            .map(|e| e.as_ref())
+            .collect::<Vec<&str>>()
+            .join("");
+        let path = dir.join(name.as_ref());
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await;
+        match file {
+            Ok(mut f) => {
+                f.write_all(content.as_bytes()).await.err_notes(&path)?;
+                f.shutdown().await.err_notes(&path)?;
+            },
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                info!("File {} already exists, Skip", name.as_ref());
+            },
+            _ => bail!("Unexpected Error in saving metadata file {}", name.as_ref()),
+        }
+
+        Ok(())
     }
 }

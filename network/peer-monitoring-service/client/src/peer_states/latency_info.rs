@@ -101,6 +101,12 @@ impl LatencyInfoState {
             None
         }
     }
+
+    /// Returns a copy of the recorded latency pings for test purposes
+    #[cfg(test)]
+    pub fn get_recorded_latency_pings(&self) -> BTreeMap<u64, f64> {
+        self.recorded_latency_ping_durations_secs.clone()
+    }
 }
 
 impl StateValueInterface for LatencyInfoState {
@@ -187,5 +193,190 @@ impl StateValueInterface for LatencyInfoState {
             .message("Error encountered when pinging peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::peer_states::{key_value::StateValueInterface, latency_info::LatencyInfoState};
+    use aptos_config::{
+        config::{LatencyMonitoringConfig, PeerRole},
+        network_id::{NetworkId, PeerNetworkId},
+    };
+    use aptos_netcore::transport::ConnectionOrigin;
+    use aptos_network::{
+        application::metadata::PeerMetadata,
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
+    use aptos_peer_monitoring_service_types::{
+        LatencyPingRequest, LatencyPingResponse, PeerMonitoringServiceRequest,
+        PeerMonitoringServiceResponse,
+    };
+    use aptos_time_service::TimeService;
+    use aptos_types::{network_address::NetworkAddress, PeerId};
+    use rand::{rngs::OsRng, Rng};
+    use std::{cmp::min, str::FromStr};
+
+    // Useful test constants
+    const TEST_NETWORK_ADDRESS: &str = "/ip4/127.0.0.1/tcp/8081";
+
+    #[test]
+    fn test_verify_latency_info_state() {
+        // Create the latency info state
+        let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let time_service = TimeService::mock();
+        let mut latency_info_state =
+            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+
+        // Verify the initial latency info state
+        assert_eq!(latency_info_state.latency_ping_counter, 0);
+        assert!(latency_info_state.get_average_latency_ping_secs().is_none());
+        verify_no_recorded_pings(&mut latency_info_state);
+
+        // Attempt to handle an invalid ping response with mismatched ping counters
+        let ping_request_counter = latency_info_state.get_and_increment_latency_ping_counter();
+        handle_monitoring_service_response(
+            &mut latency_info_state,
+            ping_request_counter,
+            ping_request_counter + 1,
+            0.0,
+        );
+
+        // Verify there are still no recorded latency pings
+        verify_no_recorded_pings(&mut latency_info_state);
+
+        // Handle several valid ping responses
+        let num_latency_pings = latency_monitoring_config.max_num_latency_pings_to_retain;
+        for _ in 0..num_latency_pings {
+            // Handle the ping response
+            let ping_request_counter = latency_info_state.get_and_increment_latency_ping_counter();
+            let latency_ping_duration = get_random_u64() as f64;
+            handle_monitoring_service_response(
+                &mut latency_info_state,
+                ping_request_counter,
+                ping_request_counter,
+                latency_ping_duration,
+            );
+        }
+
+        // Verify the average latency
+        let recorded_latency_pings = latency_info_state.get_recorded_latency_pings();
+        assert_eq!(
+            latency_info_state.get_average_latency_ping_secs().unwrap(),
+            recorded_latency_pings.values().sum::<f64>() / recorded_latency_pings.len() as f64,
+        );
+    }
+
+    #[test]
+    fn test_verify_latency_info_garbage_collection() {
+        // Create the latency info state
+        let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let time_service = TimeService::mock();
+        let mut latency_info_state =
+            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+
+        // Verify the initial latency info state
+        assert_eq!(latency_info_state.latency_ping_counter, 0);
+        assert!(latency_info_state.get_average_latency_ping_secs().is_none());
+        verify_no_recorded_pings(&mut latency_info_state);
+
+        // Handle several valid ping responses and verify the number of stored entries
+        let max_num_latency_pings_to_retain =
+            latency_monitoring_config.max_num_latency_pings_to_retain as u64;
+        let num_latency_pings = max_num_latency_pings_to_retain * 10;
+        for i in 0..num_latency_pings {
+            // Handle the ping response
+            let ping_request_counter = latency_info_state.get_and_increment_latency_ping_counter();
+            let latency_ping_duration = ping_request_counter as f64;
+            handle_monitoring_service_response(
+                &mut latency_info_state,
+                ping_request_counter,
+                ping_request_counter,
+                latency_ping_duration,
+            );
+
+            // Verify the number of recorded latencies
+            let recorded_latency_pings = latency_info_state.get_recorded_latency_pings();
+            let expected_num_latency_pings = min(max_num_latency_pings_to_retain, i + 1);
+            assert_eq!(
+                recorded_latency_pings.len() as u64,
+                expected_num_latency_pings,
+            );
+
+            // Verify the recorded latencies
+            let lowest_latency_ping_counter =
+                if ping_request_counter >= max_num_latency_pings_to_retain {
+                    ping_request_counter - max_num_latency_pings_to_retain + 1
+                } else {
+                    ping_request_counter
+                };
+            for latency_ping_counter in lowest_latency_ping_counter..ping_request_counter + 1 {
+                let latency_ping_duration =
+                    recorded_latency_pings.get(&latency_ping_counter).unwrap();
+                assert_eq!(*latency_ping_duration, latency_ping_counter as f64);
+            }
+
+            // Verify the average latency
+            assert_eq!(
+                latency_info_state.get_average_latency_ping_secs().unwrap(),
+                recorded_latency_pings.values().sum::<f64>() / recorded_latency_pings.len() as f64,
+            );
+        }
+    }
+
+    /// Returns a random U64
+    fn get_random_u64() -> u64 {
+        let mut rng = OsRng;
+        rng.gen()
+    }
+
+    /// Handles a monitoring service response from a peer
+    fn handle_monitoring_service_response(
+        latency_info_state: &mut LatencyInfoState,
+        request_ping_counter: u64,
+        response_ping_counter: u64,
+        response_time_secs: f64,
+    ) {
+        // Create a new peer metadata entry
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+        let connection_metadata = ConnectionMetadata::new(
+            peer_network_id.peer_id(),
+            ConnectionId::default(),
+            NetworkAddress::from_str(TEST_NETWORK_ADDRESS).unwrap(),
+            ConnectionOrigin::Outbound,
+            MessagingProtocolVersion::V1,
+            ProtocolIdSet::empty(),
+            PeerRole::Validator,
+        );
+        let peer_metadata = PeerMetadata::new(connection_metadata);
+
+        // Create the service request
+        let peer_monitoring_service_request =
+            PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest {
+                ping_counter: request_ping_counter,
+            });
+
+        // Create the service response
+        let peer_monitoring_service_response =
+            PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
+                ping_counter: response_ping_counter,
+            });
+
+        // Handle the response
+        latency_info_state.handle_monitoring_service_response(
+            &peer_network_id,
+            peer_metadata,
+            peer_monitoring_service_request,
+            peer_monitoring_service_response,
+            response_time_secs,
+        );
+    }
+
+    /// Verifies that there are no recorded latency pings
+    fn verify_no_recorded_pings(latency_info_state: &mut LatencyInfoState) {
+        assert!(latency_info_state
+            .recorded_latency_ping_durations_secs
+            .is_empty());
     }
 }
