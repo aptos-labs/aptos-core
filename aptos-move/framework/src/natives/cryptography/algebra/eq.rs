@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    abort_unless_feature_flag_enabled, abort_unless_arithmetics_enabled_for_structure,
+    abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::{
         cryptography::algebra::{
-            abort_invariant_violated, gas::GasParameters,
+            abort_invariant_violated, feature_flag_from_structure, gas::GasParameters,
             AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
@@ -15,7 +15,6 @@ use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-use crate::natives::cryptography::algebra::feature_flag_from_structure;
 
 macro_rules! ark_eq_internal {
     ($context:ident, $args:ident, $ark_typ:ty, $gas:expr) => {{

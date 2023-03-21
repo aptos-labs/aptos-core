@@ -4,22 +4,20 @@ use crate::{
     abort_unless_feature_flag_enabled,
     natives::{
         cryptography::algebra::{
-            abort_invariant_violated, gas::GasParameters,
-            AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+            abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
+            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
     safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
 };
+use aptos_types::on_chain_config::FeatureFlag;
+use ark_ec::{CurveGroup, Group};
+use ark_ff::Field;
 use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
-use ark_ff::Field;
-use ark_ec::Group;
-use aptos_types::on_chain_config::FeatureFlag;
-use ark_ec::CurveGroup;
 
 fn feature_flag_of_group_scalar_mul(
     group_opt: Option<Structure>,
@@ -115,7 +113,6 @@ pub fn scalar_mul_internal(
         }),
     }
 }
-
 
 macro_rules! ark_msm_internal {
     (

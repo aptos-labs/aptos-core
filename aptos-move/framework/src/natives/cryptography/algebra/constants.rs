@@ -1,27 +1,23 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    abort_unless_feature_flag_enabled, abort_unless_arithmetics_enabled_for_structure,
+    abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     natives::{
         cryptography::algebra::{
-            gas::GasParameters,
-            AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
+            BLS12381_GT_GENERATOR, BLS12381_R_LENDIAN, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
     store_element, structure_from_ty_arg,
 };
+use ark_ec::Group;
 use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use num_traits::Zero;
+use num_traits::{One, Zero};
+use once_cell::sync::Lazy;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
-use once_cell::sync::Lazy;
-use ark_ec::Group;
-use num_traits::One;
-use crate::natives::cryptography::algebra::BLS12381_GT_GENERATOR;
-use crate::natives::cryptography::algebra::BLS12381_R_LENDIAN;
-use crate::natives::cryptography::algebra::feature_flag_from_structure;
 
 macro_rules! ark_constant_op_internal {
     ($context:expr, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{

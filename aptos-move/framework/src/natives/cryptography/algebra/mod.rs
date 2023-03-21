@@ -3,53 +3,42 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        cryptography::algebra::{
-            casting::{downcast_internal, upcast_internal},
-            eq::eq_internal,
-            gas::GasParameters,
-            hash_to_structure::hash_to_internal,
-            pairing::{multi_pairing_internal, pairing_internal},
-            serialization::{deserialize_internal, serialize_internal},
-        },
-        helpers::{
-            make_safe_native, make_test_only_native_from_func,
-        },
-    },
-};
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
-use ark_serialize::CanonicalDeserialize;
-use better_any::{Tid, TidAble};
-use move_binary_format::errors::{PartialVMError};
-use move_core_types::{
-    language_storage::TypeTag,
-    vm_status::StatusCode,
-};
-use move_vm_runtime::native_functions::NativeFunction;
-use once_cell::sync::Lazy;
-use std::{
-    any::Any,
-    hash::Hash,
-    rc::Rc,
-    sync::Arc,
-};
-use arithmetics::div::div_internal;
-use crate::natives::cryptography::algebra::constants::{one_internal, order_internal, zero_internal};
-use arithmetics::inv::inv_internal;
-use arithmetics::scalar_mul::{multi_scalar_mul_internal, scalar_mul_internal};
-use crate::natives::cryptography::algebra::arithmetics::add::add_internal;
-use crate::natives::cryptography::algebra::arithmetics::double::double_internal;
-use crate::natives::cryptography::algebra::arithmetics::mul::mul_internal;
-use crate::natives::cryptography::algebra::arithmetics::neg::neg_internal;
-use crate::natives::cryptography::algebra::arithmetics::sqr::sqr_internal;
-use crate::natives::cryptography::algebra::arithmetics::sub::sub_internal;
-use crate::natives::cryptography::algebra::new::from_u64_internal;
 #[cfg(feature = "testing")]
 use crate::natives::cryptography::algebra::rand::rand_insecure_internal;
+use crate::natives::{
+    cryptography::algebra::{
+        arithmetics::{
+            add::add_internal, double::double_internal, mul::mul_internal, neg::neg_internal,
+            sqr::sqr_internal, sub::sub_internal,
+        },
+        casting::{downcast_internal, upcast_internal},
+        constants::{one_internal, order_internal, zero_internal},
+        eq::eq_internal,
+        gas::GasParameters,
+        hash_to_structure::hash_to_internal,
+        new::from_u64_internal,
+        pairing::{multi_pairing_internal, pairing_internal},
+        serialization::{deserialize_internal, serialize_internal},
+    },
+    helpers::{make_safe_native, make_test_only_native_from_func},
+};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatures};
+use arithmetics::{
+    div::div_internal,
+    inv::inv_internal,
+    scalar_mul::{multi_scalar_mul_internal, scalar_mul_internal},
+};
+use ark_serialize::CanonicalDeserialize;
+use better_any::{Tid, TidAble};
+use move_binary_format::errors::PartialVMError;
+use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
+use move_vm_runtime::native_functions::NativeFunction;
+use once_cell::sync::Lazy;
+use std::{any::Any, hash::Hash, rc::Rc, sync::Arc};
 
 pub mod arithmetics;
 pub mod casting;
+pub mod constants;
 pub mod eq;
 pub mod gas;
 pub mod hash_to_structure;
@@ -57,7 +46,6 @@ pub mod new;
 pub mod pairing;
 pub mod rand;
 pub mod serialization;
-pub mod constants;
 
 /// Equivalent to `std::error::invalid_argument(0)` in Move.
 const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0000;
@@ -202,9 +190,7 @@ macro_rules! store_element {
     }};
 }
 
-fn feature_flag_from_structure(
-    structure_opt: Option<Structure>,
-) -> Option<FeatureFlag> {
+fn feature_flag_from_structure(structure_opt: Option<Structure>) -> Option<FeatureFlag> {
     match structure_opt {
         Some(Structure::BLS12381Fr)
         | Some(Structure::BLS12381Fq12)
@@ -242,7 +228,6 @@ macro_rules! abort_unless_feature_flag_enabled {
 fn abort_invariant_violated() -> PartialVMError {
     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
 }
-
 
 static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(|| {
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").unwrap();

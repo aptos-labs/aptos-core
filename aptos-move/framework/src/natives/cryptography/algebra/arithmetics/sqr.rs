@@ -1,18 +1,22 @@
 // Copyright © Aptos Foundation
 
-use crate::{abort_unless_feature_flag_enabled, abort_unless_arithmetics_enabled_for_structure, ark_unary_op_internal, natives::{
-    cryptography::algebra::{
-        abort_invariant_violated, gas::GasParameters,
-        AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED
+use crate::{
+    abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
+    ark_unary_op_internal,
+    natives::{
+        cryptography::algebra::{
+            abort_invariant_violated, feature_flag_from_structure, gas::GasParameters,
+            AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        },
+        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
-    helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
-}, safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg};
+    safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
+};
+use ark_ff::Field;
 use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
-use ark_ff::Field;
-use crate::natives::cryptography::algebra::feature_flag_from_structure;
 
 pub fn sqr_internal(
     gas_params: &GasParameters,

@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 
-pub mod scalar_mul;
-pub mod div;
-pub mod inv;
 pub mod add;
-pub mod sub;
+pub mod div;
+pub mod double;
+pub mod inv;
 pub mod mul;
 pub mod neg;
+pub mod scalar_mul;
 pub mod sqr;
-pub mod double;
+pub mod sub;
 
 #[macro_export]
 macro_rules! ark_binary_op_internal {

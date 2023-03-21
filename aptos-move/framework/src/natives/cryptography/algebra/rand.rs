@@ -1,23 +1,19 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    natives::{
-        cryptography::algebra::{
-            AlgebraContext, Structure,
-        },
-    },
+    natives::cryptography::algebra::{AlgebraContext, Structure, BLS12381_GT_GENERATOR},
     store_element, structure_from_ty_arg,
 };
-use move_core_types::gas_algebra::InternalGas;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use smallvec::smallvec;
-use std::{collections::VecDeque, rc::Rc};
 use ark_ff::Field;
 use ark_std::{test_rng, UniformRand};
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::natives::function::NativeResult;
-use crate::natives::cryptography::algebra::BLS12381_GT_GENERATOR;
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+};
+use smallvec::smallvec;
+use std::{collections::VecDeque, rc::Rc};
 
 #[cfg(feature = "testing")]
 macro_rules! ark_rand_internal {
