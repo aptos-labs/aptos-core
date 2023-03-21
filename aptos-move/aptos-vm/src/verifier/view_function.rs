@@ -11,6 +11,7 @@ use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::gas::{UnmeteredGasMeter};
 use std::io::Cursor;
+use move_binary_format::normalized::Type;
 
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
@@ -45,32 +46,35 @@ pub(crate) fn validate_view_function<S: MoveResolverExt>(
         );
     }
 
+// Validate arguments. We allow all what transaction allows, in addition, signers can
+    // be passed. Some arguments (e.g. utf8 strings) need validation which happens here.
+    let mut needs_construction = vec![];
     for (idx, ty) in fun_inst.parameters.iter().enumerate() {
-        let (valid, needs_construction) = transaction_arg_validation::is_valid_txn_arg(session, ty);
-        if !valid {
-            return Err(
-                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                    .with_message("invalid view function argument".to_string()),
-            );
+        match ty {
+            Type::Signer => continue,
+            Type::Reference(inner_type) if matches!(&**inner_type, Type::Signer) => continue,
+            _ => {
+                let (valid, construction) = transaction_arg_validation::is_valid_txn_arg(session, ty);
+                if !valid {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .with_message("invalid view function argument".to_string()),
+                    );
+                }
+                if construction {
+                    construction.push(idx);
+                }
+            },
         }
-        if needs_construction {
-            let mut cursor = Cursor::new(&args[idx][..]);
-            let mut new_arg = vec![];
-            let mut gas_meter = UnmeteredGasMeter;
-            transaction_arg_validation::recursively_construct_arg(
-                session,
-                ty,
-                &mut cursor,
-                &mut gas_meter,
-                &mut new_arg,
-            )
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                    .with_message("invalid view function argument".to_string())
-            })?;
-            args[idx] = new_arg;
-            // Check cursor has parsed everything
-        }
+    }
+    if !needs_construction.is_empty()
+        && transaction_arg_validation::construct_args(session, &needs_validation, &mut args, fun_inst)
+        .is_err()
+    {
+        return Err(
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                .with_message("invalid view function argument: failed validation".to_string()),
+        );
     }
 
     Ok(args)
