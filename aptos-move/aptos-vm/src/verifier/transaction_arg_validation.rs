@@ -129,8 +129,7 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             .collect()
     };
     if !needs_construction.is_empty() {
-        let mut gas_meter = UnmeteredGasMeter;
-        construct_args(session, &needs_construction[..], &mut combined_args, func, &mut gas_meter)?;
+        construct_args(session, &needs_construction, &mut combined_args, func)?;
     }
     Ok(combined_args)
 }
@@ -165,8 +164,8 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
     idxs: &[usize],
     args: &mut Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
-    gas_meter: &mut impl GasMeter,
 ) -> Result<(), VMStatus> {
+    let mut gas_meter = UnmeteredGasMeter;
     for (idx, ty) in func.parameters.iter().enumerate() {
         if !idxs.contains(&idx) {
             continue;
@@ -175,7 +174,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         let mut cursor = Cursor::new(&arg[..]);
         let mut new_arg = vec![];
         // Perhaps in a future we should do proper gas metering here
-        recursively_construct_arg(session, ty, &mut cursor, gas_meter, &mut new_arg)?;
+        recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
         // Check cursor has parsed everything
         // is_empty is not enabled
         if cursor.position() != arg.len() as u64 {
