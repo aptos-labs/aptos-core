@@ -176,7 +176,7 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         // Perhaps in a future we should do proper gas metering here
         recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
         // Check cursor has parsed everything
-        // is_empty is not enabled
+        // Unfortunately, is_empty is only enabled in nightly, so we check this way.
         if cursor.position() != arg.len() as u64 {
             return Err(VMStatus::Error(
                 StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
@@ -187,7 +187,10 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
     }
     Ok(())
 }
-// A Cursor is used to recursively walk the serialized arg manually and correctly.
+
+// A Cursor is used to recursively walk the serialized arg manually and correctly. In effect we
+// are parsing the BCS serialized implicit constructor invocation tree, while serializing the
+// constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     ty: &Type,
@@ -217,6 +220,8 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
             let constructor = ALLOWED_STRUCTS
                 .get(&full_name)
                 .expect("unreachable: struct must be allowed");
+            // By appending the BCS to the output parameter we construct the correct BCS format
+            // of the argument.
             arg.append(&mut validate_and_construct(
                 session,
                 ty,
@@ -238,6 +243,10 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
     Ok(())
 }
 
+// A move function that constructs a type will return the BCS serialized representation of the
+// constructed value. This is the correct data to pass as the argument to a function taking
+// said struct as a parameter. In this function we execute the constructor constructing the
+// value and returning the BCS serialized representation.
 fn validate_and_construct<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     expected_type: &Type,
