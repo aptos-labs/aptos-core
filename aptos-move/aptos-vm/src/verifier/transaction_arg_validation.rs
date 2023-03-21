@@ -156,9 +156,10 @@ pub(crate) fn is_valid_txn_arg<S: MoveResolverExt>(
 pub(crate) fn construct_args<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     idxs: &[usize],
-    args: &mut Vec<Vec<u8>>,
+    args: &mut [Vec<u8>],
     func: &LoadedFunctionInstantiation,
 ) -> Result<(), VMStatus> {
+    // Perhaps in a future we should do proper gas metering here
     let mut gas_meter = UnmeteredGasMeter;
     for (idx, ty) in func.parameters.iter().enumerate() {
         if !idxs.contains(&idx) {
@@ -167,7 +168,6 @@ pub(crate) fn construct_args<S: MoveResolverExt>(
         let arg = &mut args[idx];
         let mut cursor = Cursor::new(&arg[..]);
         let mut new_arg = vec![];
-        // Perhaps in a future we should do proper gas metering here
         recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
         // Check cursor has parsed everything
         // Unfortunately, is_empty is only enabled in nightly, so we check this way.
@@ -234,6 +234,7 @@ pub(crate) fn recursively_construct_arg<S: MoveResolverExt>(
             unreachable!("Validation is only for arguments with String")
         },
     };
+
     Ok(())
 }
 
