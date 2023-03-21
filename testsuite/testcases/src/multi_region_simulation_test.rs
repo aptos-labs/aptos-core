@@ -61,7 +61,7 @@ fn create_multi_region_swarm_network_chaos(
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
-    let (mut group_network_delays, mut group_network_bandwidth): (
+    let (mut group_network_delays, mut group_network_bandwidths): (
         Vec<GroupNetworkDelay>,
         Vec<GroupNetworkBandwidth>,
     ) = validator_chunks
@@ -84,7 +84,7 @@ fn create_multi_region_swarm_network_chaos(
             info!("delay {:?}", delay);
 
             let bandwidth = GroupNetworkBandwidth {
-                name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
+                name: format!("{}-to-{}-bandwidth", from_region.clone(), to_region.clone()),
                 source_nodes: from_chunk.to_vec(),
                 target_nodes: to_chunk.to_vec(),
                 rate: 1000 / 8,
@@ -109,7 +109,7 @@ fn create_multi_region_swarm_network_chaos(
         group_network_delays[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
-        group_network_bandwidth[0]
+        group_network_bandwidths[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
     }
@@ -119,7 +119,7 @@ fn create_multi_region_swarm_network_chaos(
             group_network_delays,
         },
         SwarmNetworkBandwidth {
-            group_network_bandwidths: group_network_bandwidth,
+            group_network_bandwidths,
         },
     )
 }
