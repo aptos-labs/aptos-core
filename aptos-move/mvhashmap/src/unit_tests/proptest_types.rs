@@ -2,12 +2,19 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
+use super::{
+    types::{MVDataError, MVDataOutput, TxnIndex},
+    MVHashMap,
+};
+use crate::unit_tests::KeyType;
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
-use aptos_types::{state_store::state_value::StateValue, write_set::TransactionWrite};
+use aptos_types::{
+    executable::ExecutableTestType, state_store::state_value::StateValue,
+    write_set::TransactionWrite,
+};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -62,7 +69,7 @@ enum Data<V> {
     Write(Value<V>),
     Delta(DeltaOp),
 }
-struct Baseline<K, V>(HashMap<K, BTreeMap<usize, Data<V>>>);
+struct Baseline<K, V>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
@@ -70,7 +77,7 @@ where
     V: Clone + Into<Vec<u8>> + Debug + PartialEq,
 {
     pub fn new(txns: &[(K, Operator<V>)]) -> Self {
-        let mut baseline: HashMap<K, BTreeMap<usize, Data<V>>> = HashMap::new();
+        let mut baseline: HashMap<K, BTreeMap<TxnIndex, Data<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
                 Operator::Insert(v) => Data::Write(Value(Some(v.clone()))),
@@ -82,13 +89,13 @@ where
             baseline
                 .entry(k.clone())
                 .or_insert_with(BTreeMap::new)
-                .insert(idx, value_to_update);
+                .insert(idx as TxnIndex, value_to_update);
         }
         Self(baseline)
     }
 
-    pub fn get(&self, key: &K, version: usize) -> ExpectedOutput<V> {
-        match self.0.get(key).map(|tree| tree.range(..version)) {
+    pub fn get(&self, key: &K, txn_idx: TxnIndex) -> ExpectedOutput<V> {
+        match self.0.get(key).map(|tree| tree.range(..txn_idx)) {
             None => ExpectedOutput::NotInMap,
             Some(mut iter) => {
                 let mut acc: Option<DeltaOp> = None;
@@ -182,7 +189,8 @@ where
         .collect::<Vec<_>>();
 
     let baseline = Baseline::new(transactions.as_slice());
-    let map = MVHashMap::<K, Value<V>>::new();
+    // Only testing data, provide executable type ().
+    let map = MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new(None);
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -197,18 +205,18 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.add_write(&key, (idx, 0), Value(None));
-        map.mark_estimate(&key, idx);
+        map.write(&KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
+        map.mark_estimate(&KeyType(key), idx as TxnIndex);
     }
 
-    let curent_idx = AtomicUsize::new(0);
+    let current_idx = AtomicUsize::new(0);
 
     // Spawn a few threads in parallel to commit each operator.
     rayon::scope(|s| {
         for _ in 0..universe.len() {
             s.spawn(|_| loop {
                 // Each thread will eagerly fetch an Operator to execute.
-                let idx = curent_idx.fetch_add(1, Ordering::Relaxed);
+                let idx = current_idx.fetch_add(1, Ordering::Relaxed);
                 if idx >= transactions.len() {
                     // Abort when all transactions are processed.
                     break;
@@ -216,14 +224,14 @@ where
                 let key = &transactions[idx].0;
                 match &transactions[idx].1 {
                     Operator::Read => {
-                        use MVHashMapError::*;
-                        use MVHashMapOutput::*;
+                        use MVDataError::*;
+                        use MVDataOutput::*;
 
-                        let baseline = baseline.get(key, idx);
+                        let baseline = baseline.get(key, idx as TxnIndex);
                         let mut retry_attempts = 0;
                         loop {
-                            match map.read(key, idx) {
-                                Ok(Version(_, v)) => {
+                            match map.fetch_data(&KeyType(key.clone()), idx as TxnIndex) {
+                                Ok(Versioned(_, v)) => {
                                     match &*v {
                                         Value(Some(w)) => {
                                             assert_eq!(
@@ -275,12 +283,18 @@ where
                         }
                     },
                     Operator::Remove => {
-                        map.add_write(key, (idx, 1), Value(None));
+                        map.write(&KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
                     },
                     Operator::Insert(v) => {
-                        map.add_write(key, (idx, 1), Value(Some(v.clone())));
+                        map.write(
+                            &KeyType(key.clone()),
+                            (idx as TxnIndex, 1),
+                            Value(Some(v.clone())),
+                        );
                     },
-                    Operator::Update(delta) => map.add_delta(key, idx, *delta),
+                    Operator::Update(delta) => {
+                        map.add_delta(&KeyType(key.clone()), idx as TxnIndex, *delta)
+                    },
                 }
             })
         }

@@ -31,6 +31,7 @@ use aptos_types::{
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use rayon::prelude::*;
+use std::time::Instant;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -38,6 +39,7 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 }
 
 // Wrapper to avoid orphan rule
+#[derive(PartialEq, Debug)]
 pub(crate) struct AptosTransactionOutput(TransactionOutputExt);
 
 impl AptosTransactionOutput {
@@ -137,5 +139,63 @@ impl BlockAptosVM {
             },
             Err(Error::UserError(err)) => Err(err),
         }
+    }
+
+    pub fn execute_block_benchmark<S: StateView + Sync>(
+        transactions: Vec<Transaction>,
+        state_view: &S,
+        concurrency_level: usize,
+        check_correctness: bool,
+    ) -> usize {
+        // Verify the signatures of all the transactions in parallel.
+        // This is time consuming so don't wait and do the checking
+        // sequentially while executing the transactions.
+        let signature_verified_block: Vec<PreprocessedTransaction> =
+            RAYON_EXEC_POOL.install(|| {
+                transactions
+                    .clone()
+                    .into_par_iter()
+                    .with_min_len(25)
+                    .map(preprocess_transaction::<AptosVM>)
+                    .collect()
+            });
+        let signature_verified_block_for_seq: Vec<PreprocessedTransaction> = RAYON_EXEC_POOL
+            .install(|| {
+                transactions
+                    .into_par_iter()
+                    .with_min_len(25)
+                    .map(preprocess_transaction::<AptosVM>)
+                    .collect()
+            });
+        let block_size = signature_verified_block.len();
+
+        init_speculative_logs(signature_verified_block.len());
+
+        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+            concurrency_level,
+        );
+
+        let timer = Instant::now();
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let exec_t = timer.elapsed();
+
+        flush_speculative_logs();
+
+        if check_correctness {
+            // sequentially execute the block and check if the results match
+            let seq_executor =
+                BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
+            let seq_ret = seq_executor.execute_block(
+                state_view,
+                signature_verified_block_for_seq,
+                state_view,
+            );
+            assert_eq!(ret, seq_ret);
+            drop(seq_ret);
+        }
+        drop(ret);
+
+        block_size * 1000 / exec_t.as_millis() as usize
     }
 }

@@ -44,9 +44,12 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `generate_extend_ref`](#0x1_object_generate_extend_ref)
 -  [Function `generate_transfer_ref`](#0x1_object_generate_transfer_ref)
 -  [Function `generate_signer`](#0x1_object_generate_signer)
+-  [Function `address_from_constructor_ref`](#0x1_object_address_from_constructor_ref)
 -  [Function `object_from_constructor_ref`](#0x1_object_object_from_constructor_ref)
+-  [Function `can_generate_delete_ref`](#0x1_object_can_generate_delete_ref)
 -  [Function `create_guid`](#0x1_object_create_guid)
 -  [Function `new_event_handle`](#0x1_object_new_event_handle)
+-  [Function `address_from_delete_ref`](#0x1_object_address_from_delete_ref)
 -  [Function `object_from_delete_ref`](#0x1_object_object_from_delete_ref)
 -  [Function `delete`](#0x1_object_delete)
 -  [Function `generate_signer_for_extending`](#0x1_object_generate_signer_for_extending)
@@ -862,11 +865,36 @@ Create a signer for the ConstructorRef
 
 </details>
 
+<a name="0x1_object_address_from_constructor_ref"></a>
+
+## Function `address_from_constructor_ref`
+
+Returns the address associated with the constructor
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_object_object_from_constructor_ref"></a>
 
 ## Function `object_from_constructor_ref`
 
-Returns the address of within a ConstructorRef
+Returns an Object<T> from within a DeleteRef
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
@@ -880,6 +908,31 @@ Returns the address of within a ConstructorRef
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
     <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_can_generate_delete_ref"></a>
+
+## Function `can_generate_delete_ref`
+
+Returns whether or not the ConstructorRef can be used to create DeleteRef
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): bool {
+    ref.can_delete
 }
 </code></pre>
 
@@ -934,6 +987,31 @@ Generate a new event handle.
     <a href="object.md#0x1_object">object</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
 ): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt; <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <a href="event.md#0x1_event_new_event_handle">event::new_event_handle</a>(<a href="object.md#0x1_object_create_guid">create_guid</a>(<a href="object.md#0x1_object">object</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_delete_ref"></a>
+
+## Function `address_from_delete_ref`
+
+Returns the address associated with the constructor
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_ref">address_from_delete_ref</a>(ref: &<a href="object.md#0x1_object_DeleteRef">DeleteRef</a>): <b>address</b> {
+    ref.self
 }
 </code></pre>
 

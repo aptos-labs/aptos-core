@@ -15,18 +15,10 @@ struct Token {
     collection_id: u64,
     creator: AccountAddress,
     description: String,
-    mutability_config: MutabilityConfig,
     name: String,
     creation_name: Option<String>,
     uri: String,
     mutation_events: EventHandle,
-}
-
-#[derive(Debug, Deserialize, Eq, PartialEq)]
-struct MutabilityConfig {
-    description: bool,
-    name: bool,
-    uri: bool,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -109,7 +101,7 @@ fn test_basic_token() {
 
     let result = h.run_entry_function(
         &account,
-        str::parse(&format!("0x{}::token::set_description_entry", addr)).unwrap(),
+        str::parse(&format!("0x{}::hero::set_hero_description", addr)).unwrap(),
         vec![],
         vec![
             bcs::to_bytes("Hero Quest!").unwrap(),

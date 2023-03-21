@@ -8,10 +8,10 @@ use crate::{
         state_kv_pruner_worker::StateKvPrunerWorker,
     },
     pruner_utils,
+    state_kv_db::StateKvDb,
 };
 use aptos_config::config::StateKvPrunerConfig;
 use aptos_infallible::Mutex;
-use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
 use std::{sync::Arc, thread::JoinHandle};
 
@@ -85,7 +85,7 @@ impl PrunerManager for StateKvPrunerManager {
 
 impl StateKvPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(state_kv_db: Arc<DB>, state_kv_pruner_config: StateKvPrunerConfig) -> Self {
+    pub fn new(state_kv_db: Arc<StateKvDb>, state_kv_pruner_config: StateKvPrunerConfig) -> Self {
         let state_kv_pruner = pruner_utils::create_state_kv_pruner(state_kv_db);
 
         if state_kv_pruner_config.enable {
