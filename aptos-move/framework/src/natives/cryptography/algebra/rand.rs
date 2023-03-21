@@ -1,0 +1,65 @@
+// Copyright © Aptos Foundation
+
+use crate::{
+    natives::{
+        cryptography::algebra::{
+            AlgebraContext, Structure,
+        },
+    },
+    store_element, structure_from_ty_arg,
+};
+use move_core_types::gas_algebra::InternalGas;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::smallvec;
+use std::{collections::VecDeque, rc::Rc};
+use ark_ff::Field;
+use ark_std::{test_rng, UniformRand};
+use move_binary_format::errors::PartialVMResult;
+use move_vm_runtime::native_functions::NativeContext;
+use move_vm_types::natives::function::NativeResult;
+use crate::natives::cryptography::algebra::BLS12381_GT_GENERATOR;
+
+#[cfg(feature = "testing")]
+macro_rules! ark_rand_internal {
+    ($context:expr, $typ:ty) => {{
+        let element = <$typ>::rand(&mut test_rng());
+        let handle = store_element!($context, element);
+        Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+            Value::u64(handle as u64)
+        ]))
+    }};
+}
+
+#[cfg(feature = "testing")]
+pub fn rand_insecure_internal(
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    mut _args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert_eq!(1, ty_args.len());
+    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    match structure_opt {
+        Some(Structure::BLS12381Fr) => {
+            ark_rand_internal!(context, ark_bls12_381::Fr)
+        },
+        Some(Structure::BLS12381Fq12) => {
+            ark_rand_internal!(context, ark_bls12_381::Fq12)
+        },
+        Some(Structure::BLS12381G1Affine) => {
+            ark_rand_internal!(context, ark_bls12_381::G1Projective)
+        },
+        Some(Structure::BLS12381G2Affine) => {
+            ark_rand_internal!(context, ark_bls12_381::G2Projective)
+        },
+        Some(Structure::BLS12381Gt) => {
+            let k = ark_bls12_381::Fr::rand(&mut test_rng());
+            let k_bigint: ark_ff::BigInteger256 = k.into();
+            let element = BLS12381_GT_GENERATOR.pow(k_bigint);
+            let handle = store_element!(context, element);
+            Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+                Value::u64(handle as u64)
+            ]))
+        },
+        _ => unreachable!(),
+    }
+}
