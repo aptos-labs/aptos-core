@@ -321,10 +321,10 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn send_rand_shares(&mut self, rand_shares: RandShares, recipient: Author) {
+    pub async fn send_rand_shares(&mut self, rand_shares: RandShares, recipients: Vec<Author>) {
         fail_point!("consensus::send::rand_share", |_| ());
         let msg = ConsensusMsg::RandShareMsg(Box::new(rand_shares));
-        self.send(msg, vec![recipient]).await
+        self.send(msg, recipients).await
     }
 
     pub async fn broadcast_rand_shares(&mut self, rand_shares: RandShares) {
@@ -332,14 +332,6 @@ impl NetworkSender {
         let msg = ConsensusMsg::RandShareMsg(Box::new(rand_shares));
         self.broadcast(msg).await
     }
-
-    // /// Sends the randomness to self buffer manager
-    // pub async fn send_rand_decisions(&self, rand_decisions: RandDecisions) {
-    //     fail_point!("consensus::send::rand_decision", |_| ());
-    //     // this requires re-verification of the ledger info we can probably optimize it later
-    //     let msg = ConsensusMsg::RandDecisionMsg(Box::new(rand_decisions));
-    //     self.send(msg, vec![self.author]).await
-    // }
 
     pub async fn broadcast_rand_decisions(&mut self, rand_decisions: RandDecisions) {
         fail_point!("consensus::send::broadcast_rand_decision", |_| ());
