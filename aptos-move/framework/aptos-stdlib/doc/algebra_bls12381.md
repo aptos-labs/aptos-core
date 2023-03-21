@@ -6,12 +6,13 @@
 This module defines marker types, constants and test cases for working with BLS12-381 curves
 using generic API defined in <code><a href="algebra.md#0x1_algebra">algebra</a>.<b>move</b></code>.
 
-Below are the BLS12-381 structures currently supported.
-- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code>.
-- Group <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>.
-- Field <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>.
+See https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-11#name-bls-curves-for-the-128-bit-
+for the full sepcification of BLS12-381 curves.
+
+Currently supported the BLS12-381 structures include <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fq12">Fq12</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Fr">Fr</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>,
+along with their widely-used serialization formats,
+the pairing between <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code>, <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_Gt">Gt</a></code>,
+and the hash-to-curve operations for <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> and <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G2Affine">G2Affine</a></code> defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16.
 
 
 -  [Struct `Fq`](#0x1_algebra_bls12381_Fq)
