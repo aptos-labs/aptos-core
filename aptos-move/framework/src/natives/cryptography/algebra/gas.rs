@@ -22,6 +22,17 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
     }
 }
 
+/// The approximate cost model of https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89.
+fn ark_msm_bigint_wnaf_cost(cost_add: InternalGasPerArg, cost_double: InternalGasPerArg, num_entries: usize) -> InternalGas {
+    let window_size = ark_msm_window_size(num_entries);
+    let num_windows = (255 + window_size - 1) / window_size;
+    let num_buckets = 1_usize << window_size;
+    cost_add
+        * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
+        + cost_double
+        * NumArgs::from((num_buckets * num_windows) as u64)
+}
+
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub ark_bls12_381_fr_add: InternalGasPerArg,
@@ -91,22 +102,10 @@ impl GasParameters {
     pub fn group_multi_scalar_mul(&self, structure: Structure, num_entries: usize) -> InternalGas {
         match structure {
             Structure::BLS12381G1Affine => {
-                let window_size = ark_msm_window_size(num_entries);
-                let num_windows = (255 + window_size - 1) / window_size;
-                let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g1_proj_add
-                    * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
-                    + self.ark_bls12_381_g1_proj_double
-                        * NumArgs::from((num_buckets * num_windows) as u64)
+                ark_msm_bigint_wnaf_cost(self.ark_bls12_381_g1_proj_add, self.ark_bls12_381_g1_proj_double, num_entries)
             },
             Structure::BLS12381G2Affine => {
-                let window_size = ark_msm_window_size(num_entries);
-                let num_windows = (255 + window_size - 1) / window_size;
-                let num_buckets = 1_usize << window_size;
-                self.ark_bls12_381_g2_proj_add
-                    * NumArgs::from(((num_entries + num_buckets + 1) * num_windows) as u64)
-                    + self.ark_bls12_381_g2_proj_double
-                        * NumArgs::from((num_buckets * num_windows) as u64)
+                ark_msm_bigint_wnaf_cost(self.ark_bls12_381_g2_proj_add, self.ark_bls12_381_g2_proj_double, num_entries)
             },
             _ => unreachable!(),
         }
