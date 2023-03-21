@@ -1,9 +1,9 @@
 /// This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
 /// which can be used to build generic cryptographic schemes atop.
 ///
-/// In general, a structure implements operations like (de)serialization, equality check, random sampling.
+/// In general, every structure implements basic operations like (de)serialization, equality check, random sampling.
 ///
-/// A group typically implements the following operations. (Additive notions are used.)
+/// A group may also implement the following operations. (Additive notions are used.)
 /// - `order()` for group order.
 /// - `zero()` for group identity.
 /// - `one()` for group generator (if exists).
@@ -15,7 +15,7 @@
 /// - `multi_scalar_mul()` for efficient group multi-scalar multiplication.
 /// - `hash_to()` for hash-to-group.
 ///
-/// A field typically implements the following operations.
+/// A field may also implement the following operations.
 /// - `zero()` for the field additive identity.
 /// - `one()` for the field multiplicative identity.
 /// - `add()` for field addition.
@@ -27,9 +27,9 @@
 /// - `sqr()` for efficient field element squaring.
 /// - `from_u64()` for quick conversion from u64 to field element.
 ///
-/// A pairing typically implements `pairing()` and `multi_pairing()`.
+/// For 3 groups that form a bilinear map, `pairing()` and `multi_pairing()` may be implemented.
 ///
-/// `upcasting()` and `downcasting()` are implemented whenever there is a subset/superset relationship between 2 structures.
+/// For a subset/superset relationship between 2 structures, `upcasting()` and `downcasting()` may be implemented.
 ///
 /// See `algebra_*.move` for currently implemented algebraic structures.
 module aptos_std::algebra {
@@ -265,7 +265,7 @@ module aptos_std::algebra {
     //
 
     fun abort_unless_cryptography_algebra_natives_enabled() {
-        if (features::cryptography_algebra_natives_enabled()) return;
+        if (features::cryptography_algebra_enabled()) return;
         abort(std::error::not_implemented(0))
     }
 

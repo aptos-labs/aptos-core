@@ -6,9 +6,9 @@
 This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
 which can be used to build generic cryptographic schemes atop.
 
-In general, a structure implements operations like (de)serialization, equality check, random sampling.
+In general, every structure implements basic operations like (de)serialization, equality check, random sampling.
 
-A group typically implements the following operations. (Additive notions are used.)
+A group may also implement the following operations. (Additive notions are used.)
 - <code><a href="algebra.md#0x1_algebra_order">order</a>()</code> for group order.
 - <code><a href="algebra.md#0x1_algebra_zero">zero</a>()</code> for group identity.
 - <code><a href="algebra.md#0x1_algebra_one">one</a>()</code> for group generator (if exists).
@@ -20,7 +20,7 @@ A group typically implements the following operations. (Additive notions are use
 - <code><a href="algebra.md#0x1_algebra_multi_scalar_mul">multi_scalar_mul</a>()</code> for efficient group multi-scalar multiplication.
 - <code><a href="algebra.md#0x1_algebra_hash_to">hash_to</a>()</code> for hash-to-group.
 
-A field typically implements the following operations.
+A field may also implement the following operations.
 - <code><a href="algebra.md#0x1_algebra_zero">zero</a>()</code> for the field additive identity.
 - <code><a href="algebra.md#0x1_algebra_one">one</a>()</code> for the field multiplicative identity.
 - <code><a href="algebra.md#0x1_algebra_add">add</a>()</code> for field addition.
@@ -32,9 +32,9 @@ A field typically implements the following operations.
 - <code><a href="algebra.md#0x1_algebra_sqr">sqr</a>()</code> for efficient field element squaring.
 - <code><a href="algebra.md#0x1_algebra_from_u64">from_u64</a>()</code> for quick conversion from u64 to field element.
 
-A pairing typically implements <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> and <code><a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>()</code>.
+For 3 groups that form a bilinear map, <code><a href="algebra.md#0x1_algebra_pairing">pairing</a>()</code> and <code><a href="algebra.md#0x1_algebra_multi_pairing">multi_pairing</a>()</code> may be implemented.
 
-<code>upcasting()</code> and <code>downcasting()</code> are implemented whenever there is a subset/superset relationship between 2 structures.
+For a subset/superset relationship between 2 structures, <code>upcasting()</code> and <code>downcasting()</code> may be implemented.
 
 See <code>algebra_*.<b>move</b></code> for currently implemented algebraic structures.
 
@@ -788,7 +788,7 @@ Abort if <code>dst</code> is too long.
 
 
 <pre><code><b>fun</b> <a href="algebra.md#0x1_algebra_abort_unless_cryptography_algebra_natives_enabled">abort_unless_cryptography_algebra_natives_enabled</a>() {
-    <b>if</b> (<a href="../../move-stdlib/doc/features.md#0x1_features_cryptography_algebra_natives_enabled">features::cryptography_algebra_natives_enabled</a>()) <b>return</b>;
+    <b>if</b> (<a href="../../move-stdlib/doc/features.md#0x1_features_cryptography_algebra_enabled">features::cryptography_algebra_enabled</a>()) <b>return</b>;
     <b>abort</b>(std::error::not_implemented(0))
 }
 </code></pre>
