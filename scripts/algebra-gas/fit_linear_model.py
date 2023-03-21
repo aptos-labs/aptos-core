@@ -7,9 +7,7 @@ import numpy as np
 from pathlib import Path
 
 def main(datapoints:list):
-    for item in datapoints:
-        assert type(item)==list
-        assert len(item)==2
+    for item in datapoints: assert len(item)==2
     x_values, y_values = zip(*datapoints)
     X = np.array(x_values)
     Y = np.array(y_values)

@@ -8,12 +8,21 @@ from math import ceil
 from pathlib import Path
 from time import time
 
+# This should match `EXECUTION_GAS_MULTIPLIER` defined in `aptos-move/aptos-gas/src/gas_meter.rs`.
 MUL = 20
 
 def get_bench_ns_linear(bench_path):
     datapoints = load_bench_datapoints.main(bench_path)
     X,Y,k,b = fit_linear_model.main(datapoints)
     return X,Y,k,b
+
+def prettify_number(x:int) -> str:
+    s = str(x)
+    n = len(s)
+    b = n % 3
+    chunks_0 = [s[:b]] if b>=1 else []
+    chunks = chunks_0 + [s[i:i+3] for i in range(b,n,3)]
+    return '_'.join(chunks)
 
 def get_algebra_lines(gas_per_ns):
     nanoseconds = {}
@@ -47,7 +56,6 @@ def get_algebra_lines(gas_per_ns):
     nanoseconds['ark_bls12_381_fq12_zero'] = load_bench_ns.main('target/criterion/ark_bls12_381/fq12_zero')
     nanoseconds['ark_bls12_381_g1_affine_deser_comp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_affine_deser_comp')
     nanoseconds['ark_bls12_381_g1_affine_deser_uncomp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_affine_deser_uncomp')
-    _,_,nanoseconds['ark_bls12_381_g1_affine_msm_per_entry'],nanoseconds['ark_bls12_381_g1_affine_msm_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/g1_affine_msm')
     nanoseconds['ark_bls12_381_g1_affine_serialize_comp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_affine_serialize_comp')
     nanoseconds['ark_bls12_381_g1_affine_serialize_uncomp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_affine_serialize_uncomp')
     nanoseconds['ark_bls12_381_g1_proj_add'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_proj_add')
@@ -61,7 +69,6 @@ def get_algebra_lines(gas_per_ns):
     nanoseconds['ark_bls12_381_g1_proj_to_affine'] = load_bench_ns.main('target/criterion/ark_bls12_381/g1_proj_to_affine')
     nanoseconds['ark_bls12_381_g2_affine_deser_comp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g2_affine_deser_comp')
     nanoseconds['ark_bls12_381_g2_affine_deser_uncomp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g2_affine_deser_uncomp')
-    _,_,nanoseconds['ark_bls12_381_g2_affine_msm_per_entry'],nanoseconds['ark_bls12_381_g2_affine_msm_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/g2_affine_msm')
     nanoseconds['ark_bls12_381_g2_affine_serialize_comp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g2_affine_serialize_comp')
     nanoseconds['ark_bls12_381_g2_affine_serialize_uncomp'] = load_bench_ns.main('target/criterion/ark_bls12_381/g2_affine_serialize_uncomp')
     nanoseconds['ark_bls12_381_g2_proj_add'] = load_bench_ns.main('target/criterion/ark_bls12_381/g2_proj_add')
@@ -79,7 +86,7 @@ def get_algebra_lines(gas_per_ns):
     _,_,nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte'],nanoseconds['ark_h2c_bls12381g2_xmd_sha256_sswu_base'] = get_bench_ns_linear('target/criterion/ark_bls12_381/hash_to_g2_proj')
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
     gas_over_mul_units = {k:ceil(v/MUL) for k,v in gas_units.items()}
-    lines = [f'    [.algebra.{k}, {{ 8.. => "algebra.{k}" }}, {v} * MUL],' for k,v in sorted(gas_over_mul_units.items())]
+    lines = [f'    [.algebra.{k}, {{ 8.. => "algebra.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_over_mul_units.items())]
     return lines
 
 def main(gas_per_ns):
@@ -87,7 +94,7 @@ def main(gas_per_ns):
     lines = path.read_text().split('\n')
     lid_begin = lines.index('    // Algebra gas parameters begin.')
     lid_end = lines.index('    // Algebra gas parameters end.')
-    generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_algebra_gas_params.py`.'
+    generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_algebra_gas_params.py` with gas_per_ns={gas_per_ns}.'
     new_lines = lines[:lid_begin+1] + [generator_note_line] + get_algebra_lines(gas_per_ns) + lines[lid_end:]
     path.write_text('\n'.join(new_lines))
 
