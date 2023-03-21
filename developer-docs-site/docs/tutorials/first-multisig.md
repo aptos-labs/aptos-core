@@ -339,7 +339,7 @@ Here, the amounts sent to each account are specified in the hard-coded values fr
 ```python title="multisig.py snippet"
 :!: static/sdks/python/examples/multisig.py section_12
 ```
-
+Output:
 ```zsh title=Output
 === Invoking Move script ===
 Transaction hash: 0xd06de4bd9fb12a9f3cbd8ce1b9a9fd47ea2b923a8cfac21f9788869430e4149b
