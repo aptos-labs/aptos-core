@@ -23,7 +23,15 @@ The operator address will receive the pool commission that was set at the initia
 
 To create a delegation pool and obtain information about it, [connect to the Aptos Network](./connect-to-aptos-network.md) and launch your own Aptos node.
 
-You can use the CLI command `aptos account derive-resource-account-address` to get the delegation pool address.
+You can use the following CLI commands to obtain the delegation pool address depending on where you are in the process:
+- Before you create the delegation pool:  
+    ```bash
+    aptos account derive-resource-account-address --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
+    ```  
+- After you create the delegation pool: 
+    ```bash
+    aptos account derive-resource-account-address
+    ```
 
 ## Initialize a delegation pool
 
