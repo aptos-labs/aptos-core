@@ -113,11 +113,13 @@ fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDel
 fn create_bandwidth_limit(swarm: &dyn Swarm) -> SwarmNetworkBandwidth {
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     SwarmNetworkBandwidth {
-        group_network_bandwidth: vec![GroupNetworkBandwidth {
+        group_network_bandwidths: vec![GroupNetworkBandwidth {
             name: "forge-namespace-1000mbps-bandwidth".to_owned(),
             rate: 1000,
             limit: 20971520,
             buffer: 10000,
+            source_nodes: all_validators.clone(),
+            target_nodes: all_validators,
         }],
     }
 }

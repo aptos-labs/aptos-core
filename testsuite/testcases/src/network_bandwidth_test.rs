@@ -32,11 +32,13 @@ impl NetworkLoadTest for NetworkBandwidthTest {
             .collect::<Vec<_>>();
         ctx.swarm()
             .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-                group_network_bandwidth: vec![GroupNetworkBandwidth {
+                group_network_bandwidths: vec![GroupNetworkBandwidth {
                     name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
                     rate: RATE_MBPS,
                     limit: LIMIT_BYTES,
                     buffer: BUFFER_BYTES,
+                    source_nodes: all_validators.clone(),
+                    target_nodes: all_validators,
                 }],
             }))?;
         let msg = format!(
@@ -51,11 +53,13 @@ impl NetworkLoadTest for NetworkBandwidthTest {
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-            group_network_bandwidth: vec![GroupNetworkBandwidth {
+            group_network_bandwidths: vec![GroupNetworkBandwidth {
                 name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
                 rate: RATE_MBPS,
                 limit: LIMIT_BYTES,
                 buffer: BUFFER_BYTES,
+                source_nodes: all_validators.clone(),
+                target_nodes: all_validators,
             }],
         }))
     }

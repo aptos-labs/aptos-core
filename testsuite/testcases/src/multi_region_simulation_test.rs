@@ -61,7 +61,10 @@ fn create_multi_region_swarm_network_chaos(
 
     let validator_chunks = all_validators.chunks_exact(approx_validators_per_region);
 
-    let mut group_network_delays: Vec<GroupNetworkDelay> = validator_chunks
+    let (mut group_network_delays, mut group_network_bandwidth): (
+        Vec<GroupNetworkDelay>,
+        Vec<GroupNetworkBandwidth>,
+    ) = validator_chunks
         .clone()
         .zip(link_stats_table.iter().clone())
         .combinations(2)
@@ -70,29 +73,29 @@ fn create_multi_region_swarm_network_chaos(
             let (to_chunk, (to_region, _)) = &comb[1];
 
             let (_, latency) = stats.get(*to_region).unwrap();
-            let delay = [
-                GroupNetworkDelay {
-                    name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
-                    source_nodes: from_chunk.to_vec(),
-                    target_nodes: to_chunk.to_vec(),
-                    latency_ms: *latency as u64,
-                    jitter_ms: 5,
-                    correlation_percentage: 50,
-                },
-                // GroupNetworkDelay {
-                //     name: format!("{}-to-{}-delay", to_region.clone(), from_region.clone()),
-                //     source_nodes: to_chunk.to_vec(),
-                //     target_nodes: from_chunk.to_vec(),
-                //     latency_ms: *latency as u64,
-                //     jitter_ms: 5,
-                //     correlation_percentage: 50,
-                // },
-            ];
+            let delay = GroupNetworkDelay {
+                name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
+                source_nodes: from_chunk.to_vec(),
+                target_nodes: to_chunk.to_vec(),
+                latency_ms: *latency as u64,
+                jitter_ms: 5,
+                correlation_percentage: 50,
+            };
             info!("delay {:?}", delay);
-            delay
+
+            let bandwidth = GroupNetworkBandwidth {
+                name: format!("{}-to-{}-delay", from_region.clone(), to_region.clone()),
+                source_nodes: from_chunk.to_vec(),
+                target_nodes: to_chunk.to_vec(),
+                rate: 1000 / 8,
+                limit: 20971520,
+                buffer: 10000,
+            };
+            info!("bandwidth {:?}", bandwidth);
+
+            (delay, bandwidth)
         })
-        .flatten()
-        .collect();
+        .unzip();
 
     let remainder = validator_chunks.remainder();
     let remaining_validators: Vec<PeerId> = validator_chunks
@@ -106,9 +109,9 @@ fn create_multi_region_swarm_network_chaos(
         group_network_delays[0]
             .source_nodes
             .append(remaining_validators.to_vec().as_mut());
-        // group_network_delays[1]
-        //     .target_nodes
-        //     .append(remaining_validators.to_vec().as_mut());
+        group_network_bandwidth[0]
+            .source_nodes
+            .append(remaining_validators.to_vec().as_mut());
     }
 
     (
@@ -116,12 +119,7 @@ fn create_multi_region_swarm_network_chaos(
             group_network_delays,
         },
         SwarmNetworkBandwidth {
-            group_network_bandwidth: vec![GroupNetworkBandwidth {
-                name: "forge-namespace-1000mbps-bandwidth".to_owned(),
-                rate: 1000 / 8,
-                limit: 20971520,
-                buffer: 10000,
-            }],
+            group_network_bandwidths: group_network_bandwidth,
         },
     )
 }
@@ -238,31 +236,35 @@ mod tests {
     fn test_create_multi_region_swarm_network_chaos() {
         aptos_logger::Logger::new().init();
 
-        let all_validators = (0..20).map(|_| PeerId::random()).collect();
+        let all_validators = (0..14).map(|_| PeerId::random()).collect();
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators);
 
-        assert_eq!(delay.group_network_delays.len(), 380);
-        // assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
+        assert_eq!(delay.group_network_delays.len(), 21);
+        assert_eq!(bandwidth.group_network_bandwidths.len(), 21);
 
-        let all_validators: Vec<PeerId> = (0..24).map(|_| PeerId::random()).collect();
+        let all_validators: Vec<PeerId> = (0..16).map(|_| PeerId::random()).collect();
         let (delay, bandwidth) = create_multi_region_swarm_network_chaos(all_validators.clone());
 
-        assert_eq!(delay.group_network_delays.len(), 380);
-        // assert_eq!(bandwidth.group_network_bandwidth.len(), 190);
-        assert_eq!(delay.group_network_delays[0].source_nodes.len(), 5);
-        assert_eq!(delay.group_network_delays[0].target_nodes.len(), 1);
-        assert_eq!(delay.group_network_delays[1].target_nodes.len(), 5);
-        assert_eq!(delay.group_network_delays[1].source_nodes.len(), 1);
-        assert_eq!(delay.group_network_delays[2].source_nodes.len(), 1);
-        // assert_eq!(bandwidth.group_network_bandwidth[0].source_nodes.len(), 5);
-        // assert_eq!(bandwidth.group_network_bandwidth[1].source_nodes.len(), 1);
+        assert_eq!(delay.group_network_delays.len(), 21);
+        assert_eq!(bandwidth.group_network_bandwidths.len(), 21);
+        assert_eq!(delay.group_network_delays[0].source_nodes.len(), 4);
+        assert_eq!(delay.group_network_delays[0].target_nodes.len(), 2);
+        assert_eq!(bandwidth.group_network_bandwidths[0].source_nodes.len(), 4);
+        assert_eq!(bandwidth.group_network_bandwidths[0].target_nodes.len(), 2);
         assert_eq!(
-            bandwidth.group_network_bandwidth[0],
+            bandwidth.group_network_bandwidths[0],
             GroupNetworkBandwidth {
-                name: "forge-namespace-1000mbps-bandwidth".to_owned(),
+                name: "aws--ap-northeast-1-to-aws--eu-north-1-delay".to_owned(),
                 rate: 125,
                 limit: 20971520,
-                buffer: 10000
+                buffer: 10000,
+                source_nodes: vec![
+                    all_validators[0],
+                    all_validators[1],
+                    all_validators[14],
+                    all_validators[15]
+                ],
+                target_nodes: vec![all_validators[2], all_validators[3]],
             }
         )
     }
