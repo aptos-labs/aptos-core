@@ -231,12 +231,14 @@ module aptos_std::algebra_bls12381 {
     // Hash-to-structure suites begin.
     //
 
-    /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`
-    /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
+    /// The hash-to-curve suite `BLS12381G1_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
+    ///
+    /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
     struct H2SSuiteBls12381g1XmdSha256SswuRo {}
 
-    /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`
-    /// defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
+    /// The hash-to-curve suite `BLS12381G2_XMD:SHA-256_SSWU_RO_` that hashes a byte array into `G1Affine` elements.
+    ///
+    /// Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
     struct H2SSuiteBls12381g2XmdSha256SswuRo {}
 
     //

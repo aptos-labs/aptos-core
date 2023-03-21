@@ -943,8 +943,9 @@ NOTE: the same scheme is also used in other implementations (e.g., ark-bls12-381
 
 ## Struct `H2SSuiteBls12381g1XmdSha256SswuRo`
 
-The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code>
-defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
+The hash-to-curve suite <code>BLS12381G1_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
+
+Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g1.
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_H2SSuiteBls12381g1XmdSha256SswuRo">H2SSuiteBls12381g1XmdSha256SswuRo</a>
@@ -972,8 +973,9 @@ defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-1
 
 ## Struct `H2SSuiteBls12381g2XmdSha256SswuRo`
 
-The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code>
-defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
+The hash-to-curve suite <code>BLS12381G2_XMD:SHA-256_SSWU_RO_</code> that hashes a byte array into <code><a href="algebra_bls12381.md#0x1_algebra_bls12381_G1Affine">G1Affine</a></code> elements.
+
+Full specification is defined in https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#name-bls12-381-g2.
 
 
 <pre><code><b>struct</b> <a href="algebra_bls12381.md#0x1_algebra_bls12381_H2SSuiteBls12381g2XmdSha256SswuRo">H2SSuiteBls12381g2XmdSha256SswuRo</a>
