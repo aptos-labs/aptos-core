@@ -338,6 +338,8 @@ impl InnerBuilder {
                 .back_pressure
                 .backlog_per_validator_batch_limit_count
                 * self.num_validators,
+            self.config.proof_max_in_future_usecs,
+            self.config.proof_max_per_author,
         );
         spawn_named!(
             "proof_manager",

@@ -65,17 +65,7 @@ impl Display for BatchId {
 }
 
 #[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Serialize,
-    CryptoHasher,
-    BCSCryptoHash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub struct BatchInfo {
     author: PeerId,

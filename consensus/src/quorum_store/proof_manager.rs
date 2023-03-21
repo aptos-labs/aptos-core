@@ -36,9 +36,11 @@ impl ProofManager {
         my_peer_id: PeerId,
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
+        max_in_future_usecs: u64,
+        max_per_author: u64,
     ) -> Self {
         Self {
-            proofs_for_consensus: ProofQueue::new(my_peer_id),
+            proofs_for_consensus: ProofQueue::new(my_peer_id, max_in_future_usecs, max_per_author),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,

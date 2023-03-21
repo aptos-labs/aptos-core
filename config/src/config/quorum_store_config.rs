@@ -54,6 +54,8 @@ pub struct QuorumStoreConfig {
     pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
+    pub proof_max_in_future_usecs: u64,
+    pub proof_max_per_author: u64,
 }
 
 impl Default for QuorumStoreConfig {
@@ -77,6 +79,8 @@ impl Default for QuorumStoreConfig {
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
+            proof_max_in_future_usecs: Duration::from_secs(120).as_micros() as u64,
+            proof_max_per_author: 1000,
         }
     }
 }

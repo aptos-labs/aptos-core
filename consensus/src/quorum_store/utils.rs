@@ -140,7 +140,6 @@ impl MempoolProxy {
     }
 }
 
-// TODO: unitest
 pub struct ProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness, includes insertion time
@@ -149,19 +148,18 @@ pub struct ProofQueue {
     batch_to_proof: HashMap<BatchInfo, Option<(ProofOfStore, Instant)>>,
     latest_block_timestamp: u64,
     max_in_future_usecs: u64,
-    max_queue_size_per_author: usize,
+    max_per_author: usize,
 }
 
 impl ProofQueue {
-    pub(crate) fn new(my_peer_id: PeerId) -> Self {
+    pub(crate) fn new(my_peer_id: PeerId, max_in_future_usecs: u64, max_per_author: u64) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
             batch_to_proof: HashMap::new(),
             latest_block_timestamp: 0,
-            // TODO: move these to configs
-            max_in_future_usecs: Duration::from_secs(120).as_micros() as u64,
-            max_queue_size_per_author: 1000,
+            max_in_future_usecs,
+            max_per_author: max_per_author as usize,
         }
     }
 
@@ -188,7 +186,7 @@ impl ProofQueue {
         }
 
         if let Some(queue) = self.author_to_batches.get(&proof.author()) {
-            if queue.len() >= self.max_queue_size_per_author {
+            if queue.len() >= self.max_per_author {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(10)),
                     warn!("Queue full for author {}", proof.author())
