@@ -64,7 +64,7 @@ static ALLOWED_STRUCTS: Lazy<BTreeMap<String, FunctionId>> = Lazy::new(|| {
 pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
     session: &mut SessionExt<S>,
     senders: Vec<AccountAddress>,
-    mut args: Vec<Vec<u8>>,
+    args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
@@ -88,44 +88,31 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.parameters.len() {
-        return Err(VMStatus::Error(
-            StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
-            None,
-        ));
-    }
-
     // validate all non_signer params
+    let mut needs_construction = vec![];
     for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, needs_construction) = is_valid_txn_arg(session, ty);
+        let (valid, construction) = is_valid_txn_arg(session, ty);
         if !valid {
             return Err(VMStatus::Error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
                 None,
             ));
         }
-        if needs_construction {
-            let mut cursor = Cursor::new(&args[idx][..]);
-            let mut new_arg = vec![];
-            // Perhaps in a future we should do proper gas metering here
-            let mut gas_meter = UnmeteredGasMeter;
-            recursively_construct_arg(session, ty, &mut cursor, &mut gas_meter, &mut new_arg)?;
-            // Check cursor has parsed everything
-            // is_empty is not enabled
-            if cursor.position() != args[idx].len() as u64 {
-                return Err(VMStatus::Error(
-                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                    None,
-                ));
-            }
-            args[idx] = new_arg;
+        if construction {
+            needs_construction.push(idx + signer_param_cnt);
         }
     }
 
+    if (signer_param_cnt + args.len()) != func.parameters.len() {
+        return Err(VMStatus::Error(
+            StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+            None,
+        ));
+    }
     // if function doesn't require signer, we reuse txn args
     // if the function require signer, we check senders number same as signers
     // and then combine senders with txn args.
-    let combined_args = if signer_param_cnt == 0 {
+    let mut combined_args = if signer_param_cnt == 0 {
         args
     } else {
         // the number of txn senders should be the same number of signers
@@ -141,6 +128,22 @@ pub(crate) fn validate_combine_signer_and_txn_args<S: MoveResolverExt>(
             .chain(args)
             .collect()
     };
+    for idx in needs_construction {
+        let mut cursor = Cursor::new(&combined_args[idx][..]);
+        let mut new_arg = vec![];
+        // Perhaps in a future we should do proper gas metering here
+        let mut gas_meter = UnmeteredGasMeter;
+        recursively_construct_arg(session, &func.parameters[idx], &mut cursor, &mut gas_meter, &mut new_arg)?;
+        // Check cursor has parsed everything
+        // is_empty is not enabled
+        if cursor.position() != combined_args[idx].len() as u64 {
+            return Err(VMStatus::Error(
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                None,
+            ));
+        }
+        combined_args[idx] = new_arg;
+    }
     Ok(combined_args)
 }
 
