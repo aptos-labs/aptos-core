@@ -812,7 +812,8 @@ impl Loader {
         if !Self::match_return_type(return_type, expected_return_type, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
-                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(Location::Undefined)
+                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                    .finish(Location::Undefined),
             );
         }
 
@@ -826,7 +827,8 @@ impl Loader {
                 // Unknown type argument we are not able to infer the type arguments.
                 // For functions that are marked constructor this should not happen.
                 return Err(
-                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(Location::Undefined)
+                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                        .finish(Location::Undefined),
                 );
             }
         }
