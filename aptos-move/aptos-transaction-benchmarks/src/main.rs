@@ -50,7 +50,12 @@ fn main() {
             for m in &measurements[i] {
                 seq_sum += m.1;
             }
-            println!("Avg Parallel TPS = {:?}, Avg Sequential TPS = {:?}, speed up {}x", par_sum / measurements[i].len(), seq_sum / measurements[i].len(), par_sum / seq_sum);
+            println!(
+                "Avg Parallel TPS = {:?}, Avg Sequential TPS = {:?}, speed up {}x",
+                par_sum / measurements[i].len(),
+                seq_sum / measurements[i].len(),
+                par_sum / seq_sum
+            );
             i += 1;
         }
         println!();

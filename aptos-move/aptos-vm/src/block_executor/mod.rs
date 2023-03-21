@@ -178,7 +178,10 @@ impl BlockAptosVM {
         let timer = Instant::now();
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         let exec_t = timer.elapsed();
-        println!("Parallel execution finishes, TPS = {}", block_size * 1000 / exec_t.as_millis() as usize);
+        println!(
+            "Parallel execution finishes, TPS = {}",
+            block_size * 1000 / exec_t.as_millis() as usize
+        );
 
         flush_speculative_logs();
 
@@ -187,19 +190,22 @@ impl BlockAptosVM {
             BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
         println!("Sequential execution starts...");
         let seq_timer = Instant::now();
-        let seq_ret = seq_executor.execute_block(
-            state_view,
-            signature_verified_block_for_seq,
-            state_view,
-        );
+        let seq_ret =
+            seq_executor.execute_block(state_view, signature_verified_block_for_seq, state_view);
         let seq_exec_t = seq_timer.elapsed();
-        println!("Sequential execution finishes, TPS = {}", block_size * 1000 / seq_exec_t.as_millis() as usize);
+        println!(
+            "Sequential execution finishes, TPS = {}",
+            block_size * 1000 / seq_exec_t.as_millis() as usize
+        );
 
         assert_eq!(ret, seq_ret);
 
         drop(ret);
         drop(seq_ret);
 
-        (block_size * 1000 / exec_t.as_millis() as usize, block_size * 1000 / seq_exec_t.as_millis() as usize)
+        (
+            block_size * 1000 / exec_t.as_millis() as usize,
+            block_size * 1000 / seq_exec_t.as_millis() as usize,
+        )
     }
 }

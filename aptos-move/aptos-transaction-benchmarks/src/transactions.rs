@@ -236,10 +236,7 @@ impl TransactionBenchState {
         .expect("VM should not fail to start");
     }
 
-    fn execute_blockstm_benchmark(
-        self,
-        concurrency_level: usize,
-    ) -> (usize, usize) {
+    fn execute_blockstm_benchmark(self, concurrency_level: usize) -> (usize, usize) {
         BlockAptosVM::execute_block_benchmark(
             self.transactions,
             self.executor.get_state_view(),
